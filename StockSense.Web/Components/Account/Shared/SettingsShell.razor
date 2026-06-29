@@ -1,0 +1,25 @@
+<div style="display: flex; flex-direction: column; height: 100vh;">
+    @* Force the Nav components to be interactive so buttons (like dark mode) work *@
+    <PublicNav @rendermode="InteractiveServer" />
+
+    <div class="settings-mobile-nav">
+        <SettingsNav @rendermode="InteractiveServer" />
+    </div>
+
+    <div style="display: flex; flex: 1; overflow: hidden;">
+        <aside class="settings-sidebar">
+            <SettingsNav @rendermode="InteractiveServer" />
+        </aside>
+        <main class="settings-main" style="flex: 1; overflow-y: auto; padding: var(--space-8);">
+            <div style="max-width: 640px; width: 100%;">
+                @* Leave Body alone! It stays static so the Identity forms don't crash *@
+                @Body
+            </div>
+        </main>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? Body { get; set; }
+}

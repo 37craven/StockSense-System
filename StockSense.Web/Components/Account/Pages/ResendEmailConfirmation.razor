@@ -1,0 +1,86 @@
+@page "/Account/ResendEmailConfirmation"
+@layout PublicLayout
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using StockSense.Web.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject Application.Interfaces.IEmailSender<ApplicationUser> EmailSender
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Resend email confirmation</PageTitle>
+
+<div style="display: flex; padding: 2vh; justify-content: center; align-items: center; min-height: 100%; background-color: var(--background); font-family: var(--font-sans);">
+    <div style="background-color: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--card-padding); max-width: var(--card-max-width-sm); width: 100%;">
+
+        <h1 style="text-align: center; font-size: var(--text-3xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Resend Confirmation</h1>
+        <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-bottom: var(--space-4); color: var(--muted-foreground);">Enter your email address.</h2>
+
+        <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
+
+        <StatusMessage Message="@message" />
+
+        <EditForm Model="Input" FormName="resend-email-confirmation" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <DataAnnotationsValidator />
+            <ValidationSummary style="margin-bottom: var(--space-6); color: var(--destructive); background-color: var(--destructive-muted); padding: var(--space-2); border: 1px solid var(--destructive-border); border-radius: var(--radius); font-size: var(--text-sm);" role="alert" />
+
+            <div style="margin-bottom: var(--space-6);">
+                <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Email</label>
+                <InputText @bind-Value="Input.Email"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                           aria-required="true" placeholder="name@example.com" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
+                    <ValidationMessage For="() => Input.Email" />
+                </div>
+            </div>
+
+            <button type="submit" style="width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer;">
+                Resend
+            </button>
+        </EditForm>
+
+        <div style="text-align: center; margin-top: var(--space-6);">
+            <a href="/Account/Login" style="font-size: var(--text-sm); color: var(--primary); text-decoration: none;">Back to login</a>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private string? message;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private async Task OnValidSubmitAsync()
+    {
+        var user = await UserManager.FindByEmailAsync(Input.Email!);
+        if (user is null)
+        {
+            message = "Verification email sent. Please check your email.";
+            return;
+        }
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
+        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+
+        message = "Verification email sent. Please check your email.";
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+    }
+}

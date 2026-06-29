@@ -1,0 +1,197 @@
+@rendermode InteractiveWebAssembly
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Net
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+
+<header style="position: sticky; top: 0; z-index: 50; width: 100%; border-bottom: 1px solid var(--border); background-color: var(--background); backdrop-filter: blur(8px); box-sizing: border-box;">
+    <div class="header-wrapper" style="display: flex; height: 3.5rem; width: 100%; align-items: center; justify-content: space-between; box-sizing: border-box;">
+
+        <div style="display: flex; align-items: center; gap: 1rem; min-width: 0;">
+            <a href="/" style="text-decoration: none; flex-shrink: 0;">
+                <div style="display: flex; flex-direction: column; line-height: 0.9;">
+                    <span style="color: var(--primary); font-weight: 800; font-style: italic; font-size: 1.125rem; letter-spacing: 0.05em;">SAP</span>
+                    <span style="color: var(--primary); font-weight: 800; font-style: italic; font-size: 1.125rem; letter-spacing: 0.05em;">SHOP</span>
+                </div>
+            </a>
+
+            <nav class="navbar-desktop-nav" style="align-items: center; gap: 0.25rem;">
+                <a href="/" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Home</a>
+                <a href="/appointment" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/appointment") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Appointment</a>
+                <a href="/build" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/build") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Build</a>
+            </nav>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+            <div class="navbar-desktop-nav" style="padding: var(--space-2) var(--space-3); align-items: center; gap: 0.5rem;">
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="/Account/Manage" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/Account/Manage") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Profile</a>
+
+                        <form action="Account/Logout" method="post" style="margin: 0; display: inline-flex;">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                            <button type="submit" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: transparent; border: none; white-space: nowrap;">Logout</button>
+                        </form>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/Account/Login" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: transparent; text-decoration: none; white-space: nowrap;">Login</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+
+            <button type="button" @onclick="ToggleTheme" class="navbar-btn" style="display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius); cursor: pointer; height: 2.25rem; width: 2.25rem; padding: 0; color: var(--foreground); background-color: transparent; border: none; flex-shrink: 0;">
+                @if (isDarkMode)
+                {
+                    <LucideIcon Name="sun" Size="18" />
+                }
+                else
+                {
+                    <LucideIcon Name="moon" Size="18" />
+                }
+            </button>
+
+            <button type="button" @onclick="ToggleMobileMenu" class="navbar-mobile-trigger navbar-btn" style="align-items: center; justify-content: center; border-radius: var(--radius); cursor: pointer; height: 2.25rem; width: 2.25rem; padding: 0; color: var(--foreground); background-color: transparent; border: none; flex-shrink: 0;">
+                <LucideIcon Name="@(mobileMenuOpen ? "x" : "menu")" Size="20" />
+            </button>
+
+        </div>
+    </div>
+
+    @if (mobileMenuOpen)
+    {
+        <div class="navbar-mobile-trigger" style="border-top: 1px solid var(--border); background-color: var(--background); padding: var(--space-3) var(--space-4); flex-direction: column; gap: var(--space-1);">
+            <a href="/" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/") ? "var(--secondary)" : "transparent");">Home</a>
+            <a href="/appointment" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/appointment") ? "var(--secondary)" : "transparent");">Appointment</a>
+            <a href="/build" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/build") ? "var(--secondary)" : "transparent");">Build</a>
+            <div style="border-top: 1px solid var(--border); margin: var(--space-1) 0;"></div>
+            <AuthorizeView>
+                <Authorized>
+                    <a href="/Account/Manage" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none;">Profile</a>
+                    <form action="Account/Logout" method="post" style="margin: 0;">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                        <button type="submit" style="width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans); text-align: left;">Logout</button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/Account/Login" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none;">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    }
+</header>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string? currentUrl;
+    private bool isDarkMode = false;
+    private bool mobileMenuOpen = false;
+    private System.Threading.Timer? sessionCheckTimer;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+
+        // HEARTBEAT: Checks every 10 seconds (Matches Sidebar logic)
+        sessionCheckTimer = new System.Threading.Timer(async _ =>
+        {
+            await CheckSession();
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private async Task CheckSession()
+    {
+        try
+        {
+            // Ping an authorized endpoint
+            var response = await Http.GetAsync("api/auth/check");
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                await HandleAutoLogout();
+            }
+        }
+        catch
+        {
+            // Fail silently if server is down or unreachable
+        }
+    }
+
+    private async Task HandleAutoLogout()
+    {
+        sessionCheckTimer?.Dispose();
+
+        // 1. Manually notify the provider to flip UI buttons immediately
+        if (AuthStateProvider is PersistentAuthenticationStateProvider clientProvider)
+        {
+            clientProvider.NotifyLogout();
+        }
+
+        // 2. Force re-render of Navbar
+        await InvokeAsync(StateHasChanged);
+
+        // 3. Force navigate to home with hard reload
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AuthState != null)
+        {
+            // This ensures the <AuthorizeView> inside the Navbar
+            // flips from Authorized to NotAuthorized instantly.
+            await AuthState;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
+                isDarkMode = theme == "dark";
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        mobileMenuOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDarkMode = !isDarkMode;
+        await JSRuntime.InvokeVoidAsync("window.setTheme", isDarkMode);
+    }
+
+    private void ToggleMobileMenu() => mobileMenuOpen = !mobileMenuOpen;
+    private void CloseMobileMenu() => mobileMenuOpen = false;
+
+    private bool IsActive(string path)
+    {
+        var currentPath = "/" + (currentUrl ?? "");
+        if (path == "/" && currentPath == "/") return true;
+        return path != "/" && currentPath.StartsWith(path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        sessionCheckTimer?.Dispose();
+    }
+}

@@ -1,0 +1,512 @@
+@page "/admin/services"
+@layout AdminLayout
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@using StockSense.Application.DTOs
+@using System.Net.Http.Json
+@using System.Text.Json
+@using StockSense.Client.Layout
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Manage Services</PageTitle>
+
+<div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: var(--space-3);">
+        <div>
+            <h1 style="font-size: var(--text-2xl); font-weight: var(--font-bold); color: var(--foreground); margin: 0;">Service Management</h1>
+            <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Define generic parts needed per service and link them to inventory products.</p>
+        </div>
+        <BbButton Variant="ButtonVariant.Default" OnClick="OpenCreateModal">
+            <LucideIcon Name="plus" Size="16"/>
+            Create Service
+        </BbButton>
+    </div>
+
+    @if (services == null)
+    {
+        <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
+            <LightSpinner Description="Loading Services..." />
+        </div>
+    }
+    else
+    {
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4);">
+            @foreach (var s in services)
+            {
+                <div style="justify-content: space-between; background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: auto; ">
+                    <div>
+                        @* Card header *@
+                        <div style="padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: var(--space-2);">
+                            <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); flex: 1;">@s.Name</span>
+                            <BbBadge Variant="BadgeVariant.Secondary">@s.Category</BbBadge>
+                        </div>
+
+                        @* Card body *@
+                        <div style="padding: var(--space-2) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); overflow: auto; max-height: 200px;">
+                            @{
+                                var linkedProducts = s.RequiredProducts?.ToList() ?? new();
+                                var localItems = GetServiceItems(s.Id);
+                                var items = linkedProducts.Any() ? linkedProducts.Select(p => p.Name).ToList() :
+                                            localItems.Any() ? localItems.Select(i => i.Name).ToList() :
+                                            null;
+                            }
+                            @if (items != null)
+                            {
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px; overflow: auto;">
+                                    @foreach (var item in items)
+                                    {
+                                        <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: var(--text-xs); background-color: var(--muted); color: var(--foreground); white-space: nowrap;">@item</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span style="font-style: italic; font-size: var(--text-xs); color: var(--muted-foreground);">No products linked</span>
+                            }
+                        </div>
+                    </div>
+
+                    @* Card footer *@
+                    <div style="padding: var(--space-2) var(--space-4); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--foreground);">₱@s.Price.ToString("N0")</span>
+                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="() => OpenModal(s)">
+                            <LucideIcon Name="settings-2" Size="14" />
+                            Manage Service
+                        </BbButton>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* Modal *@
+@if (showModal && selectedService != null)
+{
+    <div @onclick="CloseModal" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-4);">
+        <div @onclick:stopPropagation style="background-color: var(--card); width: 680px; max-width: 100%; max-height: 88vh; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
+
+            @* Modal Header *@
+            <div style="padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0;">
+                <div style="flex: 1;">
+                    <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-2) 0;">@selectedService.Name</h3>
+                    <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Define generic items and link them to inventory products.</p>
+                </div>
+                <button @onclick="CloseModal" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: var(--space-1); border-radius: var(--radius); display: flex;">
+                    <LucideIcon Name="x" Size="18" />
+                </button>
+            </div>
+
+            @* Modal Body *@
+            <div style="flex: 1; overflow-y: auto; padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-6);">
+
+                @* Add generic item input *@
+                <div>
+                    <p style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-2) 0;">Generic Items Needed</p>
+                    <p style="font-size: var(--text-xs); color: var(--muted-foreground); margin: 0 0 var(--space-3) 0;">Name the generic parts this service requires (e.g. "Engine Oil", "Air Filter").</p>
+                    <div style="display: flex; gap: var(--space-2);">
+                        <input @bind="newItemName" @bind:event="oninput" @onkeydown="HandleItemInputKey" placeholder="e.g. Engine Oil"
+                               style="flex: 1; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                        <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" OnClick="AddGenericItem" Disabled="@string.IsNullOrWhiteSpace(newItemName)">
+                            <LucideIcon Name="plus" Size="14" />
+                            Add
+                        </BbButton>
+                    </div>
+                </div>
+
+                @* Generic items list with product linking *@
+                @if (editingItems.Any())
+                {
+                    <div style="display: flex; flex-direction: column; gap: var(--space-5);">
+                        @foreach (var item in editingItems)
+                        {
+                            <div style="background-color: var(--background); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
+
+                                @* Item header *@
+                                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); background-color: var(--muted);">
+                                    <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground);">@item.Name</span>
+                                    <button @onclick="() => RemoveGenericItem(item)" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); display: flex; align-items: center; padding: var(--space-1); border-radius: var(--radius);">
+                                        <LucideIcon Name="trash-2" Size="14" />
+                                    </button>
+                                </div>
+
+                                @* Search within this item *@
+                                <div style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border);">
+                                    <input @bind="item.SearchQuery" @bind:event="oninput" placeholder="Search products..."
+                                           style="width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;" />
+                                </div>
+
+                                @* Product list for this item *@
+                                <div style="max-height: 200px; overflow-y: auto;">
+                                    @if (allProducts == null)
+                                    {
+                                        <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-sm);">Loading products...</div>
+                                    }
+                                    else
+                                    {
+                                        var filtered = allProducts
+                                        .Where(p => string.IsNullOrWhiteSpace(item.SearchQuery) ||
+                                        p.Name.Contains(item.SearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                                        p.Brand.Contains(item.SearchQuery, StringComparison.OrdinalIgnoreCase))
+                                        .ToList();
+
+                                        @foreach (var product in filtered)
+                                        {
+                                            bool isLinked = item.LinkedProductIds.Contains(product.Id);
+                                            <div @onclick="() => ToggleProductForItem(item, product.Id)"
+                                                 style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-2) var(--space-4); cursor: pointer; border-bottom: 1px solid var(--border); background-color: @(isLinked ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent");">
+                                                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                                    <div style="width: 1.1rem; height: 1.1rem; border-radius: var(--radius); border: 2px solid @(isLinked ? "var(--primary)" : "var(--border)"); background-color: @(isLinked ? "var(--primary)" : "transparent"); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                                        @if (isLinked)
+                                                        {
+                                                            <LucideIcon Name="check" Size="10" />
+                                                        }
+                                                    </div>
+                                                    <div>
+                                                        <div style="font-size: var(--text-sm); font-weight: @(isLinked ? "var(--font-medium)" : "var(--font-normal)"); color: var(--foreground);">@product.Name</div>
+                                                        <div style="font-size: var(--text-xs); color: var(--muted-foreground);">@product.Brand</div>
+                                                    </div>
+                                                </div>
+                                                <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); white-space: nowrap; margin-left: var(--space-4);">₱@product.Price.ToString("N0")</span>
+                                            </div>
+                                        }
+
+                                        @if (!filtered.Any())
+                                        {
+                                            <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-sm);">No products match.</div>
+                                        }
+                                    }
+                                </div>
+
+                                @* Linked count *@
+                                @if (item.LinkedProductIds.Any())
+                                {
+                                    <div style="padding: var(--space-2) var(--space-4); background-color: var(--muted); font-size: var(--text-xs); color: var(--muted-foreground);">
+                                        @item.LinkedProductIds.Count product(s) linked
+                                    </div>
+                                }
+
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div style="text-align: center; padding: var(--space-6); color: var(--muted-foreground); border: 1px dashed var(--border); border-radius: var(--radius);">
+                        <LucideIcon Name="package" Size="32" />
+                        <p style="font-size: var(--text-sm); margin: var(--space-2) 0 0 0;">No generic items defined yet. Add one above.</p>
+                    </div>
+                }
+
+            </div>
+
+            @* Modal Footer *@
+            <div style="padding: var(--space-3) var(--space-6); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <label style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--muted-foreground);">Price:</label>
+                    <input type="number" @bind="editPrice"
+                           style="width: 80px; padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--text-base);" />
+                </div>
+                <div style="display: flex; gap: var(--space-2);">
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseModal">Cancel</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="SaveItems" Disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <BbSpinner Size="SpinnerSize.Small" />
+                        }
+                        else
+                        {
+                            <span>Update Service</span>
+                        }
+                    </BbButton>
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+@* Create Modal *@
+@if (showCreateModal)
+{
+    <div @onclick="() => showCreateModal = false" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-4);">
+        <div @onclick:stopPropagation style="background-color: var(--card); width: 480px; max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
+            <div style="padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Create Service</h3>
+                    <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Add a new service to the catalog.</p>
+                </div>
+                <button @onclick="() => showCreateModal = false" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: var(--space-1); border-radius: var(--radius); display: flex;">
+                    <LucideIcon Name="x" Size="18" />
+                </button>
+            </div>
+            <div style="padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-4);">
+                <div>
+                    <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Service Name</label>
+                    <input @bind="newServiceName" placeholder="e.g. Change Oil"
+                           style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                </div>
+                <div style="display: flex; gap: var(--space-3);">
+                    <div style="flex: 1;">
+                        <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Category</label>
+                        <input @bind="newServiceCategory" placeholder="e.g. General"
+                               style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Est. Minutes</label>
+                        <input type="number" @bind="newServiceMinutes" placeholder="e.g. 30"
+                               style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Price (₱)</label>
+                    <input type="number" @bind="newServicePrice" placeholder="0"
+                           style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                </div>
+            </div>
+            <div style="padding: var(--space-3) var(--space-6); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--space-2);">
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showCreateModal = false">Cancel</BbButton>
+                <BbButton Variant="ButtonVariant.Default" OnClick="CreateService" Disabled="@(isSaving || string.IsNullOrWhiteSpace(newServiceName))">
+                    @if (isSaving)
+                    {
+                        <BbSpinner Size="SpinnerSize.Small" />
+                    }
+                    else
+                    {
+                        <span>Create Service</span>
+                    }
+                </BbButton>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<StoreServiceDto>? services;
+    private List<ProductDto>? allProducts;
+    private StoreServiceDto? selectedService;
+    private bool showModal = false;
+    private bool showCreateModal = false;
+    private bool isSaving = false;
+    private string newItemName = "";
+    private string newServiceName = "";
+    private string newServiceCategory = "General";
+    private decimal newServicePrice = 0;
+    private int newServiceMinutes = 0;
+    private decimal editPrice;
+
+    // In-memory store: serviceId -> list of generic items
+    private Dictionary<int, List<GenericItem>> serviceItemsMap = new();
+
+    private List<GenericItem> editingItems = new();
+
+    public class GenericItem
+    {
+        public string Name { get; set; } = "";
+        public List<int> LinkedProductIds { get; set; } = new();
+        public string SearchQuery { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            services = await Http.GetFromJsonAsync<List<StoreServiceDto>>("api/services");
+            allProducts = await Http.GetFromJsonAsync<List<ProductDto>>("api/products");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Load error: {ex.Message}");
+        }
+
+        await LoadFromLocalStorage();
+    }
+
+    private void OpenCreateModal()
+    {
+        newServiceName = "";
+        newServiceCategory = "General";
+        newServicePrice = 0;
+        newServiceMinutes = 0;
+        showCreateModal = true;
+    }
+
+    private async Task CreateService()
+    {
+        if (string.IsNullOrWhiteSpace(newServiceName)) return;
+        isSaving = true;
+        try
+        {
+            var dto = new CreateStoreServiceDto
+            {
+                Name = newServiceName.Trim(),
+                Category = newServiceCategory.Trim(),
+                Price = newServicePrice,
+                EstimatedMinutes = newServiceMinutes
+            };
+            var response = await Http.PostAsJsonAsync("api/services", dto);
+            if (response.IsSuccessStatusCode)
+            {
+                services = await Http.GetFromJsonAsync<List<StoreServiceDto>>("api/services");
+                showCreateModal = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Create error: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task LoadFromLocalStorage()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "serviceItemsMap");
+            if (!string.IsNullOrEmpty(json))
+            {
+                var loaded = JsonSerializer.Deserialize<Dictionary<int, List<GenericItem>>>(json);
+                if (loaded != null)
+                    serviceItemsMap = loaded;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LocalStorage load error: {ex.Message}");
+        }
+    }
+
+    private async Task SaveToLocalStorage()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(serviceItemsMap);
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "serviceItemsMap", json);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LocalStorage save error: {ex.Message}");
+        }
+    }
+
+    private List<GenericItem> GetServiceItems(int serviceId)
+    {
+        return serviceItemsMap.TryGetValue(serviceId, out var items) ? items : new();
+    }
+
+    private void OpenModal(StoreServiceDto service)
+    {
+        selectedService = service;
+        editPrice = service.Price;
+
+        var localItems = GetServiceItems(service.Id);
+        if (localItems.Any())
+        {
+            editingItems = localItems
+                .Select(i => new GenericItem
+                {
+                    Name = i.Name,
+                    LinkedProductIds = new List<int>(i.LinkedProductIds)
+                }).ToList();
+        }
+        else if (service.RequiredProducts?.Any() == true)
+        {
+            editingItems = service.RequiredProducts
+                .GroupBy(p => p.Category)
+                .Select(g => new GenericItem
+                {
+                    Name = g.Key,
+                    LinkedProductIds = g.Select(p => p.Id).ToList()
+                }).ToList();
+        }
+
+        newItemName = "";
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedService = null;
+        editingItems = new();
+    }
+
+    private void AddGenericItem()
+    {
+        if (string.IsNullOrWhiteSpace(newItemName)) return;
+        if (editingItems.Any(i => i.Name.Equals(newItemName.Trim(), StringComparison.OrdinalIgnoreCase))) return;
+        editingItems.Add(new GenericItem { Name = newItemName.Trim() });
+        newItemName = "";
+    }
+
+    private void HandleItemInputKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddGenericItem();
+    }
+
+    private void RemoveGenericItem(GenericItem item) => editingItems.Remove(item);
+
+    private void ToggleProductForItem(GenericItem item, int productId)
+    {
+        if (item.LinkedProductIds.Contains(productId))
+            item.LinkedProductIds.Remove(productId);
+        else
+            item.LinkedProductIds.Add(productId);
+    }
+
+    private async Task SaveItems()
+    {
+        if (selectedService == null) return;
+        isSaving = true;
+
+        // 1. Update your local storage map (keeps your generic item groups intact for the UI)
+        serviceItemsMap[selectedService.Id] = editingItems
+            .Select(i => new GenericItem
+            {
+                Name = i.Name,
+                LinkedProductIds = new List<int>(i.LinkedProductIds)
+            }).ToList();
+
+        await SaveToLocalStorage();
+
+        // 2. Extract all unique product IDs across all generic items
+        var allLinkedProductIds = editingItems
+            .SelectMany(i => i.LinkedProductIds)
+            .Distinct()
+            .ToList();
+
+        // 3. Create the payload matching your controller's expected DTO
+        var dto = new UpdateServiceProductsDto
+        {
+            ServiceId = selectedService.Id,
+            Price = editPrice,
+            ProductIds = allLinkedProductIds
+        };
+
+        // 4. Send the update to the database
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/services/update-products", dto);
+
+            if (response.IsSuccessStatusCode)
+            {
+                selectedService.Price = editPrice;
+            }
+            else
+            {
+                Console.WriteLine("Failed to save products to the database.");
+                // You could add an errorMessage state here to show in the UI
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"API connection error: {ex.Message}");
+        }
+
+        isSaving = false;
+        CloseModal();
+    }
+}

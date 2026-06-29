@@ -1,0 +1,166 @@
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Net
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject HttpClient Http
+@rendermode InteractiveWebAssembly
+
+<BbSidebarContent>
+
+    @* --- MAIN SECTION --- *@
+    <BbSidebarGroup>
+        <BbSidebarGroupLabel>Main</BbSidebarGroupLabel>
+        <BbSidebarMenu>
+            <BbSidebarMenuItem>
+                <BbSidebarMenuButton IsActive="@IsActive("/Dashboard")" href="/Dashboard">
+                    Dashboard
+                </BbSidebarMenuButton>
+            </BbSidebarMenuItem>
+        </BbSidebarMenu>
+    </BbSidebarGroup>
+
+    @* --- ADMIN SECTION --- *@
+    <AuthorizeView Roles="Employee" Context="EmployeeContext">
+        <Authorized>
+            <BbSidebarGroup>
+                <BbSidebarGroupLabel>Admin</BbSidebarGroupLabel>
+                <BbSidebarMenu>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton IsActive="@IsActive("/admin/appointments")" href="/admin/appointments">
+                            Appointments
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton IsActive="@IsActive("/admin/builds")" href="/admin/builds">
+                            Builds
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                </BbSidebarMenu>
+            </BbSidebarGroup>
+        </Authorized>
+    </AuthorizeView>
+
+    @* --- ACCOUNT SECTION --- *@
+    <BbSidebarGroup>
+        <BbSidebarGroupLabel>Account</BbSidebarGroupLabel>
+        <BbSidebarMenu>
+            <AuthorizeView Context="authContext">
+                <Authorized>
+                    <BbSidebarMenuItem>
+                        <BbCollapsible @bind-Open="profileOpen">
+                            <BbCollapsibleTrigger AsChild="true">
+                                <BbSidebarMenuButton>
+                                    Profile
+                                </BbSidebarMenuButton>
+                            </BbCollapsibleTrigger>
+                            <BbCollapsibleContent>
+                                <BbSidebarMenuSub>
+                                    <BbSidebarMenuSubItem>
+                                        <BbSidebarMenuSubButton IsActive="@IsActive("Account/Manage")" href="Account/Manage">Profile</BbSidebarMenuSubButton>
+                                    </BbSidebarMenuSubItem>
+                                    <BbSidebarMenuSubItem>
+                                        <BbSidebarMenuSubButton IsActive="@IsActive("Account/Manage/Email")" href="Account/Manage/Email">Email</BbSidebarMenuSubButton>
+                                    </BbSidebarMenuSubItem>
+                                    <BbSidebarMenuSubItem>
+                                        <BbSidebarMenuSubButton IsActive="@IsActive("Account/Manage/ChangePassword")" href="Account/Manage/ChangePassword">Password</BbSidebarMenuSubButton>
+                                    </BbSidebarMenuSubItem>
+                                    <BbSidebarMenuSubItem>
+                                        <BbSidebarMenuSubButton IsActive="@IsActive("Account/Manage/TwoFactorAuthentication")" href="Account/Manage/TwoFactorAuthentication">Two-Factor Auth</BbSidebarMenuSubButton>
+                                    </BbSidebarMenuSubItem>
+                                    <BbSidebarMenuSubItem>
+                                        <BbSidebarMenuSubButton IsActive="@IsActive("Account/Manage/PersonalData")" href="Account/Manage/PersonalData">Personal Data</BbSidebarMenuSubButton>
+                                    </BbSidebarMenuSubItem>
+                                </BbSidebarMenuSub>
+                            </BbCollapsibleContent>
+                        </BbCollapsible>
+                    </BbSidebarMenuItem>
+                </Authorized>
+                <NotAuthorized>
+                    @* This displays the Login button when the session expires *@
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton href="Account/Login">
+                            Login
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                </NotAuthorized>
+            </AuthorizeView>
+        </BbSidebarMenu>
+    </BbSidebarGroup>
+
+</BbSidebarContent>
+
+@code {
+    private bool profileOpen = false;
+    private System.Threading.Timer? _sessionTimer;
+
+    protected override void OnInitialized()
+    {
+        var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        profileOpen = path.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
+        NavigationManager.LocationChanged += OnLocationChanged;
+
+        // Start Heartbeat Check
+        _sessionTimer = new System.Threading.Timer(async _ =>
+        {
+            // Get the current path relative to the base URL
+            var currentPath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+
+            // list of pages where we SHOULD NOT check the session (Auth pages)
+            bool isAuthPage = currentPath.StartsWith("Account/Login", StringComparison.OrdinalIgnoreCase) ||
+                             currentPath.StartsWith("Account/Register", StringComparison.OrdinalIgnoreCase) ||
+                             currentPath.StartsWith("/Account/RegisterConfirmation", StringComparison.OrdinalIgnoreCase);
+
+            // Only check the session if we AREN'T on a login/register page
+            if (!isAuthPage)
+            {
+                await InvokeAsync(CheckSessionStatus);
+            }
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private async Task CheckSessionStatus()
+    {
+        try
+        {
+            // Pings the server check endpoint
+            var response = await Http.GetAsync("api/auth/status");
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                // Force AuthStateProvider to update UI immediately
+                if (AuthStateProvider is PersistentAuthenticationStateProvider clientProvider)
+                {
+                    clientProvider.NotifyLogout();
+                }
+
+                // Perform hard reload to redirect to landing page
+                NavigationManager.NavigateTo("/", forceLoad: true);
+            }
+        }
+        catch { /* Silent fail for network blips */ }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var path = NavigationManager.ToBaseRelativePath(e.Location);
+        profileOpen = path.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsActive(string path)
+    {
+        var current = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        return path != "/" && current.StartsWith(path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsExact(string path) =>
+        NavigationManager.ToBaseRelativePath(NavigationManager.Uri)
+            .Equals(path, StringComparison.OrdinalIgnoreCase);
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        _sessionTimer?.Dispose();
+    }
+}

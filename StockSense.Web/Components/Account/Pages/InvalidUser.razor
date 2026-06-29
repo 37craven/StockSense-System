@@ -1,0 +1,25 @@
+@page "/Account/InvalidUser"
+
+@layout PublicLayout
+
+<PageTitle>Invalid user</PageTitle>
+
+<div style="display: flex; padding: 2vh; justify-content: center; align-items: center; min-height: 100%; background-color: var(--background); font-family: var(--font-sans);">
+    <div style="background-color: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--card-padding); max-width: var(--card-max-width-sm); width: 100%;">
+
+        <h1 style="text-align: center; font-size: var(--text-3xl); font-weight: var(--font-semibold); color: var(--destructive); margin: 0;">Invalid User</h1>
+        <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-bottom: var(--space-4); color: var(--muted-foreground);">We could not find your account.</h2>
+
+        <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
+
+        <div style="text-align:center;">
+            <StatusMessage />
+        </div>
+
+
+        <a href="/Account/Login" style="display: block; text-align: center; width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none; box-sizing: border-box; margin-top: var(--space-6);">
+            Back to login
+        </a>
+
+    </div>
+</div>

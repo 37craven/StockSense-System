@@ -1,0 +1,13 @@
+@using BlazorBlueprint.Primitives.Services
+@inherits LayoutComponentBase
+
+<div style="display: flex; flex-direction: column; height: 100vh;">
+    @* Force the Navbar to be an Interactive Server component so the @onclick button works! *@
+    <PublicNav @rendermode="InteractiveServer" />
+
+    <main style="flex: 1; overflow: auto; display: flex; flex-direction: column;">
+        @Body
+    </main>
+</div>
+
+@* Portal host + dialog provider are placed per-page to match render mode *@

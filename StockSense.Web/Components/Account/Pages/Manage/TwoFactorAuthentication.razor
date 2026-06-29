@@ -1,0 +1,124 @@
+@page "/Account/Manage/TwoFactorAuthentication"
+@layout SettingsLayout
+
+@using Microsoft.AspNetCore.Http.Features
+@using Microsoft.AspNetCore.Identity
+@using StockSense.Web.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Two-factor authentication (2FA)</PageTitle>
+
+<h1 style="font-size: var(--text-2xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">Two-Factor Authentication</h1>
+<h2 style="font-size: var(--text-base); font-weight: var(--font-normal); color: var(--muted-foreground); margin: 0 0 var(--space-6) 0;">Add an extra layer of security to your account.</h2>
+<div style="border-top: 1px solid var(--border); margin-bottom: var(--space-6);"></div>
+
+<StatusMessage />
+
+@if (!canTrack)
+{
+    <div style="padding: var(--space-4); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive); font-size: var(--text-sm);">
+        <strong>Privacy and cookie policy have not been accepted.</strong>
+        <p style="margin: var(--space-2) 0 0 0;">You must accept the policy before you can enable two-factor authentication.</p>
+    </div>
+}
+else
+{
+    <div style="display: flex; flex-direction: column; gap: var(--space-6);">
+
+        @if (is2faEnabled)
+        {
+            @if (recoveryCodesLeft == 0)
+            {
+                <div style="padding: var(--space-4); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive); font-size: var(--text-sm);">
+                    <strong>You have no recovery codes left.</strong>
+                    <p style="margin: var(--space-2) 0 0 0;">You must <a href="Account/Manage/GenerateRecoveryCodes" style="color: var(--destructive); text-decoration: underline;">generate a new set of recovery codes</a> before you can log in with a recovery code.</p>
+                </div>
+            }
+            else if (recoveryCodesLeft <= 3)
+            {
+                <div style="padding: var(--space-4); border-radius: var(--radius); background-color: var(--warning-muted); border: 1px solid var(--warning-border); color: var(--warning-foreground); font-size: var(--text-sm);">
+                    <strong>You have @recoveryCodesLeft recovery code@(recoveryCodesLeft == 1 ? "" : "s") left.</strong>
+                    <p style="margin: var(--space-2) 0 0 0;">You should <a href="Account/Manage/GenerateRecoveryCodes" style="color: var(--warning-foreground); text-decoration: underline;">generate a new set of recovery codes</a>.</p>
+                </div>
+            }
+
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                <p style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">2FA is currently enabled.</p>
+
+                <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2);">
+                    @if (isMachineRemembered)
+                    {
+                        <form @formname="forget-browser" @onsubmit="OnSubmitForgetBrowserAsync" method="post" style="margin: 0;">
+                            <AntiforgeryToken />
+                            <button type="submit" style="padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--secondary); color: var(--secondary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer;">
+                                Forget this browser
+                            </button>
+                        </form>
+                    }
+                    <a href="Account/Manage/Disable2fa" style="padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--destructive); color: var(--destructive-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none;">
+                        Disable 2FA
+                    </a>
+                    <a href="Account/Manage/GenerateRecoveryCodes" style="padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--secondary); color: var(--secondary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none;">
+                        Reset recovery codes
+                    </a>
+                </div>
+            </div>
+        }
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+            <p style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Authenticator app</p>
+            <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Use an authenticator app to generate one-time login codes.</p>
+            <div style="display: flex; gap: var(--space-2);">
+                @if (!hasAuthenticator)
+                {
+                    <a href="Account/Manage/EnableAuthenticator" style="padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none;">
+                        Add authenticator app
+                    </a>
+                }
+                else
+                {
+                    <a href="Account/Manage/EnableAuthenticator" style="padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none;">
+                        Set up authenticator app
+                    </a>
+                    <a href="Account/Manage/ResetAuthenticator" style="padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--secondary); color: var(--secondary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none;">
+                        Reset authenticator app
+                    </a>
+                }
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool canTrack;
+    private bool hasAuthenticator;
+    private int recoveryCodesLeft;
+    private bool is2faEnabled;
+    private bool isMachineRemembered;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        canTrack = HttpContext.Features.Get<ITrackingConsentFeature>()?.CanTrack ?? true;
+        hasAuthenticator = await UserManager.GetAuthenticatorKeyAsync(user) is not null;
+        is2faEnabled = await UserManager.GetTwoFactorEnabledAsync(user);
+        isMachineRemembered = await SignInManager.IsTwoFactorClientRememberedAsync(user);
+        recoveryCodesLeft = await UserManager.CountRecoveryCodesAsync(user);
+    }
+
+    private async Task OnSubmitForgetBrowserAsync()
+    {
+        await SignInManager.ForgetTwoFactorClientAsync();
+        RedirectManager.RedirectToCurrentPageWithStatus(
+            "The current browser has been forgotten. When you login again from this browser you will be prompted for your 2fa code.",
+            HttpContext);
+    }
+}

@@ -1,0 +1,66 @@
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<nav style="display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2);">
+    <p style="font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--muted-foreground); padding: 0 var(--space-2); margin: 0 0 var(--space-1) 0; text-transform: uppercase; letter-spacing: 0.05em;">Account</p>
+    @foreach (var link in NavLinks)
+    {
+        var active = IsExact(link.Path);
+        <a href="@link.Path" style="@NavLinkStyle(active)">
+            <LucideIcon Name="@link.Icon" Size="16" />
+            <span class="@(active ? "settings-nav-label-active" : "settings-nav-label")">@link.Label</span>
+        </a>
+    }
+</nav>
+
+@code {
+    private record NavLink(string Path, string Icon, string Label);
+
+    private readonly List<NavLink> NavLinks = new()
+    {
+        new("Account/Manage", "user", "Profile"),
+        new("Account/Manage/Email", "mail", "Email"),
+        new("Account/Manage/ChangePassword", "lock", "Password"),
+        new("Account/Manage/TwoFactorAuthentication", "shield", "Two-Factor Auth"),
+        new("Account/Manage/PersonalData", "database", "Personal Data"),
+    };
+
+    protected override void OnInitialized()
+    {
+        // Subscribe to navigation events so the menu updates when the URL changes
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Force the component to re-render and recalculate the active tabs
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        // Always unsubscribe to prevent memory leaks!
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    private string NavLinkStyle(bool isActive) =>
+        $"display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: {(isActive ? "var(--foreground)" : "var(--muted-foreground)")}; text-decoration: none; background-color: {(isActive ? "var(--secondary)" : "transparent")}; margin-bottom: var(--space-1);";
+
+    private bool IsExact(string path)
+    {
+        var currentUri = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+
+        // Strip out any query strings (like ?statusMessage=...) so it doesn't break the match
+        var queryIndex = currentUri.IndexOf('?');
+        if (queryIndex > -1)
+        {
+            currentUri = currentUri.Substring(0, queryIndex);
+        }
+
+        // Trim trailing slashes just in case
+        currentUri = currentUri.TrimEnd('/');
+        var targetPath = path.TrimEnd('/');
+
+        return currentUri.Equals(targetPath, StringComparison.OrdinalIgnoreCase);
+    }
+}

@@ -1,0 +1,70 @@
+@page "/Account/Manage/GenerateRecoveryCodes"
+@layout SettingsLayout
+
+@using Microsoft.AspNetCore.Identity
+
+@using StockSense.Web.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<GenerateRecoveryCodes> Logger
+
+<PageTitle>Generate recovery codes</PageTitle>
+
+@if (recoveryCodes is not null)
+{
+    <ShowRecoveryCodes RecoveryCodes="recoveryCodes.ToArray()" StatusMessage="@message" />
+}
+else
+{
+    <h1 style="font-size: var(--text-2xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">Recovery Codes</h1>
+    <h2 style="font-size: var(--text-base); font-weight: var(--font-normal); color: var(--muted-foreground); margin: 0 0 var(--space-6) 0;">Generate new two-factor authentication recovery codes.</h2>
+    <div style="border-top: 1px solid var(--border); margin-bottom: var(--space-6);"></div>
+
+    <div style="padding: var(--space-4); border-radius: var(--radius); background-color: var(--muted); border-left: 4px solid var(--warning); margin-bottom: var(--space-6); display: flex; flex-direction: column; gap: var(--space-2);">
+        <p style="font-size: var(--text-sm); color: var(--foreground); margin: 0;"><strong>Put these codes in a safe place.</strong></p>
+        <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">If you lose your device and don't have the recovery codes you will lose access to your account.</p>
+        <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">
+            Generating new recovery codes does not change the keys used in authenticator apps. If you wish to change the key
+            used in an authenticator app you should <a href="Account/Manage/ResetAuthenticator" style="color: var(--primary); text-decoration: underline;">reset your authenticator keys.</a>
+        </p>
+    </div>
+
+    <form @formname="generate-recovery-codes" @onsubmit="OnSubmitAsync" method="post">
+        <AntiforgeryToken />
+        <button type="submit"
+                style="width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--destructive); color: var(--destructive-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer;">
+            Generate Recovery Codes
+        </button>
+    </form>
+}
+
+@code {
+    private string? message;
+    private ApplicationUser user = default!;
+    private IEnumerable<string>? recoveryCodes;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+
+        var isTwoFactorEnabled = await UserManager.GetTwoFactorEnabledAsync(user);
+        if (!isTwoFactorEnabled)
+        {
+            throw new InvalidOperationException("Cannot generate recovery codes for user because they do not have 2FA enabled.");
+        }
+    }
+
+    private async Task OnSubmitAsync()
+    {
+        var userId = await UserManager.GetUserIdAsync(user);
+        recoveryCodes = await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        message = "You have generated new recovery codes.";
+
+        Logger.LogInformation("User with ID '{UserId}' has generated new 2FA recovery codes.", userId);
+    }
+}

@@ -1,0 +1,328 @@
+@rendermode InteractiveWebAssembly
+@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+@* Desktop Sidebar *@
+<aside class="admin-sidebar-desktop" style="width: @(collapsed ? "3.5rem" : "16rem"); height: 100%; flex-shrink: 0; transition: width 0.2s ease; display: flex; flex-direction: column; background-color: var(--sidebar); border-right: 1px solid var(--sidebar-border); overflow: hidden;">
+
+    @* Header *@
+    <div style="display: flex; align-items: center; justify-content: @(collapsed ? "center" : "space-between"); padding: var(--space-4) var(--space-3); border-bottom: 1px solid var(--sidebar-border); flex-shrink: 0;">
+        @if (!collapsed)
+        {
+            <a href="/" style="text-decoration: none; font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--sidebar-foreground); white-space: nowrap; color: red">SapShop</a>
+        }
+        <button @onclick="ToggleCollapse" style="display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--sidebar-foreground); padding: var(--space-1); border-radius: var(--radius); flex-shrink: 0;">
+            <LucideIcon Name="@(collapsed ? "panel-left-open" : "panel-left-close")" Size="18" />
+        </button>
+    </div>
+
+    @* Nav *@
+    <nav style="flex: 1; overflow-y: auto; overflow-x: hidden; padding: var(--space-3) var(--space-2);">
+        @NavContent(collapsed)
+    </nav>
+
+    @* Footer *@
+    <div style="padding: var(--space-3); border-top: 1px solid var(--sidebar-border); flex-shrink: 0;">
+        <button @onclick="ToggleTheme" title="Toggle theme" style="width: 100%; display: flex; align-items: center; gap: var(--space-2); justify-content: @(collapsed ? "center" : "flex-start"); padding: var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans); margin-bottom: var(--space-1);">
+            @if (isDarkMode)
+            {
+                <LucideIcon Name="sun" Size="16" />
+                @if (!collapsed)
+                {
+                    <span style="white-space: nowrap;">Light mode</span>
+                }
+            }
+            else
+            {
+                <LucideIcon Name="moon" Size="16" />
+                @if (!collapsed)
+                {
+                    <span style="white-space: nowrap;">Dark mode</span>
+                }
+            }
+        </button>
+        <AuthorizeView>
+            <Authorized>
+                <form action="Account/Logout" method="post" style="margin: 0;">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="" />
+                    <button type="submit" title="Sign out" style="width: 100%; display: flex; align-items: center; gap: var(--space-2); justify-content: @(collapsed ? "center" : "flex-start"); padding: var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans);">
+                        <LucideIcon Name="log-out" Size="16" />
+                        @if (!collapsed)
+                        {
+                            <span style="white-space: nowrap;">Sign out</span>
+                        }
+                    </button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+
+</aside>
+
+@* Mobile Floating Trigger *@
+<div class="admin-sidebar-mobile-trigger">
+    <button @onclick="ToggleMobile" style="position: fixed; top: var(--space-3); right: var(--space-3); z-index: 60; display: flex; align-items: center; justify-content: center; background-color: var(--background); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; width: 2.25rem; height: 2.25rem; color: var(--foreground);">
+        <LucideIcon Name="@(mobileOpen ? "x" : "menu")" Size="18" />
+    </button>
+</div>
+
+@* Mobile Overlay *@
+@if (mobileOpen)
+{
+    <div @onclick="ToggleMobile" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); z-index: 40;"></div>
+    <aside style="position: fixed; top: 0; right: 0; height: 100%; width: 16rem; z-index: 50; display: flex; flex-direction: column; background-color: var(--sidebar); border-left: 1px solid var(--sidebar-border); overflow: hidden;">
+
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-3); border-bottom: 1px solid var(--sidebar-border); flex-shrink: 0;">
+            <a href="/" style="text-decoration: none; font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--sidebar-foreground);">StockSense</a>
+        </div>
+
+        <nav style="flex: 1; overflow-y: auto; padding: var(--space-3) var(--space-2);">
+            @NavContent(false)
+        </nav>
+
+        <div style="padding: var(--space-3); border-top: 1px solid var(--sidebar-border); flex-shrink: 0;">
+            <button @onclick="ToggleTheme" title="Toggle theme" style="width: 100%; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans); margin-bottom: var(--space-1);">
+                @if (isDarkMode)
+                {
+                    <LucideIcon Name="sun" Size="16" />
+                    <span style="white-space: nowrap;">Light mode</span>
+                }
+                else
+                {
+                    <LucideIcon Name="moon" Size="16" />
+                    <span style="white-space: nowrap;">Dark mode</span>
+                }
+            </button>
+            <AuthorizeView>
+                <Authorized>
+                    <form action="Account/Logout" method="post" style="margin: 0;">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="" />
+                        <button type="submit" style="width: 100%; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans);">
+                            <LucideIcon Name="log-out" Size="16" />
+                            <span style="white-space: nowrap;">Sign out</span>
+                        </button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+    </aside>
+}
+
+@code {
+    private bool collapsed = false;
+    private bool mobileOpen = false;
+    private bool profileOpen = false;
+    private bool isDarkMode = false;
+
+    protected override void OnInitialized()
+    {
+        var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        profileOpen = path.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var theme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "theme");
+                isDarkMode = theme == "dark";
+            }
+            catch { }
+            StateHasChanged();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var path = NavigationManager.ToBaseRelativePath(e.Location);
+        profileOpen = path.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
+        mobileOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleCollapse() => collapsed = !collapsed;
+    private void ToggleMobile() => mobileOpen = !mobileOpen;
+
+    private void ToggleProfile()
+    {
+        if (collapsed)
+        {
+            collapsed = false;
+            profileOpen = true;
+        }
+        else
+        {
+            profileOpen = !profileOpen;
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDarkMode = !isDarkMode;
+        await JSRuntime.InvokeVoidAsync("window.setTheme", isDarkMode);
+    }
+
+    private RenderFragment NavContent(bool isCollapsed) => __builder =>
+        {
+            @* --- MAIN SECTION --- *@
+            if (!isCollapsed)
+            {
+                <p style="font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--muted-foreground); padding: 0 var(--space-2); margin: 0 0 var(--space-1) 0; text-transform: uppercase; letter-spacing: 0.05em;">Main</p>
+            }
+            <a href="/Dashboard" title="Dashboard" style="@NavLinkStyle(IsActive("/Dashboard"), isCollapsed)">
+                <LucideIcon Name="layout-dashboard" Size="16" />
+                @if (!isCollapsed)
+                {
+                    <span style="white-space: nowrap;">Dashboard</span>
+                }
+            </a>
+            <a href="/admin/pos" title="POS" style="@NavLinkStyle(IsActive("/admin/pos"), isCollapsed)">
+                <LucideIcon Name="scan-barcode" Size="16" />
+                @if (!isCollapsed)
+                {
+                    <span style="white-space: nowrap;">POS</span>
+                }
+            </a>
+
+            @* --- STAFF SECTION (Employee & Admin) --- *@
+            <AuthorizeView Roles="Employee, Admin">
+                <Authorized>
+                    <div style="margin: var(--space-4) 0 var(--space-1) 0; border-top: 1px solid var(--sidebar-border);"></div>
+                    @if (!isCollapsed)
+                    {
+                        <p style="font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--muted-foreground); padding: 0 var(--space-2); margin: var(--space-2) 0 var(--space-1) 0; text-transform: uppercase; letter-spacing: 0.05em;">Staff Tools</p>
+                    }
+                    <a href="/admin/appointments" title="Appointments" style="@NavLinkStyle(IsActive("/admin/appointments"), isCollapsed)">
+                        <LucideIcon Name="calendar" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Appointments</span>
+                        }
+                    </a>
+                    <a href="/admin/builds" title="Builds" style="@NavLinkStyle(IsActive("/admin/builds"), isCollapsed)">
+                        <LucideIcon Name="blocks" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Builds</span>
+                        }
+                    </a>
+                    <a href="/admin/orderslips" title="Order Slips" style="@NavLinkStyle(IsActive("/admin/orderslips"), isCollapsed)">
+                        <LucideIcon Name="clipboard-list" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Order Slips</span>
+                        }
+                    </a>
+                    <a href="/admin/prebuilts" title="PreBuilts" style="@NavLinkStyle(IsActive("/admin/prebuilts"), isCollapsed)">
+                        <LucideIcon Name="package" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Pre-Builts</span>
+                        }
+                    </a>
+
+                    <a href="/admin/services" title="Services" style="@NavLinkStyle(IsActive("/admin/services"), isCollapsed)">
+                        <LucideIcon Name="wrench" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Services</span>
+                        }
+                    </a>
+
+                    <a href="/admin/stock" title="Stocks" style="@NavLinkStyle(IsActive("/admin/stock"), isCollapsed)">
+                        <LucideIcon Name="warehouse" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Stocks</span>
+                        }
+                    </a>
+                </Authorized>
+            </AuthorizeView>
+
+            @* --- SYSTEM SECTION (Strictly Admin) --- *@
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <div style="margin: var(--space-4) 0 var(--space-1) 0; border-top: 1px solid var(--sidebar-border);"></div>
+                    @if (!isCollapsed)
+                    {
+                        <p style="font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--muted-foreground); padding: 0 var(--space-2); margin: var(--space-2) 0 var(--space-1) 0; text-transform: uppercase; letter-spacing: 0.05em;">System</p>
+                    }
+                    <a href="/admin/management" title="User Management" style="@NavLinkStyle(IsActive("/admin/management"), isCollapsed)">
+                        <LucideIcon Name="users" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Management</span>
+                        }
+                    </a>
+                </Authorized>
+            </AuthorizeView>
+
+            <div style="margin: var(--space-4) 0 var(--space-1) 0; border-top: 1px solid var(--sidebar-border);"></div>
+
+            @* --- ACCOUNT SECTION --- *@
+            @if (!isCollapsed)
+            {
+                <p style="font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--muted-foreground); padding: 0 var(--space-2); margin: var(--space-2) 0 var(--space-1) 0; text-transform: uppercase; letter-spacing: 0.05em;">Account</p>
+                <button @onclick="ToggleProfile" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--sidebar-foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans); margin-bottom: var(--space-1);">
+                    <span style="display: flex; align-items: center; gap: var(--space-2);">
+                        <LucideIcon Name="user" Size="16" />
+                        Profile
+                    </span>
+                    <LucideIcon Name="@(profileOpen ? "chevron-up" : "chevron-down")" Size="14" />
+                </button>
+                @if (profileOpen)
+                {
+                    <div style="padding-left: var(--space-3);">
+                        <a href="Account/Manage" style="@NavLinkStyle(IsExact("Account/Manage"), false)">
+                            <LucideIcon Name="user" Size="16" />
+                            <span style="white-space: nowrap;">Profile</span>
+                        </a>
+                        <a href="Account/Manage/Email" style="@NavLinkStyle(IsExact("Account/Manage/Email"), false)">
+                            <LucideIcon Name="mail" Size="16" />
+                            <span style="white-space: nowrap;">Email</span>
+                        </a>
+                        <a href="Account/Manage/ChangePassword" style="@NavLinkStyle(IsExact("Account/Manage/ChangePassword"), false)">
+                            <LucideIcon Name="lock" Size="16" />
+                            <span style="white-space: nowrap;">Password</span>
+                        </a>
+                        <a href="Account/Manage/TwoFactorAuthentication" style="@NavLinkStyle(IsExact("Account/Manage/TwoFactorAuthentication"), false)">
+                            <LucideIcon Name="shield-check" Size="16" />
+                            <span style="white-space: nowrap;">Two-Factor Auth</span>
+                        </a>
+                        <a href="Account/Manage/PersonalData" style="@NavLinkStyle(IsExact("Account/Manage/PersonalData"), false)">
+                            <LucideIcon Name="database" Size="16" />
+                            <span style="white-space: nowrap;">Personal Data</span>
+                        </a>
+                    </div>
+                }
+            }
+            else
+            {
+                <a href="Account/Manage" title="Profile" style="@NavLinkStyle(IsActive("Account/Manage"), true)">
+                    <LucideIcon Name="user" Size="16" />
+                </a>
+            }
+        };
+
+    private string NavLinkStyle(bool isActive, bool isCollapsed) =>
+        $"display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: {(isActive ? "var(--sidebar-foreground)" : "var(--muted-foreground)")}; text-decoration: none; background-color: {(isActive ? "var(--sidebar-accent)" : "transparent")}; margin-bottom: var(--space-1); justify-content: {(isCollapsed ? "center" : "flex-start")};";
+
+    private bool IsActive(string path)
+    {
+        var current = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        return path != "/" && current.StartsWith(path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsExact(string path) =>
+        NavigationManager.ToBaseRelativePath(NavigationManager.Uri)
+            .Equals(path, StringComparison.OrdinalIgnoreCase);
+
+    public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
+}

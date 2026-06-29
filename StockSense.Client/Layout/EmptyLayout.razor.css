@@ -1,0 +1,46 @@
+/* Container styling - Height and padding reduced */
+.navbar {
+    background-color: #000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px; /* Reduced vertical padding */
+    height: 60px; /* Navbar is now shorter */
+}
+
+/* Brand styling */
+.brand {
+    display: flex;
+    flex-direction: column;
+    line-height: 0.9;
+    cursor: pointer;
+}
+
+.brand-text {
+    color: #FF0000;
+    font-weight: 800;
+    font-style: italic;
+    font-size: 22px; /* Reduced from 28px */
+    letter-spacing: 1px;
+    font-family: sans-serif;
+}
+
+/* Nav links styling */
+.nav-links {
+    display: flex;
+    gap: 25px; /* Reduced from 40px */
+    align-items: center;
+}
+
+    .nav-links a {
+        color: #FFFFFF;
+        text-decoration: none;
+        font-family: sans-serif;
+        font-size: 15px; /* Reduced from 18px */
+        font-weight: 500;
+        transition: color 0.3s ease;
+    }
+
+        .nav-links a:hover {
+            color: #FF0000;
+        }

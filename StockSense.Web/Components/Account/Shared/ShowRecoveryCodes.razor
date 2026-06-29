@@ -1,0 +1,48 @@
+@* --- CUSTOM STATUS MESSAGE --- *@
+@if (!string.IsNullOrEmpty(StatusMessage))
+{
+    var isError = StatusMessage.StartsWith("Error") || StatusMessage.StartsWith("Unable");
+
+    <div style="margin-bottom: var(--space-6); padding: var(--space-3); border-radius: var(--radius); border: 1px solid; display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm);
+                    @(isError ? "background-color: var(--destructive-muted); border-color: var(--destructive-border); color: var(--destructive-muted-foreground);"
+                                   : "background-color: var(--success-muted); border-color: var(--success-border); color: var(--success-muted-foreground);")" role="alert">
+
+        @if (isError)
+        {
+            <LucideIcon Name="alert-triangle" Size="18" style="flex-shrink: 0;" />
+        }
+        else
+        {
+            <LucideIcon Name="check" Size="18" style="flex-shrink: 0;" />
+        }
+        <span style="font-weight: var(--font-medium);">@StatusMessage</span>
+    </div>
+}
+
+<h3 style="font-size: var(--text-xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-4) 0;">Recovery codes</h3>
+
+<div style="padding: var(--space-4); border-radius: var(--radius); background-color: var(--muted); border-left: 4px solid var(--warning); margin-bottom: var(--space-6); display: flex; flex-direction: column; gap: var(--space-2);">
+    <p style="font-size: var(--text-sm); color: var(--foreground); margin: 0;"><strong>Put these codes in a safe place.</strong></p>
+    <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">
+        If you lose your device and don't have the recovery codes you will lose access to your account.
+    </p>
+</div>
+
+@* --- RECOVERY CODES GRID --- *@
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-6);">
+    @foreach (var recoveryCode in RecoveryCodes)
+    {
+        <div style="background-color: var(--background); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3); text-align: center; box-shadow: var(--shadow-sm);">
+            <code style="font-family: var(--font-mono), monospace; font-size: var(--text-base); font-weight: var(--font-bold); color: var(--foreground); letter-spacing: 2px;">
+                @recoveryCode
+            </code>
+        </div>
+    }
+</div>
+@code {
+    [Parameter]
+    public string[] RecoveryCodes { get; set; } = [];
+
+    [Parameter]
+    public string? StatusMessage { get; set; }
+}

@@ -1,0 +1,273 @@
+
+
+/* =============================================================================
+   LAYOUT — Build & Appointment
+   ============================================================================= */
+.build-layout {
+    display: flex;
+    height: calc(100vh - 3.5rem);
+    overflow: hidden;
+}
+
+.build-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--card);
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.build-main {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.build-mobile-bar {
+    display: none;
+}
+
+.build-bottom-drawer {
+    display: none;
+}
+
+.appt-layout {
+    display: flex;
+    height: calc(100vh - 3.5rem);
+    overflow: hidden;
+}
+
+.appt-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+}
+
+.appt-mobile-bar {
+    display: none;
+}
+
+.appt-bottom-drawer {
+    display: none;
+}
+
+
+/* =============================================================================
+   APP LAYER — Navbar, Sidebar, Settings
+   ============================================================================= */
+@layer app {
+    .navbar-btn:hover {
+        background-color: var(--accent) !important;
+        color: var(--accent-foreground) !important;
+    }
+
+    .navbar-desktop-nav {
+        display: flex;
+    }
+
+    .navbar-mobile-trigger {
+        display: none;
+    }
+
+    .settings-nav-label {
+        display: none;
+    }
+
+    .settings-nav-label-active {
+        display: inline;
+    }
+
+    .admin-sidebar-desktop {
+        display: flex;
+    }
+
+    .admin-sidebar-mobile-trigger {
+        display: none;
+    }
+}
+
+
+/* =============================================================================
+   STATIC STYLES — Header, Settings Sidebar
+   ============================================================================= */
+.header-wrapper {
+    padding: 0 6rem;
+}
+
+.settings-sidebar {
+    width: 14rem;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background-color: var(--background);
+    padding: var(--space-4) var(--space-2);
+    overflow-y: auto;
+}
+
+.settings-mobile-trigger {
+    display: none;
+}
+
+.settings-mobile-nav {
+    display: none;
+}
+
+
+/* =============================================================================
+   MEDIA QUERIES (outside @layer to avoid suppression)
+   ============================================================================= */
+
+/* ── ≥641px: show settings nav labels ── */
+@media (min-width: 641px) {
+    .settings-nav-label {
+        display: inline !important;
+    }
+}
+
+/* ── ≤640px: mobile navbar & settings ── */
+@media (max-width: 640px) {
+    .navbar-desktop-nav {
+        display: none !important;
+    }
+
+    .navbar-mobile-trigger {
+        display: flex !important;
+    }
+
+    .header-wrapper {
+        padding: 0 1rem;
+    }
+
+    .settings-mobile-trigger {
+        display: flex !important;
+    }
+
+    .settings-mobile-nav {
+        display: block;
+        border-bottom: 1px solid var(--border);
+        background-color: var(--background);
+        overflow-x: auto;
+    }
+
+        .settings-mobile-nav nav {
+            flex-direction: row !important;
+            flex-wrap: nowrap;
+            padding: var(--space-2) var(--space-4);
+            gap: var(--space-1);
+            overflow-x: auto;
+        }
+
+        .settings-mobile-nav p {
+            display: none;
+        }
+
+    .settings-sidebar {
+        display: none !important;
+    }
+
+    .settings-main {
+        padding: var(--space-4) !important;
+    }
+
+    .step3-container {
+        flex-direction: column !important;
+        max-height: none !important;
+    }
+
+    .step3-calendar {
+        border-right: none !important;
+        border-bottom: 1px solid var(--border) !important;
+        overflow-y: visible !important;
+    }
+
+    .step3-slots {
+        max-height: 40vh !important;
+    }
+}
+
+/* ── ≤767px: mobile build, appointment & admin sidebar ── */
+@media (max-width: 767px) {
+    /* Build layout */
+    .build-layout {
+        flex-direction: column;
+    }
+
+    .build-sidebar {
+        display: none !important;
+    }
+
+    .build-main {
+        padding: var(--space-1) !important;
+    }
+
+    .build-mobile-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: 1px solid var(--border);
+        background-color: var(--card);
+        flex-shrink: 0;
+    }
+
+    .build-bottom-drawer {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+        background-color: var(--card);
+        border-top: 1px solid var(--border);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    /* Appointment layout */
+    .appt-layout {
+        flex-direction: column !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .appt-sidebar {
+        width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid var(--border) !important;
+    }
+
+    .appt-mobile-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: 1px solid var(--border);
+        background-color: var(--card);
+        flex-shrink: 0;
+    }
+
+    .appt-bottom-drawer {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+        background-color: var(--card);
+        border-top: 1px solid var(--border);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    /* Admin sidebar */
+    .admin-sidebar-desktop {
+        display: none !important;
+    }
+
+    .admin-sidebar-mobile-trigger {
+        display: block !important;
+    }
+}

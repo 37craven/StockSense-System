@@ -1,0 +1,59 @@
+@using Microsoft.AspNetCore.Identity
+@using StockSense.Infrastructure.Data
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager NavigationManager
+@rendermode InteractiveWebAssembly
+
+<BbSidebarContent>
+    <BbSidebarGroup>
+        <BbSidebarGroupLabel>Account</BbSidebarGroupLabel>
+        <BbSidebarMenu>
+            <BbSidebarMenuItem>
+                <BbSidebarMenuButton IsActive="@IsExact("Account/Manage")" href="Account/Manage">
+                    Profile
+                </BbSidebarMenuButton>
+            </BbSidebarMenuItem>
+            <BbSidebarMenuItem>
+                <BbSidebarMenuButton IsActive="@IsExact("Account/Manage/Email")" href="Account/Manage/Email">
+                    Email
+                </BbSidebarMenuButton>
+            </BbSidebarMenuItem>
+            <BbSidebarMenuItem>
+                <BbSidebarMenuButton IsActive="@IsExact("Account/Manage/ChangePassword")" href="Account/Manage/ChangePassword">
+                    Password
+                </BbSidebarMenuButton>
+            </BbSidebarMenuItem>
+            @if (hasExternalLogins)
+            {
+                <BbSidebarMenuItem>
+                    <BbSidebarMenuButton IsActive="@IsExact("Account/Manage/ExternalLogins")" href="Account/Manage/ExternalLogins">
+                        External Logins
+                    </BbSidebarMenuButton>
+                </BbSidebarMenuItem>
+            }
+            <BbSidebarMenuItem>
+                <BbSidebarMenuButton IsActive="@IsExact("Account/Manage/TwoFactorAuthentication")" href="Account/Manage/TwoFactorAuthentication">
+                    Two-Factor Auth
+                </BbSidebarMenuButton>
+            </BbSidebarMenuItem>
+            <BbSidebarMenuItem>
+                <BbSidebarMenuButton IsActive="@IsExact("Account/Manage/PersonalData")" href="Account/Manage/PersonalData">
+                    Personal Data
+                </BbSidebarMenuButton>
+            </BbSidebarMenuItem>
+        </BbSidebarMenu>
+    </BbSidebarGroup>
+</BbSidebarContent>
+
+@code {
+    private bool hasExternalLogins;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hasExternalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).Any();
+    }
+
+    private bool IsExact(string path) =>
+        NavigationManager.ToBaseRelativePath(NavigationManager.Uri)
+            .Equals(path, StringComparison.OrdinalIgnoreCase);
+}

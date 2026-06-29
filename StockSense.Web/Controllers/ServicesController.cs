@@ -1,0 +1,73 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using StockSense.Application.DTOs;
+using StockSense.Domain.Entities;
+using StockSense.Infrastructure.Data.Repositories;
+
+namespace StockSense.Web.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class ServicesController : ControllerBase
+{
+    private readonly StoreServiceRepository _serviceRepo;
+    private readonly ProductRepository _productRepo;
+
+    public ServicesController(StoreServiceRepository serviceRepo, ProductRepository productRepo)
+    {
+        _serviceRepo = serviceRepo;
+        _productRepo = productRepo;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetServices()
+    {
+        var services = await _serviceRepo.GetAllWithProductsAsync();
+        var dtos = services.Select(s => new StoreServiceDto
+        {
+            Id = s.Id, Name = s.Name, Price = s.Price, Category = s.Category,
+            EstimatedMinutes = s.EstimatedMinutes, Status = s.Status,
+            RequiredProducts = s.RequiredProducts.Select(p => new ProductDto(
+                p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock,
+                p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? ""
+            )).ToList()
+        }).ToList();
+        return Ok(dtos);
+    }
+
+    [HttpGet("inventory")]
+    public async Task<IActionResult> GetInventory()
+    {
+        var products = await _productRepo.GetAllAsync();
+        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "")).ToList();
+        return Ok(dtos);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateService([FromBody] CreateStoreServiceDto dto)
+    {
+        var service = new StoreService
+        {
+            Name = dto.Name,
+            Price = dto.Price,
+            Category = dto.Category,
+            EstimatedMinutes = dto.EstimatedMinutes,
+            Status = "Active"
+        };
+        await _serviceRepo.AddAsync(service);
+        return Ok();
+    }
+
+    [HttpPost("update-products")]
+    public async Task<IActionResult> UpdateServiceProducts([FromBody] UpdateServiceProductsDto dto)
+    {
+        var service = await _serviceRepo.GetByIdWithProductsAsync(dto.ServiceId);
+        if (service == null) return NotFound(ApiResponse.NotFound("Service"));
+
+        service.Price = dto.Price;
+        service.RequiredProducts = await _productRepo.GetByIdsAsync(dto.ProductIds);
+        await _serviceRepo.SaveChangesAsync();
+        return Ok();
+    }
+}

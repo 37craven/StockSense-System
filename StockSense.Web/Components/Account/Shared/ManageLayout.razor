@@ -1,0 +1,26 @@
+@inherits LayoutComponentBase
+@using StockSense.Client.Layout
+
+<AuthorizeView Roles="Admin, Employee">
+    <Authorized>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div style="max-width: 640px; width: 100%;">
+                @Body
+            </div>
+        </LayoutView>
+    </Authorized>
+    <NotAuthorized>
+        <LayoutView Layout="@typeof(EmptyLayout)">
+            <div style="display: flex; flex: 1; height: 100%; overflow: hidden;">
+                <aside style="width: 14rem; flex-shrink: 0; border-right: 1px solid var(--border); background-color: var(--background); padding: var(--space-4) var(--space-2); overflow-y: auto;">
+                    <ManageNavMenu />
+                </aside>
+                <main style="flex: 1; overflow-y: auto; padding: var(--space-8);">
+                    <div style="max-width: 640px; width: 100%;">
+                        @Body
+                    </div>
+                </main>
+            </div>
+        </LayoutView>
+    </NotAuthorized>
+</AuthorizeView>

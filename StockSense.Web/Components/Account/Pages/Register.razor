@@ -1,0 +1,238 @@
+@page "/Account/Register"
+@layout PublicLayout
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using StockSense.Web.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
+@inject Application.Interfaces.IEmailSender<ApplicationUser> EmailSender
+@inject ILogger<Register> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+@inject RoleManager<IdentityRole> RoleManager
+
+<PageTitle>Register</PageTitle>
+
+<div style="display: flex; padding: 2vh; justify-content: center; align-items: center; min-height: 100%; background-color: var(--background); font-family: var(--font-sans);">
+    <div style="background-color: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--card-padding); max-width: var(--card-max-width-sm); width: 100%;">
+
+        <h1 style="text-align: center; font-size: var(--text-3xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">Register</h1>
+
+        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+            <DataAnnotationsValidator />
+
+            <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-bottom: var(--space-4); color: var(--muted-foreground);">Create a new account.</h2>
+            <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
+
+            <StatusMessage Message="@Message" />
+
+            <ValidationSummary style="margin-bottom: var(--space-6); color: var(--destructive); background-color: var(--destructive-muted); padding: var(--space-2); border: 1px solid var(--destructive-border); border-radius: var(--radius); font-size: var(--text-sm);" role="alert" />
+
+            <div style="display: flex; gap: var(--space-3); margin-bottom: var(--space-6);">
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">First Name</label>
+                    <InputText @bind-Value="Input.FirstName"
+                               style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                               autocomplete="given-name" aria-required="true" placeholder="John" />
+                    <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
+                        <ValidationMessage For="() => Input.FirstName" />
+                    </div>
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Last Name</label>
+                    <InputText @bind-Value="Input.LastName"
+                               style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                               autocomplete="family-name" aria-required="true" placeholder="Doe" />
+                    <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
+                        <ValidationMessage For="() => Input.LastName" />
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: var(--space-6);">
+                <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Email</label>
+                <InputText @bind-Value="Input.Email"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                           autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
+                    <ValidationMessage For="() => Input.Email" />
+                </div>
+            </div>
+
+            <div style="margin-bottom: var(--space-6);">
+                <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Password</label>
+                <InputText type="password" @bind-Value="Input.Password"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                           autocomplete="new-password" aria-required="true" placeholder="password" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
+                    <ValidationMessage For="() => Input.Password" />
+                </div>
+            </div>
+
+            <div style="margin-bottom: var(--space-6);">
+                <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Confirm Password</label>
+                <InputText type="password" @bind-Value="Input.ConfirmPassword"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                           autocomplete="new-password" aria-required="true" placeholder="confirm password" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
+                    <ValidationMessage For="() => Input.ConfirmPassword" />
+                </div>
+            </div>
+
+            <div style="margin-bottom: var(--space-6);">
+                <button type="submit" disabled="@isSubmitting" style="width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: @(isSubmitting ? "not-allowed" : "pointer"); opacity: @(isSubmitting ? "0.7" : "1");">
+                    @if (isSubmitting)
+                    {
+                        <span>Registering...</span>
+                    }
+                    else
+                    {
+                        <span>Register</span>
+                    }
+                </button>
+            </div>
+
+            <div style="text-align: center;">
+                <p style="font-size: var(--text-sm); margin: var(--space-2) 0;">
+                    <a href="/Account/Login" style="color: var(--primary); text-decoration: none;">Already have an account? Log in</a>
+                </p>
+            </div>
+
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<IdentityError>? identityErrors;
+    private bool isSubmitting = false;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    public async Task RegisterUser(EditContext editContext)
+    {
+        // 1. Prevent double-click phantom saves
+        if (isSubmitting) return;
+        isSubmitting = true;
+
+        try
+        {
+            var user = CreateUser();
+
+            user.FirstName = Input.FirstName;
+            user.LastName = Input.LastName;
+
+            await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+            var emailStore = GetEmailStore();
+            await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+
+            var result = await UserManager.CreateAsync(user, Input.Password);
+
+            if (!result.Succeeded)
+            {
+                identityErrors = result.Errors;
+                return;
+            }
+
+            // --- START OF DEFAULT ROLE LOGIC ---
+            const string defaultRole = "Customer";
+
+            if (!await RoleManager.RoleExistsAsync(defaultRole))
+            {
+                await RoleManager.CreateAsync(new IdentityRole(defaultRole));
+            }
+
+            await UserManager.AddToRoleAsync(user, defaultRole);
+            // --- END OF DEFAULT ROLE LOGIC ---
+
+            Logger.LogInformation("User created a new account with Customer role.");
+
+            // --- START OF SAFE EMAIL LOGIC ---
+            try
+            {
+                var userId = await UserManager.GetUserIdAsync(user);
+                var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+                code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+
+                var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+                    NavigationManager.ToAbsoluteUri("/Account/ConfirmEmail").AbsoluteUri,
+                    new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+
+                await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+            }
+            catch (Exception ex)
+            {
+                // If SMTP fails, log it but DO NOT stop the registration flow!
+                Logger.LogError($"Email failed to send. Error: {ex.Message}");
+            }
+            // --- END OF SAFE EMAIL LOGIC ---
+
+            RedirectManager.RedirectTo("/Account/RegisterConfirmation", new Dictionary<string, object?> { ["Email"] = Input.Email });
+        }
+        finally
+        {
+            // 2. Unlock the button when everything is done
+            isSubmitting = false;
+        }
+    }
+
+    private ApplicationUser CreateUser()
+    {
+        try
+        {
+            return Activator.CreateInstance<ApplicationUser>();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
+                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+        }
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+        return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [Display(Name = "First Name")]
+        public string FirstName { get; set; } = "";
+
+        [Required]
+        [Display(Name = "Last Name")]
+        public string LastName { get; set; } = "";
+
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

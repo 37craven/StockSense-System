@@ -1,0 +1,56 @@
+@page "/Account/RegisterConfirmation"
+@layout PublicLayout
+
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Register confirmation</PageTitle>
+
+<div style="display: flex; padding: 2vh; justify-content: center; align-items: center; min-height: 100%; background-color: var(--background); font-family: var(--font-sans);">
+    <div style="background-color: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--card-padding); max-width: var(--card-max-width-sm); width: 100%;">
+
+        <h1 style="text-align: center; font-size: var(--text-3xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Almost there!</h1>
+        <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-bottom: var(--space-4); color: var(--muted-foreground);">Confirm your account.</h2>
+
+        <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
+
+        <StatusMessage Message="@statusMessage" />
+
+        <p style="font-size: var(--text-sm); color: var(--muted-foreground); text-align: center; margin: 0 0 var(--space-6) 0;">
+            @statusMessage
+        </p>
+
+        <div style="text-align: center;">
+            <a href="/Account/Login" style="display: block; text-align: center; width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer; text-decoration: none; box-sizing: border-box;">
+                Back to login
+            </a>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private string? statusMessage;
+
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Email is null)
+        {
+            RedirectManager.RedirectTo("");
+        }
+
+        var user = await UserManager.FindByEmailAsync(Email);
+        if (user is null)
+        {
+            statusMessage = "Error finding user for specified email";
+        }
+        else
+        {
+            statusMessage = "Confirmation email sent. Please check your inbox.";
+        }
+    }
+}

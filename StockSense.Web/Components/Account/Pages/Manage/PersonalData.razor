@@ -1,0 +1,33 @@
+@page "/Account/Manage/PersonalData"
+@layout SettingsLayout
+@using StockSense.Web.Components.Account
+
+@inject IdentityUserAccessor UserAccessor
+
+<PageTitle>Personal Data</PageTitle>
+
+<h1 style="font-size: var(--text-2xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">Personal Data</h1>
+<h2 style="font-size: var(--text-base); font-weight: var(--font-normal); color: var(--muted-foreground); margin: 0 0 var(--space-6) 0;">Manage your personal data.</h2>
+<div style="border-top: 1px solid var(--border); margin-bottom: var(--space-6);"></div>
+
+<StatusMessage />
+
+<p style="font-size: var(--text-sm); color: var(--foreground); margin: 0 0 var(--space-2) 0;">Your account contains personal data that you have given us. This page allows you to download or delete that data.</p>
+<p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0 0 var(--space-6) 0;"><strong>Deleting this data will permanently remove your account and cannot be recovered.</strong></p>
+
+<div style="display: flex; flex-direction: column; gap: var(--space-3);">
+
+    <form action="Account/Manage/DownloadPersonalData" method="post">
+        <AntiforgeryToken />
+        <button type="submit"
+                style="width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--secondary); color: var(--secondary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: 1px solid var(--border); cursor: pointer;">
+            Download my data
+        </button>
+    </form>
+
+    <a href="Account/Manage/DeletePersonalData"
+       style="display: block; text-align: center; width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--destructive); color: var(--destructive-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none; box-sizing: border-box;">
+        Delete my account
+    </a>
+
+</div>

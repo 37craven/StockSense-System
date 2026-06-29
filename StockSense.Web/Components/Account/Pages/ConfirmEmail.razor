@@ -1,0 +1,65 @@
+@page "/Account/ConfirmEmail"
+@layout PublicLayout
+
+@using System.Text
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using StockSense.Web.Components.Account
+
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Confirm email</PageTitle>
+
+<div style="display: flex; padding: 2vh; justify-content: center; align-items: center; min-height: 100%; background-color: var(--background); font-family: var(--font-sans);">
+    <div style="background-color: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: var(--card-padding); max-width: var(--card-max-width-sm); width: 100%;">
+
+        <h1 style="text-align: center; font-size: var(--text-3xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Email Confirmed</h1>
+        <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-top: var(--space-2); margin-bottom: var(--space-4); color: var(--muted-foreground);">Your account is ready.</h2>
+
+        <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
+        <div style="text-align:center">
+            <StatusMessage Message="@statusMessage" />
+        </div>
+
+        <a href="/Account/Login" style="display: block; text-align: center; width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none; box-sizing: border-box; margin-top: var(--space-6);">
+            Go to login
+        </a>
+
+    </div>
+</div>
+
+@code {
+    private string? statusMessage;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? UserId { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Code { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserId is null || Code is null)
+        {
+            RedirectManager.RedirectTo("");
+        }
+
+        var user = await UserManager.FindByIdAsync(UserId);
+        if (user is null)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            statusMessage = $"Error loading user with ID {UserId}";
+        }
+        else
+        {
+            var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
+            var result = await UserManager.ConfirmEmailAsync(user, code);
+            statusMessage = result.Succeeded ? "Thank you for confirming your email." : "Error confirming your email.";
+        }
+    }
+}

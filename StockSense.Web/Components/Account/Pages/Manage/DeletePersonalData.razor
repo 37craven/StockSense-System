@@ -1,0 +1,96 @@
+@page "/Account/Manage/DeletePersonalData"
+@layout SettingsLayout
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using StockSense.Infrastructure.Data
+@using StockSense.Web.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<DeletePersonalData> Logger
+
+<PageTitle>Delete Personal Data</PageTitle>
+
+<h1 style="font-size: var(--text-2xl); font-weight: var(--font-semibold); color: var(--destructive); margin: 0 0 var(--space-1) 0;">Delete Account</h1>
+<h2 style="font-size: var(--text-base); font-weight: var(--font-normal); color: var(--muted-foreground); margin: 0 0 var(--space-6) 0;">Permanently delete your account and all associated data.</h2>
+<div style="border-top: 1px solid var(--border); margin-bottom: var(--space-6);"></div>
+
+<StatusMessage Message="@message" />
+
+<div style="padding: var(--space-4); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); margin-bottom: var(--space-6);">
+    <p style="font-size: var(--text-sm); color: var(--destructive); margin: 0;">
+        <strong>This action is permanent and cannot be undone.</strong> Deleting your account will remove all your data immediately.
+    </p>
+</div>
+
+<EditForm Model="Input" FormName="delete-user" OnValidSubmit="OnValidSubmitAsync" method="post">
+    <DataAnnotationsValidator />
+    <ValidationSummary style="margin-bottom: var(--space-6); color: var(--destructive); background-color: var(--destructive-muted); padding: var(--space-2); border: 1px solid var(--destructive-border); border-radius: var(--radius); font-size: var(--text-sm);" role="alert" />
+
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+
+        @if (requirePassword)
+        {
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Confirm your password</label>
+                <InputText type="password" @bind-Value="Input.Password" autocomplete="current-password" aria-required="true"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                <ValidationMessage For="() => Input.Password" style="font-size: var(--text-sm); color: var(--destructive);" />
+            </div>
+        }
+
+        <button type="submit"
+                style="width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--destructive); color: var(--destructive-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer;">
+            Delete my account
+        </button>
+
+    </div>
+</EditForm>
+
+@code {
+    private string? message;
+    private ApplicationUser user = default!;
+    private bool requirePassword;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        requirePassword = await UserManager.HasPasswordAsync(user);
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        if (requirePassword && !await UserManager.CheckPasswordAsync(user, Input.Password))
+        {
+            message = "Error: Incorrect password.";
+            return;
+        }
+
+        var result = await UserManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException("Unexpected error occurred deleting user.");
+        }
+
+        await SignInManager.SignOutAsync();
+        var userId = await UserManager.GetUserIdAsync(user);
+        Logger.LogInformation("User with ID '{UserId}' deleted themselves.", userId);
+        RedirectManager.RedirectToCurrentPage();
+    }
+
+    private sealed class InputModel
+    {
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+    }
+}

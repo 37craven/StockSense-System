@@ -1,0 +1,127 @@
+@page "/Account/LoginWith2fa"
+
+@layout PublicLayout
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+
+@using StockSense.Web.Components.Account
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject IdentityRedirectManager RedirectManager
+@inject ILogger<LoginWith2fa> Logger
+
+<PageTitle>Two-factor authentication</PageTitle>
+
+<div style="display: flex; flex-direction: column; min-height: calc(100vh - 64px); justify-content: center; align-items: center; background-color: var(--background); font-family: var(--font-sans); padding: 1rem;">
+    <div style="background-color: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 2rem; max-width: 24rem; width: 100%;">
+
+        <h1 style="text-align: center; font-size: var(--text-2xl); font-weight: 600; color: var(--foreground); margin: 0 0 0.5rem 0;">Two-factor authentication</h1>
+        <p style="text-align: center; font-size: var(--text-sm); color: var(--muted-foreground); margin: 0 0 1.5rem 0;">
+            Your login is protected with an authenticator app. Enter your authenticator code below.
+        </p>
+
+        <div style="border-top: 1px solid var(--border); margin: 1.5rem 0;"></div>
+
+        @* --- CUSTOM ERROR MESSAGE --- *@
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div style="margin-bottom: 1.5rem; font-size: var(--text-sm); color: var(--destructive); background-color: var(--destructive-muted); padding: 0.75rem; border: 1px solid var(--destructive-border); border-radius: var(--radius); display: flex; align-items: center; gap: 0.5rem;" role="alert">
+                <LucideIcon Name="triangle-alert" Size="18" style="flex-shrink: 0;" />
+                <span style="font-weight: 500;">@message</span>
+            </div>
+        }
+
+        <EditForm Model="Input" FormName="login-with-2fa" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+            <input type="hidden" name="RememberMe" value="@RememberMe" />
+            <DataAnnotationsValidator />
+
+            <ValidationSummary style="margin-bottom: 1.5rem; font-size: var(--text-sm); color: var(--destructive); background-color: var(--destructive-muted); padding: 0.75rem; border: 1px solid var(--destructive-border); border-radius: var(--radius); list-style-position: inside;" role="alert" />
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 0.5rem; color: var(--foreground);">Authenticator code</label>
+                <InputText @bind-Value="Input.TwoFactorCode" autocomplete="off" style="width: 100%; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); outline: none; box-sizing: border-box; letter-spacing: 2px; font-weight: 600;" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: 0.25rem;">
+                    <ValidationMessage For="() => Input.TwoFactorCode" />
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <InputCheckbox @bind-Value="Input.RememberMachine" id="remember-machine" style="width: 1rem; height: 1rem; border-radius: 0.125rem; border: 1px solid var(--input); accent-color: var(--primary); cursor: pointer;" />
+                <label for="remember-machine" style="font-size: var(--text-sm); color: var(--foreground); margin: 0; cursor: pointer;">Remember this machine</label>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <button type="submit" style="width: 100%; padding: 0.625rem 1rem; border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--text-sm); font-weight: 500; border: none; cursor: pointer;">
+                    Log in
+                </button>
+            </div>
+        </EditForm>
+
+        <div style="text-align: center; margin-top: 1rem;">
+            <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">
+                Don't have access to your device?<br />
+                <a href="Account/LoginWithRecoveryCode?ReturnUrl=@ReturnUrl" style="color: var(--primary); text-decoration: none; font-weight: 500; display: inline-block; margin-top: 0.25rem;">Log in with a recovery code</a>
+            </p>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private string? message;
+    private ApplicationUser user = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private bool RememberMe { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Ensure the user has gone through the username & password screen first
+        user = await SignInManager.GetTwoFactorAuthenticationUserAsync() ??
+            throw new InvalidOperationException("Unable to load two-factor authentication user.");
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var authenticatorCode = Input.TwoFactorCode!.Replace(" ", string.Empty).Replace("-", string.Empty);
+        var result = await SignInManager.TwoFactorAuthenticatorSignInAsync(authenticatorCode, RememberMe, Input.RememberMachine);
+        var userId = await UserManager.GetUserIdAsync(user);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User with ID '{UserId}' logged in with 2fa.", userId);
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User with ID '{UserId}' account locked out.", userId);
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            Logger.LogWarning("Invalid authenticator code entered for user with ID '{UserId}'.", userId);
+            message = "Error: Invalid authenticator code.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [StringLength(7, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Text)]
+        [Display(Name = "Authenticator code")]
+        public string? TwoFactorCode { get; set; }
+
+        [Display(Name = "Remember this machine")]
+        public bool RememberMachine { get; set; }
+    }
+}

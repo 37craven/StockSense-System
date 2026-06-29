@@ -1,0 +1,46 @@
+@inherits LayoutComponentBase
+<BbSidebarProvider>
+    <BbSidebar>
+        <BbSidebarHeader>
+            <div style="padding: var(--space-2) var(--space-2);">
+                <a href="/Dashboard" style="display: flex; align-items: center; gap: var(--space-2); text-decoration: none; font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--foreground); padding: var(--space-2) var(--space-2); border-radius: var(--radius);">
+                    StockSense
+                </a>
+            </div>
+        </BbSidebarHeader>
+
+        <NavMenu />
+
+        <BbSidebarFooter>
+            <AuthorizeView>
+                <Authorized>
+                    <form action="Account/Logout" method="post" style="margin: 0; padding: var(--space-2);">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="" />
+                        <button type="submit" style="width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans); text-align: left;">
+                            Sign out
+                        </button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+        </BbSidebarFooter>
+    </BbSidebar>
+
+    <BbSidebarInset>
+        <header style="display: flex; height: 3.5rem; align-items: center; gap: var(--space-2); border-bottom: 1px solid var(--border); padding: 0 var(--space-4); position: sticky; top: 0; background-color: var(--background); z-index: 10;">
+            <BbSidebarTrigger />
+        </header>
+
+        <main style="flex: 1; overflow-y: auto; padding: var(--space-8);">
+            @Body
+        </main>
+    </BbSidebarInset>
+</BbSidebarProvider>
+
+<BbPortalHost />
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">ðŸ—™</a>
+</div>

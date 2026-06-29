@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script>
+        (function () {
+            var intendedDark = localStorage.getItem('theme') === 'dark';
+
+            function applyTheme() {
+                intendedDark = localStorage.getItem('theme') === 'dark';
+                if (intendedDark) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }
+
+            applyTheme();
+            document.addEventListener('blazor:navigated', applyTheme);
+
+            const observer = new MutationObserver(function () {
+                if (intendedDark && !document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.add('dark');
+                }
+            });
+
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+
+            window.setTheme = function (dark) {
+                intendedDark = dark;
+                localStorage.setItem('theme', dark ? 'dark' : 'light');
+                if (dark) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            };
+        })();
+    </script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="styles/app.min.css" />
+    <link rel="stylesheet" href="styles/app.css" />
+
+
+    <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
+    <link rel="stylesheet" href="styles/theme.css" />
+
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet />
+</head>
+
+<body>
+    <CascadingAuthenticationState>
+        <Routes />
+    </CascadingAuthenticationState>
+
+    <script src="_framework/blazor.web.js"></script>
+    <script>
+        window.triggerDownload = async (url, fileName) => {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    console.error('Download failed:', response.status, response.statusText);
+                    return;
+                }
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(blobUrl);
+                }, 5000);
+            } catch (e) {
+                console.error('Download error:', e);
+            }
+        };
+
+        window.pinnedSlipsStorage = {
+            get: function (key) {
+                return localStorage.getItem(key) || '';
+            },
+            set: function (key, value) {
+                localStorage.setItem(key, value);
+            },
+            remove: function (key) {
+                localStorage.removeItem(key);
+            }
+        };
+    </script>
+</body>
+
+</html>

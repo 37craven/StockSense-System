@@ -1,0 +1,109 @@
+@page "/Account/ConfirmEmailChange"
+@layout PublicLayout
+@using System.Text
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using StockSense.Web.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Confirm Email Change</PageTitle>
+
+<div style="display: flex; padding: 2vh; justify-content: center; align-items: center; min-height: calc(100vh - 64px); background-color: var(--background); font-family: var(--font-sans);">
+    <div style="background-color: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 2rem; max-width: 24rem; width: 100%;">
+
+        <h1 style="text-align: center; font-size: var(--text-2xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-6) 0;">Email Change</h1>
+
+        @* --- CUSTOM STATUS MESSAGE --- *@
+        @if (!string.IsNullOrEmpty(message))
+        {
+            var isError = message.StartsWith("Error") || message.StartsWith("Unable");
+
+            <div style="margin-bottom: var(--space-6); padding: var(--space-3); border-radius: var(--radius); border: 1px solid; display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm);
+                            @(isError ? "background-color: var(--destructive-muted); border-color: var(--destructive-border); color: var(--destructive-muted-foreground);"
+                                                   : "background-color: var(--success-muted); border-color: var(--success-border); color: var(--success-muted-foreground);")" role="alert">
+
+                @if (isError)
+                {
+                    <LucideIcon Name="triangle-alert" Size="18" style="flex-shrink: 0;" />
+                }
+                else
+                {
+                    <LucideIcon Name="check-circle" Size="18" style="flex-shrink: 0;" />
+                }
+                <span style="font-weight: var(--font-medium);">@message</span>
+            </div>
+
+            @* Only show success instructions if it actually succeeded *@
+            @if (!isError)
+            {
+                <p style="text-align: center; font-size: var(--text-sm); color: var(--muted-foreground); margin: 0 0 var(--space-6) 0;">
+                    You can now log in with your new email.
+                </p>
+            }
+        }
+
+        <div style="border-top: 1px solid var(--border); margin: 0 0 var(--space-6) 0;"></div>
+
+        <a href="/Account/Login" style="display: block; text-align: center; width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); text-decoration: none; box-sizing: border-box;">
+            Back to login
+        </a>
+
+    </div>
+</div>
+
+@* Keep your existing @code { ... } block right here! *@
+
+@code {
+    private string? message;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? UserId { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Code { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserId is null || Email is null || Code is null)
+        {
+            RedirectManager.RedirectToWithStatus(
+                "Account/Login", "Error: Invalid email change confirmation link.", HttpContext);
+        }
+
+        var user = await UserManager.FindByIdAsync(UserId);
+        if (user is null)
+        {
+            message = "Unable to find user with Id '{userId}'";
+            return;
+        }
+
+        var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
+        var result = await UserManager.ChangeEmailAsync(user, Email, code);
+        if (!result.Succeeded)
+        {
+            message = "Error changing email.";
+            return;
+        }
+
+        // In our UI email and user name are one and the same, so when we update the email
+        // we need to update the user name.
+        var setUserNameResult = await UserManager.SetUserNameAsync(user, Email);
+        if (!setUserNameResult.Succeeded)
+        {
+            message = "Error changing user name.";
+            return;
+        }
+
+        await SignInManager.RefreshSignInAsync(user);
+        message = "Thank you for confirming your email change.";
+    }
+}

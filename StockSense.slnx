@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="StockSense.Application/StockSense.Application.csproj">
+      <BuildDependency Project="StockSense.Domain/StockSense.Domain.csproj" />
+    </Project>
+    <Project Path="StockSense.Client/StockSense.Client.csproj">
+      <BuildDependency Project="StockSense.Application/StockSense.Application.csproj" />
+      <BuildDependency Project="StockSense.Domain/StockSense.Domain.csproj" />
+    </Project>
+    <Project Path="StockSense.Domain/StockSense.Domain.csproj" />
+    <Project Path="StockSense.Infrastructure/StockSense.Infrastructure.csproj" />
+    <Project Path="StockSense.Web/StockSense.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+</Solution>

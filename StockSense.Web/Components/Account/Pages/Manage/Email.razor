@@ -1,0 +1,158 @@
+@page "/Account/Manage/Email"
+@layout SettingsLayout
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using StockSense.Web.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject Application.Interfaces.IEmailSender<ApplicationUser> EmailSender
+@inject IdentityUserAccessor UserAccessor
+@inject NavigationManager NavigationManager
+
+<PageTitle>Manage email</PageTitle>
+
+<h1 style="font-size: var(--text-2xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Email</h1>
+<h2 style="font-size: var(--text-base); font-weight: var(--font-normal); color: var(--muted-foreground); margin: 0;">Manage your email address.</h2>
+<div style="border-top: 1px solid var(--border); margin: var(--space-3) 0;"></div>
+
+@* --- CUSTOM STATUS MESSAGE --- *@
+@if (!string.IsNullOrEmpty(message))
+{
+    var isSuccess = message.Contains("sent") || message.Contains("unchanged");
+
+    <div style="margin-bottom: var(--space-6); padding: var(--space-3); border-radius: var(--radius); border: 1px solid; display: flex; align-items: center; gap: var(--space-2);
+                    @(isSuccess ? "background-color: var(--success-muted); border-color: var(--success-border); color: var(--success-muted-foreground);"
+                                     : "background-color: var(--info-muted); border-color: var(--info-border); color: var(--info-muted-foreground);")" role="alert">
+
+        @if (isSuccess)
+        {
+            <LucideIcon Name="check" Size="18" style="flex-shrink: 0;" />
+        }
+        else
+        {
+            <LucideIcon Name="info" Size="18" style="flex-shrink: 0;" />
+        }
+        <span style="font-weight: var(--font-medium); font-size: var(--text-sm);">@message</span>
+    </div>
+}
+
+<form @onsubmit="OnSendEmailVerificationAsync" @formname="send-verification" id="send-verification-form" method="post">
+    <AntiforgeryToken />
+</form>
+
+<EditForm Model="Input" FormName="change-email" OnValidSubmit="OnValidSubmitAsync" method="post">
+    <DataAnnotationsValidator />
+
+    @* --- VALIDATION SUMMARY --- *@
+    <ValidationSummary style="margin-bottom: var(--space-6); font-size: var(--text-sm); color: var(--destructive); background-color: var(--destructive-muted); padding: var(--space-3); border: 1px solid var(--destructive-border); border-radius: var(--radius);" role="alert" />
+
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+            <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); display: flex; align-items: center;">
+                Current email
+                @if (isEmailConfirmed)
+                {
+                    <span style="margin-left: var(--space-2); font-size: var(--text-xs); color: var(--success); font-weight: var(--font-normal); display: flex; align-items: center; gap: var(--space-1);">
+                        <LucideIcon Name="check" Size="14" /> Verified
+                    </span>
+                }
+                else
+                {
+                    <span style="margin-left: var(--space-2); font-size: var(--text-xs); color: var(--warning); font-weight: var(--font-normal); display: flex; align-items: center; gap: var(--space-1);">
+                        <LucideIcon Name="triangle-alert" Size="14" /> Unverified
+                    </span>
+                }
+            </label>
+            <input type="text" value="@email" disabled
+                   style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--muted); color: var(--muted-foreground); font-size: var(--input-font-size); cursor: not-allowed; outline: none; box-sizing: border-box;" />
+            @if (!isEmailConfirmed)
+            {
+                <button type="submit" form="send-verification-form"
+                        style="align-self: flex-start; padding: var(--space-1) var(--space-3); margin-top: var(--space-1); border-radius: var(--radius); background-color: transparent; color: var(--primary); font-size: var(--text-sm); font-weight: var(--font-medium); border: 1px solid var(--primary); cursor: pointer;">
+                    Resend verification email
+                </button>
+            }
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+            <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">New email</label>
+            <InputText @bind-Value="Input.NewEmail" autocomplete="email" aria-required="true"
+                       style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); outline: none; box-sizing: border-box;" />
+            <ValidationMessage For="() => Input.NewEmail" style="font-size: var(--text-sm); color: var(--destructive);" />
+        </div>
+
+        <button type="submit"
+                style="width: 100%; margin-top: var(--space-2); padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer;">
+            Change email
+        </button>
+
+    </div>
+</EditForm>
+
+@code {
+    private string? message;
+    private ApplicationUser user = default!;
+    private string? email;
+    private bool isEmailConfirmed;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "change-email")]
+    private InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        email = await UserManager.GetEmailAsync(user);
+        isEmailConfirmed = await UserManager.IsEmailConfirmedAsync(user);
+        Input.NewEmail ??= email;
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        if (Input.NewEmail is null || Input.NewEmail == email)
+        {
+            message = "Your email is unchanged.";
+            return;
+        }
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateChangeEmailTokenAsync(user, Input.NewEmail);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmailChange").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["email"] = Input.NewEmail, ["code"] = code });
+
+        await EmailSender.SendConfirmationLinkAsync(user, Input.NewEmail, HtmlEncoder.Default.Encode(callbackUrl));
+        message = "Confirmation link to change email sent. Please check your email.";
+    }
+
+    private async Task OnSendEmailVerificationAsync()
+    {
+        if (email is null) return;
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
+
+        await EmailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(callbackUrl));
+        message = "Verification email sent. Please check your email.";
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "New email")]
+        public string? NewEmail { get; set; }
+    }
+}

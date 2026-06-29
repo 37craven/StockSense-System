@@ -1,0 +1,239 @@
+@page "/my-builds"
+@layout PublicLayout
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@using System.Text.Json
+@using System.Globalization
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Authorization
+@using StockSense.Client.Layout
+@using StockSense.Application.DTOs
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+@attribute [Authorize]
+
+<PageTitle>My Builds</PageTitle>
+
+<div style="width: 100%; max-width: 900px; margin: 0 auto; padding: var(--space-8) var(--space-4);">
+
+    <div style="margin-bottom: var(--space-6);">
+        <h1 style="font-size: var(--text-2xl); font-weight: var(--font-bold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">My Builds</h1>
+        <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Track the status of your submitted custom builds.</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div style="display: flex; align-items: center; gap: var(--space-3); color: var(--muted-foreground); padding: var(--space-8); justify-content: center;">
+            <span style="font-size: var(--text-sm);">Loading your builds...</span>
+        </div>
+    }
+    else if (myBuilds == null || !myBuilds.Any())
+    {
+        <div style="text-align: center; padding: var(--space-8); background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; gap: var(--space-4);">
+            <div>
+                <p style="font-size: var(--text-base); font-weight: var(--font-medium); color: var(--foreground); margin: 0 0 var(--space-1) 0;">No builds yet</p>
+                <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">You haven't submitted any builds yet.</p>
+            </div>
+            <button @onclick='() => Nav.NavigateTo("/build")' style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: var(--radius); cursor: pointer;">Start a New Build</button>
+        </div>
+    }
+    else
+    {
+        <div style="display: flex; justify-content: flex-end; margin-bottom: var(--space-3); align-items: center; gap: 8px;">
+            <input type="checkbox" @bind="showAllHistory" id="userBuildArchive" />
+            <label for="userBuildArchive" style="font-size: var(--text-xs); color: var(--muted-foreground); cursor: pointer;">Show full history</label>
+        </div>
+
+        <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: var(--text-sm); min-width: 600px;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
+                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Date Submitted</th>
+                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Type</th>
+                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Items</th>
+                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Total Value</th>
+                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Status</th>
+                        <th style="text-align: center; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var build in FilteredBuilds)
+                    {
+                        var rawParts = ParseParts(build.SelectedPartsJson);
+
+                        // Extract the hidden metadata tag
+                        var metaTag = rawParts.FirstOrDefault(p => p.Category == "SYSTEM_METADATA");
+                        bool isPreBuilt = metaTag?.Name == "TYPE_PREBUILT";
+
+                        // Get the package name from the Brand field, fallback to generic name if old build
+                        string buildName = metaTag?.Brand ?? (isPreBuilt ? "Pre-Built Package" : "Custom Parts Selection");
+
+                        // Filter out the metadata tag so it doesn't mess up your UI counts
+                        var actualParts = rawParts.Where(p => p.Category != "SYSTEM_METADATA").ToList();
+
+                        <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;">
+                            <td style="padding: 12px 16px; color: var(--muted-foreground); font-size: var(--text-xs);">@build.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</td>
+
+                            <td style="padding: 12px 16px;">
+                                @if (isPreBuilt)
+                                {
+                                    <span style="display: inline-flex; align-items: center; background: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                                        <LucideIcon Name="zap" Size="10" style="margin-right: 4px;" /> Pre-Built
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span style="display: inline-flex; align-items: center; background: var(--muted); color: var(--foreground); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                                        <LucideIcon Name="wrench" Size="10" style="margin-right: 4px;" /> Custom
+                                    </span>
+                                }
+                            </td>
+
+                            <td style="padding: 12px 16px;">
+                                <span style="background: var(--muted); padding: 2px 8px; border-radius: 4px; font-size: var(--text-xs);">@actualParts.Count items</span>
+                            </td>
+                            <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);">₱@actualParts.Sum(p => p.Price).ToString("N2")</td>
+                            <td style="padding: 12px 16px;">
+                                <span style="padding: 4px 10px; border-radius: 9999px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; background: rgba(255,255,255,0.05); color: @GetStatusColor(build.Status);">
+                                    @build.Status
+                                </span>
+                            </td>
+                            <td style="padding: 12px 16px; text-align: center;">
+                                <button @onclick="() => OpenModal(build, actualParts, buildName)" style="background: transparent; border: 1px solid var(--border); color: var(--foreground); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: var(--text-xs);">
+                                    VIEW
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@if (ShowModal && CurrentParts != null)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 20px;">
+        <div style="background: var(--card); width: 600px; max-height: 85vh; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
+            <div style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h3 style="margin: 0 0 6px 0; color: var(--foreground); font-size: 1.25rem;">Build Summary</h3>
+                    @if (!string.IsNullOrEmpty(modalBuildName))
+                    {
+                        <span style="display: inline-block; font-size: 11px; color: #3b82f6; text-transform: uppercase; font-weight: 800; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); padding: 4px 10px; border-radius: 6px;">
+                            @modalBuildName
+                        </span>
+                    }
+                </div>
+                <button @onclick="CloseModal" style="background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 1.5rem;">&times;</button>
+            </div>
+            <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                @foreach (var group in CurrentParts.GroupBy(p => p.Category))
+                {
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="font-size: 0.7rem; color: var(--primary); text-transform: uppercase; margin-bottom: 8px;">@group.Key</h4>
+                        @foreach (var part in group)
+                        {
+                            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <span style="font-size: 0.85rem; color: var(--foreground);">@part.Brand @part.Name</span>
+                                <span style="font-weight: bold;">₱@part.Price.ToString("N2")</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div style="padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold; font-size: 1.1rem;">Total: ₱@CurrentParts.Sum(p => p.Price).ToString("N2")</span>
+                <button @onclick="CloseModal" style="padding: 8px 20px; background: var(--secondary); color: var(--foreground); border: none; border-radius: 6px; cursor: pointer;">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+    private List<BuildRequestDto>? myBuilds;
+    private bool isLoading = true;
+    private bool showAllHistory = false;
+
+    private bool ShowModal = false;
+    private BuildRequestDto? CurrentBuild;
+    private List<ProductDto> CurrentParts = new();
+    private string modalBuildName = "";
+
+    private IEnumerable<BuildRequestDto> FilteredBuilds
+    {
+        get
+        {
+            if (myBuilds == null) return Enumerable.Empty<BuildRequestDto>();
+
+            var active = myBuilds.Where(b => b.Status == "Pending" || b.Status == "Confirmed");
+            var history = myBuilds.Where(b => b.Status == "Completed" || b.Status == "Cancelled");
+
+            if (!showAllHistory)
+            {
+                var limitDate = DateTime.Now.AddDays(-30);
+                history = history.Where(b => b.CreatedAt >= limitDate);
+            }
+
+            return active.Concat(history).OrderByDescending(b => b.CreatedAt);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateTask!;
+        if (authState.User.Identity == null || !authState.User.Identity.IsAuthenticated)
+        {
+            Nav.NavigateTo($"/Account/Login?returnUrl={Uri.EscapeDataString(Nav.Uri)}", true);
+            return;
+        }
+
+        var userName = authState.User.Identity.Name;
+
+        try
+        {
+            myBuilds = await Http.GetFromJsonAsync<List<BuildRequestDto>>($"api/builds/customer/{userName}");
+        }
+        catch
+        {
+            myBuilds = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private List<ProductDto> ParseParts(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "[]") return new();
+        try
+        {
+            return JsonSerializer.Deserialize<List<ProductDto>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    private void OpenModal(BuildRequestDto build, List<ProductDto> parts, string buildName)
+    {
+        CurrentBuild = build;
+        CurrentParts = parts;
+        modalBuildName = string.IsNullOrWhiteSpace(buildName) ? "Custom Parts Selection" : buildName;
+        ShowModal = true;
+    }
+
+    private void CloseModal() => ShowModal = false;
+
+    private string GetStatusColor(string status) => status?.ToLower() switch
+    {
+        "pending" => "#f59e0b",
+        "confirmed" => "#3b82f6",
+        "completed" => "#10b981",
+        "cancelled" => "#ef4444",
+        _ => "var(--foreground)"
+    };
+}

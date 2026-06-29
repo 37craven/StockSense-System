@@ -1,0 +1,425 @@
+@page "/admin/appointments"
+@layout AdminLayout
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@using StockSense.Application.DTOs
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.Authorization
+@using StockSense.Client.Layout
+@using BlazorBlueprint.Primitives.Services
+@inject HttpClient Http
+
+@attribute [Authorize(Roles = "Employee, Admin")]
+
+<PageTitle>Manage Appointments</PageTitle>
+
+<BbPortalHost />
+<BbDialogProvider />
+
+<div>
+    <div style="display: flex; align-items: start; margin-bottom: var(--space-6); flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: var(--space-2); flex-direction: row;">
+            <h1 style="font-size: var(--text-2xl); font-weight: var(--font-bold); color: var(--foreground); margin: 0;">Manage Appointments</h1>
+            <span style="background: var(--destructive); color: white; padding: 2px 8px; border-radius: var(--radius); font-size: var(--text-xs); font-weight: bold;">
+                @ActiveAppointments.Count(a => a.Status == "Pending") Pending
+            </span>
+        </div>
+        <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Review and manage customer appointment requests.</p>
+    </div>
+
+    @if (allAppointments == null)
+    {
+        <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
+            <LightSpinner Description="Loading Appointments..." />
+        </div>
+    }
+    else
+    {
+        @* --- TABS & ARCHIVE TOGGLE --- *@
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+            <div style="display: flex; gap: var(--space-2);">
+                <button @onclick='() => currentTab = "Active"'
+                        style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "Active" ? "var(--secondary)" : "transparent"); color: @(currentTab == "Active" ? "var(--foreground)" : "var(--muted-foreground)");">
+                    Active (@ActiveAppointments.Count())
+                </button>
+                <button @onclick='() => currentTab = "History"'
+                        style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "History" ? "var(--secondary)" : "transparent"); color: @(currentTab == "History" ? "var(--foreground)" : "var(--muted-foreground)");">
+                    History (@HistoryAppointments.Count())
+                </button>
+            </div>
+
+            @if (currentTab == "History")
+            {
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" @bind="showAllHistory" id="archiveToggle" />
+                    <label for="archiveToggle" style="font-size: var(--text-xs); color: var(--muted-foreground); cursor: pointer;">Show older than 30 days</label>
+                </div>
+            }
+        </div>
+
+        <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: var(--text-sm); min-width: 750px;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
+                            <th @onclick="@(() => ToggleSort("customer"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                                Customer @SortArrow("customer")
+                            </th>
+                            <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground);">Mechanic</th>
+                            <th @onclick="@(() => ToggleSort("schedule"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                                Schedule @SortArrow("schedule")
+                            </th>
+                            <th @onclick="@(() => ToggleSort("services"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                                Services @SortArrow("services")
+                            </th>
+                            <th @onclick="@(() => ToggleSort("total"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                                Total Value @SortArrow("total")
+                            </th>
+                            <th @onclick="@(() => ToggleSort("status"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                                Status @SortArrow("status")
+                            </th>
+                            <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground);">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!DisplayAppointments.Any())
+                        {
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 40px; color: var(--muted-foreground);">
+                                    <span>No appointments found in this section.</span>
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var appt in DisplayAppointments)
+                        {
+                            <tr @onclick="() => OpenDetail(appt)"
+                                style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;"
+                                onmouseover="this.style.backgroundColor='color-mix(in oklch, var(--primary) 5%, transparent)'"
+                                onmouseout="this.style.backgroundColor='transparent'">
+                                <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);">@appt.CustomerName</td>
+                                <td style="padding: 12px 16px; color: var(--foreground); font-size: var(--text-xs);">@FormatMechanicName(appt.MechanicName)</td>
+                                <td style="padding: 12px 16px; white-space: nowrap;">
+                                    <span style="color: var(--foreground);">@appt.AppointmentDate.ToString("MMM dd, yyyy")</span>
+                                    <span style="color: #3b82f6; font-weight: bold; margin-left: 6px;">@appt.TimeSlot</span>
+                                    <span style="color: var(--muted-foreground); margin-left: 4px;">(@appt.DurationMinutes mins)</span>
+                                </td>
+                                <td style="padding: 12px 16px;">
+                                    <div style="color: var(--muted-foreground); font-size: var(--text-sm);">@appt.ServicesRequested</div>
+                                </td>
+                                <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);">
+                                    ₱@appt.TotalAmount.ToString("N2")
+                                </td>
+                                <td style="padding: 12px 16px;">
+                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(appt.Status); color: white;">
+                                        <span style="width: 6px; height: 6px; border-radius: 50%; background: white; opacity: 0.7;"></span>
+                                        @appt.Status
+                                    </span>
+                                </td>
+                                <td style="padding: 12px 16px;" @onclick:stopPropagation>
+                                    @{
+                                        var isPending = appt.Status == "Pending";
+                                        var isConfirmed = appt.Status == "Confirmed";
+                                        var isCompleted = appt.Status == "Completed";
+                                        var isCancelled = appt.Status == "Cancelled";
+                                    }
+                                    <div style="display: flex; gap: 6px; flex-wrap: nowrap;">
+                                        @if (isPending)
+                                        {
+                                            <button @onclick="@(() => UpdateStatus(appt, "Confirmed"))"
+                                                    title="Confirm"
+                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                <LucideIcon Name="check" Size="12" /> Confirm
+                                            </button>
+                                            <button @onclick="@(() => UpdateStatus(appt, "Cancelled"))"
+                                                    title="Cancel"
+                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                <LucideIcon Name="x" Size="12" /> Cancel
+                                            </button>
+                                        }
+                                        else if (isConfirmed)
+                                        {
+                                            <button @onclick="@(() => UpdateStatus(appt, "Completed"))"
+                                                    title="Complete"
+                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                <LucideIcon Name="circle-check" Size="12" /> Complete
+                                            </button>
+                                            <button @onclick="@(() => UpdateStatus(appt, "Cancelled"))"
+                                                    title="Cancel"
+                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                <LucideIcon Name="x" Size="12" /> Cancel
+                                            </button>
+                                        }
+                                        else if (isCompleted || isCancelled)
+                                        {
+                                            <button @onclick="@(() => UpdateStatus(appt, "Pending"))"
+                                                    title="Reopen"
+                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                <LucideIcon Name="rotate-ccw" Size="12" /> Reopen
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@* DETAIL MODAL *@
+<BbDialog @bind-Open="showDetailModal">
+    <BbDialogContent Style="width: min(96vw, 600px); max-height: 85vh; display: flex; flex-direction: column;">
+        <BbDialogHeader>
+            <div style="display:flex; flex-direction: row; align-items: center; gap: 12px;">
+                <BbDialogTitle>Appointment Details</BbDialogTitle>
+                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(selectedAppointment.Status); color: white;">
+                    @selectedAppointment.Status
+                </span>
+            </div>
+            <BbDialogDescription>
+                <div style="font-size: 0.85rem; color: var(--muted-foreground); font-style: italic;">
+                    #@selectedAppointment?.Id | @selectedAppointment.CreatedAt.ToString("MM/dd/yy HH:mm")
+                </div>
+            </BbDialogDescription>
+
+
+        </BbDialogHeader>
+        <div style="flex: 1; overflow-y: auto; padding: var(--space-2) 0; display: flex; flex-direction: column; gap: var(--space-4);">
+            @if (selectedAppointment != null)
+            {
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Customer</div>
+                        <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin-top: 4px;">@selectedAppointment.CustomerName</div>
+                        @if (!string.IsNullOrEmpty(selectedAppointment.ContactNumber))
+                        {
+                            <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">@selectedAppointment.ContactNumber</div>
+                        }
+                    </div>
+                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Mechanic</div>
+                        <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin-top: 4px;">@FormatMechanicName(selectedAppointment.MechanicName)</div>
+                    </div>
+                </div>
+
+                <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Schedule</div>
+                    <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: 4px;">
+                        <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground);">@selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy")</span>
+                        <span style="font-size: var(--text-sm); color: #3b82f6; font-weight: bold;">@selectedAppointment.TimeSlot</span>
+                        <span style="font-size: var(--text-xs); color: var(--muted-foreground);">(~@selectedAppointment.DurationMinutes mins)</span>
+                    </div>
+                </div>
+
+                <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Services & Parts</div>
+                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
+                        @foreach (var svc in selectedAppointment.ServicesRequested.Split(", ", StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            <div style="font-size: var(--text-sm); color: var(--foreground);">• @svc</div>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(selectedAppointment.SelectedProductsJson))
+                    {
+                        var productData = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
+                        @if (productData != null)
+                        {   
+                            <div style="margin-top: var(--space-2); border-top: 1px dashed var(--border); padding-top: var(--space-2);">
+                                <div style="font-size: 10px; color: var(--muted-foreground); text-transform: uppercase; margin-bottom: 4px;">Selected Products</div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    @{
+                                        var allProds = productData.SelectMany(e => e.products).ToList();
+                                    }
+                                    @if (allProds.Any())
+                                    {
+                                        @foreach (var p in allProds)
+                                        {
+                                            <div style="font-size: var(--text-sm); color: var(--foreground);">• @p.name (₱@p.price.ToString("N0"))</div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div style="font-size: var(--text-sm); color: var(--muted-foreground); font-style: italic;">No parts selected</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Total Amount</div>
+                    <span style="font-size: var(--text-xl); font-weight: 900; color: var(--primary);">₱@selectedAppointment.TotalAmount.ToString("N2")</span>
+                </div>
+            }
+        </div>
+        <div style="display: flex; justify-content: end; align-items: center; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border); flex-shrink: 0;">
+            @if (selectedAppointment != null)
+            {
+                var s = selectedAppointment;
+                <div style="display: flex; gap: 6px;">
+                    @if (s.Status == "Pending")
+                    {
+                        <button @onclick="@(() => { UpdateStatus(s, "Confirmed"); showDetailModal = false; })"
+                                style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <LucideIcon Name="check" Size="14" /> Confirm
+                        </button>
+                        <button @onclick="@(() => { UpdateStatus(s, "Cancelled"); showDetailModal = false; })"
+                                style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <LucideIcon Name="x" Size="14" /> Cancel
+                        </button>
+                    }
+                    else if (s.Status == "Confirmed")
+                    {
+                        <button @onclick="@(() => { UpdateStatus(s, "Completed"); showDetailModal = false; })"
+                                style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <LucideIcon Name="circle" Size="14" /> Complete
+                        </button>
+                        <button @onclick="@(() => { UpdateStatus(s, "Cancelled"); showDetailModal = false; })"
+                                style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <LucideIcon Name="x" Size="14" /> Cancel
+                        </button>
+                    }
+                    else if (s.Status == "Completed" || s.Status == "Cancelled")
+                    {
+                        <button @onclick="@(() => { UpdateStatus(s, "Pending"); showDetailModal = false; })"
+                                style="flex: 1; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <LucideIcon Name="rotate-ccw" Size="14" /> Reopen
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private List<AppointmentDto>? allAppointments;
+    private string currentTab = "Active";
+    private bool showAllHistory = false;
+    private bool showDetailModal = false;
+    private AppointmentDto? selectedAppointment;
+    private string sortColumn = "created";
+    private bool sortAsc = false;
+
+    private IEnumerable<AppointmentDto> ActiveAppointments =>
+        allAppointments?.Where(a => a.Status == "Pending" || a.Status == "Confirmed") ?? Enumerable.Empty<AppointmentDto>();
+
+    private IEnumerable<AppointmentDto> HistoryAppointments
+    {
+        get
+        {
+            if (allAppointments == null) return Enumerable.Empty<AppointmentDto>();
+            var query = allAppointments.Where(a => a.Status == "Completed" || a.Status == "Cancelled");
+            if (!showAllHistory)
+            {
+                var limitDate = DateTime.Now.AddDays(-30);
+                query = query.Where(a => a.AppointmentDate >= limitDate);
+            }
+            return query;
+        }
+    }
+
+    private IEnumerable<AppointmentDto> DisplayAppointments
+    {
+        get
+        {
+            var src = currentTab == "Active" ? ActiveAppointments : HistoryAppointments;
+            return (sortColumn, sortAsc) switch
+            {
+                ("customer", true) => src.OrderBy(a => a.CustomerName),
+                ("customer", false) => src.OrderByDescending(a => a.CustomerName),
+                ("schedule", true) => src.OrderBy(a => a.AppointmentDate).ThenBy(a => a.TimeSlot),
+                ("schedule", false) => src.OrderByDescending(a => a.AppointmentDate).ThenByDescending(a => a.TimeSlot),
+                ("services", true) => src.OrderBy(a => a.ServicesRequested),
+                ("services", false) => src.OrderByDescending(a => a.ServicesRequested),
+                ("total", true) => src.OrderBy(a => a.TotalAmount),
+                ("total", false) => src.OrderByDescending(a => a.TotalAmount),
+                ("status", true) => src.OrderBy(a => a.Status),
+                ("status", false) => src.OrderByDescending(a => a.Status),
+                _ => src.OrderByDescending(a => a.CreatedAt)
+            };
+        }
+    }
+
+    private void ToggleSort(string column)
+    {
+        if (sortColumn == column) sortAsc = !sortAsc;
+        else { sortColumn = column; sortAsc = true; }
+    }
+
+    private string SortArrow(string column)
+    {
+        if (sortColumn != column) return "";
+        return sortAsc ? "▲" : " ▼";
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAppointments();
+
+    private async Task LoadAppointments()
+    {
+        try
+        {
+            allAppointments = await Http.GetFromJsonAsync<List<AppointmentDto>>("api/appointments/all");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private void OpenDetail(AppointmentDto appt)
+    {
+        selectedAppointment = appt;
+        showDetailModal = true;
+    }
+
+    private async Task UpdateStatus(AppointmentDto appt, string newStatus)
+    {
+        var response = await Http.PutAsJsonAsync($"api/appointments/{appt.Id}/status", newStatus);
+        if (response.IsSuccessStatusCode) appt.Status = newStatus;
+        StateHasChanged();
+    }
+
+    private string GetStatusColor(string status) => status?.ToLower() switch
+    {
+        "pending" => "#f59e0b",
+        "confirmed" => "#3b82f6",
+        "completed" => "#10b981",
+        "cancelled" => "#ef4444",
+        _ => "gray"
+    };
+
+    private string FormatMechanicName(string? name)
+    {
+        if (string.IsNullOrEmpty(name) || name == "Any Available") return "Any Available";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 ? parts[^1] : name;
+    }
+
+    private List<ProductBreakdownEntry>? ParseProductBreakdown(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<ProductBreakdownEntry>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch { return null; }
+    }
+
+    private class ProductBreakdownEntry
+    {
+        public string serviceName { get; set; } = "";
+        public decimal servicePrice { get; set; }
+        public List<ProductItem> products { get; set; } = new();
+    }
+
+    private class ProductItem
+    {
+        public string name { get; set; } = "";
+        public decimal price { get; set; }
+        public bool selected { get; set; }
+        public string category { get; set; } = "";
+    }
+}
