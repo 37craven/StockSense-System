@@ -14,11 +14,11 @@ DELETE FROM [OrderSlipItems];
 DELETE FROM [OrderSlips];
 DELETE FROM [TransactionItem];
 DELETE FROM [Transactions];
-DELETE FROM [PreBuildPackageProduct];
+DELETE FROM [PreBuiltPackageProduct];
 DELETE FROM [ProductStoreService];
 DELETE FROM [Products];
 DELETE FROM [StoreServices];
-DELETE FROM [PreBuildPackages];
+DELETE FROM [PreBuiltPackages];
 DELETE FROM [Appointments];
 DELETE FROM [BuildRequests];
 DELETE FROM [SalesHistory];
@@ -30,7 +30,7 @@ DBCC CHECKIDENT ('[Suppliers]', RESEED, 0);
 DBCC CHECKIDENT ('[Mechanics]', RESEED, 0);
 DBCC CHECKIDENT ('[Products]', RESEED, 0);
 DBCC CHECKIDENT ('[StoreServices]', RESEED, 0);
-DBCC CHECKIDENT ('[PreBuildPackages]', RESEED, 0);
+DBCC CHECKIDENT ('[PreBuiltPackages]', RESEED, 0);
 DBCC CHECKIDENT ('[OrderSlips]', RESEED, 0);
 DBCC CHECKIDENT ('[OrderSlipItems]', RESEED, 0);
 DBCC CHECKIDENT ('[Transactions]', RESEED, 0);
@@ -227,17 +227,17 @@ SET IDENTITY_INSERT [StoreServices] OFF;
 -- ============================================================
 -- PRE-BUILD PACKAGES (5)
 -- ============================================================
-PRINT 'Inserting PreBuildPackages...';
-SET IDENTITY_INSERT [PreBuildPackages] ON;
+PRINT 'Inserting PreBuiltPackages...';
+SET IDENTITY_INSERT [PreBuiltPackages] ON;
 
-INSERT INTO [PreBuildPackages] ([Id], [Name], [Description], [CompatibleBrand], [CompatibleModel], [TargetCC], [EstimatedAddedCC], [IsActive]) VALUES
+INSERT INTO [PreBuiltPackages] ([Id], [Name], [Description], [CompatibleBrand], [CompatibleModel], [TargetCC], [EstimatedAddedCC], [IsActive]) VALUES
 (1, N'Daily Ride Setup',   N'Essential upgrades for daily city commute. Reliable and affordable.',  N'Honda',  N'XRM 125',     N'100cc-125cc', 3, 1),
 (2, N'Long Ride Kit',      N'Built for endurance on long provincial highways. Extra comfort and safety.', N'Yamaha', N'Mio 125', N'125cc-150cc', 5, 1),
 (3, N'Racing Config',      N'Track-ready performance parts for maximum power and handling.',      N'Suzuki', N'Raider 150',  N'150cc-200cc', 12, 1),
 (4, N'Budget Build',       N'Cost-effective upgrade package without breaking the bank.',           N'Various',N'Universal',   N'100cc-150cc', 2, 1),
 (5, N'Full Overhaul Kit',  N'Complete engine and drivetrain restoration package.',                 N'Kawasaki',N'Barako 175', N'150cc-200cc', 8, 1);
 
-SET IDENTITY_INSERT [PreBuildPackages] OFF;
+SET IDENTITY_INSERT [PreBuiltPackages] OFF;
 
 -- ============================================================
 -- PRODUCT-STORE-SERVICE M:M (ProductStoreService)
@@ -283,29 +283,29 @@ INSERT INTO [ProductStoreService] ([RequiredProductsId], [StoreServicesId]) VALU
 (61,8), (62,8);
 
 -- ============================================================
--- PRE-BUILD PACKAGE PRODUCT M:M (PreBuildPackageProduct)
+-- PRE-BUILD PACKAGE PRODUCT M:M (PreBuiltPackageProduct)
 -- ============================================================
-PRINT 'Inserting PreBuildPackageProduct...';
+PRINT 'Inserting PreBuiltPackageProduct...';
 
 -- Package 1: Daily Ride Setup (Oil, plug, brake shoes, tire, battery, cable)
-INSERT INTO [PreBuildPackageProduct] ([IncludedProductsId], [PreBuildPackagesId]) VALUES
+INSERT INTO [PreBuiltPackageProduct] ([IncludedProductsId], [PreBuiltPackagesId]) VALUES
 (1,1), (7,1), (13,1), (25,1), (31,1), (52,1), (66,1);
 
 -- Package 2: Long Ride Kit (Better oil, iridium plug, bendix pads, DID chain, Kenda tire, DRL, CRC, cover)
-INSERT INTO [PreBuildPackageProduct] ([IncludedProductsId], [PreBuildPackagesId]) VALUES
+INSERT INTO [PreBuiltPackageProduct] ([IncludedProductsId], [PreBuiltPackagesId]) VALUES
 (2,2), (11,2), (17,2), (19,2), (26,2), (43,2), (48,2), (61,2), (65,2);
 
 -- Package 3: Racing Config (Repsol, iridium, brake lever, Tsubaki chain, Pirelli tire, throttle cable, fork seal)
-INSERT INTO [PreBuildPackageProduct] ([IncludedProductsId], [PreBuildPackagesId]) VALUES
+INSERT INTO [PreBuiltPackageProduct] ([IncludedProductsId], [PreBuiltPackagesId]) VALUES
 (4,3), (11,3), (15,3), (21,3), (29,3), (49,3), (58,3), (69,3);
 
 -- Package 4: Budget Build (Castrol, Denso plug, TZM shoes, RKP sprocket, Cheng Shin tire, air filter, cables, grips)
-INSERT INTO [PreBuildPackageProduct] ([IncludedProductsId], [PreBuildPackagesId]) VALUES
+INSERT INTO [PreBuiltPackageProduct] ([IncludedProductsId], [PreBuiltPackagesId]) VALUES
 (6,4), (12,4), (18,4), (24,4), (28,4), (41,4), (52,4), (53,4), (66,4);
 
 -- Package 5: Full Overhaul Kit (Motul, Denso iridium, brake lever, RK chain, Sunstar sprocket, Michelin, oil filter,
 --               steering bearing, oil seal, reg/rect, cam chain tensioner)
-INSERT INTO [PreBuildPackageProduct] ([IncludedProductsId], [PreBuildPackagesId]) VALUES
+INSERT INTO [PreBuiltPackageProduct] ([IncludedProductsId], [PreBuiltPackagesId]) VALUES
 (3,5), (10,5), (15,5), (20,5), (22,5), (30,5), (37,5), (55,5), (59,5), (67,5), (75,5);
 
 -- ============================================================
