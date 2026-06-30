@@ -46,9 +46,9 @@ jobs:
     - name: Azure Login
       uses: azure/login@v2
       with:
-        client-id: ${{ vars.StockSense_Project_CLIENT_ID_FAC3 }}
-        tenant-id: ${{ vars.StockSense_Project_TENANT_ID_FAC3 }}
-        subscription-id: ${{ vars.StockSense_Project_SUBSCRIPTION_ID_FAC3 }}
+        client-id: ${{ secrets.StockSense_Project_CLIENT_ID_FAC3 }}
+        tenant-id: ${{ secrets.StockSense_Project_TENANT_ID_FAC3 }}
+        subscription-id: ${{ secrets.StockSense_Project_SUBSCRIPTION_ID_FAC3 }}
     - name: Deploy to Azure WebApp
       uses: azure/webapps-deploy@v2
       with:
