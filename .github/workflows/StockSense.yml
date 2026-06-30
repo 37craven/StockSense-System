@@ -46,9 +46,11 @@ jobs:
     - name: Azure Login
       uses: azure/login@v2
       with:
+        auth-type: SERVICE_PRINCIPAL
         client-id: ${{ secrets.StockSense_CLIENT_ID_091B }}
         tenant-id: ${{ secrets.StockSense_TENANT_ID_091B }}
         subscription-id: ${{ secrets.StockSense_SUBSCRIPTION_ID_091B }}
+        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
     - name: Deploy to Azure WebApp
       uses: azure/webapps-deploy@v2
       with:
