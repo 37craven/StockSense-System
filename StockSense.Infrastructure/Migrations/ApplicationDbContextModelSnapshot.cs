@@ -8,7 +8,7 @@ using StockSense.Infrastructure.Data;
 
 #nullable disable
 
-namespace StockSense.Web.Migrations
+namespace StockSense.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot

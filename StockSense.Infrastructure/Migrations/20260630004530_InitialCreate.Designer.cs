@@ -9,11 +9,11 @@ using StockSense.Infrastructure.Data;
 
 #nullable disable
 
-namespace StockSense.Web.Migrations
+namespace StockSense.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260628125845_RenamePreBuildToPreBuilt")]
-    partial class RenamePreBuildToPreBuilt
+    [Migration("20260630004530_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
