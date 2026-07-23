@@ -15,4 +15,6 @@ public class UpdateProductDto
 
     [Range(0, 999_999)]
     public int CurrentStock { get; set; }
+
+    public string? Barcode { get; set; }
 }

@@ -27,8 +27,20 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<List<ProductDto>>> GetProducts()
     {
         var products = await _productRepo.GetAllAsync();
-        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "")).ToList();
+        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode)).ToList();
         return Ok(dtos);
+    }
+
+    [HttpGet("barcode/{barcode}")]
+    public async Task<ActionResult<ProductDto>> GetProductByBarcode(string barcode)
+    {
+        var product = await _productRepo.GetByBarcodeAsync(barcode);
+        if (product == null) return NotFound(ApiResponse.NotFound("Product"));
+
+        var dto = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
+            product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
+            product.ImageUrl ?? "", product.Barcode);
+        return Ok(dto);
     }
 
     [HttpPost("send-quote")]
@@ -67,11 +79,18 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductDto dto)
     {
+        if (!string.IsNullOrWhiteSpace(dto.Barcode))
+        {
+            var existing = await _productRepo.GetByBarcodeAsync(dto.Barcode.Trim());
+            if (existing != null) return BadRequest(ApiResponse.Error("A product with this barcode already exists."));
+        }
+
         var product = new Product
         {
             Name = dto.Name,
             Brand = dto.Brand,
             Category = dto.Category,
+            Barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim(),
             Price = dto.Price,
             ReorderTarget = dto.ReorderTarget,
             ImageUrl = dto.ImageUrl
@@ -90,6 +109,14 @@ public class ProductsController : ControllerBase
         var product = await _productRepo.GetByIdAsync(id);
         if (product == null) return NotFound(ApiResponse.NotFound("Product"));
 
+        var newBarcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim();
+        if (newBarcode != null)
+        {
+            var existing = await _productRepo.GetByBarcodeAsync(newBarcode);
+            if (existing != null && existing.Id != id) return BadRequest(ApiResponse.Error("A product with this barcode already exists."));
+        }
+
+        product.Barcode = newBarcode;
         product.Price = dto.Price;
         product.ReorderTarget = dto.ReorderTarget;
         product.CurrentStock = dto.CurrentStock;

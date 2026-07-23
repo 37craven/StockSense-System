@@ -54,4 +54,11 @@ public class ProductRepository
     {
         await _context.SaveChangesAsync();
     }
+
+    public async Task<Product?> GetByBarcodeAsync(string barcode)
+    {
+        return await _context.Products
+            .Include(p => p.Supplier)
+            .FirstOrDefaultAsync(p => p.Barcode == barcode);
+    }
 }

@@ -10,5 +10,7 @@ public record ProductDto(
     int ReorderTarget = 0,
     int SupplierId = 0,
     string SupplierName = "",
-    string ImageUrl = ""
+    string ImageUrl = "",
+    string? Barcode = null
+
 );

@@ -10,6 +10,7 @@ public class Product
     [Required] public string Name { get; set; } = string.Empty;
     [Required] public string Category { get; set; } = string.Empty;
     public string Brand { get; set; } = string.Empty;
+    public string? Barcode { get; set; }
     [Column(TypeName = "decimal(18,2)")] public decimal Price { get; set; }
     public string ImageUrl { get; set; } = "https://placehold.co/300x200";
     [JsonInclude]

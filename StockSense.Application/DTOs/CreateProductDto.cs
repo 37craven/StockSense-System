@@ -9,4 +9,5 @@ public class CreateProductDto
     public int InitialStock { get; set; }
     public int ReorderTarget { get; set; }
     public string ImageUrl { get; set; } = "https://placehold.co/300x200";
+    public string? Barcode { get; set; }
 }
