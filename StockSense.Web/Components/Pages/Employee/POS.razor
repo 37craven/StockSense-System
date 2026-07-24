@@ -8,6 +8,7 @@
 @inject TransactionHelper SaleService
 @inject IJSRuntime JS
 @rendermode InteractiveServer
+@implements IDisposable
 
 @attribute [Authorize(Roles = "Admin, Employee")]
 
@@ -21,11 +22,17 @@
         <div style="flex-shrink: 0; padding: var(--space-4) var(--space-4); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-3);">
 
             @* FIX: Standard HTML input to prevent ChangeEventArgs crash during real-time typing *@
-            <input type="text"
-                   @bind="searchTerm"
-                   @bind:event="oninput"
-                   placeholder="Search products or brands..."
-                   style="width: 100%; padding: 10px 15px; border-radius: var(--radius); border: 1px solid var(--border); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); outline: none;" />
+            <div style="display: flex; gap: var(--space-2);">
+                <input type="text"
+                       @bind="searchTerm"
+                       @bind:event="oninput"
+                       placeholder="Search products or brands..."
+                       style="flex: 1; padding: 10px 15px; border-radius: var(--radius); border: 1px solid var(--border); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); outline: none;" />
+                <BbButton Variant="ButtonVariant.Outline" OnClick="OpenScanModal" title="Scan a product barcode">
+                    <LucideIcon Name="scan-line" Size="16" />
+                    <span class="scan-btn-label">Scan</span>
+                </BbButton>
+            </div>
 
             <div style="display: flex; flex-wrap: nowrap; gap: var(--space-1); overflow-x: auto; padding-bottom: var(--space-1);">
                 <button type="button" @onclick="() => selectedCategory = null"
@@ -155,7 +162,81 @@
     </div>
 </div>
 
-@* --- E-RECEIPT MODAL --- *@
+@* --- BARCODE SCAN MODAL --- *@
+@if (showScanModal)
+{
+    <div class="scan-backdrop no-print" @onclick="CloseScanModal"></div>
+    <div class="scan-modal no-print">
+        <div class="scan-modal-header">
+            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                <LucideIcon Name="camera" Size="18" />
+                <span style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--card-foreground);">Scan Barcode</span>
+            </div>
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="CloseScanModal">
+                <LucideIcon Name="x" Size="16" />
+            </BbButton>
+        </div>
+
+        @* Upper half: live camera preview. Sizing/position is controlled by .scan-camera-area CSS below. *@
+        <div class="scan-camera-area">
+            <div id="barcode-camera-container"></div>
+            <div class="scan-frame-hint"></div>
+        </div>
+
+        @* Lower half: what was just recognized, plus Confirm/Discard. Item is only added to the cart on Confirm. *@
+        <div class="scan-info-area">
+            @if (!string.IsNullOrEmpty(scanErrorMessage))
+            {
+                <div style="padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); font-size: var(--text-sm); color: var(--destructive-muted-foreground);">
+                    @scanErrorMessage
+                </div>
+            }
+            else if (scannedProduct != null)
+            {
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);">
+                    <div style="min-width: 0;">
+                        <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            @scannedProduct.Name
+                        </div>
+                        <div style="font-size: var(--text-xs); color: var(--muted-foreground);">
+                            @scannedProduct.Brand · Stock: @scannedProduct.CurrentStock
+                        </div>
+                    </div>
+                    <div style="font-size: var(--text-base); font-weight: var(--font-bold); color: var(--primary); flex-shrink: 0;">
+                        ₱@scannedProduct.Price.ToString("N2")
+                    </div>
+                </div>
+                @if (scannedProduct.CurrentStock <= 0)
+                {
+                    <div style="font-size: var(--text-xs); color: var(--destructive);">Out of stock — cannot add.</div>
+                }
+                <div style="display: flex; gap: var(--space-2);">
+                    <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="DiscardScannedItem">
+                        <LucideIcon Name="x" Size="14" /> Discard
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="ConfirmScannedItem" Disabled="@(scannedProduct.CurrentStock <= 0)">
+                        <LucideIcon Name="check" Size="14" /> Confirm &amp; Add
+                    </BbButton>
+                </div>
+            }
+            else
+            {
+                <div style="text-align: center; color: var(--muted-foreground); font-size: var(--text-sm); padding: var(--space-2) 0;">
+                    Point the camera at a barcode…
+                </div>
+            }
+
+            @if (recentlyScannedCount > 0)
+            {
+                <div style="text-align: center; font-size: var(--text-xs); color: var(--muted-foreground);">
+                    @recentlyScannedCount item(s) added this session · <a href="javascript:void(0)" @onclick="CloseScanModal" style="color: var(--primary); text-decoration: underline;">Done Scanning</a>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+
 @if (showReceiptModal && completedTransaction != null)
 {
     <div class="receipt-backdrop no-print"></div>
@@ -308,6 +389,81 @@
 
     private bool showReceiptModal = false;
     private ReceiptDto? completedTransaction;
+
+    // --- Barcode scan modal state ---
+    private bool showScanModal = false;
+    private bool scannerShouldStart = false;
+    private Product? scannedProduct;
+    private string? scanErrorMessage;
+    private int recentlyScannedCount = 0;
+    private DotNetObjectReference<POS>? dotNetRef;
+
+    private void OpenScanModal()
+    {
+        scannedProduct = null;
+        scanErrorMessage = null;
+        recentlyScannedCount = 0;
+        showScanModal = true;
+        scannerShouldStart = true; // camera container isn't in the DOM yet - start it after render
+    }
+
+    private async Task CloseScanModal()
+    {
+        showScanModal = false;
+        scannedProduct = null;
+        scanErrorMessage = null;
+        await JS.InvokeVoidAsync("barcodeScanner.stop");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (scannerShouldStart)
+        {
+            scannerShouldStart = false;
+            dotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("barcodeScanner.start", "barcode-camera-container", dotNetRef);
+        }
+    }
+
+    // Called from barcodeScanner.js every time a barcode is recognized in frame.
+    [JSInvokable]
+    public async Task OnBarcodeScanned(string barcode)
+    {
+        if (scannedProduct != null && scannedProduct.Barcode == barcode)
+            return; // already previewing this exact item - avoid refetching every frame
+
+        var product = await ProductRepo.GetByBarcodeAsync(barcode);
+        scanErrorMessage = product == null ? $"No product found for barcode \"{barcode}\"." : null;
+        scannedProduct = product;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Called from barcodeScanner.js if the camera fails to start (e.g. permission denied).
+    [JSInvokable]
+    public async Task OnScannerError(string message)
+    {
+        scanErrorMessage = $"Camera error: {message}";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ConfirmScannedItem()
+    {
+        if (scannedProduct == null || scannedProduct.CurrentStock <= 0) return;
+        AddToCart(scannedProduct);
+        recentlyScannedCount++;
+        scannedProduct = null; // keep camera open so staff can scan the next item
+    }
+
+    private void DiscardScannedItem()
+    {
+        scannedProduct = null;
+        scanErrorMessage = null;
+    }
+
+    public void Dispose()
+    {
+        dotNetRef?.Dispose();
+    }
 
     protected override async Task OnInitializedAsync() => await LoadData();
 
@@ -603,6 +759,96 @@
             width: 100%;
             margin: 0;
             padding: 0;
+        }
+    }
+    /* BARCODE SCAN MODAL STYLES */
+    .scan-backdrop {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0,0,0,0.6);
+        z-index: 100;
+    }
+
+    .scan-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--card);
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        z-index: 101;
+        width: 420px;
+        max-width: 92vw;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    .scan-modal-header {
+        flex-shrink: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* Upper half: the live camera feed. Change this height (or use flex/vh) to
+       reposition/resize the scan area - e.g. flex: 1 for true half-split,
+       or a fixed vh value to pin it to the upper-middle of the screen. */
+    .scan-camera-area {
+        position: relative;
+        flex: 0 0 55%;
+        background-color: #000;
+        overflow: hidden;
+    }
+
+        .scan-camera-area #barcode-camera-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        .scan-camera-area #barcode-camera-container video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+        }
+
+    .scan-frame-hint {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 70%;
+        height: 40%;
+        border: 2px solid var(--primary);
+        border-radius: var(--radius);
+        pointer-events: none;
+        box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
+    }
+
+    /* Lower half: recognized-item preview + Confirm/Discard */
+    .scan-info-area {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: var(--space-4);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        justify-content: center;
+    }
+
+    .scan-btn-label {
+        display: inline;
+    }
+
+    @@media (max-width: 767px) {
+        .scan-btn-label {
+            display: none;
         }
     }
 </style>
