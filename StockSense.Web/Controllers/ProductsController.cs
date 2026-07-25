@@ -16,11 +16,13 @@ public class ProductsController : ControllerBase
 {
     private readonly ProductRepository _productRepo;
     private readonly EmailSender _emailSender;
+    private readonly BarcodeService _barcodeService;
 
-    public ProductsController(ProductRepository productRepo, EmailSender emailSender)
+    public ProductsController(ProductRepository productRepo, EmailSender emailSender, BarcodeService barcodeService)
     {
         _productRepo = productRepo;
         _emailSender = emailSender;
+        _barcodeService = barcodeService;
     }
 
     [HttpGet]
@@ -79,26 +81,46 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductDto dto)
     {
-        if (!string.IsNullOrWhiteSpace(dto.Barcode))
-        {
-            var existing = await _productRepo.GetByBarcodeAsync(dto.Barcode.Trim());
-            if (existing != null) return BadRequest(ApiResponse.Error("A product with this barcode already exists."));
-        }
-
         var product = new Product
         {
             Name = dto.Name,
             Brand = dto.Brand,
             Category = dto.Category,
-            Barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim(),
             Price = dto.Price,
             ReorderTarget = dto.ReorderTarget,
             ImageUrl = dto.ImageUrl
         };
         if (dto.InitialStock > 0) product.AddStock(dto.InitialStock);
         await _productRepo.AddAsync(product);
+        await _productRepo.SaveChangesAsync(); // first save to get the auto-generated Id
+
+        // Every new product gets a unique, system-generated barcode - staff never type one in.
+        product.Barcode = BarcodeService.GenerateBarcodeValue(product.Id);
         await _productRepo.SaveChangesAsync();
-        return Ok();
+
+        var dtoResult = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
+            product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
+            product.ImageUrl ?? "", product.Barcode);
+        return Ok(dtoResult);
+    }
+
+    [HttpGet("{id}/barcode-pdf")]
+    public async Task<IActionResult> GetBarcodePdf(int id)
+    {
+        var product = await _productRepo.GetByIdAsync(id);
+        if (product == null) return NotFound(ApiResponse.NotFound("Product"));
+
+        // Safety net for products that existed before this feature and have no barcode yet.
+        if (string.IsNullOrWhiteSpace(product.Barcode))
+        {
+            product.Barcode = BarcodeService.GenerateBarcodeValue(product.Id);
+            await _productRepo.SaveChangesAsync();
+        }
+
+        var imageBytes = _barcodeService.GenerateBarcodeImage(product.Barcode);
+        var pdfBytes = _barcodeService.GenerateBarcodeLabelPdf(product, imageBytes);
+        var safeName = string.Concat(product.Name.Split(Path.GetInvalidFileNameChars()));
+        return File(pdfBytes, "application/pdf", $"Barcode_{safeName}.pdf");
     }
 
     [HttpPut("{id}")]

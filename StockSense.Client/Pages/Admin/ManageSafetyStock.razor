@@ -5,6 +5,7 @@
 @using System.Net.Http.Json
 @using StockSense.Client.Layout
 @inject HttpClient Http
+@inject IJSRuntime JS
 
 <PageTitle>Inventory & Pricing</PageTitle>
 
@@ -410,8 +411,17 @@
             var response = await Http.PostAsJsonAsync("api/products", newProduct);
             if (response.IsSuccessStatusCode)
             {
+                var created = await response.Content.ReadFromJsonAsync<ProductDto>();
                 await LoadProducts();
                 CloseNewProductModal();
+
+                // Every new product gets a system-generated barcode - hand the owner a printable
+                // label straight away so the shelf/item can be tagged immediately.
+                if (created != null)
+                {
+                    var safeName = string.Concat(created.Name.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
+                    await JS.InvokeVoidAsync("triggerDownload", $"api/products/{created.Id}/barcode-pdf", $"Barcode_{safeName}.pdf");
+                }
             }
             else
             {

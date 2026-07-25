@@ -20,5 +20,9 @@
     <PackageReference Include="MailKit" Version="4.15.0" /> <PackageReference Include="MimeKit" Version="4.15.1" />
 
     <PackageReference Include="QuestPDF" Version="2026.2.4" />
+
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+
+    <PackageReference Include="ZXing.Net.Bindings.SkiaSharp" Version="0.16.22" />
   </ItemGroup>
 </Project>
