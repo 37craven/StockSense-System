@@ -364,3 +364,13 @@ FodyWeavers.xsd
 
 # Tailwind CLI binary
 tailwindcss
+
+# macOS
+.DS_Store
+
+# JetBrains IDEs
+.idea/
+*.sln.DotSettings.user
+
+# Local notes
+NOTES.md.agents/
