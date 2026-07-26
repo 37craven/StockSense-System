@@ -21,18 +21,11 @@
     <div class="pos-catalog">
         <div style="flex-shrink: 0; padding: var(--space-4) var(--space-4); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-3);">
 
-            @* FIX: Standard HTML input to prevent ChangeEventArgs crash during real-time typing *@
-            <div style="display: flex; gap: var(--space-2);">
-                <input type="text"
-                       @bind="searchTerm"
-                       @bind:event="oninput"
-                       placeholder="Search products or brands..."
-                       style="flex: 1; padding: 10px 15px; border-radius: var(--radius); border: 1px solid var(--border); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); outline: none;" />
-                <BbButton Variant="ButtonVariant.Outline" OnClick="OpenScanModal" title="Scan a product barcode">
-                    <LucideIcon Name="scan-line" Size="16" />
-                    <span class="scan-btn-label">Scan</span>
-                </BbButton>
-            </div>
+            <input type="text"
+                   @bind="searchTerm"
+                   @bind:event="oninput"
+                   placeholder="Search products or brands..."
+                   style="width: 100%; padding: 10px 15px; border-radius: var(--radius); border: 1px solid var(--border); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); outline: none;" />
 
             <div style="display: flex; flex-wrap: nowrap; gap: var(--space-1); overflow-x: auto; padding-bottom: var(--space-1);">
                 <button type="button" @onclick="() => selectedCategory = null"
@@ -68,28 +61,90 @@
         </div>
     </div>
 
-    @* --- DESKTOP CART --- *@
-    <div class="pos-cart-desktop">
-        <div style="flex-shrink: 0; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: var(--space-2);">
-            <LucideIcon Name="shopping-cart" Size="18" />
-            <span style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--card-foreground);">Current Order</span>
+    @* --- RIGHT COLUMN (desktop): order summary + scanner card --- *@
+    <div class="pos-right">
+        <div class="pos-cart-desktop">
+            <div style="flex-shrink: 0; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: var(--space-2);">
+                <LucideIcon Name="shopping-cart" Size="18" />
+                <span style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--card-foreground);">Current Order</span>
+            </div>
+
+            <div style="flex: 1; overflow-x: hidden; overflow-y: auto; padding: var(--space-4);">
+                @if (!cart.Any())
+                {
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: var(--space-3); color: var(--muted-foreground);">
+                        <LucideIcon Name="shopping-cart" Size="40" />
+                        <p style="font-size: var(--text-sm); margin: 0;">Cart is empty</p>
+                    </div>
+                }
+                else
+                {
+                    @CartTable()
+                }
+            </div>
+
+            @CartFooter()
         </div>
 
-        <div style="flex: 1; overflow-x: hidden; overflow-y: auto; padding: var(--space-4);">
-            @if (!cart.Any())
+        @* --- SCANNER CARD --- *@
+        <div class="pos-scanner-card">
+            <div class="pos-scanner-header">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <LucideIcon Name="scan-line" Size="16" />
+                    <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--card-foreground);">Barcode Scanner</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleCamera" title="Flip camera">
+                        <LucideIcon Name="switch-camera" Size="16" />
+                    </BbButton>
+                    <label class="switch">
+                        <input type="checkbox" @bind="scannerEnabled" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            @if (scannerEnabled)
             {
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: var(--space-3); color: var(--muted-foreground);">
-                    <LucideIcon Name="shopping-cart" Size="40" />
-                    <p style="font-size: var(--text-sm); margin: 0;">Cart is empty</p>
+                <div class="pos-scanner-body">
+                    <div id="barcode-camera-container" class="@CameraClass"></div>
+
+                    @if (!string.IsNullOrEmpty(scanErrorMessage))
+                    {
+                        <div class="pos-scanner-msg error">@scanErrorMessage</div>
+                    }
+                    else if (scannedProduct != null)
+                    {
+                        <div class="pos-scanner-result">
+                            <div class="pos-scanner-product-info">
+                                <span class="pos-scanner-product-name">@scannedProduct.Name</span>
+                                <span class="pos-scanner-product-price">₱@scannedProduct.Price.ToString("N2")</span>
+                                <span class="pos-scanner-product-stock">Stock: @scannedProduct.CurrentStock</span>
+                            </div>
+                            @if (scannedProduct.CurrentStock <= 0)
+                            {
+                                <div class="pos-scanner-msg error">Out of stock — cannot add.</div>
+                            }
+                            else
+                            {
+                                <div class="pos-scanner-qty-row">
+                                    <label>Qty:</label>
+                                    <input type="number" @bind="scanQuantity" min="1" max="@scannedProduct.CurrentStock" />
+                                </div>
+                            }
+                            <div class="pos-scanner-actions">
+                                <BbButton Variant="ButtonVariant.Outline" Class="flex-1" OnClick="DiscardScannedItem">Discard</BbButton>
+                                <BbButton Variant="ButtonVariant.Default" Class="flex-1" OnClick="ConfirmScannedItem" Disabled="@(scannedProduct.CurrentStock <= 0)">Add to Order</BbButton>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="pos-scanner-waiting"></div>
+                    }
                 </div>
             }
-            else
-            {
-                @CartTable()
-            }
         </div>
-
-        @CartFooter()
     </div>
 
     @* --- MOBILE CART DRAWER --- *@
@@ -161,80 +216,6 @@
         </div>
     </div>
 </div>
-
-@* --- BARCODE SCAN MODAL --- *@
-@if (showScanModal)
-{
-    <div class="scan-backdrop no-print" @onclick="CloseScanModal"></div>
-    <div class="scan-modal no-print">
-        <div class="scan-modal-header">
-            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                <LucideIcon Name="camera" Size="18" />
-                <span style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--card-foreground);">Scan Barcode</span>
-            </div>
-            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="CloseScanModal">
-                <LucideIcon Name="x" Size="16" />
-            </BbButton>
-        </div>
-
-        @* Upper half: live camera preview. Sizing/position is controlled by .scan-camera-area CSS below. *@
-        <div class="scan-camera-area">
-            <div id="barcode-camera-container"></div>
-            <div class="scan-frame-hint"></div>
-        </div>
-
-        @* Lower half: what was just recognized, plus Confirm/Discard. Item is only added to the cart on Confirm. *@
-        <div class="scan-info-area">
-            @if (!string.IsNullOrEmpty(scanErrorMessage))
-            {
-                <div style="padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); font-size: var(--text-sm); color: var(--destructive-muted-foreground);">
-                    @scanErrorMessage
-                </div>
-            }
-            else if (scannedProduct != null)
-            {
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);">
-                    <div style="min-width: 0;">
-                        <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            @scannedProduct.Name
-                        </div>
-                        <div style="font-size: var(--text-xs); color: var(--muted-foreground);">
-                            @scannedProduct.Category · @scannedProduct.Brand · Units in stock: @scannedProduct.CurrentStock
-                        </div>
-                    </div>
-                    <div style="font-size: var(--text-base); font-weight: var(--font-bold); color: var(--primary); flex-shrink: 0;">
-                        ₱@scannedProduct.Price.ToString("N2")
-                    </div>
-                </div>
-                @if (scannedProduct.CurrentStock <= 0)
-                {
-                    <div style="font-size: var(--text-xs); color: var(--destructive);">Out of stock — cannot add.</div>
-                }
-                <div style="display: flex; gap: var(--space-2);">
-                    <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="DiscardScannedItem">
-                        <LucideIcon Name="x" Size="14" /> Discard
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="ConfirmScannedItem" Disabled="@(scannedProduct.CurrentStock <= 0)">
-                        <LucideIcon Name="check" Size="14" /> Confirm &amp; Add
-                    </BbButton>
-                </div>
-            }
-            else
-            {
-                <div style="text-align: center; color: var(--muted-foreground); font-size: var(--text-sm); padding: var(--space-2) 0;">
-                    Point the camera at a barcode…
-                </div>
-            }
-
-            @if (recentlyScannedCount > 0)
-            {
-                <div style="text-align: center; font-size: var(--text-xs); color: var(--muted-foreground);">
-                    @recentlyScannedCount item(s) added this session · <a href="javascript:void(0)" @onclick="CloseScanModal" style="color: var(--primary); text-decoration: underline;">Done Scanning</a>
-                </div>
-            }
-        </div>
-    </div>
-}
 
 
 @if (showReceiptModal && completedTransaction != null)
@@ -390,38 +371,36 @@
     private bool showReceiptModal = false;
     private ReceiptDto? completedTransaction;
 
-    // --- Barcode scan modal state ---
-    private bool showScanModal = false;
-    private bool scannerShouldStart = false;
+    // --- Barcode scanner inline state ---
+    private bool scannerEnabled = false;
+    private bool scanFlash = false;
     private Product? scannedProduct;
     private string? scanErrorMessage;
-    private int recentlyScannedCount = 0;
+    private int scanQuantity = 1;
     private DotNetObjectReference<POS>? dotNetRef;
 
-    private void OpenScanModal()
-    {
-        scannedProduct = null;
-        scanErrorMessage = null;
-        recentlyScannedCount = 0;
-        showScanModal = true;
-        scannerShouldStart = true; // camera container isn't in the DOM yet - start it after render
-    }
-
-    private async Task CloseScanModal()
-    {
-        showScanModal = false;
-        scannedProduct = null;
-        scanErrorMessage = null;
-        await JS.InvokeVoidAsync("barcodeScanner.stop");
-    }
+    private string CameraClass => scannedProduct != null ? "scanned" : "scanning";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (scannerShouldStart)
+        if (scannerEnabled && dotNetRef == null)
         {
-            scannerShouldStart = false;
-            dotNetRef ??= DotNetObjectReference.Create(this);
+            dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("barcodeScanner.start", "barcode-camera-container", dotNetRef);
+        }
+        else if (!scannerEnabled && dotNetRef != null)
+        {
+            await JS.InvokeVoidAsync("barcodeScanner.stop");
+            dotNetRef?.Dispose();
+            dotNetRef = null;
+        }
+    }
+
+    private async Task ToggleCamera()
+    {
+        if (dotNetRef != null)
+        {
+            await JS.InvokeVoidAsync("barcodeScanner.cycleCamera");
         }
     }
 
@@ -430,15 +409,17 @@
     public async Task OnBarcodeScanned(string barcode)
     {
         if (scannedProduct != null && scannedProduct.Barcode == barcode)
-            return; // already previewing this exact item - avoid refetching every frame
+            return;
 
         var product = await ProductRepo.GetByBarcodeAsync(barcode);
         scanErrorMessage = product == null ? $"No product found for barcode \"{barcode}\"." : null;
         scannedProduct = product;
+        scanQuantity = 1;
+        scanFlash = true;
         await InvokeAsync(StateHasChanged);
     }
 
-    // Called from barcodeScanner.js if the camera fails to start (e.g. permission denied).
+    // Called from barcodeScanner.js if the camera fails to start.
     [JSInvokable]
     public async Task OnScannerError(string message)
     {
@@ -449,15 +430,17 @@
     private void ConfirmScannedItem()
     {
         if (scannedProduct == null || scannedProduct.CurrentStock <= 0) return;
-        AddToCart(scannedProduct);
-        recentlyScannedCount++;
-        scannedProduct = null; // keep camera open so staff can scan the next item
+        for (var i = 0; i < scanQuantity; i++)
+            AddToCart(scannedProduct);
+        scannedProduct = null;
+        scanQuantity = 1;
     }
 
     private void DiscardScannedItem()
     {
         scannedProduct = null;
         scanErrorMessage = null;
+        scanQuantity = 1;
     }
 
     public void Dispose()
@@ -584,17 +567,6 @@
         border-radius: var(--radius);
     }
 
-    .pos-cart-desktop {
-        width: 24rem;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        background-color: var(--card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-    }
-
     .pos-cart-mobile {
         display: none;
     }
@@ -605,7 +577,9 @@
 
     @@media (max-width: 767px) {
         .pos-wrapper {
-            height: calc(100dvh - 3.5rem);
+            flex-direction: column;
+            height: auto;
+            min-height: calc(100dvh - 3.5rem);
             gap: 0;
         }
 
@@ -638,9 +612,18 @@
             display: block;
         }
 
+        .pos-right {
+            order: 1;
+            width: 100%;
+        }
+
         .pos-catalog {
+            order: 0;
             margin-bottom: 5rem;
-            border-radius: var(--radius);
+        }
+
+        .pos-scanner-card {
+            margin: 0 var(--space-4) calc(5rem + var(--space-4));
         }
     }
 
@@ -761,33 +744,48 @@
             padding: 0;
         }
     }
-    /* BARCODE SCAN MODAL STYLES */
-    .scan-backdrop {
-        position: fixed;
-        inset: 0;
-        background-color: rgba(0,0,0,0.6);
-        z-index: 100;
+    /* --- RIGHT COLUMN (desktop) --- */
+    .pos-right {
+        width: 24rem;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
     }
 
-    .scan-modal {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: var(--card);
-        border-radius: var(--radius);
-        border: 1px solid var(--border);
-        z-index: 101;
-        width: 420px;
-        max-width: 92vw;
-        max-height: 85vh;
+    /* --- ORDER SUMMARY CARD --- */
+    .pos-cart-desktop {
+        flex: 1;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        background-color: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
     }
 
-    .scan-modal-header {
+    /* --- SCANNER CARD --- */
+    .pos-scanner-card {
+        flex-shrink: 0;
+        background-color: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: box-shadow 0.3s;
+    }
+
+    .pos-scanner-body #barcode-camera-container.scanning {
+        border: 2px solid var(--destructive);
+    }
+
+    .pos-scanner-body #barcode-camera-container.scanned {
+        border-color: var(--success);
+    }
+
+    .pos-scanner-header {
         flex-shrink: 0;
         padding: var(--space-3) var(--space-4);
         border-bottom: 1px solid var(--border);
@@ -796,59 +794,159 @@
         justify-content: space-between;
     }
 
-    /* Upper half: the live camera feed. Change this height (or use flex/vh) to
-       reposition/resize the scan area - e.g. flex: 1 for true half-split,
-       or a fixed vh value to pin it to the upper-middle of the screen. */
-    .scan-camera-area {
-        position: relative;
-        flex: 0 0 55%;
-        background-color: #000;
-        overflow: hidden;
-    }
-
-        .scan-camera-area #barcode-camera-container {
-            width: 100%;
-            height: 100%;
-        }
-
-        .scan-camera-area #barcode-camera-container video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover;
-        }
-
-    .scan-frame-hint {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 70%;
-        height: 40%;
-        border: 2px solid var(--primary);
-        border-radius: var(--radius);
-        pointer-events: none;
-        box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
-    }
-
-    /* Lower half: recognized-item preview + Confirm/Discard */
-    .scan-info-area {
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-        padding: var(--space-4);
+    .pos-scanner-body {
+        padding: var(--space-3);
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
-        justify-content: center;
     }
 
-    .scan-btn-label {
-        display: inline;
+    .pos-scanner-body #barcode-camera-container {
+        width: 100%;
+        height: 200px;
+        background-color: transparent;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 2px solid var(--border);
+        box-sizing: border-box;
     }
 
-    @@media (max-width: 767px) {
-        .scan-btn-label {
-            display: none;
-        }
+    .pos-scanner-body #barcode-camera-container video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
     }
+
+    .pos-scanner-waiting,
+    .pos-scanner-msg {
+        text-align: center;
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius);
+        font-size: var(--text-sm);
+    }
+
+    .pos-scanner-msg.error {
+        background-color: var(--destructive-muted);
+        border: 1px solid var(--destructive-border);
+        color: var(--destructive-muted-foreground);
+    }
+
+    .pos-scanner-waiting {
+        color: var(--muted-foreground);
+    }
+
+    .pos-scanner-result {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+    }
+
+    .pos-scanner-product-info {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+    }
+
+    .pos-scanner-product-name {
+        font-size: var(--text-sm);
+        font-weight: var(--font-semibold);
+        color: var(--foreground);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .pos-scanner-product-price {
+        font-size: var(--text-base);
+        font-weight: var(--font-bold);
+        color: var(--primary);
+        flex-shrink: 0;
+    }
+
+    .pos-scanner-product-stock {
+        font-size: var(--text-xs);
+        color: var(--muted-foreground);
+        flex-shrink: 0;
+    }
+
+    .pos-scanner-qty-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .pos-scanner-qty-row label {
+        font-size: var(--text-sm);
+        color: var(--foreground);
+        flex-shrink: 0;
+    }
+
+    .pos-scanner-qty-row input {
+        width: 72px;
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius);
+        border: 1px solid var(--input);
+        background-color: var(--background);
+        color: var(--foreground);
+        font-size: var(--text-sm);
+        box-sizing: border-box;
+    }
+
+    .pos-scanner-actions {
+        display: flex;
+        gap: var(--space-2);
+    }
+
+    .pos-scanner-actions .flex-1 {
+        flex: 1;
+    }
+
+    /* --- TOGGLE SWITCH --- */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: var(--muted);
+        border-radius: 24px;
+        transition: background-color 0.2s;
+    }
+
+    .slider::before {
+        content: "";
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #fff;
+        border-radius: 9999px;
+        transition: transform 0.2s;
+    }
+
+    .switch input:checked + .slider {
+        background-color: var(--primary);
+    }
+
+    .switch input:checked + .slider::before {
+        transform: translateX(20px);
+    }
+
 </style>

@@ -50,7 +50,7 @@ public class BarcodeService
                 Width = 320,
                 Height = 140,
                 Margin = 10,
-                PureBarcode = false // keep the human-readable digits printed under the bars
+                PureBarcode = false
             }
         };
 
@@ -60,8 +60,28 @@ public class BarcodeService
         return data.ToArray();
     }
 
-    /// <summary>Builds a printable one-page PDF label for a product's barcode.</summary>
-    public byte[] GenerateBarcodeLabelPdf(Product product, byte[] barcodeImagePng)
+    /// <summary>Renders a QR code as a PNG image (bytes) — encodes the product's URL or barcode as fallback content.</summary>
+    public byte[] GenerateQrCodeImage(Product product)
+    {
+        var writer = new BarcodeWriter
+        {
+            Format = BarcodeFormat.QR_CODE,
+            Options = new EncodingOptions
+            {
+                Width = 200,
+                Height = 200,
+                Margin = 10
+            }
+        };
+
+        using SKBitmap bitmap = writer.Write(product.Barcode ?? $"STOCKSENSE-{product.Id}");
+        using SKImage image = SKImage.FromBitmap(bitmap);
+        using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
+
+    /// <summary>Builds a printable one-page PDF label for a product with EAN-13 barcode + QR code side-by-side.</summary>
+    public byte[] GenerateBarcodeLabelPdf(Product product, byte[] barcodeImagePng, byte[] qrCodeImagePng)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -81,9 +101,11 @@ public class BarcodeService
 
                 page.Content()
                     .PaddingTop(10)
-                    .AlignCenter()
-                    .AlignMiddle()
-                    .Image(barcodeImagePng);
+                    .Row(row =>
+                    {
+                        row.RelativeItem(3).AlignCenter().AlignMiddle().Image(barcodeImagePng);
+                        row.RelativeItem(2).AlignCenter().AlignMiddle().Image(qrCodeImagePng);
+                    });
 
                 page.Footer().Row(row =>
                 {

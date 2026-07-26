@@ -163,10 +163,16 @@
 
             @* Modal Footer *@
             <div style="padding: var(--space-4) var(--space-6); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                <BbButton Variant="ButtonVariant.Outline" OnClick="PromptDeleteProduct" style="color: var(--destructive); border-color: var(--destructive);">
-                    <LucideIcon Name="trash-2" Size="16" />
-                    Remove Product
-                </BbButton>
+                <div style="display: flex; gap: var(--space-2);">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="PromptDeleteProduct" style="color: var(--destructive); border-color: var(--destructive);">
+                        <LucideIcon Name="trash-2" Size="16" />
+                        Remove Product
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="DownloadBarcodePdf">
+                        <LucideIcon Name="barcode" Size="16" />
+                        Print Label
+                    </BbButton>
+                </div>
                 <div style="display: flex; gap: var(--space-2);">
                     <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseEditModal">Cancel</BbButton>
                     <BbButton Variant="ButtonVariant.Default" OnClick="SaveSettings" Disabled="@isSaving">Save Changes</BbButton>
@@ -365,6 +371,13 @@
         }
         isSaving = false;
         CloseEditModal();
+    }
+
+    private async Task DownloadBarcodePdf()
+    {
+        if (selectedProduct == null) return;
+        var safeName = string.Concat(selectedProduct.Name.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
+        await JS.InvokeVoidAsync("triggerDownload", $"api/products/{selectedProduct.Id}/barcode-pdf", $"Barcode_{safeName}.pdf");
     }
 
     private void PromptDeleteProduct()

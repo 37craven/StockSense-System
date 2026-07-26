@@ -117,8 +117,9 @@ public class ProductsController : ControllerBase
             await _productRepo.SaveChangesAsync();
         }
 
-        var imageBytes = _barcodeService.GenerateBarcodeImage(product.Barcode);
-        var pdfBytes = _barcodeService.GenerateBarcodeLabelPdf(product, imageBytes);
+        var barcodePng = _barcodeService.GenerateBarcodeImage(product.Barcode);
+        var qrPng = _barcodeService.GenerateQrCodeImage(product);
+        var pdfBytes = _barcodeService.GenerateBarcodeLabelPdf(product, barcodePng, qrPng);
         var safeName = string.Concat(product.Name.Split(Path.GetInvalidFileNameChars()));
         return File(pdfBytes, "application/pdf", $"Barcode_{safeName}.pdf");
     }
