@@ -1,0 +1,43 @@
+@page "/admin/order-slips/{Id:int}/receive"
+@layout AdminLayout
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using StockSense.Application.DTOs
+@using StockSense.Application.Interfaces
+@using StockSense.Domain.Entities
+@using StockSense.Infrastructure.Data
+@inject ApplicationDbContext Db
+@inject IOrderSlipWorkflowService Workflow
+@inject AuthenticationStateProvider AuthenticationState
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin, Employee")]
+
+<PageTitle>Receive Order Slip</PageTitle>
+@if (slip == null) { <div class="p-16 flex justify-center"><BbSpinner /></div> }
+else
+{
+<div class="flex flex-col gap-5 max-w-5xl mx-auto"><div><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick='() => Navigation.NavigateTo($"/admin/order-slips/{Id}")'><LucideIcon Name="arrow-left" Size="14" /> Back</BbButton><h1 class="text-2xl font-bold mt-2 mb-0">Record receipt · @Number</h1><p class="text-sm text-muted-foreground m-0">Enter quantities received in this delivery. Partial receipts remain open.</p></div>
+@if (!string.IsNullOrWhiteSpace(error)) { <div role="alert" class="rounded-md border p-3 text-sm" style="border-color:var(--destructive);color:var(--destructive)">@error</div> }
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3"><label class="flex flex-col gap-1 text-sm">Received date<input type="date" @bind="receivedAt" @bind:format="yyyy-MM-dd" class="h-9 rounded-md border border-input bg-background px-2" /></label><label class="flex flex-col gap-1 text-sm">Supplier reference<input @bind="reference" maxlength="100" class="h-9 rounded-md border border-input bg-background px-2" /></label><label class="flex flex-col gap-1 text-sm">Remarks<input @bind="remarks" maxlength="500" class="h-9 rounded-md border border-input bg-background px-2" /></label></div>
+<div class="rounded-lg border border-border bg-card overflow-x-auto"><table class="w-full text-sm" style="border-collapse:collapse"><thead class="bg-muted/30"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-right">Ordered</th><th class="p-3 text-right">Previously received</th><th class="p-3 text-left">Receive now</th></tr></thead><tbody>@foreach (var item in slip.Items) { var remaining=Ordered(item)-item.ReceivedQuantity; <tr class="border-t border-border"><td class="p-3 font-medium">@item.ProductName</td><td class="p-3 text-right">@Ordered(item)</td><td class="p-3 text-right">@item.ReceivedQuantity</td><td class="p-3"><label class="sr-only" for="receive-@item.Id">Quantity received for @item.ProductName</label><input id="receive-@item.Id" type="number" min="0" max="@remaining" @bind="quantities[item.Id]" class="h-9 w-28 rounded-md border border-input bg-background px-2 text-right" /><span class="text-xs text-muted-foreground ml-2">of @remaining remaining</span></td></tr> }</tbody></table></div>
+<div class="flex justify-end"><BbButton OnClick="Save" Disabled="busy">@if (busy) { <BbSpinner Size="SpinnerSize.Small" /> } Save receipt</BbButton></div></div>
+}
+@code {
+    [Parameter] public int Id { get; set; }
+    private OrderSlip? slip; private Dictionary<int,int> quantities=[]; private DateTime receivedAt=DateTime.Today; private string? reference,remarks; private string error=""; private bool busy;
+    protected override async Task OnParametersSetAsync() { slip=await Db.OrderSlips.AsNoTracking().Include(x=>x.Items).SingleOrDefaultAsync(x=>x.Id==Id); quantities=slip?.Items.ToDictionary(x=>x.Id,_=>0) ?? []; }
+    private string Number => string.IsNullOrWhiteSpace(slip!.OrderSlipNumber) ? slip.SlipNumber : slip.OrderSlipNumber;
+    private static int Ordered(OrderSlipItem x) => x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity;
+    private async Task Save()
+    {
+        if (slip==null) return; error="";
+        foreach(var item in slip.Items) if(quantities[item.Id] < 0 || quantities[item.Id] > Ordered(item)-item.ReceivedQuantity) { error=$"Invalid received quantity for {item.ProductName}."; return; }
+        var received=quantities.Where(x=>x.Value>0).ToList(); if(received.Count==0) { error="Enter at least one received quantity."; return; }
+        busy=true;
+        try { var user=(await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier); var result=await Workflow.ReceiveAsync(new ReceiveOrderSlipCommand { OrderSlipId=Id, LocationId="MAIN", ReceivedAt=receivedAt, ReferenceNumber=reference, Remarks=remarks, ReceivedByUserId=user, RowVersion=slip.RowVersion, Items=received.Select(x=>new ReceiveOrderSlipItemCommand { OrderSlipItemId=x.Key, QuantityReceived=x.Value }).ToList() }); if(!result.IsSuccess || result.Value==null) throw new InvalidOperationException(result.ErrorMessage); Navigation.NavigateTo($"/admin/order-slips/{Id}"); }
+        catch(Exception ex) { error=ex.Message; }
+        finally { busy=false; }
+    }
+}

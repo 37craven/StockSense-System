@@ -697,7 +697,7 @@
         try
         {
             var authState = await AuthStateTask!;
-            string userEmail = authState.User.Identity?.Name ?? "Guest"; // <--- MUST USE EMAIL HERE for DB Link
+            string userEmail = authState.User.Identity?.Name ?? "Guest";
 
             // --- FETCH ACTUAL NAME FOR DISPLAY ONLY ---
             string realName = userEmail.Contains("@") ? userEmail.Split('@')[0] : userEmail;
@@ -732,7 +732,7 @@
 
             var buildRequest = new CreateBuildRequestDto
             {
-                CustomerName = userEmail,
+                CustomerName = realName,
                 BuildName = buildRoute == "PreBuilt" ? pkgName : "Custom Build",
                 SelectedPartsJson = JsonSerializer.Serialize(partsToSave),
                 TotalPrice = selectedParts.Sum(p => p.Price)

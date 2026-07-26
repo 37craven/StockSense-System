@@ -1,7 +1,10 @@
 using System.Text;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StockSense.Application.DTOs;
+using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Data.Repositories;
@@ -17,19 +20,31 @@ public class ProductsController : ControllerBase
     private readonly ProductRepository _productRepo;
     private readonly EmailSender _emailSender;
     private readonly BarcodeService _barcodeService;
+    private readonly ApplicationDbContext _context;
+    private readonly ISafetyStockCalculationService _calculationService;
+    private readonly ILogger<ProductsController> _logger;
 
-    public ProductsController(ProductRepository productRepo, EmailSender emailSender, BarcodeService barcodeService)
+    public ProductsController(
+        ProductRepository productRepo,
+        EmailSender emailSender,
+        BarcodeService barcodeService,
+        ApplicationDbContext context,
+        ISafetyStockCalculationService calculationService,
+        ILogger<ProductsController> logger)
     {
         _productRepo = productRepo;
         _emailSender = emailSender;
         _barcodeService = barcodeService;
+        _context = context;
+        _calculationService = calculationService;
+        _logger = logger;
     }
 
     [HttpGet]
     public async Task<ActionResult<List<ProductDto>>> GetProducts()
     {
         var products = await _productRepo.GetAllAsync();
-        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode)).ToList();
+        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode, p.UnitCost, p.RowVersion)).ToList();
         return Ok(dtos);
     }
 
@@ -41,7 +56,7 @@ public class ProductsController : ControllerBase
 
         var dto = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode);
+            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion);
         return Ok(dto);
     }
 
@@ -79,6 +94,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductDto dto)
     {
         var product = new Product
@@ -87,6 +103,7 @@ public class ProductsController : ControllerBase
             Brand = dto.Brand,
             Category = dto.Category,
             Price = dto.Price,
+            UnitCost = dto.UnitCost,
             ReorderTarget = dto.ReorderTarget,
             ImageUrl = dto.ImageUrl
         };
@@ -100,7 +117,7 @@ public class ProductsController : ControllerBase
 
         var dtoResult = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode);
+            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion);
         return Ok(dtoResult);
     }
 
@@ -124,6 +141,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateProduct(int id, [FromBody] UpdateProductDto dto)
     {
         if (id != dto.Id) return BadRequest(ApiResponse.Error("ID mismatch."));
@@ -138,16 +156,84 @@ public class ProductsController : ControllerBase
             if (existing != null && existing.Id != id) return BadRequest(ApiResponse.Error("A product with this barcode already exists."));
         }
 
+        var changesStock = dto.CurrentStock.HasValue && dto.CurrentStock.Value != product.CurrentStock;
+        var changesReorderTarget = dto.ReorderTarget.HasValue && dto.ReorderTarget.Value != product.ReorderTarget;
+        var changesInventory = changesStock || changesReorderTarget;
+        if (changesInventory && dto.RowVersion.Length == 0)
+            return BadRequest(ApiResponse.Error("A row version is required when changing stock or the reorder target. Reload the product and try again."));
+
+        if (changesInventory)
+            _context.Entry(product).Property(value => value.RowVersion).OriginalValue = dto.RowVersion;
+
+        var stockBefore = product.CurrentStock;
         product.Barcode = newBarcode;
         product.Price = dto.Price;
-        product.ReorderTarget = dto.ReorderTarget;
-        product.CurrentStock = dto.CurrentStock;
-        await _productRepo.UpdateAsync(product);
-        await _productRepo.SaveChangesAsync();
-        return NoContent();
+        product.UnitCost = dto.UnitCost;
+        if (dto.ReorderTarget.HasValue) product.ReorderTarget = dto.ReorderTarget.Value;
+        if (dto.CurrentStock.HasValue) product.CurrentStock = dto.CurrentStock.Value;
+
+        if (changesStock)
+        {
+            var changedAt = DateTime.Now;
+            _context.Transactions.Add(new Transaction
+            {
+                InvoiceNumber = $"ADJ-{changedAt:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}",
+                TransactionDate = changedAt,
+                TransactionType = TransactionTypes.StockCorrection,
+                PaymentMethod = "N/A",
+                UserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                LocationId = InventoryDefaults.LocationId,
+                ReferenceNumber = $"PRODUCT-{product.Id}",
+                Remarks = "Product stock corrected through the product administration endpoint.",
+                Items =
+                [
+                    new TransactionItem
+                    {
+                        ProductId = product.Id,
+                        ProductName = product.Name,
+                        UnitPrice = product.Price,
+                        UnitCost = product.UnitCost,
+                        Quantity = Math.Abs(product.CurrentStock - stockBefore),
+                        StockBefore = stockBefore,
+                        StockAfter = product.CurrentStock
+                    }
+                ]
+            });
+        }
+
+        try
+        {
+            await _productRepo.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            _logger.LogWarning(exception, "Product {ProductId} update conflicted with another inventory change.", id);
+            return Conflict(ApiResponse.Error("The product was changed by another user. Reload the latest data and try again."));
+        }
+
+        if (!changesStock) return NoContent();
+
+        try
+        {
+            await _calculationService.RecalculateProductAsync(product.Id, InventoryDefaults.LocationId, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Stock correction for product {ProductId} committed, but safety-stock recalculation did not complete.",
+                product.Id);
+            return Ok(new
+            {
+                message = "Product updated.",
+                warning = "Safety-stock metrics could not be refreshed. Run recalculation again from inventory management."
+            });
+        }
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteProduct(int id)
     {
         var product = await _productRepo.GetByIdAsync(id);

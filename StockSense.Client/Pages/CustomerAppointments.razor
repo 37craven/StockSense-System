@@ -119,18 +119,9 @@
 
             if (user.Identity?.IsAuthenticated == true)
             {
-                string customerName = user.Identity.Name ?? "User";
-
                 try
                 {
-                    var profile = await Http.GetFromJsonAsync<UserProfile>("api/user/profile");
-                    if (profile != null) customerName = $"{profile.FirstName} {profile.LastName}".Trim();
-                }
-                catch { }
-
-                try
-                {
-                    myAppointments = await Http.GetFromJsonAsync<List<AppointmentDto>>($"api/appointments/my-bookings?name={Uri.EscapeDataString(customerName)}");
+                    myAppointments = await Http.GetFromJsonAsync<List<AppointmentDto>>("api/appointments/my-bookings");
                 }
                 catch
                 {

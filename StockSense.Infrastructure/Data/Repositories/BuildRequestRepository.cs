@@ -15,6 +15,7 @@ public class BuildRequestRepository
     public async Task<List<BuildRequest>> GetAllAsync()
     {
         return await _context.BuildRequests
+            .Include(b => b.Transaction)
             .OrderByDescending(b => b.CreatedAt)
             .ToListAsync();
     }
@@ -27,7 +28,23 @@ public class BuildRequestRepository
     public async Task<List<BuildRequest>> GetByCustomerNameAsync(string customerName)
     {
         return await _context.BuildRequests
+            .Include(b => b.Transaction)
             .Where(b => b.CustomerName == customerName)
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<List<BuildRequest>> GetByCustomerIdentityAsync(
+        string userId,
+        string email,
+        string fullName)
+    {
+        return await _context.BuildRequests
+            .Include(b => b.Transaction)
+            .Where(b => b.CustomerUserId == userId
+                || (b.CustomerUserId == null && b.CustomerEmail == email)
+                || (b.CustomerUserId == null && b.CustomerEmail == null
+                    && (b.CustomerName == email || b.CustomerName == fullName)))
             .OrderByDescending(b => b.CreatedAt)
             .ToListAsync();
     }

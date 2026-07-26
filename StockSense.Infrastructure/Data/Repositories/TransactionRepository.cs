@@ -1,3 +1,5 @@
+using System.Data;
+using Microsoft.EntityFrameworkCore;
 using StockSense.Domain.Entities;
 
 namespace StockSense.Infrastructure.Data.Repositories;
@@ -11,9 +13,13 @@ public class TransactionRepository
         _context = context;
     }
 
-    public async Task<Product?> GetProductByIdAsync(int productId)
+    public async Task<List<Product>> GetProductsByIdsAsync(
+        IReadOnlyCollection<int> productIds,
+        CancellationToken cancellationToken = default)
     {
-        return await _context.Products.FindAsync(productId);
+        return await _context.Products
+            .Where(product => productIds.Contains(product.Id))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task UpdateAsync(Product product)
@@ -22,20 +28,32 @@ public class TransactionRepository
         await Task.CompletedTask;
     }
 
-    public async Task AddAsync(SalesHistory history)
+    public async Task AddAsync(Transaction transaction, CancellationToken cancellationToken = default)
     {
-        _context.SalesHistory.Add(history);
-        await Task.CompletedTask;
+        await _context.Transactions.AddAsync(transaction, cancellationToken);
     }
 
-    public async Task AddAsync(Transaction transaction)
+    public Task<TResult> ExecuteInTransactionAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken = default)
     {
-        _context.Transactions.Add(transaction);
-        await Task.CompletedTask;
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        return executionStrategy.ExecuteAsync(async () =>
+        {
+            // POS catalog reads share this scoped context. Clear them so checkout always
+            // reloads authoritative stock/prices, and so a retry cannot deduct twice.
+            _context.ChangeTracker.Clear();
+            await using var transaction = await _context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable,
+                cancellationToken);
+            var result = await operation(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
     }
 
-    public async Task SaveChangesAsync()
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

@@ -96,7 +96,13 @@
                                 style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;"
                                 onmouseover="this.style.backgroundColor='color-mix(in oklch, var(--primary) 5%, transparent)'"
                                 onmouseout="this.style.backgroundColor='transparent'">
-                                <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);">@appt.CustomerName</td>
+                                <td style="padding: 12px 16px; color: var(--foreground);">
+                                    <div style="font-weight: bold;">@appt.CustomerName</div>
+                                    @if (!string.IsNullOrWhiteSpace(appt.CustomerEmail))
+                                    {
+                                        <div style="font-size: var(--text-xs); color: var(--muted-foreground);">@appt.CustomerEmail</div>
+                                    }
+                                </td>
                                 <td style="padding: 12px 16px; color: var(--foreground); font-size: var(--text-xs);">@FormatMechanicName(appt.MechanicName)</td>
                                 <td style="padding: 12px 16px; white-space: nowrap;">
                                     <span style="color: var(--foreground);">@appt.AppointmentDate.ToString("MMM dd, yyyy")</span>
@@ -138,10 +144,10 @@
                                         }
                                         else if (isConfirmed)
                                         {
-                                            <button @onclick="@(() => UpdateStatus(appt, "Completed"))"
-                                                    title="Complete"
+                                            <button @onclick="@(() => OpenDetail(appt))"
+                                                    title="Checkout"
                                                     style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="circle-check" Size="12" /> Complete
+                                                <LucideIcon Name="circle-check" Size="12" /> Checkout
                                             </button>
                                             <button @onclick="@(() => UpdateStatus(appt, "Cancelled"))"
                                                     title="Cancel"
@@ -149,13 +155,9 @@
                                                 <LucideIcon Name="x" Size="12" /> Cancel
                                             </button>
                                         }
-                                        else if (isCompleted || isCancelled)
+                                        else if (isCompleted && !string.IsNullOrWhiteSpace(appt.InvoiceNumber))
                                         {
-                                            <button @onclick="@(() => UpdateStatus(appt, "Pending"))"
-                                                    title="Reopen"
-                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="rotate-ccw" Size="12" /> Reopen
-                                            </button>
+                                            <span style="font-size: var(--text-xs); font-family: monospace;">@appt.InvoiceNumber</span>
                                         }
                                     </div>
                                 </td>
@@ -193,6 +195,10 @@
                     <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
                         <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Customer</div>
                         <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin-top: 4px;">@selectedAppointment.CustomerName</div>
+                        @if (!string.IsNullOrWhiteSpace(selectedAppointment.CustomerEmail))
+                        {
+                            <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">@selectedAppointment.CustomerEmail</div>
+                        }
                         @if (!string.IsNullOrEmpty(selectedAppointment.ContactNumber))
                         {
                             <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">@selectedAppointment.ContactNumber</div>
@@ -259,34 +265,38 @@
             @if (selectedAppointment != null)
             {
                 var s = selectedAppointment;
+                @if (s.Status == "Confirmed")
+                {
+                    <select @bind="checkoutPaymentMethod" aria-label="Payment method" style="padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--background); color:var(--foreground);">
+                        <option>Cash</option><option>GCash</option><option>Card</option>
+                    </select>
+                    <input @bind="checkoutReference" maxlength="100" aria-label="Payment reference" placeholder="Reference (optional)" style="padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--background); color:var(--foreground);" />
+                    @if (!string.IsNullOrWhiteSpace(checkoutError))
+                    {
+                        <span role="alert" style="color:var(--destructive); font-size:var(--text-xs);">@checkoutError</span>
+                    }
+                }
                 <div style="display: flex; gap: 6px;">
                     @if (s.Status == "Pending")
                     {
-                        <button @onclick="@(() => { UpdateStatus(s, "Confirmed"); showDetailModal = false; })"
+                        <button @onclick="@(async () => { await UpdateStatus(s, "Confirmed"); showDetailModal = false; })"
                                 style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
                             <LucideIcon Name="check" Size="14" /> Confirm
                         </button>
-                        <button @onclick="@(() => { UpdateStatus(s, "Cancelled"); showDetailModal = false; })"
+                        <button @onclick="@(async () => { await UpdateStatus(s, "Cancelled"); showDetailModal = false; })"
                                 style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
                             <LucideIcon Name="x" Size="14" /> Cancel
                         </button>
                     }
                     else if (s.Status == "Confirmed")
                     {
-                        <button @onclick="@(() => { UpdateStatus(s, "Completed"); showDetailModal = false; })"
+                        <button @onclick="@(async () => await Complete(s))" disabled="@isCheckingOut"
                                 style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
-                            <LucideIcon Name="circle" Size="14" /> Complete
+                            <LucideIcon Name="circle" Size="14" /> @(isCheckingOut ? "Processing..." : "Complete sale")
                         </button>
-                        <button @onclick="@(() => { UpdateStatus(s, "Cancelled"); showDetailModal = false; })"
+                        <button @onclick="@(async () => { await UpdateStatus(s, "Cancelled"); showDetailModal = false; })"
                                 style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
                             <LucideIcon Name="x" Size="14" /> Cancel
-                        </button>
-                    }
-                    else if (s.Status == "Completed" || s.Status == "Cancelled")
-                    {
-                        <button @onclick="@(() => { UpdateStatus(s, "Pending"); showDetailModal = false; })"
-                                style="flex: 1; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
-                            <LucideIcon Name="rotate-ccw" Size="14" /> Reopen
                         </button>
                     }
                 </div>
@@ -303,6 +313,10 @@
     private AppointmentDto? selectedAppointment;
     private string sortColumn = "created";
     private bool sortAsc = false;
+    private string checkoutPaymentMethod = "Cash";
+    private string? checkoutReference;
+    private string? checkoutError;
+    private bool isCheckingOut;
 
     private IEnumerable<AppointmentDto> ActiveAppointments =>
         allAppointments?.Where(a => a.Status == "Pending" || a.Status == "Confirmed") ?? Enumerable.Empty<AppointmentDto>();
@@ -373,6 +387,9 @@
     private void OpenDetail(AppointmentDto appt)
     {
         selectedAppointment = appt;
+        checkoutPaymentMethod = "Cash";
+        checkoutReference = null;
+        checkoutError = null;
         showDetailModal = true;
     }
 
@@ -381,6 +398,35 @@
         var response = await Http.PutAsJsonAsync($"api/appointments/{appt.Id}/status", newStatus);
         if (response.IsSuccessStatusCode) appt.Status = newStatus;
         StateHasChanged();
+    }
+
+    private async Task Complete(AppointmentDto appointment)
+    {
+        checkoutError = null;
+        isCheckingOut = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/appointments/{appointment.Id}/complete",
+                new CompleteWorkOrderDto { PaymentMethod = checkoutPaymentMethod, ReferenceNumber = checkoutReference });
+            if (!response.IsSuccessStatusCode)
+            {
+                checkoutError = $"Checkout failed ({(int)response.StatusCode}). Review stock and try again.";
+                return;
+            }
+
+            var receipt = await response.Content.ReadFromJsonAsync<ReceiptDto>();
+            appointment.Status = "Completed";
+            appointment.CompletedAt = receipt?.TransactionDate;
+            appointment.TransactionId = receipt?.Id;
+            appointment.InvoiceNumber = receipt?.InvoiceNumber;
+            appointment.TotalAmount = receipt?.TotalAmount ?? appointment.TotalAmount;
+            showDetailModal = false;
+        }
+        finally
+        {
+            isCheckingOut = false;
+        }
     }
 
     private string GetStatusColor(string status) => status?.ToLower() switch

@@ -213,11 +213,18 @@
                             <span style="white-space: nowrap;">Builds</span>
                         }
                     </a>
-                    <a href="/admin/orderslips" title="Order Slips" style="@NavLinkStyle(IsActive("/admin/orderslips"), isCollapsed)">
+                    <a href="/admin/orderslips" title="Generate Order Slips" style="@NavLinkStyle(IsActive("/admin/orderslips"), isCollapsed)">
                         <LucideIcon Name="clipboard-list" Size="16" />
                         @if (!isCollapsed)
                         {
-                            <span style="white-space: nowrap;">Order Slips</span>
+                            <span style="white-space: nowrap;">Generate Orders</span>
+                        }
+                    </a>
+                    <a href="/admin/order-history" title="Order Slip History" style="@NavLinkStyle(IsActive("/admin/order-history") || IsActive("/admin/order-slips/"), isCollapsed)">
+                        <LucideIcon Name="history" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Order History</span>
                         }
                     </a>
                     <a href="/admin/prebuilts" title="PreBuilts" style="@NavLinkStyle(IsActive("/admin/prebuilts"), isCollapsed)">
@@ -236,11 +243,18 @@
                         }
                     </a>
 
-                    <a href="/admin/stock" title="Stocks" style="@NavLinkStyle(IsActive("/admin/stock"), isCollapsed)">
+                    <a href="/admin/stock" title="Safety Stock" style="@NavLinkStyle(IsActive("/admin/stock"), isCollapsed)">
                         <LucideIcon Name="warehouse" Size="16" />
                         @if (!isCollapsed)
                         {
-                            <span style="white-space: nowrap;">Stocks</span>
+                            <span style="white-space: nowrap;">Safety Stock</span>
+                        }
+                    </a>
+                    <a href="/admin/product-sales" title="Product Sales" style="@NavLinkStyle(IsActive("/admin/product-sales"), isCollapsed)">
+                        <LucideIcon Name="chart-no-axes-combined" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Product Sales</span>
                         }
                     </a>
                 </Authorized>

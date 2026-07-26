@@ -13,6 +13,13 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Content Include="Data\TOP_100_MONTHLY_PRODUCT_SALES_WITH_BRAND_CATEGORY.csv">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="BlazorBlueprint.Components" Version="3.10.0" />
         <PackageReference Include="BlazorBlueprint.Icons.Lucide" Version="2.0.0" />
         <PackageReference Include="BlazorBlueprint.Primitives" Version="3.10.0" />

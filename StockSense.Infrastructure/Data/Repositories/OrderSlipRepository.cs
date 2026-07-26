@@ -12,25 +12,25 @@ public class OrderSlipRepository
         _context = context;
     }
 
-    public async Task<List<OrderSlip>> GetAllAsync()
+    public async Task<List<OrderSlip>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.OrderSlips
             .Include(s => s.Supplier)
             .Include(s => s.Items)
             .OrderByDescending(s => s.DateGenerated)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<OrderSlip?> GetByIdAsync(int id)
+    public async Task<OrderSlip?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return await _context.OrderSlips
             .Include(s => s.Items)
-            .FirstOrDefaultAsync(s => s.Id == id);
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
-    public async Task AddSlipAsync(OrderSlip slip)
+    public async Task AddSlipAsync(OrderSlip slip, CancellationToken cancellationToken = default)
     {
-        await _context.OrderSlips.AddAsync(slip);
+        await _context.OrderSlips.AddAsync(slip, cancellationToken);
     }
 
     public async Task UpdateSlipAsync(OrderSlip slip)
@@ -39,25 +39,28 @@ public class OrderSlipRepository
         await Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var slip = await _context.OrderSlips.FindAsync(id);
+        var slip = await _context.OrderSlips.FindAsync([id], cancellationToken);
         if (slip != null) _context.OrderSlips.Remove(slip);
     }
 
-    public async Task DeleteItemAsync(int itemId)
+    public async Task DeleteItemAsync(int itemId, CancellationToken cancellationToken = default)
     {
-        var item = await _context.OrderSlipItems.FindAsync(itemId);
+        var item = await _context.OrderSlipItems.FindAsync([itemId], cancellationToken);
         if (item != null) _context.OrderSlipItems.Remove(item);
     }
 
-    public async Task<int> GetPendingCountAsync()
+    public async Task<int> GetPendingCountAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.OrderSlips.CountAsync(s => !s.IsReceived);
+        return await _context.OrderSlips.CountAsync(
+            s => s.Status != OrderSlipStatuses.Completed
+                 && s.Status != OrderSlipStatuses.Cancelled,
+            cancellationToken);
     }
 
-    public async Task SaveChangesAsync()
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

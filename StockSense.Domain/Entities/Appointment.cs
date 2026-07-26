@@ -6,6 +6,8 @@ public class Appointment
     public int Id { get; set; }
     // Customer Info
     public string CustomerName { get; set; } = string.Empty;
+    public string? CustomerEmail { get; set; }
+    public string? CustomerUserId { get; set; }
     public string? ContactNumber { get; set; }
     // Date and Time
     public DateTime AppointmentDate { get; set; } = DateTime.Now;
@@ -20,4 +22,7 @@ public class Appointment
     public string Category { get; set; } = "General";
     public string MechanicName { get; set; } = string.Empty;
     public int DurationMinutes { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public int? TransactionId { get; set; }
+    public Transaction? Transaction { get; set; }
 }

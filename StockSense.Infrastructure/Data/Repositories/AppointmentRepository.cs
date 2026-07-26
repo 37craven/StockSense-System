@@ -15,6 +15,7 @@ public class AppointmentRepository
     public async Task<List<Appointment>> GetAllAsync()
     {
         return await _context.Appointments
+            .Include(a => a.Transaction)
             .OrderByDescending(a => a.AppointmentDate)
             .ToListAsync();
     }
@@ -63,7 +64,23 @@ public class AppointmentRepository
     public async Task<List<Appointment>> GetByCustomerNameAsync(string customerName)
     {
         return await _context.Appointments
+            .Include(a => a.Transaction)
             .Where(a => a.CustomerName == customerName)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<List<Appointment>> GetByCustomerIdentityAsync(
+        string userId,
+        string email,
+        string fullName)
+    {
+        return await _context.Appointments
+            .Include(a => a.Transaction)
+            .Where(a => a.CustomerUserId == userId
+                || (a.CustomerUserId == null && a.CustomerEmail == email)
+                || (a.CustomerUserId == null && a.CustomerEmail == null
+                    && (a.CustomerName == email || a.CustomerName == fullName)))
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
     }

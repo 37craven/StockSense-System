@@ -189,11 +189,9 @@
             return;
         }
 
-        var userName = authState.User.Identity.Name;
-
         try
         {
-            myBuilds = await Http.GetFromJsonAsync<List<BuildRequestDto>>($"api/builds/customer/{userName}");
+            myBuilds = await Http.GetFromJsonAsync<List<BuildRequestDto>>("api/builds/mine");
         }
         catch
         {

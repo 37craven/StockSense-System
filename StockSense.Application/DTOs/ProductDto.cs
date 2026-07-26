@@ -11,6 +11,8 @@ public record ProductDto(
     int SupplierId = 0,
     string SupplierName = "",
     string ImageUrl = "",
-    string? Barcode = null
+    string? Barcode = null,
+    decimal UnitCost = 0m,
+    byte[]? RowVersion = null
 
 );

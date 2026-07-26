@@ -12,7 +12,9 @@ using StockSense.Web.Helpers;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Services;
 using StockSense.Infrastructure.Data.Repositories;
+using StockSense.Web.Services;
 using StockSense.Web.Utility.Security;
+using StockSense.Application.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +28,9 @@ builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, PersistingRevalidatingAuthenticationStateProvider>();
 builder.Services.AddLocalization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("InventoryStaff", policy => policy.RequireRole("Admin", "Employee"))
+    .AddPolicy("InventoryAdministrator", policy => policy.RequireRole("Admin"));
 
 // --- 2. AUTHENTICATION & COOKIES ---
 builder.Services.AddAuthentication(options =>
@@ -121,6 +126,11 @@ builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<BarcodeService>();
 builder.Services.AddScoped<OrderEmailSender>();
 builder.Services.AddSingleton<PdfDownloadCache>();
+builder.Services.AddScoped<IProductSalesDatasetService, ProductSalesReportingService>();
+builder.Services.AddScoped<IHistoricalSalesImporter, HistoricalSalesCsvImporter>();
+builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
+builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();
+builder.Services.AddScoped<IWorkOrderCheckoutService, WorkOrderCheckoutService>();
 
 // --- HELPERS (concrete, no interfaces) ---
 builder.Services.AddScoped<OrderSlipHelper>();
@@ -172,8 +182,18 @@ using (var scope = app.Services.CreateScope())
         {
             context.Database.Migrate();
         }
+
+        if (context.Database.CanConnect())
+        {
+            var importer = services.GetRequiredService<IHistoricalSalesImporter>();
+            await importer.ImportBundledDatasetAsync();
+        }
     }
-    catch (Exception ex) { Console.WriteLine("STARTUP ERROR (Migration): " + ex.Message); }
+    catch (Exception ex)
+    {
+        app.Logger.LogCritical(ex, "Database migration or startup import failed. Application startup is stopping.");
+        throw;
+    }
 }
 
 if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();

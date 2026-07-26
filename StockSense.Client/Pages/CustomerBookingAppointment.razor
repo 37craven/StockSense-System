@@ -892,6 +892,7 @@
             servicePrice = s.Price,
             products = s.PickedProducts.Where(kv => kv.Value != null).Select(kv => new
             {
+                id = kv.Value!.Id,
                 name = kv.Value!.Name,
                 price = kv.Value.Price,
                 selected = true,
