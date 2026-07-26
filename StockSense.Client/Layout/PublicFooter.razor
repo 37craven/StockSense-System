@@ -1,0 +1,52 @@
+<footer style="border-top: 3px solid var(--primary); background: color-mix(in oklch, var(--background) 88%, var(--foreground) 12%); color: var(--foreground); box-shadow: inset 0 1px 0 color-mix(in oklch, var(--foreground) 8%, transparent); transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;">
+    <div style="width: min(100% - 2rem, 72rem); margin: 0 auto; padding: clamp(2.5rem, 6vw, 4rem) 0 1.5rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: clamp(2rem, 5vw, 4rem);">
+            <section aria-label="StockSense Motorcycle Shop">
+                <div style="margin-bottom: var(--space-4);">
+                    <Logo Size="86" Color="#FF0000" />
+                </div>
+                <p style="max-width: 18rem; font-size: var(--text-sm); line-height: 1.7; color: var(--muted-foreground); margin: 0;">
+                    Motorcycle care, parts, and custom builds—all in one place.
+                </p>
+            </section>
+
+            <nav aria-labelledby="footer-links-heading">
+                <h2 id="footer-links-heading" style="font-size: var(--text-sm); font-weight: var(--font-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--foreground); margin: 0 0 var(--space-4);">
+                    Quick links
+                </h2>
+                <div style="display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3);">
+                    <a href="/" style="font-size: var(--text-sm); color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%); text-decoration: none;">Home</a>
+                    <a href="/appointment" style="font-size: var(--text-sm); color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%); text-decoration: none;">Book an appointment</a>
+                    <a href="/build" style="font-size: var(--text-sm); color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%); text-decoration: none;">Build a motorcycle</a>
+                    <a href="/Account/Login" style="font-size: var(--text-sm); color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%); text-decoration: none;">Customer login</a>
+                </div>
+            </nav>
+
+            <section aria-labelledby="footer-contact-heading">
+                <h2 id="footer-contact-heading" style="font-size: var(--text-sm); font-weight: var(--font-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--foreground); margin: 0 0 var(--space-4);">
+                    Visit the shop
+                </h2>
+                <address style="display: flex; flex-direction: column; gap: var(--space-3); font-size: var(--text-sm); line-height: 1.5; color: var(--muted-foreground); font-style: normal;">
+                    <span>123 Sample Street, Sample City</span>
+                    <a href="tel:+639001234567" style="color: inherit; text-decoration: none;">+63 900 123 4567</a>
+                    <a href="mailto:hello@stocksense.example" style="color: inherit; text-decoration: none;">hello@stocksense.example</a>
+                </address>
+            </section>
+
+            <section aria-labelledby="footer-hours-heading">
+                <h2 id="footer-hours-heading" style="font-size: var(--text-sm); font-weight: var(--font-bold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--foreground); margin: 0 0 var(--space-4);">
+                    Shop hours
+                </h2>
+                <div style="display: grid; grid-template-columns: auto auto; justify-content: start; gap: var(--space-2) var(--space-5); font-size: var(--text-sm); color: var(--muted-foreground);">
+                    <span>Monday–Saturday</span><span>8:00 AM–6:00 PM</span>
+                    <span>Sunday</span><span>By appointment</span>
+                </div>
+            </section>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); margin-top: clamp(2.5rem, 6vw, 4rem); padding-top: var(--space-5); border-top: 1px solid color-mix(in oklch, var(--foreground) 14%, transparent); font-size: var(--text-xs); color: var(--muted-foreground);">
+            <span>© @DateTime.Now.Year StockSense Motorcycle Shop. All rights reserved.</span>
+            <span>Temporary business information for demonstration purposes.</span>
+        </div>
+    </div>
+</footer>

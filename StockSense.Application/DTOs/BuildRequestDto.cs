@@ -4,9 +4,13 @@ public class BuildRequestDto
 {
     public int Id { get; set; }
     public string CustomerName { get; set; } = string.Empty;
+    public string? CustomerEmail { get; set; }
     public string BuildName { get; set; } = string.Empty;
     public string SelectedPartsJson { get; set; } = string.Empty;
     public decimal TotalPrice { get; set; }
     public DateTime CreatedAt { get; set; }
     public string Status { get; set; } = "Pending";
+    public DateTime? CompletedAt { get; set; }
+    public int? TransactionId { get; set; }
+    public string? InvoiceNumber { get; set; }
 }

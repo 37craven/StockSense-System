@@ -1,9 +1,14 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using StockSense.Application.DTOs;
+using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
+using StockSense.Infrastructure.Data;
 
 namespace StockSense.Web.Controllers;
 
@@ -13,109 +18,154 @@ namespace StockSense.Web.Controllers;
 public class BuildsController : ControllerBase
 {
     private readonly BuildRequestRepository _buildRepo;
-    private readonly ProductRepository _productRepo;
+    private readonly IWorkOrderCheckoutService _checkoutService;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public BuildsController(BuildRequestRepository buildRepo, ProductRepository productRepo)
+    public BuildsController(
+        BuildRequestRepository buildRepo,
+        IWorkOrderCheckoutService checkoutService,
+        UserManager<ApplicationUser> userManager)
     {
         _buildRepo = buildRepo;
-        _productRepo = productRepo;
+        _checkoutService = checkoutService;
+        _userManager = userManager;
     }
 
     [HttpPost]
     public async Task<IActionResult> CreateBuild([FromBody] CreateBuildRequestDto dto)
     {
         if (dto == null) return BadRequest(ApiResponse.Error("Request is empty."));
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
 
         var request = new BuildRequest
         {
-            CustomerName = dto.CustomerName,
+            CustomerName = GetFullName(customer),
+            CustomerEmail = customer.Email,
+            CustomerUserId = customer.Id,
             BuildName = dto.BuildName,
             SelectedPartsJson = dto.SelectedPartsJson,
             TotalPrice = dto.TotalPrice,
             CreatedAt = DateTime.Now,
-            Status = "Pending"
+            Status = WorkOrderStatuses.Pending
         };
 
         await _buildRepo.AddAsync(request);
         await _buildRepo.SaveChangesAsync();
-
-        var result = new BuildRequestDto
-        {
-            Id = request.Id, CustomerName = request.CustomerName, BuildName = request.BuildName,
-            SelectedPartsJson = request.SelectedPartsJson, TotalPrice = request.TotalPrice,
-            CreatedAt = request.CreatedAt, Status = request.Status
-        };
-        return Ok(result);
+        return Ok(MapToDto(request));
     }
 
     [HttpGet("all")]
+    [Authorize(Roles = "Employee,Admin")]
     public async Task<ActionResult<List<BuildRequestDto>>> GetAllBuilds()
     {
         var builds = await _buildRepo.GetAllAsync();
-        var dtos = builds.Select(b => new BuildRequestDto
-        {
-            Id = b.Id, CustomerName = b.CustomerName, BuildName = b.BuildName,
-            SelectedPartsJson = b.SelectedPartsJson, TotalPrice = b.TotalPrice,
-            CreatedAt = b.CreatedAt, Status = b.Status
-        }).ToList();
-        return Ok(dtos);
+        await EnrichCustomerIdentitiesAsync(builds);
+        return Ok(builds.Select(MapToDto).ToList());
     }
 
     [HttpPut("{id}/status")]
+    [Authorize(Roles = "Employee,Admin")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
     {
         var build = await _buildRepo.GetByIdAsync(id);
         if (build == null) return NotFound(ApiResponse.NotFound("Build"));
 
-        if (newStatus == "Completed" && build.Status != "Completed")
-        {
-            await DeductInventory(build);
-        }
+        if (string.Equals(newStatus, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(ApiResponse.Error("Use the completion checkout endpoint to complete a build."));
 
-        build.Status = newStatus;
+        var canonicalStatus = new[] { WorkOrderStatuses.Confirmed, WorkOrderStatuses.Cancelled }
+            .SingleOrDefault(value => string.Equals(value, newStatus?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (canonicalStatus is null) return BadRequest(ApiResponse.Error("Unsupported build status."));
+        var transitionError = WorkOrderRules.ValidateStatusTransition(build.Status, canonicalStatus);
+        if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
+
+        build.Status = canonicalStatus;
         await _buildRepo.SaveChangesAsync();
-        return Ok();
+        return Ok(new { message = "Status updated" });
     }
 
-    private async Task DeductInventory(BuildRequest build)
+    [HttpPost("{id}/complete")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<ActionResult<ReceiptDto>> Complete(
+        int id,
+        [FromBody] CompleteWorkOrderDto request,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(build.SelectedPartsJson)) return;
         try
         {
-            var usedParts = JsonSerializer.Deserialize<List<BuildPartDto>>(
-                build.SelectedPartsJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
-            if (usedParts != null)
-            {
-                foreach (var part in usedParts)
-                {
-                    var dbProduct = await _productRepo.GetByIdAsync(part.Id);
-                    if (dbProduct != null)
-                    {
-                        dbProduct.DeductStock(1);
-                        await _productRepo.UpdateAsync(dbProduct);
-                    }
-                }
-            }
+            var receipt = await _checkoutService.CompleteBuildAsync(
+                id,
+                request,
+                User.FindFirstValue(ClaimTypes.NameIdentifier),
+                InventoryDefaults.LocationId,
+                cancellationToken);
+            return Ok(receipt);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException)
         {
-            Console.WriteLine($"Failed to deduct inventory: {ex.Message}");
+            return NotFound(ApiResponse.NotFound("Build"));
+        }
+        catch (JsonException)
+        {
+            return BadRequest(ApiResponse.Error("The build's selected-parts data is invalid."));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Conflict(ApiResponse.Error(exception.Message));
         }
     }
 
-    [HttpGet("customer/{userName}")]
-    public async Task<ActionResult<List<BuildRequestDto>>> GetCustomerBuilds(string userName)
+    [HttpGet("mine")]
+    public async Task<ActionResult<List<BuildRequestDto>>> GetCustomerBuilds()
     {
-        if (string.IsNullOrEmpty(userName)) return BadRequest(ApiResponse.Error("User name is required."));
-        var builds = await _buildRepo.GetByCustomerNameAsync(userName);
-        var dtos = builds.Select(b => new BuildRequestDto
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+        var builds = await _buildRepo.GetByCustomerIdentityAsync(
+            customer.Id,
+            customer.Email ?? string.Empty,
+            GetFullName(customer));
+        await EnrichCustomerIdentitiesAsync(builds);
+        return Ok(builds.Select(MapToDto).ToList());
+    }
+
+    private static BuildRequestDto MapToDto(BuildRequest build) => new()
+    {
+        Id = build.Id,
+        CustomerName = build.CustomerName,
+        CustomerEmail = build.CustomerEmail,
+        BuildName = build.BuildName,
+        SelectedPartsJson = build.SelectedPartsJson,
+        TotalPrice = build.TotalPrice,
+        CreatedAt = build.CreatedAt,
+        Status = build.Status,
+        CompletedAt = build.CompletedAt,
+        TransactionId = build.TransactionId,
+        InvoiceNumber = build.Transaction?.InvoiceNumber
+    };
+
+    private static string GetFullName(ApplicationUser user)
+    {
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        return string.IsNullOrWhiteSpace(fullName)
+            ? user.Email?.Split('@')[0] ?? "Customer"
+            : fullName;
+    }
+
+    private async Task EnrichCustomerIdentitiesAsync(IEnumerable<BuildRequest> builds)
+    {
+        var users = await _userManager.Users.AsNoTracking().ToListAsync();
+        foreach (var build in builds)
         {
-            Id = b.Id, CustomerName = b.CustomerName, BuildName = b.BuildName,
-            SelectedPartsJson = b.SelectedPartsJson, TotalPrice = b.TotalPrice,
-            CreatedAt = b.CreatedAt, Status = b.Status
-        }).ToList();
-        return Ok(dtos);
+            var user = users.FirstOrDefault(value => value.Id == build.CustomerUserId)
+                ?? users.FirstOrDefault(value =>
+                    string.Equals(value.Email, build.CustomerEmail, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(value.Email, build.CustomerName, StringComparison.OrdinalIgnoreCase))
+                ?? users.FirstOrDefault(value =>
+                    string.Equals(GetFullName(value), build.CustomerName, StringComparison.OrdinalIgnoreCase));
+            if (user is null) continue;
+            build.CustomerName = GetFullName(user);
+            build.CustomerEmail = user.Email;
+        }
     }
 }

@@ -1,0 +1,34 @@
+@page "/admin/order-slips/{Id:int}"
+@layout AdminLayout
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using StockSense.Domain.Entities
+@using StockSense.Infrastructure.Data
+@inject ApplicationDbContext Db
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@attribute [Authorize(Roles = "Admin, Employee")]
+
+<PageTitle>Order Slip Details</PageTitle>
+@if (slip == null) { <div class="p-16 flex justify-center"><BbSpinner /></div> }
+else
+{
+<div class="flex flex-col gap-5">
+    <div class="flex flex-wrap justify-between gap-3"><div><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick='() => Navigation.NavigateTo("/admin/order-history")'><LucideIcon Name="arrow-left" Size="14" /> Back</BbButton><h1 class="text-2xl font-bold mt-2 mb-0">@Number</h1><p class="text-sm text-muted-foreground m-0">@slip.Supplier.Name · @slip.Status</p></div><div class="flex gap-2"><BbButton Variant="ButtonVariant.Outline" OnClick="Print" title="Print this order slip" aria-label="Print this order slip"><LucideIcon Name="printer" Size="16" /> Print</BbButton>@if (slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived) { <BbButton OnClick='() => Navigation.NavigateTo($"/admin/order-slips/{Id}/receive")'>Record receipt</BbButton> }</div></div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">@Fact("Generated", Generated.ToString("MMM d, yyyy h:mm tt")) @Fact("Expected delivery", slip.ExpectedDeliveryDate?.ToString("MMM d, yyyy") ?? "—") @Fact("Estimated cost", $"₱{slip.TotalEstimatedCost:N2}") @Fact("Location", slip.LocationId)</div>
+    <div class="rounded-lg border border-border bg-card overflow-x-auto"><table class="w-full text-sm" style="border-collapse:collapse;min-width:1450px"><thead class="bg-muted/30 text-muted-foreground"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-right">Current</th><th class="p-3 text-right">Incoming</th><th class="p-3 text-right">Reserved</th><th class="p-3 text-right">Backorder</th><th class="p-3 text-right">Position</th><th class="p-3 text-right">Demand/day</th><th class="p-3 text-right">Lead days</th><th class="p-3 text-right">Safety</th><th class="p-3 text-right">Reorder</th><th class="p-3 text-right">Target</th><th class="p-3 text-right">Suggested</th><th class="p-3 text-right">Ordered</th><th class="p-3 text-right">Received</th><th class="p-3 text-left">Reason</th></tr></thead><tbody>@foreach (var item in slip.Items) { <tr class="border-t border-border"><td class="p-3 font-medium">@item.ProductName</td><td class="p-3 text-right">@item.CurrentStockSnapshot</td><td class="p-3 text-right">@item.IncomingStockSnapshot</td><td class="p-3 text-right">@item.ReservedStockSnapshot</td><td class="p-3 text-right">@item.BackorderStockSnapshot</td><td class="p-3 text-right">@item.InventoryPositionSnapshot</td><td class="p-3 text-right">@item.AverageDailyDemandSnapshot.ToString("0.####")</td><td class="p-3 text-right">@item.LeadTimeDaysSnapshot.ToString("0.##")</td><td class="p-3 text-right">@item.SafetyStockSnapshot</td><td class="p-3 text-right">@item.ReorderPointSnapshot</td><td class="p-3 text-right">@item.TargetStockSnapshot</td><td class="p-3 text-right">@item.SuggestedQuantity</td><td class="p-3 text-right">@Ordered(item)</td><td class="p-3 text-right">@item.ReceivedQuantity</td><td class="p-3 max-w-72">@Reason(item)</td></tr> }</tbody></table></div>
+    @if (!string.IsNullOrWhiteSpace(slip.Remarks)) { <div class="rounded-lg border border-border p-4"><h2 class="text-sm font-semibold m-0 mb-1">Remarks</h2><p class="text-sm text-muted-foreground m-0">@slip.Remarks</p></div> }
+</div>
+}
+@code {
+    [Parameter] public int Id { get; set; }
+    private OrderSlip? slip;
+    protected override async Task OnParametersSetAsync() => slip = await Db.OrderSlips.AsNoTracking().Include(x=>x.Supplier).Include(x=>x.Items).SingleOrDefaultAsync(x=>x.Id==Id);
+    private string Number => string.IsNullOrWhiteSpace(slip!.OrderSlipNumber) ? slip.SlipNumber : slip.OrderSlipNumber;
+    private DateTime Generated => slip!.GeneratedAt == default ? slip.DateGenerated : slip.GeneratedAt;
+    private static int Ordered(OrderSlipItem x) => x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity;
+    private static string Reason(OrderSlipItem x) => string.IsNullOrWhiteSpace(x.RecommendationReason) ? x.Reasoning : x.RecommendationReason;
+    private async Task Print() => await JS.InvokeVoidAsync("print");
+    private static RenderFragment Fact(string label,string value) => @<div class="rounded-lg border border-border bg-card p-3"><div class="text-xs text-muted-foreground">@label</div><div class="font-medium mt-1">@value</div></div>;
+}

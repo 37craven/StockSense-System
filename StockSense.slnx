@@ -11,5 +11,7 @@
     <Project Path="StockSense.Infrastructure/StockSense.Infrastructure.csproj" />
     <Project Path="StockSense.Web/StockSense.Web.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/StockSense.Tests/StockSense.Tests.csproj" />
+  </Folder>
 </Solution>

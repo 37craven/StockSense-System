@@ -9,6 +9,14 @@ namespace StockSense.Application.DTOs
         public bool IsBlocked { get; set; }
     }
 
+    public sealed class UserProfileDto
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+
     public class CreateEmployeeDto
     {
         public string Email { get; set; } = string.Empty;

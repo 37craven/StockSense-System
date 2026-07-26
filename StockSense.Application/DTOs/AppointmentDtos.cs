@@ -6,6 +6,7 @@ public class AppointmentDto
 {
     public int Id { get; set; }
     public string CustomerName { get; set; } = string.Empty;
+    public string? CustomerEmail { get; set; }
     public string? ContactNumber { get; set; }
     public DateTime AppointmentDate { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -17,6 +18,9 @@ public class AppointmentDto
     public string Category { get; set; } = string.Empty;
     public string MechanicName { get; set; } = string.Empty;
     public int DurationMinutes { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public int? TransactionId { get; set; }
+    public string? InvoiceNumber { get; set; }
 }
 
 public partial class CreateAppointmentDto

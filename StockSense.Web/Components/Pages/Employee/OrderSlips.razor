@@ -1,501 +1,86 @@
 @page "/admin/orderslips"
 @layout AdminLayout
-@using StockSense.Application.DTOs
-@using System.Security.Claims
-@using StockSense.Infrastructure.Data.Repositories
-@using StockSense.Infrastructure.Services
-@using StockSense.Web.Helpers
-@inject OrderSlipHelper OrderService
-@inject NavigationManager NavManager
-@inject IJSRuntime JS
-@inject AuthenticationStateProvider Auth
-@inject PdfDownloadCache PdfCache
-@inject ProductRepository ProductRepo
 @rendermode InteractiveServer
-@using BlazorBlueprint.Primitives.Table
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@using StockSense.Application.DTOs
+@using StockSense.Application.Interfaces
+@inject IOrderSlipWorkflowService Workflow
+@inject AuthenticationStateProvider AuthenticationState
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Admin, Employee")]
 
-<PageTitle>Order Slips</PageTitle>
+<PageTitle>Order Slip Generator</PageTitle>
 
-<div>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-foreground m-0 mb-1">Order Slips</h1>
-            <p class="text-sm text-muted-foreground m-0">Generate and manage supplier restock orders.</p>
-        </div>
-        <div class="flex gap-2">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="@(() => NavManager.NavigateTo("/admin/order-history"))">
-                <LucideIcon Name="clock" Size="16"/>
-                View History
-            </BbButton>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="CreateCustomSlip">
-                <LucideIcon Name="file-plus" Size="16"/>
-                Custom Slip
-            </BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="GenerateSlips" Disabled="@isLoading">
-                @if (isLoading)
-                {
-                    <BbSpinner Size="SpinnerSize.Small"/>
-                }
-                <LucideIcon Name="scan" Size="16"/>
-                Scan Low Stock
-            </BbButton>
-
-        </div>
+<div class="flex flex-col gap-5">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div><h1 class="text-2xl font-bold text-foreground m-0">Order-Slip Generator</h1><p class="text-sm text-muted-foreground mt-1 m-0">Review recommendations before creating supplier drafts. Nothing is automatically approved or sent.</p></div>
+        <div class="flex gap-2"><BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/order-history")'><LucideIcon Name="clipboard-list" Size="16" /> View order slips</BbButton><BbButton OnClick="LoadPreview" Disabled="busy">@if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }<LucideIcon Name="scan" Size="16" /> Generate preview</BbButton></div>
     </div>
+    @if (!string.IsNullOrWhiteSpace(message)) { <div role="status" class="rounded-md border border-border bg-muted/30 p-3 text-sm">@message</div> }
+    @if (!string.IsNullOrWhiteSpace(error)) { <div role="alert" class="rounded-md border p-3 text-sm" style="border-color:var(--destructive);color:var(--destructive)">@error</div> }
 
-    @if (isLoading && !slips.Any())
+    @if (preview == null)
     {
-        <div class="flex items-center justify-center gap-3 p-16 text-muted-foreground">
-            <BbSpinner Size="SpinnerSize.Large"/>
-            <span class="text-sm">Analyzing stock levels...</span>
-        </div>
-    }
-    else if (!slips.Any())
-    {
-        <div class="mt-6 flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg text-muted-foreground">
-            <LucideIcon Name="scan" Size="40" />
-            <p class="font-medium text-foreground mt-3 mb-1">No slips generated yet</p>
-            <p class="text-sm m-0">Click "Scan Low Stock" to check inventory levels and generate order slips.</p>
-        </div>
+        <div class="rounded-lg border-2 border-dashed border-border p-12 text-center text-muted-foreground"><LucideIcon Name="package-search" Size="40" /><p class="text-foreground font-medium mb-1">No preview loaded</p><p class="text-sm m-0">Generate a preview to calculate inventory position and supplier quantities.</p></div>
     }
     else
     {
-        <div class="pt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            @foreach (var slip in slips)
-            {
-                <div class="rounded-lg border border-border bg-card overflow-hidden flex flex-col">
-
-                    @* Header *@
-                    <div class="px-5 py-3 flex items-center justify-between border-b border-border bg-muted/30">
-                        <div>
-                            <div class="text-sm font-bold text-foreground">@slip.SupplierName</div>
-                            <p class="text-xs text-muted-foreground m-0">@slip.SlipNumber</p>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                      OnClick="() => TogglePin(slip)"
-                                      title="@GetPinTitle(slip)">
-                                <LucideIcon Name="pin" Size="16" style="@GetPinStyle(slip)" />
-                            </BbButton>
-                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                      OnClick="() => DownloadPdf(slip)"
-                                      Disabled="downloadingSlips.Contains(slip.SlipNumber)"
-                                      title="Download PDF">
-                                @if (downloadingSlips.Contains(slip.SlipNumber))
-                                {
-                                    <BbSpinner Size="SpinnerSize.Small"/>
-                                }
-                                else
-                                {
-                                    <LucideIcon Name="download" Size="16"/>
-                                }
-                            </BbButton>
-                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                      OnClick="() => DiscardSlip(slip)"
-                                      title="Discard">
-                                <LucideIcon Name="trash-2" Size="16"/>
-                            </BbButton>
-                        </div>
-                    </div>
-                    
-                    @* Table *@
-                    <div class="overflow-x-auto flex-1">
-                        <BbTable TData="OrderSlipItemDto" class="w-full">
-                            <BbTableHeader class="bg-muted/20 border-b border-border">
-                                <BbTableRow TData="OrderSlipItemDto">
-                                    <BbTableHeaderCell TData="OrderSlipItemDto"
-                                                       class="p-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                        Product
-                                    </BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto"
-                                                       class="p-4 text-center text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                        Stock
-                                    </BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto"
-                                                       class="p-4 text-center text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                        Target
-                                    </BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto"
-                                                       class="p-4 text-center text-xs font-medium text-muted-foreground uppercase tracking-wide w-20">
-                                        Qty
-                                    </BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto" class="p-4 w-8"></BbTableHeaderCell>
-                                </BbTableRow>
-                            </BbTableHeader>
-                            <BbTableBody TData="OrderSlipItemDto">
-                                @foreach (var item in slip.Items)
-                                {
-                                    <BbTableRow TData="OrderSlipItemDto" class="border-b border-border last:border-0">
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4">
-                                            @if (allProducts != null)
-                                            {
-                                                <div class="flex items-center gap-1">
-                                                    <select class="flex-1 min-w-0 text-sm bg-transparent border-0 outline-none text-foreground cursor-pointer hover:bg-muted/20 rounded px-0 py-0"
-                                                            style="-webkit-appearance: none; appearance: none;"
-                                                            value="@(allProducts.FindIndex(p => p.Name == item.ProductName))"
-                                                            @onchange="e => OnProductChanged(slip, item, e)">
-                                                        <option value="-1" class="text-muted-foreground">— Select —</option>
-                                                        @for (int i = 0; i < allProducts.Count; i++)
-                                                        {
-                                                            var p = allProducts[i];
-                                                            <option value="@i">@p.Name — @p.Brand</option>
-                                                        }
-                                                        <LucideIcon Name="chevron-down" Size="14" Class="text-muted-foreground flex-shrink-0 pointer-events-none"/>
-                                                    </select>
-                                                    
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <div class="text-sm text-muted-foreground">Loading...</div>
-                                            }
-                                        </BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto"
-                                                     class="p-4 text-center font-mono text-sm text-foreground">@item.CurrentStock</BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto"
-                                                     class="p-4 text-center font-mono text-sm text-muted-foreground">@item.ReorderTarget</BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4">
-                                            <input type="number" @bind="item.Quantity"
-                                                   class="w-full h-8 text-center text-sm rounded-md border border-input bg-background outline-none"
-                                                   style="padding: var(--space-1) var(--space-2); color: var(--foreground); box-sizing: border-box;"/>
-                                        </BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4 text-right">
-                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon"
-                                      OnClick="() => RemoveItem(slip, item)">
-                                <LucideIcon Name="x" Size="14"/>
-                            </BbButton>
-                                        </BbTableCell>
-                                    </BbTableRow>
-                                }
-                            </BbTableBody>
-                        </BbTable>
-                    </div>
-
-                    @* Footer *@
-                    <div class="px-4 py-3 border-t border-border bg-muted/10">
-                        <div class="flex items-center justify-between gap-2">
-                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
-                                      OnClick="() => AddItem(slip)">
-                                <LucideIcon Name="plus" Size="14"/>
-                                Add Item
-                            </BbButton>
-                            <div class="flex gap-2">
-                                <span title="@GetSaveButtonTooltip(slip)">
-                                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
-                                              OnClick="() => AddToHistory(slip)"
-                                              Disabled="savingSlips.Contains(slip.SlipNumber) || !CanSave(slip)">
-                                        @if (savingSlips.Contains(slip.SlipNumber))
-                                        {
-                                            <BbSpinner Size="SpinnerSize.Small"/>
-                                            <span>Saving...</span>
-                                        }
-                                        else
-                                        {
-                                            <span>Add to History</span>
-                                        }
-                                    </BbButton>
-                                </span>
-                                <span title="@GetEmailButtonTooltip(slip)">
-                                    <BbButton Size="ButtonSize.Small"
-                                              OnClick="() => SendEmailAndSave(slip)"
-                                              Disabled="processingSlips.Contains(slip.SlipNumber) || !CanSave(slip)">
-                                        @if (processingSlips.Contains(slip.SlipNumber))
-                                        {
-                                            <BbSpinner Size="SpinnerSize.Small"/>
-                                            <span>Sending...</span>
-                                        }
-                                        else
-                                        {
-                                            <LucideIcon Name="mail" Size="14"/>
-                                            <span>Email Order</span>
-                                        }
-                                    </BbButton>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            }
-        </div>
+        @if (preview.Warnings.Count > 0)
+        {
+            <div class="rounded-lg border border-border bg-card p-4"><h2 class="text-sm font-semibold m-0 mb-2">Skipped products and warnings</h2><ul class="text-sm text-muted-foreground m-0 pl-5">@foreach (var warning in preview.Warnings) { <li>@warning.ProductName: @warning.Message</li> }</ul></div>
+        }
+        @foreach (var group in preview.SupplierGroups)
+        {
+            <section class="rounded-lg border border-border bg-card overflow-hidden" aria-labelledby="supplier-@group.SupplierId">
+                <header class="p-4 border-b border-border bg-muted/20 flex justify-between"><h2 id="supplier-@group.SupplierId" class="text-base font-semibold m-0">@group.SupplierName</h2><span class="font-medium">Selected total: ₱@SelectedTotal(group).ToString("N2")</span></header>
+                <div class="overflow-x-auto"><table class="w-full text-sm" style="border-collapse:collapse;min-width:1250px"><thead class="text-muted-foreground"><tr><th class="p-3 text-left">Include</th><th class="p-3 text-left">Product</th><th class="p-3 text-right">Current</th><th class="p-3 text-right">Incoming</th><th class="p-3 text-right">Position</th><th class="p-3 text-right">Safety</th><th class="p-3 text-right">Reorder</th><th class="p-3 text-right">Target</th><th class="p-3 text-right">Suggested</th><th class="p-3 text-left">Final quantity</th><th class="p-3 text-right">Unit cost</th><th class="p-3 text-right">Total</th></tr></thead>
+                    <tbody>@foreach (var item in group.Items) { <tr class="border-t border-border"><td class="p-3"><input type="checkbox" @bind="item.IsSelected" aria-label="Include @item.ProductName" /></td><td class="p-3"><div class="font-medium">@item.ProductName</div><div class="text-xs text-muted-foreground" title="@item.RecommendationReason">@item.Brand · @item.RecommendationReason</div></td><td class="p-3 text-right">@item.CurrentStock</td><td class="p-3 text-right">@item.IncomingStock</td><td class="p-3 text-right">@item.InventoryPosition</td><td class="p-3 text-right">@item.SafetyStock</td><td class="p-3 text-right">@item.ReorderPoint</td><td class="p-3 text-right">@item.TargetStock</td><td class="p-3 text-right">@item.SuggestedQuantity</td><td class="p-3"><label class="sr-only" for="qty-@item.ProductId">Final quantity for @item.ProductName</label><input id="qty-@item.ProductId" type="number" min="1" step="@item.PackageSize" @bind="item.FinalQuantity" class="h-9 w-24 rounded-md border border-input bg-background px-2 text-right" />@if (errors.TryGetValue(item.ProductId, out var itemError)) { <div role="alert" class="text-xs mt-1" style="color:var(--destructive)">@itemError</div> }</td><td class="p-3 text-right">₱@item.UnitCost.ToString("N2")</td><td class="p-3 text-right">₱@((item.FinalQuantity * item.UnitCost).ToString("N2"))</td></tr> }</tbody></table></div>
+            </section>
+        }
+        <div class="flex justify-end"><BbButton OnClick="CreateDrafts" Disabled="@(busy || !CanCreate)"><LucideIcon Name="file-plus" Size="16" /> Create selected drafts</BbButton></div>
     }
 </div>
 
 @code {
-    private List<OrderSlipDto> slips = new();
-    private List<ProductDto>? allProducts;
-    private HashSet<string> pinnedSlipNumbers = new();
-    private HashSet<string> processingSlips = new();
-    private HashSet<string> savingSlips = new();
-    private HashSet<string> downloadingSlips = new();
-    private bool isLoading;
-    private HashSet<string> generatedSlipNumbers = new();
-    private string userId = string.Empty;
-    private bool pinnedSlipsLoaded;
+    private OrderSlipPreviewDto? preview;
+    private readonly Dictionary<int, string> errors = [];
+    private bool busy;
+    private string message = "", error = "";
+    private bool CanCreate => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && errors.Count == 0;
 
-    protected override async Task OnInitializedAsync()
+    private async Task LoadPreview()
     {
-        slips = new();
-        var products = await ProductRepo.GetAllAsync();
-        allProducts = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "")).ToList();
-        var authState = await Auth.GetAuthenticationStateAsync();
-        userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous";
+        busy = true; error = ""; message = ""; errors.Clear();
+        try { var result = await Workflow.PreviewAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage); preview = result.Value; message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations."; }
+        catch (Exception ex) { error = ex.Message; }
+        finally { busy = false; }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private void Validate(OrderSlipPreviewItemDto item)
     {
-        if (pinnedSlipsLoaded) return;
+        errors.Remove(item.ProductId);
+        if (item.FinalQuantity < item.MinimumOrderQuantity) errors[item.ProductId] = $"Minimum order quantity is {item.MinimumOrderQuantity}.";
+        else if (item.FinalQuantity % item.PackageSize != 0) errors[item.ProductId] = $"Quantity must be a multiple of package size {item.PackageSize}.";
+        else if (item.MaximumStockLevel.HasValue && item.InventoryPosition + item.FinalQuantity > item.MaximumStockLevel) errors[item.ProductId] = $"Projected stock exceeds maximum {item.MaximumStockLevel}.";
+    }
 
+    private decimal SelectedTotal(OrderSlipPreviewGroupDto group) => group.Items.Where(x => x.IsSelected).Sum(x => x.FinalQuantity * x.UnitCost);
+    private async Task CreateDrafts()
+    {
+        if (preview == null) return;
+        foreach (var item in preview.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected)) Validate(item);
+        if (errors.Count > 0) return;
+        busy = true; error = "";
         try
         {
-            var pinned = await OrderService.GetPinnedSlipsAsync(userId);
-            if (pinned != null)
-            {
-                foreach (var slip in pinned)
-                {
-                    if (!slips.Any(s => s.SlipNumber == slip.SlipNumber))
-                    {
-                        slips.Add(slip);
-                    }
-                    pinnedSlipNumbers.Add(slip.SlipNumber);
-                }
-            }
-            pinnedSlipsLoaded = true;
-            StateHasChanged();
+            var state = await AuthenticationState.GetAuthenticationStateAsync();
+            var command = new CreateOrderSlipDraftsCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierGroups = preview.SupplierGroups.Select(group => new CreateDraftOrderSlipGroupCommand { SupplierId = group.SupplierId, Items = group.Items.Where(item => item.IsSelected).Select(item => new CreateDraftOrderSlipItemCommand { ProductId = item.ProductId, OrderedQuantity = item.FinalQuantity }).ToList() }).Where(group => group.Items.Count > 0).ToList() };
+            var result = await Workflow.CreateDraftsAsync(command);
+            if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage);
+            message = $"Created {result.Value.OrderSlips.Count} draft order slips."; preview = null;
         }
-        catch
-        {
-        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { busy = false; }
     }
-
-    private async Task SavePinnedSlipsAsync()
-    {
-        var pinned = slips.Where(s => pinnedSlipNumbers.Contains(s.SlipNumber)).ToList();
-        await OrderService.SavePinnedSlipsAsync(userId, pinned);
-    }
-
-    private async Task GenerateSlips()
-    {
-        isLoading = true;
-        try
-        {
-            var generated = await OrderService.GenerateSuggestedOrderSlipsAsync();
-            generatedSlipNumbers = generated.Select(s => s.SlipNumber).ToHashSet();
-
-            var keptPinned = slips.Where(s => pinnedSlipNumbers.Contains(s.SlipNumber)).ToList();
-            slips = generated.Concat(keptPinned).DistinctBy(s => s.SlipNumber).ToList();
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"GenerateSlips failed: {ex.Message}");
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
-
-    private async Task TogglePin(OrderSlipDto slip)
-    {
-        if (pinnedSlipNumbers.Contains(slip.SlipNumber))
-        {
-            pinnedSlipNumbers.Remove(slip.SlipNumber);
-            if (!generatedSlipNumbers.Contains(slip.SlipNumber))
-            {
-                slips.Remove(slip);
-            }
-        }
-        else
-        {
-            pinnedSlipNumbers.Add(slip.SlipNumber);
-        }
-
-        await SavePinnedSlipsAsync();
-    }
-
-    private async Task AddToHistory(OrderSlipDto slip)
-    {
-        savingSlips.Add(slip.SlipNumber);
-        try
-        {
-            var command = new SaveOrderSlipCommand
-            {
-                SlipNumber = slip.SlipNumber,
-                SupplierId = ResolveSupplierId(slip),
-                Items = slip.Items.Select(i => new SaveOrderSlipItemCommand
-                {
-                    ProductName = i.ProductName,
-                    Brand = i.Brand,
-                    Quantity = i.Quantity
-                }).ToList()
-            };
-            await OrderService.SaveOrderSlipToDbAsync(command);
-            slips.Remove(slip);
-            pinnedSlipNumbers.Remove(slip.SlipNumber);
-            await SavePinnedSlipsAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"AddToHistory failed: {ex.Message}");
-        }
-        finally
-        {
-            savingSlips.Remove(slip.SlipNumber);
-        }
-    }
-
-    private async Task DiscardSlip(OrderSlipDto slip)
-    {
-        slips.Remove(slip);
-        pinnedSlipNumbers.Remove(slip.SlipNumber);
-        generatedSlipNumbers.Remove(slip.SlipNumber);
-        await SavePinnedSlipsAsync();
-    }
-
-    private async Task DownloadPdf(OrderSlipDto slip)
-    {
-        downloadingSlips.Add(slip.SlipNumber);
-        try
-        {
-            var bytes = OrderService.GeneratePdfBytes(slip);
-            var token = PdfCache.Store(bytes);
-            var fileName = $"Order_{slip.SlipNumber}.pdf";
-            var url = $"/api/download/{token}";
-            await JS.InvokeVoidAsync("triggerDownload", url, fileName);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Download failed: {ex.Message}");
-        }
-        finally
-        {
-            downloadingSlips.Remove(slip.SlipNumber);
-        }
-    }
-
-    private async Task SendEmailAndSave(OrderSlipDto slip)
-    {
-        processingSlips.Add(slip.SlipNumber);
-
-        try
-        {
-            var bytes = OrderService.GeneratePdfBytes(slip);
-
-            string targetEmail = "37craven@gmail.com";
-
-            var command = new SaveOrderSlipCommand
-            {
-                SlipNumber = slip.SlipNumber,
-                SupplierId = ResolveSupplierId(slip),
-                Items = slip.Items.Select(i => new SaveOrderSlipItemCommand
-                {
-                    ProductName = i.ProductName,
-                    Brand = i.Brand,
-                    Quantity = i.Quantity
-                }).ToList()
-            };
-
-            await OrderService.SendEmailAsync(targetEmail, bytes, slip.SlipNumber);
-            await OrderService.SaveOrderSlipToDbAsync(command);
-            slips.Remove(slip);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"SendEmailAndSave failed: {ex.Message}");
-        }
-        finally
-        {
-            processingSlips.Remove(slip.SlipNumber);
-        }
-    }
-
-    private void CreateCustomSlip()
-    {
-        var slip = new OrderSlipDto
-        {
-            SlipNumber = $"CUSTOM-{DateTime.Now:yyyyMMdd-HHmmss}",
-            DateGenerated = DateTime.Now,
-            SupplierName = "Custom Order",
-            Items = new List<OrderSlipItemDto> { new OrderSlipItemDto() }
-        };
-        slips.Insert(0, slip);
-    }
-
-    private async Task OnProductSelected(OrderSlipDto slip, OrderSlipItemDto item, int productIndex)
-    {
-        if (allProducts == null || productIndex < 0 || productIndex >= allProducts.Count) return;
-        var product = allProducts[productIndex];
-        await OrderService.ApplyProductToItemAsync(item, product.Id);
-    }
-
-    private void AddItem(OrderSlipDto slip)
-    {
-        slip.Items.Add(new OrderSlipItemDto());
-    }
-
-    private async Task OnProductChanged(OrderSlipDto slip, OrderSlipItemDto item, ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out var index))
-            await OnProductSelected(slip, item, index);
-    }
-
-    private void RemoveItem(OrderSlipDto slip, OrderSlipItemDto item)
-    {
-        slip.Items.Remove(item);
-        if (slip.Items.Count == 0)
-        {
-            DiscardSlip(slip);
-        }
-    }
-
-    private static bool HasEmptyItems(OrderSlipDto slip) =>
-        slip.Items.Any(i => string.IsNullOrWhiteSpace(i.ProductName));
-
-    private static bool HasDuplicateItems(OrderSlipDto slip)
-    {
-        var selected = slip.Items
-            .Where(i => !string.IsNullOrWhiteSpace(i.ProductName))
-            .Select(i => (i.ProductName, i.Brand))
-            .ToList();
-        return selected.Count != selected.Distinct().Count();
-    }
-
-    private bool CanSave(OrderSlipDto slip) =>
-        !HasEmptyItems(slip) && !HasDuplicateItems(slip);
-
-    private int ResolveSupplierId(OrderSlipDto slip)
-    {
-        if (slip.SupplierId > 0) return slip.SupplierId;
-        var firstItem = slip.Items.FirstOrDefault(i => !string.IsNullOrWhiteSpace(i.ProductName));
-        if (firstItem == null || allProducts == null) return 0;
-        var product = allProducts.FirstOrDefault(p =>
-            p.Name == firstItem.ProductName && p.Brand == firstItem.Brand);
-        return product?.SupplierId ?? 0;
-    }
-
-    private string GetSaveButtonTooltip(OrderSlipDto slip)
-    {
-        if (slip.SupplierId <= 0 && allProducts != null)
-            ResolveSupplierId(slip);
-        if (HasEmptyItems(slip))
-            return "Select a product for all rows before adding to history";
-        if (HasDuplicateItems(slip))
-            return "Remove duplicate products before adding to history";
-        return "";
-    }
-
-    private string GetEmailButtonTooltip(OrderSlipDto slip)
-    {
-        if (HasEmptyItems(slip))
-            return "Select a product for all rows before sending email";
-        if (HasDuplicateItems(slip))
-            return "Remove duplicate products before sending email";
-        return "";
-    }
-
-    private string GetPinStyle(OrderSlipDto slip) =>
-        pinnedSlipNumbers.Contains(slip.SlipNumber) ? "color: var(--primary);" : "color: var(--muted-foreground);";
-
-    private string GetPinTitle(OrderSlipDto slip) =>
-        pinnedSlipNumbers.Contains(slip.SlipNumber) ? "Unpin" : "Pin";
 }

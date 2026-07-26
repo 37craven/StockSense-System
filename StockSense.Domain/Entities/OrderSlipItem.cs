@@ -19,4 +19,25 @@ public class OrderSlipItem
     public bool IsPredictedHighDemand { get; set; }
     public double ConfidenceScore { get; set; }
     public string Reasoning { get; set; } = string.Empty;
+    public OrderSlip OrderSlip { get; set; } = null!;
+    public int ProductId { get; set; }
+    public Product Product { get; set; } = null!;
+    public int CurrentStockSnapshot { get; set; }
+    public int IncomingStockSnapshot { get; set; }
+    public int ReservedStockSnapshot { get; set; }
+    public int BackorderStockSnapshot { get; set; }
+    public int InventoryPositionSnapshot { get; set; }
+    public decimal AverageDailyDemandSnapshot { get; set; }
+    public decimal LeadTimeDaysSnapshot { get; set; }
+    public int SafetyStockSnapshot { get; set; }
+    public int ReorderPointSnapshot { get; set; }
+    public int TargetStockSnapshot { get; set; }
+    public int SuggestedQuantity { get; set; }
+    public int OrderedQuantity { get; set; }
+    public int PackageSizeSnapshot { get; set; } = 1;
+    public int MinimumOrderQuantitySnapshot { get; set; } = 1;
+    public decimal UnitCostSnapshot { get; set; }
+    public decimal EstimatedLineTotal { get; set; }
+    public string RecommendationReason { get; set; } = string.Empty;
+    public ICollection<TransactionItem> ReceiptItems { get; set; } = new List<TransactionItem>();
 }

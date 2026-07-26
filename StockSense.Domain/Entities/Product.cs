@@ -12,6 +12,10 @@ public class Product
     public string Brand { get; set; } = string.Empty;
     public string? Barcode { get; set; }
     [Column(TypeName = "decimal(18,2)")] public decimal Price { get; set; }
+    [Column(TypeName = "decimal(18,2)")] public decimal UnitCost { get; set; } = 0m;
+    [Timestamp]
+    [JsonIgnore]
+    public byte[] RowVersion { get; set; } = [];
     public string ImageUrl { get; set; } = "https://placehold.co/300x200";
     [JsonInclude]
     public int CurrentStock { get; set; }
@@ -37,4 +41,6 @@ public class Product
     public int? SupplierId { get; set; }
     public virtual Supplier? Supplier { get; set; }
     [JsonIgnore] public List<PreBuiltPackage> PreBuiltPackages { get; set; } = new();
+    [JsonIgnore] public ICollection<ProductInventorySetting> InventorySettings { get; set; } = new List<ProductInventorySetting>();
+    [JsonIgnore] public ICollection<ProductInventoryMetric> InventoryMetrics { get; set; } = new List<ProductInventoryMetric>();
 }

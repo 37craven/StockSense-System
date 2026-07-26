@@ -1,0 +1,1105 @@
+@page "/admin/product-sales"
+@layout AdminLayout
+@rendermode InteractiveServer
+@using System.Globalization
+@using Microsoft.AspNetCore.Authorization
+@using StockSense.Web.Services
+@attribute [Authorize(Roles = "Employee, Admin")]
+@inject IProductSalesDatasetService ProductSalesDatasetService
+@inject ILogger<ProductSales> Logger
+
+<PageTitle>Product Sales Comparison</PageTitle>
+
+<main class="product-sales-page" aria-labelledby="product-sales-title">
+    <header class="product-sales-header">
+        <div>
+            <h1 id="product-sales-title">Product sales comparison</h1>
+            <p>Compare monthly quantity sold across historical and live transaction years.</p>
+        </div>
+        @if (dataset is not null)
+        {
+            <span class="dataset-note">@DatasetCoverageText</span>
+        }
+    </header>
+
+    @if (isLoading)
+    {
+        <section class="status-card" role="status" aria-live="polite">
+            <BbSpinner Size="SpinnerSize.Large" />
+            <span>Loading product sales data...</span>
+        </section>
+    }
+    else if (loadError is not null)
+    {
+        <section class="status-card error-card" role="alert">
+            <LucideIcon Name="triangle-alert" Size="20" aria-hidden="true" />
+            <div><strong>Sales data could not be loaded.</strong><p>@loadError</p></div>
+        </section>
+    }
+    else if (dataset is null || dataset.Products.Count == 0)
+    {
+        <section class="status-card" role="status">No product sales data is available.</section>
+    }
+    else
+    {
+        <section class="filter-card" aria-label="Sales graph filters">
+            <div class="product-filter">
+                <div class="search-category-grid">
+                    <div>
+                        <label for="product-search">Search products</label>
+                        <input id="product-search"
+                               type="search"
+                               value="@productSearch"
+                               @oninput="OnSearchChanged"
+                               placeholder="Search name, brand, or category..." />
+                    </div>
+
+                    <div>
+                        <label for="category-filter">Category</label>
+                        <select id="category-filter"
+                                value="@selectedCategory"
+                                @onchange="OnCategoryChanged">
+                            <option value="">All categories</option>
+                            @foreach (var category in AvailableCategories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <fieldset class="source-filter">
+                    <legend>Data source</legend>
+                    <div class="source-filter-buttons">
+                        <button type="button"
+                                class="source-filter-button @(sourceFilter == ProductSourceFilter.All ? "active" : "")"
+                                aria-pressed="@(sourceFilter == ProductSourceFilter.All)"
+                                @onclick="() => SetSourceFilter(ProductSourceFilter.All)">
+                            All
+                        </button>
+                        <button type="button"
+                                class="source-filter-button historical @(sourceFilter == ProductSourceFilter.HistoricalOnly ? "active" : "")"
+                                aria-pressed="@(sourceFilter == ProductSourceFilter.HistoricalOnly)"
+                                @onclick="() => SetSourceFilter(ProductSourceFilter.HistoricalOnly)">
+                            Historical only
+                        </button>
+                        <button type="button"
+                                class="source-filter-button live @(sourceFilter == ProductSourceFilter.LiveOnly ? "active" : "")"
+                                aria-pressed="@(sourceFilter == ProductSourceFilter.LiveOnly)"
+                                @onclick="() => SetSourceFilter(ProductSourceFilter.LiveOnly)">
+                            Live only
+                        </button>
+                        <button type="button"
+                                class="source-filter-button mapped @(sourceFilter == ProductSourceFilter.HistoricalAndLive ? "active" : "")"
+                                aria-pressed="@(sourceFilter == ProductSourceFilter.HistoricalAndLive)"
+                                @onclick="() => SetSourceFilter(ProductSourceFilter.HistoricalAndLive)">
+                            Historical + live
+                        </button>
+                    </div>
+                </fieldset>
+
+                <label for="product-select">Product</label>
+                <select id="product-select"
+                        value="@selectedProductKey"
+                        @onchange="OnProductChanged"
+                        disabled="@(FilteredProducts.Count == 0)">
+                    @if (FilteredProducts.Count == 0)
+                    {
+                        <option value="">No matching products</option>
+                    }
+                    else
+                    {
+                        @foreach (var product in FilteredProducts)
+                        {
+                            <option value="@product.SelectionKey">
+                                @product.ProductName - @GetStatusLabel(product.SourceStatus)
+                            </option>
+                        }
+                    }
+                </select>
+                <span>
+                    Showing @FilteredProducts.Count of @dataset.Products.Count products
+                </span>
+            </div>
+
+            <fieldset class="year-filter" aria-describedby="year-filter-help">
+                <legend>Years to compare</legend>
+                <div class="year-options">
+                    @foreach (var year in AvailableYears)
+                    {
+                        <label class="year-option">
+                            <input type="checkbox"
+                                   checked="@selectedYears.Contains(year)"
+                                   @onchange="args => ToggleYear(year, args)" />
+                            <span class="year-swatch" style="background-color: @GetYearColor(year);"></span>
+                            <span>@year</span>
+                            @if (!IsCompleteYear(year))
+                            {
+                                <small>@GetProductYearCoverage(year)</small>
+                            }
+                        </label>
+                    }
+                </div>
+                <span id="year-filter-help">Select up to five years to overlay on the same January-to-December graph.</span>
+            </fieldset>
+        </section>
+
+        @if (FilteredProducts.Count == 0)
+        {
+            <section class="status-card filtered-empty" role="status">
+                <div>
+                    <strong>No products match the current filters.</strong>
+                    <p>Change the search, category, or data-source filter.</p>
+                </div>
+            </section>
+        }
+        else if (SelectedProduct is { } selectedProduct)
+        {
+            <section class="identity-card" aria-label="Product reporting identity">
+                <div>
+                    <div class="identity-heading">
+                        <h2>@selectedProduct.ProductName</h2>
+                        <span class="source-badge @GetStatusClass(selectedProduct.SourceStatus)">
+                            @GetStatusLabel(selectedProduct.SourceStatus)
+                        </span>
+                    </div>
+                    <p>@selectedProduct.Brand · @selectedProduct.Category</p>
+                    @if (selectedProduct.Mapping is { } mapping)
+                    {
+                        <p>Live series: @mapping.LiveProductName from @mapping.UseTransactionsFrom.ToString("MMMM yyyy")</p>
+                    }
+                </div>
+
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        @if (selectedProduct.ReportingProductId is int)
+                        {
+                            <div class="mapping-controls" aria-labelledby="mapping-title">
+                                <h3 id="mapping-title">Live product mapping</h3>
+                                <label for="live-product-select">Live product</label>
+                                <select id="live-product-select"
+                                        value="@mappingLiveProductId"
+                                        @onchange="OnMappingProductChanged"
+                                        disabled="@(liveProductOptions.Count == 0)">
+                                    @if (liveProductOptions.Count == 0)
+                                    {
+                                        <option value="0">No live products found</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="0">Select a live product</option>
+
+                                        @foreach (var option in AvailableLiveProductOptions)
+                                        {
+                                            var mappedToAnotherProduct = IsMappedToAnotherReportingProduct(option);
+
+                                            @if (mappedToAnotherProduct)
+                                            {
+                                                <option value="@option.ProductId" disabled>
+                                                    @GetLiveProductOptionLabel(option) — Already mapped
+                                                </option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@option.ProductId">
+                                                    @GetLiveProductOptionLabel(option)
+                                                </option>
+                                            }
+                                        }
+                                    }
+                                </select>
+                                <small class="mapping-help">
+                                    @liveProductOptions.Count live product(s) loaded.
+                                    Products already linked to another historical product are shown but cannot be selected.
+                                </small>
+
+                                <label for="mapping-cutover">Use transactions from</label>
+                                <input id="mapping-cutover" type="month" value="@mappingCutoverMonth" @onchange="OnCutoverChanged" />
+
+                                <label for="mapping-reason">Reason (optional)</label>
+                                <input id="mapping-reason" maxlength="500" value="@mappingReason" @oninput="OnReasonChanged" />
+
+                                <div class="mapping-actions">
+                                    <button type="button" disabled="@isSavingMapping" @onclick="SaveMappingAsync">
+                                        @(selectedProduct.Mapping is null ? "Link" : "Change") mapping
+                                    </button>
+                                    @if (selectedProduct.Mapping is not null)
+                                    {
+                                        <button type="button" class="secondary-button" disabled="@isSavingMapping" @onclick="UnlinkMappingAsync">
+                                            Unlink
+                                        </button>
+                                    }
+                                </div>
+                                @if (mappingFeedback is not null)
+                                {
+                                    <p class="mapping-feedback" role="status">@mappingFeedback</p>
+                                }
+                                @if (mappingError is not null)
+                                {
+                                    <p class="mapping-error" role="alert">@mappingError</p>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="read-only-note">This is an unmapped live-only product. Choose a historical reporting product to create a link.</p>
+                        }
+                    </Authorized>
+                    <NotAuthorized>
+                        <p class="read-only-note">Employees can view mappings; only administrators can change them.</p>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </section>
+
+            <section class="chart-card" aria-labelledby="chart-title" aria-describedby="chart-description">
+                <div class="chart-heading">
+                    <div><h2 id="chart-title">@selectedProduct.ProductName</h2><p>Monthly quantity sold</p></div>
+                    <span class="unit-badge">Unit: quantity sold</span>
+                </div>
+
+                @if (activeSeriesYears.Count == 0)
+                {
+                    <div class="chart-empty" role="status">Select at least one year to display the sales graph.</div>
+                }
+                else
+                {
+                    <p id="chart-description" class="sr-only">
+                        Line chart comparing monthly quantity sold for @selectedProduct.ProductName in @SelectedYearsText.
+                        Missing months have no plotted value; recorded zero sales remain at zero.
+                    </p>
+                    <div class="chart-region" role="img" aria-labelledby="chart-title" aria-describedby="chart-description">
+                        <BbLineChart Data="@chartData" Height="390px" Width="100%" EnableAnimations="true">
+                            <BbGrid Left="72" Right="24" Top="50" Bottom="40" ContainLabel="true" />
+                            <BbXAxis DataKey="month" Name="Month" BoundaryGap="false" />
+                            <BbYAxis Name="Quantity sold" Min="0" Scale="false" />
+                            <BbChartTooltip Indicator="TooltipIndicator.Line" />
+                            <BbChartLegend Position="LegendPosition.Top" />
+                            @if (GetSeriesYear(0) is int seriesYear1)
+                            {
+                                <BbLine DataKey="series1" Name="@seriesYear1.ToString()" Color="var(--chart-1)" StrokeWidth="3" ShowDots="true" DotSize="6" />
+                            }
+                            @if (GetSeriesYear(1) is int seriesYear2)
+                            {
+                                <BbLine DataKey="series2" Name="@seriesYear2.ToString()" Color="var(--chart-2)" StrokeWidth="3" ShowDots="true" DotSize="6" Dashed="true" />
+                            }
+                            @if (GetSeriesYear(2) is int seriesYear3)
+                            {
+                                <BbLine DataKey="series3" Name="@seriesYear3.ToString()" Color="var(--chart-3)" StrokeWidth="3" ShowDots="true" DotSize="6" />
+                            }
+                            @if (GetSeriesYear(3) is int seriesYear4)
+                            {
+                                <BbLine DataKey="series4" Name="@seriesYear4.ToString()" Color="var(--chart-4)" StrokeWidth="3" ShowDots="true" DotSize="6" Dashed="true" />
+                            }
+                            @if (GetSeriesYear(4) is int seriesYear5)
+                            {
+                                <BbLine DataKey="series5" Name="@seriesYear5.ToString()" Color="var(--chart-5)" StrokeWidth="3" ShowDots="true" DotSize="6" />
+                            }
+                        </BbLineChart>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table>
+                            <caption>Monthly quantity sold for @selectedProduct.ProductName</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Month</th>
+                                    @foreach (var year in activeSeriesYears)
+                                    {
+                                        <th scope="col">@year</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in chartData)
+                                {
+                                    <tr>
+                                        <th scope="row">@row.Month</th>
+                                        @foreach (var year in activeSeriesYears)
+                                        {
+                                            var quantity = GetQuantity(row, year);
+                                            <td>@(quantity?.ToString("N0") ?? "—")</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        }
+    }
+</main>
+
+<style>
+    .product-sales-page {
+        padding: 1.5rem;
+        color: var(--foreground);
+    }
+
+    .product-sales-header, .chart-heading, .identity-card, .identity-heading, .mapping-actions {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .product-sales-header {
+        margin-bottom: 1.5rem;
+    }
+
+    h1, h2, h3, p {
+        margin-top: 0;
+    }
+
+    .product-sales-header p, .chart-heading p, .identity-card p, .error-card p {
+        margin-bottom: 0;
+        color: var(--muted-foreground);
+        font-size: var(--text-sm);
+    }
+
+    .dataset-note, .unit-badge, .source-badge {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: .4rem .7rem;
+        background: var(--muted);
+        color: var(--muted-foreground);
+        font-size: var(--text-xs);
+        white-space: nowrap;
+    }
+
+        .source-badge.mapped {
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .source-badge.historical-only {
+            color: var(--chart-2);
+        }
+
+        .source-badge.live-only {
+            color: var(--chart-3);
+        }
+
+    .status-card, .filter-card, .identity-card, .chart-card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+    }
+
+    .status-card {
+        min-height: 12rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: .75rem;
+        color: var(--muted-foreground);
+    }
+
+    .error-card, .mapping-error {
+        color: var(--destructive);
+    }
+
+    .filter-card {
+        display: grid;
+        grid-template-columns: minmax(22rem, 1.15fr) minmax(22rem, 1fr);
+        gap: 1.5rem;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .product-filter {
+        display: grid;
+        gap: .85rem;
+        min-width: 0;
+    }
+
+    .search-category-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(11rem, .7fr);
+        gap: .75rem;
+    }
+
+    .product-filter label, .year-filter legend, .source-filter legend, .mapping-controls label {
+        display: block;
+        margin-bottom: .4rem;
+        font-size: var(--text-sm);
+        font-weight: 600;
+    }
+
+    select, input {
+        width: 100%;
+        min-height: 2.5rem;
+        padding: .5rem .75rem;
+        border: 1px solid var(--input);
+        border-radius: var(--radius);
+        background: var(--background);
+        color: var(--foreground);
+        font: inherit;
+        box-sizing: border-box;
+    }
+
+        select:focus-visible, input:focus-visible, button:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+
+    .product-filter > span, .year-filter > span {
+        display: block;
+        margin-top: -.35rem;
+        color: var(--muted-foreground);
+        font-size: var(--text-xs);
+    }
+
+    .source-filter, .year-filter {
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .source-filter-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .source-filter-button {
+        min-height: 2.35rem;
+        padding: .45rem .7rem;
+        border-color: var(--border);
+        background: var(--background);
+        color: var(--foreground);
+        font-size: var(--text-xs);
+    }
+
+        .source-filter-button:hover {
+            background: var(--accent);
+        }
+
+        .source-filter-button.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: var(--primary-foreground);
+        }
+
+        .source-filter-button.historical.active {
+            border-color: var(--chart-2);
+            background: var(--chart-2);
+        }
+
+        .source-filter-button.live.active {
+            border-color: var(--chart-3);
+            background: var(--chart-3);
+        }
+
+        .source-filter-button.mapped.active {
+            border-color: var(--primary);
+            background: var(--primary);
+        }
+
+    .filtered-empty {
+        min-height: 9rem;
+        text-align: center;
+    }
+
+        .filtered-empty p {
+            margin: .4rem 0 0;
+            color: var(--muted-foreground);
+            font-size: var(--text-sm);
+        }
+
+    .year-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .year-option {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        min-height: 2.5rem;
+        padding: .45rem .7rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--background);
+        cursor: pointer;
+        font-size: var(--text-sm);
+    }
+
+        .year-option:has(input:checked) {
+            border-color: var(--ring);
+            background: var(--accent);
+        }
+
+        .year-option input {
+            width: 1rem;
+            height: 1rem;
+            min-height: 0;
+            margin: 0;
+        }
+
+    .year-swatch {
+        width: .65rem;
+        height: .65rem;
+        border-radius: 50%;
+    }
+
+    .identity-card {
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .identity-heading {
+        justify-content: flex-start;
+        align-items: center;
+    }
+
+        .identity-heading h2 {
+            margin-bottom: 0;
+        }
+
+    .mapping-controls {
+        width: min(30rem, 50%);
+        display: grid;
+        grid-template-columns: 9rem 1fr;
+        gap: .5rem .75rem;
+        align-items: center;
+    }
+
+        .mapping-controls h3, .mapping-actions, .mapping-feedback, .mapping-error {
+            grid-column: 1 / -1;
+        }
+
+        .mapping-controls h3 {
+            margin-bottom: .25rem;
+            font-size: var(--text-base);
+        }
+
+    .mapping-actions {
+        justify-content: flex-end;
+        margin-top: .25rem;
+    }
+
+    button {
+        border: 1px solid var(--primary);
+        border-radius: var(--radius);
+        padding: .55rem .85rem;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        cursor: pointer;
+    }
+
+        button:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+
+    .secondary-button {
+        background: var(--background);
+        color: var(--foreground);
+        border-color: var(--border);
+    }
+
+    .mapping-feedback, .mapping-error, .read-only-note, .mapping-help {
+        font-size: var(--text-xs) !important;
+    }
+
+    .mapping-help {
+        grid-column: 2;
+        margin-top: -.25rem;
+        color: var(--muted-foreground);
+        line-height: 1.4;
+    }
+
+    option:disabled {
+        color: var(--muted-foreground);
+    }
+
+    .chart-card {
+        padding: 1.25rem;
+    }
+
+    .chart-region {
+        min-height: 390px;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .chart-empty {
+        min-height: 20rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted-foreground);
+    }
+
+    .table-wrapper {
+        margin-top: 1.25rem;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--text-sm);
+    }
+
+    caption {
+        padding: .75rem;
+        text-align: left;
+        color: var(--muted-foreground);
+        font-size: var(--text-xs);
+    }
+
+    th, td {
+        padding: .65rem .75rem;
+        border-top: 1px solid var(--border);
+        text-align: right;
+    }
+
+        th:first-child {
+            text-align: left;
+        }
+
+    thead th {
+        background: var(--muted);
+        color: var(--muted-foreground);
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0,0,0,0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    @@media (max-width: 850px) {
+        .product-sales-page {
+            padding: 1rem;
+        }
+
+        .product-sales-header, .chart-heading, .identity-card {
+            flex-direction: column;
+        }
+
+        .filter-card {
+            grid-template-columns: 1fr;
+        }
+
+        .search-category-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .source-filter-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .source-filter-button {
+            width: 100%;
+        }
+
+        .mapping-controls {
+            width: 100%;
+            grid-template-columns: 1fr;
+        }
+
+            .mapping-controls h3, .mapping-actions, .mapping-feedback, .mapping-error, .mapping-help {
+                grid-column: 1;
+            }
+    }
+</style>
+
+@code {
+    private static readonly string[] MonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    private ProductSalesDataset? dataset;
+    private IReadOnlyList<LiveProductOption> liveProductOptions = [];
+    private string selectedProductKey = string.Empty;
+    private string productSearch = string.Empty;
+    private string selectedCategory = string.Empty;
+    private ProductSourceFilter sourceFilter = ProductSourceFilter.All;
+    private HashSet<int> selectedYears = [];
+    private IReadOnlyList<int> activeSeriesYears = [];
+    private IReadOnlyList<ProductSalesChartPoint> chartData = [];
+    private int mappingLiveProductId;
+    private string mappingCutoverMonth = string.Empty;
+    private string mappingReason = string.Empty;
+    private bool isLoading = true;
+    private bool isSavingMapping;
+    private string? loadError;
+    private string? mappingFeedback;
+    private string? mappingError;
+
+    private ProductSalesProduct? SelectedProduct =>
+        dataset?.Products.FirstOrDefault(product => product.SelectionKey == selectedProductKey);
+
+    private IReadOnlyList<ProductSalesProduct> FilteredProducts =>
+        dataset?.Products
+            .Where(MatchesSearch)
+            .Where(MatchesCategory)
+            .Where(MatchesSourceFilter)
+            .OrderBy(product => product.ProductName)
+            .ThenBy(product => product.Brand)
+            .ToArray()
+        ?? [];
+
+    private IReadOnlyList<string> AvailableCategories =>
+        dataset?.Products
+            .Select(product => product.Category)
+            .Where(category => !string.IsNullOrWhiteSpace(category))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(category => category, StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+        ?? [];
+
+    private IReadOnlyList<int> AvailableYears =>
+        SelectedProduct?.Sales
+            .Select(sale => sale.Year)
+            .Distinct()
+            .Order()
+            .ToArray()
+        ?? [];
+
+    private string SelectedYearsText => string.Join(", ", activeSeriesYears);
+
+    private string DatasetCoverageText =>
+        dataset is null || dataset.Years.Count == 0
+            ? "No recorded years"
+            : $"{dataset.Years[0]}-{dataset.Years[^1]}";
+
+    private IReadOnlyList<LiveProductOption> AvailableLiveProductOptions =>
+        liveProductOptions
+            .OrderBy(option => option.ProductName)
+            .ThenBy(option => option.Brand)
+            .ThenBy(option => option.Category)
+            .ToArray();
+
+    private bool IsMappedToAnotherReportingProduct(LiveProductOption option) =>
+        option.MappedReportingProductId.HasValue &&
+        option.MappedReportingProductId != SelectedProduct?.ReportingProductId;
+
+    private static string GetLiveProductOptionLabel(LiveProductOption option)
+    {
+        var parts = new[]
+        {
+            option.ProductName,
+            option.Brand,
+            option.Category
+        }
+        .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" · ", parts);
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync(string? preserveSelection = null)
+    {
+        try
+        {
+            dataset = await ProductSalesDatasetService.GetDatasetAsync();
+            liveProductOptions = await ProductSalesDatasetService.GetLiveProductsAsync();
+            selectedProductKey = preserveSelection is not null &&
+                                 dataset.Products.Any(product => product.SelectionKey == preserveSelection)
+                ? preserveSelection
+                : dataset.Products.FirstOrDefault(product => product.ReportingProductId.HasValue)?.SelectionKey
+                  ?? dataset.Products.FirstOrDefault()?.SelectionKey
+                  ?? string.Empty;
+
+            ApplyProductFilters();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to load product sales reporting data.");
+            loadError = "Verify the reporting migration, importer, and service registration, then reload the page.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnSearchChanged(ChangeEventArgs args)
+    {
+        productSearch = args.Value?.ToString() ?? string.Empty;
+        ApplyProductFilters();
+    }
+
+    private void OnCategoryChanged(ChangeEventArgs args)
+    {
+        selectedCategory = args.Value?.ToString() ?? string.Empty;
+        ApplyProductFilters();
+    }
+
+    private void SetSourceFilter(ProductSourceFilter filter)
+    {
+        sourceFilter = filter;
+        ApplyProductFilters();
+    }
+
+    private bool MatchesSearch(ProductSalesProduct product)
+    {
+        if (string.IsNullOrWhiteSpace(productSearch))
+        {
+            return true;
+        }
+
+        var search = productSearch.Trim();
+
+        return (product.ProductName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (product.Brand?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (product.Category?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    private bool MatchesCategory(ProductSalesProduct product) =>
+        string.IsNullOrWhiteSpace(selectedCategory) ||
+        string.Equals(
+            product.Category,
+            selectedCategory,
+            StringComparison.OrdinalIgnoreCase);
+
+    private bool MatchesSourceFilter(ProductSalesProduct product) =>
+        sourceFilter switch
+        {
+            ProductSourceFilter.HistoricalOnly =>
+                product.SourceStatus == ProductSalesSourceStatus.HistoricalOnly,
+
+            ProductSourceFilter.LiveOnly =>
+                product.SourceStatus == ProductSalesSourceStatus.LiveOnly,
+
+            ProductSourceFilter.HistoricalAndLive =>
+                product.SourceStatus != ProductSalesSourceStatus.HistoricalOnly &&
+                product.SourceStatus != ProductSalesSourceStatus.LiveOnly,
+
+            _ => true
+        };
+
+    private void ApplyProductFilters()
+    {
+        var filteredProducts = FilteredProducts;
+
+        if (filteredProducts.Count == 0)
+        {
+            selectedProductKey = string.Empty;
+            selectedYears.Clear();
+            activeSeriesYears = [];
+            chartData = [];
+            InitializeMappingEditor();
+            return;
+        }
+
+        if (!filteredProducts.Any(product =>
+                product.SelectionKey == selectedProductKey))
+        {
+            selectedProductKey = filteredProducts[0].SelectionKey;
+            selectedYears.Clear();
+        }
+
+        SelectDefaultYears();
+        InitializeMappingEditor();
+        RebuildChartData();
+    }
+
+    private void OnProductChanged(ChangeEventArgs args)
+    {
+        selectedProductKey = args.Value?.ToString() ?? string.Empty;
+        SelectDefaultYears();
+        InitializeMappingEditor();
+        RebuildChartData();
+    }
+
+    private void SelectDefaultYears()
+    {
+        var available = AvailableYears.ToHashSet();
+        selectedYears.IntersectWith(available);
+        if (selectedYears.Count == 0)
+        {
+            selectedYears = available.OrderDescending().Take(2).ToHashSet();
+        }
+    }
+
+    private void ToggleYear(int year, ChangeEventArgs args)
+    {
+        mappingError = null;
+        if (args.Value is true)
+        {
+            if (selectedYears.Count >= 5)
+            {
+                mappingError = "A maximum of five comparison years can be displayed.";
+                return;
+            }
+            selectedYears.Add(year);
+        }
+        else
+        {
+            selectedYears.Remove(year);
+        }
+        RebuildChartData();
+    }
+
+    private void RebuildChartData()
+    {
+        activeSeriesYears = selectedYears.Order().Take(5).ToArray();
+        var sales = SelectedProduct?.Sales.ToDictionary(sale => (sale.Year, sale.Month), sale => sale.QuantitySold) ?? [];
+        chartData = Enumerable.Range(1, 12).Select(month => new ProductSalesChartPoint(
+            MonthNames[month - 1],
+            GetSeriesValue(sales, 0, month), GetSeriesValue(sales, 1, month), GetSeriesValue(sales, 2, month),
+            GetSeriesValue(sales, 3, month), GetSeriesValue(sales, 4, month))).ToArray();
+    }
+
+    private int? GetSeriesValue(IReadOnlyDictionary<(int Year, int Month), int> sales, int seriesIndex, int month) =>
+        GetSeriesYear(seriesIndex) is int year && sales.TryGetValue((year, month), out var quantity) ? quantity : null;
+
+    private int? GetSeriesYear(int index) => index < activeSeriesYears.Count ? activeSeriesYears[index] : null;
+
+    private int? GetQuantity(ProductSalesChartPoint point, int year)
+    {
+        var index = FindIndex(activeSeriesYears, year);
+        return index switch { 0 => point.Series1, 1 => point.Series2, 2 => point.Series3, 3 => point.Series4, 4 => point.Series5, _ => null };
+    }
+
+    private bool IsCompleteYear(int year) => SelectedProduct?.Sales.Count(sale => sale.Year == year) == 12;
+    private string GetProductYearCoverage(int year)
+    {
+        var maxMonth = SelectedProduct?.Sales.Where(sale => sale.Year == year).Select(sale => sale.Month).DefaultIfEmpty(0).Max() ?? 0;
+        return maxMonth <= 0 ? "no data" : maxMonth == 12 ? "complete" : $"Jan-{MonthNames[maxMonth - 1]}";
+    }
+
+    private string GetYearColor(int year)
+    {
+        var index = FindIndex(AvailableYears, year);
+        return $"var(--chart-{Math.Abs(index) % 5 + 1})";
+    }
+
+    private static int FindIndex(IReadOnlyList<int> values, int value)
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            if (values[index] == value)
+            {
+                return index;
+            }
+        }
+
+        return 0;
+    }
+
+    private static string GetStatusLabel(ProductSalesSourceStatus status) => status switch
+    {
+        ProductSalesSourceStatus.HistoricalOnly => "Historical only",
+        ProductSalesSourceStatus.LiveOnly => "Live only",
+        _ => "Historical + live"
+    };
+
+    private static string GetStatusClass(ProductSalesSourceStatus status) => status switch
+    {
+        ProductSalesSourceStatus.HistoricalOnly => "historical-only",
+        ProductSalesSourceStatus.LiveOnly => "live-only",
+        _ => "mapped"
+    };
+
+    private void InitializeMappingEditor()
+    {
+        var product = SelectedProduct;
+        mappingLiveProductId = product?.Mapping?.LiveProductId ?? 0;
+        var cutover = product?.Mapping?.UseTransactionsFrom ?? product?.SuggestedCutoverMonth;
+        mappingCutoverMonth = cutover?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
+        mappingReason = product?.Mapping?.Reason ?? string.Empty;
+        mappingFeedback = null;
+        mappingError = null;
+    }
+
+    private void OnMappingProductChanged(ChangeEventArgs args) => int.TryParse(args.Value?.ToString(), out mappingLiveProductId);
+    private void OnCutoverChanged(ChangeEventArgs args) => mappingCutoverMonth = args.Value?.ToString() ?? string.Empty;
+    private void OnReasonChanged(ChangeEventArgs args) => mappingReason = args.Value?.ToString() ?? string.Empty;
+
+    private async Task SaveMappingAsync()
+    {
+        if (SelectedProduct?.ReportingProductId is not int reportingProductId || mappingLiveProductId <= 0)
+        {
+            mappingError = "Select a live product to link.";
+            return;
+        }
+
+        var selectedLiveProduct = liveProductOptions.FirstOrDefault(option =>
+            option.ProductId == mappingLiveProductId);
+
+        if (selectedLiveProduct is null)
+        {
+            mappingError = "The selected live product could not be found. Reload the page and try again.";
+            return;
+        }
+
+        if (IsMappedToAnotherReportingProduct(selectedLiveProduct))
+        {
+            mappingError = "That live product is already mapped to another historical product. Unlink it first before creating this mapping.";
+            return;
+        }
+
+        if (!DateTime.TryParseExact(mappingCutoverMonth + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var cutover))
+        {
+            mappingError = "Choose a valid cutover month.";
+            return;
+        }
+
+        isSavingMapping = true;
+        mappingError = null;
+        try
+        {
+            var selection = selectedProductKey;
+            await ProductSalesDatasetService.LinkLiveProductAsync(reportingProductId, mappingLiveProductId, cutover, mappingReason);
+            await LoadAsync(selection);
+            mappingFeedback = "The live mapping was saved.";
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to save product sales mapping for reporting product {ReportingProductId}.", reportingProductId);
+            mappingError = exception.Message;
+        }
+        finally { isSavingMapping = false; }
+    }
+
+    private async Task UnlinkMappingAsync()
+    {
+        if (SelectedProduct?.ReportingProductId is not int reportingProductId) return;
+        isSavingMapping = true;
+        mappingError = null;
+        try
+        {
+            var selection = selectedProductKey;
+            await ProductSalesDatasetService.UnlinkLiveProductAsync(reportingProductId);
+            await LoadAsync(selection);
+            mappingFeedback = "The live mapping was removed.";
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to unlink reporting product {ReportingProductId}.", reportingProductId);
+            mappingError = exception.Message;
+        }
+        finally { isSavingMapping = false; }
+    }
+
+    private enum ProductSourceFilter
+    {
+        All,
+        HistoricalOnly,
+        LiveOnly,
+        HistoricalAndLive
+    }
+
+    private sealed record ProductSalesChartPoint(
+        string Month,
+        int? Series1,
+        int? Series2,
+        int? Series3,
+        int? Series4,
+        int? Series5);
+}

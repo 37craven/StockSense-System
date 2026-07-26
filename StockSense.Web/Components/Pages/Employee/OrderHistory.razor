@@ -1,223 +1,33 @@
 @page "/admin/order-history"
 @layout AdminLayout
-@using Microsoft.AspNetCore.Authorization
-@using StockSense.Application.DTOs
-@using StockSense.Web.Helpers
-@inject OrderSlipHelper OrderService
-@inject NavigationManager NavManager
 @rendermode InteractiveServer
-@using BlazorBlueprint.Primitives.Table
-
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using StockSense.Application.DTOs
+@using StockSense.Application.Interfaces
+@using StockSense.Domain.Entities
+@using StockSense.Infrastructure.Data
+@inject ApplicationDbContext Db
+@inject IOrderSlipWorkflowService Workflow
+@inject AuthenticationStateProvider AuthenticationState
+@inject NavigationManager Navigation
 @attribute [Authorize(Roles = "Admin, Employee")]
-
-<PageTitle>Order History</PageTitle>
-
-<BbDialog @bind-Open="showConfirm">
-    <BbDialogContent Style="width: min(92vw, 420px); padding: var(--space-5);">
-        <BbDialogHeader>
-            <BbDialogTitle>@confirmTitle</BbDialogTitle>
-            <BbDialogDescription>@confirmMessage</BbDialogDescription>
-        </BbDialogHeader>
-        <div style="display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-4);">
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showConfirm = false">Cancel</BbButton>
-            <BbButton Variant="@(isDestructive ? ButtonVariant.Destructive : ButtonVariant.Default)" OnClick="ConfirmAction">
-                @confirmText
-            </BbButton>
-        </div>
-    </BbDialogContent>
-</BbDialog>
-
-<div class="max-w-6xl mx-auto animate-in fade-in duration-500">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-foreground m-0 mb-1">Order History</h1>
-            <p class="text-sm text-muted-foreground m-0">Review and receive inventory from supplier order slips.</p>
-        </div>
-        <BbButton Variant="ButtonVariant.Default" OnClick='() => NavManager.NavigateTo("/admin/orderslips")'>
-            <LucideIcon Name="plus" Size="16" Class="mr-2" />
-            Create New Order
-        </BbButton>
-    </div>
-
-    @if (savedSlips == null)
-    {
-        <div class="flex items-center justify-center gap-3 p-16 text-muted-foreground">
-            <BbSpinner Size="SpinnerSize.Small" />
-            <span class="text-sm">Retrieving history...</span>
-        </div>
-    }
-    else if (!savedSlips.Any())
-    {
-        <div class="flex flex-col items-center justify-center p-16 border-2 border-dashed border-border rounded-lg text-muted-foreground">
-            <LucideIcon Name="clock" Size="40" />
-            <p class="font-medium text-foreground mt-3 mb-1">No history found</p>
-            <p class="text-sm m-0">New orders you create will appear here.</p>
-        </div>
-    }
-    else
-    {
-        <div class="md:p-6 py-6 flex flex-col gap-6">
-            @foreach (var slip in savedSlips)
-            {
-                <div class="rounded-lg border border-border bg-card overflow-auto">
-
-                    @* Header *@
-                    <div class="px-5 py-3 flex justify-between items-center border-b @(slip.IsReceived ? "bg-success/5 border-success/20" : "bg-warning/5 border-warning/20")">
-                        <div class="flex items-center gap-4">
-                            <span class="text-sm font-mono font-bold text-foreground">@slip.SlipNumber</span>
-                            <span class="text-sm font-medium text-foreground">@slip.SupplierName</span>
-                            <span class="text-xs text-muted-foreground">@slip.DateGenerated.ToString("MMM dd, yyyy")</span>
-                        </div>
-                        <BbBadge Variant="@(slip.IsReceived ? BadgeVariant.Default : BadgeVariant.Secondary)">
-                            @(slip.IsReceived ? "Received" : "Pending Intake")
-                        </BbBadge>
-                    </div>
-
-                    @* Table *@
-                    <div class="overflow-x-auto">
-                        <BbTable TData="OrderSlipItemDto" class="w-full">
-                            <BbTableHeader class="bg-muted/30 border-b border-border">
-                                <BbTableRow TData="OrderSlipItemDto">
-                                    <BbTableHeaderCell TData="OrderSlipItemDto" class="p-4 text-left font-medium text-muted-foreground text-xs uppercase tracking-wider">Product</BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto" class="p-4 text-left font-medium text-muted-foreground text-xs uppercase tracking-wider">Brand</BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto" class="p-4 text-center font-medium text-muted-foreground text-xs uppercase tracking-wider">Ordered</BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto" class="p-4 text-center font-medium text-muted-foreground text-xs uppercase tracking-wider w-32">Received</BbTableHeaderCell>
-                                    <BbTableHeaderCell TData="OrderSlipItemDto" class="p-4 w-12"></BbTableHeaderCell>
-                                </BbTableRow>
-                            </BbTableHeader>
-                            <BbTableBody TData="OrderSlipItemDto">
-                                @foreach (var item in slip.Items)
-                                {
-                                    <BbTableRow TData="OrderSlipItemDto" class="border-b border-border last:border-0">
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4 font-medium text-foreground">@item.ProductName</BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4 text-muted-foreground text-xs">@item.Brand</BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4 text-center font-mono text-foreground">@item.Quantity</BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4 text-center">
-                                            @if (slip.IsReceived)
-                                            {
-                                                <span class="font-bold" style="color: var(--success);">@item.ReceivedQuantity</span>
-                                            }
-                                            else
-                                            {
-                                                <input type="number" @bind="item.ReceivedQuantity" min="0"
-                                                       class="w-full h-9 bg-background border border-input rounded-md text-center font-bold text-sm focus:ring-1 focus:ring-primary outline-none" />
-                                            }
-                                        </BbTableCell>
-                                        <BbTableCell TData="OrderSlipItemDto" class="p-4 text-right">
-                                            @if (!slip.IsReceived)
-                                            {
-                                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => RemoveProduct(item.Id)" title="Remove product">
-                                                    <LucideIcon Name="trash" Size="14" />
-                                                </BbButton>
-                                            }
-                                            else
-                                            {
-                                                <LucideIcon Name="circle-check" Size="16" class="mx-auto" style="color: var(--success); opacity: 0.5;" />
-                                            }
-                                        </BbTableCell>
-                                    </BbTableRow>
-                                }
-                            </BbTableBody>
-                        </BbTable>
-                    </div>
-
-                    @* Footer actions *@
-                    @if (!slip.IsReceived)
-                    {
-                        <div class="px-4 py-3 border-t border-border flex justify-end gap-2 bg-muted/10">
-                            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => DeleteSlip(slip.Id)">
-                                <LucideIcon Name="trash-2" Size="14" />
-                                Delete Slip
-                            </BbButton>
-                            <BbButton Variant="ButtonVariant.Default" OnClick="() => ConfirmStockIn(slip)">
-                                <LucideIcon Name="package-check" Size="14" />
-                                Complete Stock In
-                            </BbButton>
-                        </div>
-                    }
-                    @if (slip.IsReceived)
-                    {
-                        <div class="px-4 py-3 border-t border-border flex justify-end gap-2 bg-muted/10">
-                            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => DeleteSlip(slip.Id)">
-                                <LucideIcon Name="trash-2" Size="14" />
-                                Delete Slip
-                            </BbButton>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-    }
+<PageTitle>Order Slips</PageTitle>
+<div class="flex flex-col gap-5">
+ <div class="flex flex-wrap justify-between gap-3"><div><h1 class="text-2xl font-bold m-0">Order Slips</h1><p class="text-sm text-muted-foreground m-0 mt-1">Review orders and receipt progress without deleting audit history.</p></div><BbButton OnClick='() => Navigation.NavigateTo("/admin/orderslips")'>Generate drafts</BbButton></div>
+ @if(!string.IsNullOrWhiteSpace(message)){<div role="status" class="rounded-md border border-border p-3 text-sm">@message</div>} @if(!string.IsNullOrWhiteSpace(error)){<div role="alert" class="rounded-md border p-3 text-sm" style="color:var(--destructive)">@error</div>}
+ <label class="flex flex-col gap-1 text-xs" style="width:12rem">Status<select @bind="status" @bind:after="Load" class="h-9 rounded-md border border-input bg-background px-3"><option value="">All statuses</option>@foreach(var value in Statuses){<option>@value</option>}</select></label>
+ @if(slips==null){<div class="p-16 flex justify-center"><BbSpinner /></div>}else if(slips.Count==0){<div class="p-12 border-2 border-dashed border-border text-center">No order slips match.</div>}else{
+ <div class="rounded-lg border border-border bg-card overflow-x-auto"><table class="w-full text-sm" style="border-collapse:collapse;min-width:1050px"><thead class="bg-muted/30"><tr><th class="p-3 text-left">Order slip</th><th class="p-3 text-left">Supplier</th><th class="p-3 text-left">Status</th><th class="p-3 text-left">Generated</th><th class="p-3 text-left">Expected</th><th class="p-3 text-right">Cost</th><th class="p-3 text-left">Created by</th><th class="p-3 text-left">Approved by</th><th></th></tr></thead><tbody>
+ @foreach(var slip in slips){<tr class="border-t border-border"><td class="p-3 font-mono">@Number(slip)</td><td class="p-3">@slip.Supplier.Name</td><td class="p-3"><BbBadge Variant="BadgeVariant.Secondary">@slip.Status</BbBadge></td><td class="p-3">@Generated(slip).ToString("MMM d, yyyy")</td><td class="p-3">@(slip.ExpectedDeliveryDate?.ToString("MMM d, yyyy")??"—")</td><td class="p-3 text-right">₱@slip.TotalEstimatedCost.ToString("N2")</td><td class="p-3 text-xs">@(slip.CreatedByUserId??"Legacy")</td><td class="p-3 text-xs">@(slip.ApprovedByUserId??"—")</td><td class="p-3"><div class="flex justify-end gap-1"><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenDetails(slip.Id)">Details</BbButton><AuthorizeView Roles="Admin">@if(slip.Status==OrderSlipStatuses.Draft){<BbButton Size="ButtonSize.Small" OnClick="() => Approve(slip)">Approve</BbButton>}@if(slip.Status is not (OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled)){<BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenCancel(slip)">Cancel</BbButton>}</AuthorizeView>@if(slip.Status==OrderSlipStatuses.Approved){<BbButton Size="ButtonSize.Small" OnClick="() => MarkOrdered(slip)">Mark ordered</BbButton>}@if(slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived){<BbButton Size="ButtonSize.Small" OnClick="() => OpenReceiving(slip.Id)">Record receipt</BbButton>}</div></td></tr>}
+ </tbody></table></div>}
 </div>
-
-@code {
-    private bool showConfirm;
-    private string confirmTitle = "";
-    private string confirmMessage = "";
-    private string confirmText = "";
-    private bool isDestructive;
-    private Func<Task>? pendingAction;
-
-    private void ShowConfirm(string title, string message, string text, bool destructive, Func<Task> action)
-    {
-        confirmTitle = title;
-        confirmMessage = message;
-        confirmText = text;
-        isDestructive = destructive;
-        pendingAction = action;
-        showConfirm = true;
-    }
-
-    private async Task ConfirmAction()
-    {
-        showConfirm = false;
-        if (pendingAction != null)
-            await pendingAction();
-    }
-
-    private List<OrderSlipDto>? savedSlips;
-
-    protected override async Task OnInitializedAsync() => await LoadHistory();
-
-    private async Task LoadHistory()
-    {
-        savedSlips = await OrderService.GetSavedOrderSlipsAsync();
-        if (savedSlips != null)
-        {
-            foreach (var slip in savedSlips.Where(s => !s.IsReceived))
-                foreach (var item in slip.Items)
-                    if (item.ReceivedQuantity == 0)
-                        item.ReceivedQuantity = item.Quantity;
-        }
-    }
-
-    private void RemoveProduct(int itemId) =>
-        ShowConfirm("Remove Product", "Are you sure you want to remove this item?", "Remove", true,
-            async () => {
-                await OrderService.RemoveItemFromSlipAsync(itemId);
-                await LoadHistory();
-            });
-
-    private void ConfirmStockIn(OrderSlipDto slip) =>
-        ShowConfirm("Complete Stock In", "This will update your inventory levels.", "Confirm", false,
-            async () => {
-                var command = new MarkAsReceivedCommand
-                {
-                    SlipId = slip.Id,
-                    Items = slip.Items.Select(i => new ReceivedItemCommand
-                    {
-                        ItemId = i.Id,
-                        ReceivedQuantity = i.ReceivedQuantity
-                    }).ToList()
-                };
-                await OrderService.MarkAsReceivedAsync(command);
-                await LoadHistory();
-            });
-
-    private void DeleteSlip(int id) =>
-        ShowConfirm("Delete Order Slip", "Delete this record permanently?", "Delete", true,
-            async () => {
-                await OrderService.DeleteOrderSlipAsync(id);
-                await LoadHistory();
-            });
+<BbDialog @bind-Open="cancelOpen"><BbDialogContent Style="width:min(92vw,440px)"><BbDialogHeader><BbDialogTitle>Cancel order slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history.</BbDialogDescription></BbDialogHeader><label class="flex flex-col gap-1">Reason<textarea @bind="cancelReason" rows="3" class="rounded-md border border-input bg-background p-2"></textarea></label><div class="flex justify-end gap-2 mt-4"><BbButton Variant="ButtonVariant.Ghost" OnClick="() => cancelOpen=false">Back</BbButton><BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel" Disabled="@string.IsNullOrWhiteSpace(cancelReason)">Cancel order</BbButton></div></BbDialogContent></BbDialog>
+@code{
+ private static readonly string[] Statuses=[OrderSlipStatuses.Draft,OrderSlipStatuses.Approved,OrderSlipStatuses.Ordered,OrderSlipStatuses.PartiallyReceived,OrderSlipStatuses.Completed,OrderSlipStatuses.Cancelled];
+ private List<OrderSlip>? slips;private string status="",message="",error="",cancelReason="";private bool cancelOpen;private OrderSlip? cancelling;
+ protected override Task OnInitializedAsync()=>Load();private async Task Load(){var q=Db.OrderSlips.AsNoTracking().Include(x=>x.Supplier).AsQueryable();if(!string.IsNullOrWhiteSpace(status))q=q.Where(x=>x.Status==status);slips=await q.OrderByDescending(x=>x.GeneratedAt).ThenByDescending(x=>x.Id).ToListAsync();}
+ private static string Number(OrderSlip x)=>string.IsNullOrWhiteSpace(x.OrderSlipNumber)?x.SlipNumber:x.OrderSlipNumber;private static DateTime Generated(OrderSlip x)=>x.GeneratedAt==default?x.DateGenerated:x.GeneratedAt;private void OpenDetails(int id)=>Navigation.NavigateTo($"/admin/order-slips/{id}");private void OpenReceiving(int id)=>Navigation.NavigateTo($"/admin/order-slips/{id}/receive");private async Task<string?> UserId()=>(await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier);
+ private async Task Approve(OrderSlip s)=>await Act(async()=>await Workflow.ApproveAsync(new(){OrderSlipId=s.Id,TargetStatus=OrderSlipStatuses.Approved,ActingUserId=await UserId(),RowVersion=s.RowVersion}),"Order slip approved.");private async Task MarkOrdered(OrderSlip s)=>await Act(async()=>await Workflow.MarkOrderedAsync(new(){OrderSlipId=s.Id,TargetStatus=OrderSlipStatuses.Ordered,ActingUserId=await UserId(),RowVersion=s.RowVersion}),"Order marked ordered.");private void OpenCancel(OrderSlip s){cancelling=s;cancelReason="";cancelOpen=true;}private async Task Cancel(){if(cancelling==null)return;var s=cancelling;cancelOpen=false;await Act(async()=>await Workflow.CancelAsync(new(){OrderSlipId=s.Id,ActingUserId=await UserId(),Reason=cancelReason,RowVersion=s.RowVersion}),"Order cancelled.");}private async Task Act(Func<Task<OperationResult<OrderSlipDto>>> a,string success){error="";var r=await a();if(!r.IsSuccess)error=r.ErrorMessage??"Action failed.";else message=success;await Load();}
 }
