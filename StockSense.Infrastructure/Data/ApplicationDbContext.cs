@@ -20,7 +20,21 @@ namespace StockSense.Infrastructure.Data
         public DbSet<SalesHistory> SalesHistory { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<PinnedSlip> PinnedSlips { get; set; }
+        public DbSet<UpgradeCategory> UpgradeCategories { get; set; }
+        public DbSet<BikeModel> BikeModels { get; set; }
+        public DbSet<UpgradeStage> UpgradeStages { get; set; }
+        public DbSet<UpgradePart> UpgradeParts { get; set; }
+        public DbSet<SynergyRule> SynergyRules { get; set; }
+        public DbSet<CustomerBuild> CustomerBuilds { get; set; }
 
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            builder.Entity<UpgradePart>()
+                .Property(p => p.EstimatedLaborHours)
+                .HasPrecision(4, 2);
+        }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {

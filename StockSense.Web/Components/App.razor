@@ -97,6 +97,14 @@
                 localStorage.removeItem(key);
             }
         };
+
+        window.stockSenseScrollToBottom = (element) => {
+            if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+        };
+
+        window.stockSenseCopyText = async (text) => {
+            await navigator.clipboard.writeText(text);
+        };
     </script>
 </body>
 

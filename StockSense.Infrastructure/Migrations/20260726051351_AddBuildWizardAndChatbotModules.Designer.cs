@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StockSense.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using StockSense.Infrastructure.Data;
 namespace StockSense.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260726051351_AddBuildWizardAndChatbotModules")]
+    partial class AddBuildWizardAndChatbotModules
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -343,6 +346,9 @@ namespace StockSense.Infrastructure.Migrations
                     b.Property<int>("CurrentCC")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CustomerMotorcycleId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("EstimatedLaborCost")
                         .HasColumnType("decimal(18,2)");
 
@@ -401,6 +407,72 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasIndex("UpgradeStageId");
 
                     b.ToTable("CustomerBuilds");
+                });
+
+            modelBuilder.Entity("StockSense.Domain.Entities.CustomerMotorcycle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BaseCC")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CurrentCC")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CurrentMileage")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LastOilChangeMileage")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LastServiceDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Nickname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("PurchaseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("VIN")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomerMotorcycles");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Mechanic", b =>
@@ -843,6 +915,9 @@ namespace StockSense.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("PartCount")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

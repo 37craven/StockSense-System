@@ -1,0 +1,108 @@
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+
+<div class="category-sidebar">
+    @foreach (var category in Categories)
+    {
+        <div class="category-item">
+            <button class="category-toggle @(ActiveCategoryId == category.Id ? "active" : "")" 
+                    @onclick="() => OnCategoryClick.InvokeAsync(category.Id)">
+                <span>@category.Name</span>
+                <LucideIcon Name="@(ActiveCategoryId == category.Id ? "chevron-up" : "chevron-down")" Size="14" />
+            </button>
+
+            @if (ActiveCategoryId == category.Id)
+            {
+                <div class="brand-list">
+                    <button class="brand-btn @(string.IsNullOrEmpty(SelectedBrand) ? "active" : "")" 
+                            @onclick="() => { SelectedBrand = string.Empty; }">
+                        All Brands
+                    </button>
+                    @foreach (var brand in GetBrandsByCategory(category.Name))
+                    {
+                        <button class="brand-btn @(SelectedBrand == brand ? "active" : "")" 
+                                @onclick="() => { SelectedBrand = brand; }">
+                            @brand
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .category-sidebar {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--space-3) var(--space-2);
+    }
+
+    .category-item {
+        margin-bottom: var(--space-1);
+    }
+
+    .category-toggle {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius);
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        background: transparent;
+        color: var(--foreground);
+        border: none;
+        cursor: pointer;
+        font-family: var(--font-sans);
+    }
+
+    .category-toggle.active {
+        background: var(--accent);
+    }
+
+    .category-toggle:hover {
+        background: var(--muted);
+    }
+
+    .brand-list {
+        padding: var(--space-1) var(--space-2) var(--space-2) var(--space-4);
+    }
+
+    .brand-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        font-size: var(--text-sm);
+        cursor: pointer;
+        padding: var(--space-1) var(--space-2);
+        border-radius: var(--radius);
+        color: var(--muted-foreground);
+        font-family: var(--font-sans);
+    }
+
+    .brand-btn:hover {
+        color: var(--foreground);
+    }
+
+    .brand-btn.active {
+        color: var(--foreground);
+    }
+</style>
+
+@code {
+    [Parameter] public List<UpgradeCategory> Categories { get; set; } = new();
+    [Parameter] public int ActiveCategoryId { get; set; }
+    [Parameter] public Dictionary<int, int> SelectedCounts { get; set; } = new();
+    [Parameter] public EventCallback<int> OnCategoryClick { get; set; }
+
+    private string SelectedBrand { get; set; } = "";
+
+    private IEnumerable<string> GetBrandsByCategory(string category)
+    {
+        return new List<string>();
+    }
+}

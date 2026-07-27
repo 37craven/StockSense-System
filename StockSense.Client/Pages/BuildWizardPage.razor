@@ -1,0 +1,16 @@
+@page "/build"
+@layout PublicLayout
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@using StockSense.Client.Layout
+@using StockSense.Client.Components.Build
+
+<div class="build-page-container">
+    <BuildWizard />
+</div>
+
+<style>
+    .build-page-container {
+        min-height: calc(100vh - 3.5rem);
+        background: var(--background);
+    }
+</style>
