@@ -9,6 +9,58 @@
     overflow: hidden;
 }
 
+/* Keep BlazorBlueprint dialogs aligned with the active StockSense theme. */
+[role="dialog"],
+.bb-dialog-content,
+.bb-dialog__content,
+.dialog-content,
+.modal-content {
+    background-color: var(--card) !important;
+    color: var(--card-foreground) !important;
+    border-color: var(--border) !important;
+}
+
+[role="dialog"] input,
+[role="dialog"] select,
+[role="dialog"] textarea,
+.bb-dialog-content input,
+.bb-dialog-content select,
+.bb-dialog-content textarea,
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+    background-color: var(--background) !important;
+    color: var(--foreground) !important;
+    border-color: var(--input) !important;
+}
+
+.dark .build-layout,
+.dark .build-main,
+.dark .build-wizard {
+    background-color: #050505;
+}
+
+.dark .build-wizard .tuning-topbar,
+.dark .build-wizard .tune-panel,
+.dark .build-wizard .tune-empty,
+.dark .build-wizard .picker-maint,
+.dark .build-wizard .picker-preview,
+.dark .build-wizard .part-card,
+.dark .build-wizard .cost-panel,
+.dark .build-wizard .dyno-chart,
+.dark .build-wizard .perf-gauge {
+    background-color: #101113;
+    color: var(--foreground);
+    border-color: #30343a;
+}
+
+.dark .build-wizard select,
+.dark .build-wizard input {
+    background-color: #17191d;
+    color: var(--foreground);
+    border-color: #30343a;
+}
+
 .build-sidebar {
     width: 300px;
     flex-shrink: 0;

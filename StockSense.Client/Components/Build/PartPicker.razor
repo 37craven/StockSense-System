@@ -1,0 +1,246 @@
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+@using Microsoft.AspNetCore.Components.Authorization
+@inject HttpClient Http
+
+<div class="part-picker">
+    @* Category pill tabs *@
+    <div class="category-bar">
+        @foreach (var cat in Categories)
+        {
+            <button class="cat-pill @(ActiveCategoryId == cat.Id ? "active" : "")"
+                    @onclick="() => OnCategoryClick(cat.Id)">
+                @cat.Name
+                @if (SelectedCounts.TryGetValue(cat.Id, out var cnt) && cnt > 0)
+                {
+                    <span class="cat-count">@cnt</span>
+                }
+            </button>
+        }
+    </div>
+
+    <div class="picker-layout">
+        @* LEFT: Maintenance panel (always visible, no scroll) *@
+        <aside class="picker-maint">
+            @if (Projection?.Maintenance != null)
+            {
+                <MaintenanceProjectionPanel Projection="Projection.Maintenance" />
+            }
+            else if (SelectedPartIds.Count > 0)
+            {
+                <div class="maint-placeholder">Select parts to see maintenance projection</div>
+            }
+            else
+            {
+                <div class="maint-placeholder">Add parts to your build<br />to see maintenance schedule</div>
+            }
+        </aside>
+
+        @* CENTER: Parts grid with filters *@
+        <main class="picker-main">
+            @if (SelectedAdvancedParts.Any())
+            {
+                <div class="advanced-warning">
+                    <strong>Mechanic confirmation required</strong>
+                    <span>Advanced engine parts selected: @string.Join(", ", SelectedAdvancedParts.Select(p => p.Product?.Name ?? "Engine part").Take(3)). These can be used for estimates, but final installation must be confirmed by the shop.</span>
+                </div>
+            }
+            @if (SelectedOutOfStockParts.Any())
+            {
+                <div class="advanced-warning stock-warning">
+                    <strong>Estimate only</strong>
+                    <span>Out-of-stock parts selected: @string.Join(", ", SelectedOutOfStockParts.Select(p => p.Product?.Name ?? "Build part").Take(3)). These can guide the performance estimate, but cannot be submitted until restocked.</span>
+                </div>
+            }
+
+            <div class="picker-toolbar">
+                <div class="tb-left">
+                    <span class="tb-label">@ActiveCategoryName</span>
+                    <span class="tb-count">@FilteredParts.Count part@(FilteredParts.Count != 1 ? "s" : "")</span>
+                    <span class="compatibility-pass">Model-compatible</span>
+                </div>
+                <div class="tb-right">
+                    <input type="text" placeholder="Search parts..." @bind="searchTerm" class="tuner-input" />
+                    <select @bind="sortBy" class="tuner-select">
+                        <option value="name">Sort: Name</option>
+                        <option value="price">Sort: Price</option>
+                        <option value="ccgain">Sort: CC Gain</option>
+                        <option value="hpgain">Sort: HP Gain</option>
+                    </select>
+                </div>
+            </div>
+            <PartsGrid Parts="FilteredParts" SelectedPartIds="SelectedPartIds" OnTogglePart="OnTogglePart" ValidationResult="ValidationResult" BlockedPartIds="BlockedPartIds" />
+        </main>
+
+        @* RIGHT: Live preview panel *@
+        <aside class="picker-preview">
+            <LivePreviewPanel
+                Projection="Projection"
+                ValidationResult="ValidationResult"
+                OnSaveDraft="OnSaveDraft"
+                OnSubmit="OnSubmit"
+                OnSendQuote="OnSendQuote"
+                OnSubmitToShop="OnSubmitToShop"
+                IsDirty="IsDirty"
+                IsProcessing="IsProcessing"
+                CanSubmit="@CanSubmit"
+                SelectedPartCount="SelectedPartIds.Count"
+                StatusMessage="@StatusMessage"
+                StatusIsSuccess="@StatusIsSuccess" />
+        </aside>
+    </div>
+</div>
+
+<style>
+    .part-picker { display: flex; flex-direction: column; height: 100%; min-height: 500px; gap: var(--space-3); }
+
+    .category-bar { display: flex; gap: var(--space-1); overflow-x: auto; padding: 0 0 var(--space-1); flex-shrink: 0; }
+    .cat-pill { display: inline-flex; align-items: center; gap: var(--space-1); padding: 8px 14px; border-radius: 9999px; border: 1px solid var(--tuning-border); background: var(--tuning-surface); color: var(--muted-foreground); font-family: var(--font-sans); font-size: var(--text-xs); font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+    .cat-pill:hover { border-color: var(--tuning-red); color: var(--foreground); }
+    .cat-pill.active { border-color: var(--tuning-red); background: color-mix(in oklch, var(--tuning-red) 15%, var(--tuning-surface)); color: var(--tuning-red); }
+    .cat-count { font-family: var(--tuning-mono); font-size: 9px; padding: 1px 6px; border-radius: 9999px; background: var(--tuning-red); color: white; }
+
+    .picker-layout { display: flex; flex: 1; gap: var(--space-3); min-height: 0; }
+
+    .picker-maint { width: 220px; flex-shrink: 0; overflow-y: auto; background: var(--tuning-surface); border: 1px solid var(--tuning-border); border-radius: var(--radius-xl); padding: var(--space-3); }
+    .maint-placeholder { font-size: var(--text-xs); color: var(--muted-foreground); text-align: center; padding: var(--space-4); line-height: 1.6; }
+
+    .picker-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
+    .advanced-warning { display:flex; flex-direction:column; gap:3px; margin-bottom:var(--space-2); padding:var(--space-2) var(--space-3); border:1px solid color-mix(in oklch,var(--tuning-amber) 45%,var(--tuning-border)); border-radius:var(--radius-lg); background:color-mix(in oklch,var(--tuning-amber) 10%,var(--tuning-surface)); }
+    .advanced-warning strong { color:var(--tuning-amber); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.04em; }
+    .advanced-warning span { color:var(--foreground); font-size:var(--text-xs); line-height:1.35; }
+    .stock-warning { border-color: color-mix(in oklch,var(--tuning-red) 38%,var(--tuning-border)); background: color-mix(in oklch,var(--tuning-red) 8%,var(--tuning-surface)); }
+    .stock-warning strong { color: var(--tuning-red); }
+    .picker-toolbar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); padding: var(--space-2) 0 var(--space-3); flex-shrink: 0; flex-wrap: wrap; }
+    .tb-left { display: flex; align-items: center; gap: var(--space-2); }
+    .tb-label { font-size: var(--text-base); font-weight: 800; color: var(--foreground); }
+    .tb-count { font-family: var(--tuning-mono); font-size: var(--text-xs); color: var(--muted-foreground); }
+    .compatibility-pass { padding:3px 7px; border-radius:999px; background:color-mix(in oklch,var(--tuning-green) 12%,transparent); border:1px solid color-mix(in oklch,var(--tuning-green) 30%,var(--tuning-border)); color:var(--tuning-green); font:700 9px var(--tuning-mono); }
+    .tb-right { display: flex; align-items: center; gap: var(--space-2); }
+    .tuner-input { padding: 8px 10px; border-radius: var(--radius-lg); border: 1px solid var(--tuning-border); background: var(--tuning-surface); color: var(--foreground); font-size: var(--text-xs); font-family: inherit; min-width: 160px; }
+    .tuner-input:focus { border-color: var(--tuning-red); outline: none; }
+    .tuner-select { padding: 8px 10px; border-radius: var(--radius-lg); border: 1px solid var(--tuning-border); background: var(--tuning-surface); color: var(--foreground); font-size: var(--text-xs); font-family: inherit; }
+    .tuner-select:focus { border-color: var(--tuning-red); outline: none; }
+
+    .picker-preview { width: 320px; flex-shrink: 0; overflow-y: auto; background: var(--tuning-surface); border: 1px solid var(--tuning-border); border-radius: var(--radius-xl); }
+
+    @@media (max-width: 1200px) {
+        .picker-maint { display: none; }
+    }
+    @@media (max-width: 1023px) {
+        .picker-preview { display: none; }
+        .picker-toolbar { flex-direction: column; align-items: stretch; }
+        .tb-right { flex-wrap: wrap; }
+        .tuner-input { min-width: 0; flex: 1; }
+    }
+</style>
+
+@code {
+    [Parameter] public List<UpgradeCategory> Categories { get; set; } = new();
+    [Parameter] public List<UpgradePart> Parts { get; set; } = new();
+    [Parameter] public List<UpgradePart> AllParts { get; set; } = new();
+    [Parameter] public HashSet<int> SelectedPartIds { get; set; } = new();
+    [Parameter] public int ActiveCategoryId { get; set; } = 0;
+    [Parameter] public EventCallback<int> OnCategoryChange { get; set; }
+    [Parameter] public EventCallback<int> OnTogglePart { get; set; }
+    [Parameter] public ValidationResult? ValidationResult { get; set; }
+    [Parameter] public int BikeModelId { get; set; } = 0;
+    [Parameter] public int? StageId { get; set; }
+    [Parameter] public BuildProjection? Projection { get; set; }
+    [Parameter] public EventCallback OnSaveDraft { get; set; }
+    [Parameter] public EventCallback OnSubmit { get; set; }
+    [Parameter] public EventCallback OnSendQuote { get; set; }
+    [Parameter] public EventCallback OnSubmitToShop { get; set; }
+    [Parameter] public bool IsDirty { get; set; }
+    [Parameter] public bool IsProcessing { get; set; }
+    [Parameter] public bool CanSubmit { get; set; } = true;
+    [Parameter] public string? StatusMessage { get; set; }
+    [Parameter] public bool StatusIsSuccess { get; set; }
+
+    private string searchTerm = "";
+    private string sortBy = "name";
+
+    private HashSet<int> BlockedPartIds
+    {
+        get
+        {
+            var blocked = new HashSet<int>();
+            foreach (var selectedId in SelectedPartIds)
+            {
+                var sp = Parts.FirstOrDefault(p => p.Id == selectedId);
+                if (sp == null) continue;
+                try
+                {
+                    var conflicts = System.Text.Json.JsonSerializer.Deserialize<List<int>>(sp.ConflictingPartIdsJson ?? "[]");
+                    if (conflicts != null)
+                        foreach (var cid in conflicts)
+                            blocked.Add(cid);
+                }
+                catch { }
+            }
+            // A selected part can't be "blocked" by itself
+            foreach (var sid in SelectedPartIds) blocked.Remove(sid);
+            return blocked;
+        }
+    }
+
+    private List<UpgradePart> SourceParts => AllParts.Any() ? AllParts : Parts;
+
+    private string ActiveCategoryName => Categories.FirstOrDefault(c => c.Id == ActiveCategoryId)?.Name ?? "All Parts";
+
+    private Dictionary<int, int> SelectedCounts => Categories.ToDictionary(c => c.Id, c => SourceParts.Count(p => SelectedPartIds.Contains(p.Id) && p.UpgradeCategoryId == c.Id));
+
+    private List<UpgradePart> SelectedAdvancedParts => SourceParts
+        .Where(p => SelectedPartIds.Contains(p.Id))
+        .Where(IsAdvancedEnginePart)
+        .ToList();
+
+    private List<UpgradePart> SelectedOutOfStockParts => SourceParts
+        .Where(p => SelectedPartIds.Contains(p.Id))
+        .Where(p => (p.Product?.CurrentStock ?? 0) <= 0)
+        .ToList();
+
+    private List<UpgradePart> FilteredParts
+    {
+        get
+        {
+            var query = Parts.Where(p => p.IsActive && p.Product != null && p.UpgradeCategoryId == ActiveCategoryId).ToList();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.ToLower();
+                query = query.Where(p =>
+                    (p.Product?.Name?.ToLower().Contains(term) ?? false) ||
+                    (p.Product?.Brand?.ToLower().Contains(term) ?? false)).ToList();
+            }
+
+            return sortBy switch
+            {
+                "price" => query.OrderBy(p => p.ListPrice > 0 ? p.ListPrice : p.Product?.Price ?? 0).ToList(),
+                "ccgain" => query.OrderByDescending(p => p.CCGain).ToList(),
+                "hpgain" => query.OrderByDescending(p => p.HPGain).ToList(),
+                _ => query.OrderBy(p => p.Product?.Name ?? "").ToList()
+            };
+        }
+    }
+
+    private void OnCategoryClick(int categoryId)
+    {
+        if (ActiveCategoryId == categoryId) return;
+        ActiveCategoryId = categoryId;
+        OnCategoryChange.InvokeAsync(categoryId);
+    }
+
+    private static bool IsAdvancedEnginePart(UpgradePart part)
+    {
+        var category = part.Category?.Name ?? part.Product?.Category ?? string.Empty;
+        var name = part.Product?.Name ?? string.Empty;
+        return category.Contains("Engine", StringComparison.OrdinalIgnoreCase) ||
+               category.Contains("Big Bore", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("bore", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("crank", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("head", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("cam", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("stroker", StringComparison.OrdinalIgnoreCase);
+    }
+}

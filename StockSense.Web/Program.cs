@@ -18,6 +18,10 @@ using StockSense.Application.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
 // --- 1. CORE SERVICES ---
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
@@ -125,6 +129,19 @@ builder.Services.AddScoped<StoreServiceRepository>();
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<BarcodeService>();
 builder.Services.AddScoped<OrderEmailSender>();
+builder.Services.AddScoped<ICompatibilityEngine, CompatibilityEngine>();
+builder.Services.AddScoped<IPerformanceCalculator, PerformanceCalculator>();
+builder.Services.AddSingleton<KnowledgeBase>();
+builder.Services.AddSingleton<RagRetrievalService>();
+builder.Services.AddSingleton<IAiChatProvider>(services =>
+{
+    var configuration = services.GetRequiredService<IConfiguration>();
+    var provider = configuration["Ai:Provider"];
+    return string.Equals(provider, "OpenRouter", StringComparison.OrdinalIgnoreCase)
+        ? ActivatorUtilities.CreateInstance<OpenRouterChatProvider>(services)
+        : ActivatorUtilities.CreateInstance<GeminiChatProvider>(services);
+});
+builder.Services.AddSingleton<ChatService>();
 builder.Services.AddSingleton<PdfDownloadCache>();
 builder.Services.AddScoped<IProductSalesDatasetService, ProductSalesReportingService>();
 builder.Services.AddScoped<IHistoricalSalesImporter, HistoricalSalesCsvImporter>();
@@ -183,16 +200,23 @@ using (var scope = app.Services.CreateScope())
             context.Database.Migrate();
         }
 
-        if (context.Database.CanConnect())
+if (context.Database.CanConnect())
         {
             var importer = services.GetRequiredService<IHistoricalSalesImporter>();
             await importer.ImportBundledDatasetAsync();
+        }
+
+        if (context.Database.CanConnect() &&
+            (app.Environment.IsDevelopment() || !context.BikeModels.Any(model => model.IsActive)))
+        {
+            DevelopmentCatalogSeeder.SeedScooterUpgradeCatalogAsync(context).GetAwaiter().GetResult();
         }
     }
     catch (Exception ex)
     {
         app.Logger.LogCritical(ex, "Database migration or startup import failed. Application startup is stopping.");
         throw;
+    }
     }
 }
 

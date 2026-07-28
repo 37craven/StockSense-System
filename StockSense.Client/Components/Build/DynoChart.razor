@@ -1,0 +1,199 @@
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+
+<div class="dyno-chart">
+    <div class="dyno-header">
+        <span class="dyno-label">DYNO CHART</span>
+        <div class="dyno-legend">
+            <span class="legend-item"><span class="legend-swatch base-swatch"></span> Stock</span>
+            <span class="legend-item"><span class="legend-swatch build-swatch"></span> Build</span>
+        </div>
+    </div>
+    <svg viewBox="0 0 340 190" class="dyno-svg" role="img" aria-label="Dyno comparison chart showing stock and build power curves">
+        <defs>
+            <linearGradient id="buildDynoFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="var(--tuning-red)" stop-opacity="0.22" />
+                <stop offset="100%" stop-color="var(--tuning-red)" stop-opacity="0.02" />
+            </linearGradient>
+        </defs>
+        @* Grid lines *@
+        <line x1="40" y1="20" x2="40" y2="155" stroke="var(--dyno-axis)" stroke-width="1.2" />
+        <line x1="40" y1="155" x2="310" y2="155" stroke="var(--dyno-axis)" stroke-width="1.2" />
+        <line x1="40" y1="55" x2="310" y2="55" stroke="var(--dyno-grid)" stroke-width="0.8" stroke-dasharray="3,3" />
+        <line x1="40" y1="90" x2="310" y2="90" stroke="var(--dyno-grid)" stroke-width="0.8" stroke-dasharray="3,3" />
+        <line x1="40" y1="125" x2="310" y2="125" stroke="var(--dyno-grid)" stroke-width="0.8" stroke-dasharray="3,3" />
+        <line x1="107" y1="20" x2="107" y2="155" stroke="var(--dyno-grid)" stroke-width="0.7" stroke-dasharray="3,3" />
+        <line x1="175" y1="20" x2="175" y2="155" stroke="var(--dyno-grid)" stroke-width="0.7" stroke-dasharray="3,3" />
+        <line x1="242" y1="20" x2="242" y2="155" stroke="var(--dyno-grid)" stroke-width="0.7" stroke-dasharray="3,3" />
+
+        @* Axis labels *@
+        <text x="20" y="30" fill="var(--dyno-text)" font-size="7" font-family="var(--tuning-mono)">@MaxYLabel</text>
+        <text x="20" y="60" fill="var(--dyno-text)" font-size="7" font-family="var(--tuning-mono)">@MidYLabel</text>
+        <text x="20" y="92" fill="var(--dyno-text)" font-size="7" font-family="var(--tuning-mono)">@BaseYLabel</text>
+        <text x="35" y="168" fill="var(--dyno-text)" font-size="6" font-family="var(--tuning-mono)">@MinRpmLabel</text>
+        <text x="100" y="168" fill="var(--dyno-text)" font-size="6" font-family="var(--tuning-mono)">@MidRpm1Label</text>
+        <text x="168" y="168" fill="var(--dyno-text)" font-size="6" font-family="var(--tuning-mono)">@MidRpm2Label</text>
+        <text x="235" y="168" fill="var(--dyno-text)" font-size="6" font-family="var(--tuning-mono)">@MidRpm3Label</text>
+        <text x="300" y="168" fill="var(--dyno-text)" font-size="6" font-family="var(--tuning-mono)">@MaxRpmLabel</text>
+        <text x="166" y="184" fill="var(--dyno-text)" font-size="7" text-anchor="middle" font-family="var(--tuning-mono)">RPM</text>
+
+        @* Base HP curve (gray dashed) *@
+        <polyline points="@BaseHpPoints" fill="none" stroke="var(--dyno-stock-line)" stroke-width="2.4" stroke-dasharray="5,4" opacity="0.95" />
+
+        @* Build HP curve (red solid) *@
+        <polyline points="@BuildHpPoints" fill="none" stroke="var(--tuning-red)" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round"
+                  class="hp-curve" />
+
+        @* Build Torque curve (amber dashed) *@
+        <polyline points="@BuildTqPoints" fill="none" stroke="var(--tuning-amber)" stroke-width="2.25" stroke-dasharray="4,3" stroke-linecap="round"
+                  class="tq-curve" />
+
+        @* Area under HP curve (faint red fill) *@
+        <polygon points="@BuildHpAreaPoints" fill="url(#buildDynoFill)" />
+    </svg>
+    @if (DisplayHpGain > 0)
+    {
+        <div class="dyno-gain">
+            <span class="gain-hp">+@DisplayHpGain HP</span>
+            @if (DisplayTqGain > 0) { <span class="gain-tq">+@DisplayTqGain Nm</span> }
+            @if (DisplayCcGain > 0) { <span class="gain-cc">+@DisplayCcGain cc</span> }
+        </div>
+    }
+</div>
+
+<style>
+    .dyno-chart {
+        --dyno-grid: color-mix(in oklch, var(--foreground) 24%, transparent);
+        --dyno-axis: color-mix(in oklch, var(--foreground) 38%, transparent);
+        --dyno-text: color-mix(in oklch, var(--foreground) 72%, transparent);
+        --dyno-stock-line: color-mix(in oklch, var(--foreground) 62%, transparent);
+        background: color-mix(in oklch, var(--tuning-surface) 92%, #000 8%);
+        border: 1px solid color-mix(in oklch, var(--tuning-red) 22%, var(--tuning-border));
+        border-radius: var(--radius-xl);
+        padding: var(--space-3);
+        box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 5%, transparent), 0 0 24px color-mix(in oklch, var(--tuning-red) 8%, transparent);
+    }
+    .dark .dyno-chart {
+        --dyno-grid: rgba(255, 255, 255, .18);
+        --dyno-axis: rgba(255, 255, 255, .35);
+        --dyno-text: rgba(255, 255, 255, .72);
+        --dyno-stock-line: rgba(255, 255, 255, .72);
+        background: #0b0c0f;
+    }
+    .dyno-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
+    .dyno-label { font-family: var(--tuning-mono); font-size: 9px; font-weight: 700; color: var(--muted-foreground); letter-spacing: 0.12em; }
+    .dyno-legend { display: flex; gap: var(--space-3); }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--muted-foreground); font-family: var(--tuning-mono); }
+    .legend-swatch { width: 12px; height: 3px; border-radius: 2px; }
+    .base-swatch { background: var(--muted-foreground); opacity: 0.6; }
+    .build-swatch { background: var(--tuning-red); }
+    .dyno-svg { width: 100%; min-height: 190px; height: auto; display:block; }
+    .hp-curve { filter: drop-shadow(0 0 8px color-mix(in oklch, var(--tuning-red) 80%, transparent)); animation: drawLine 0.8s ease-out; }
+    .tq-curve { filter: drop-shadow(0 0 6px color-mix(in oklch, var(--tuning-amber) 60%, transparent)); animation: drawLine 1s ease-out 0.2s both; }
+    .dyno-gain { display: flex; gap: var(--space-2); margin-top: var(--space-2); justify-content: center; }
+    .gain-hp { font-family: var(--tuning-mono); font-size: 11px; font-weight: 800; color: var(--tuning-red); }
+    .gain-tq { font-family: var(--tuning-mono); font-size: 11px; font-weight: 700; color: var(--tuning-amber); }
+    .gain-cc { font-family: var(--tuning-mono); font-size: 11px; font-weight: 600; color: var(--foreground); opacity: 0.6; }
+    @@keyframes drawLine { from { stroke-dashoffset: 1000; stroke-dasharray: 1000; } to { stroke-dashoffset: 0; stroke-dasharray: 1000; } }
+</style>
+
+@code {
+    [Parameter] public BuildProjection? Projection { get; set; }
+    [Parameter] public int? OverrideBaseHp { get; set; }
+    [Parameter] public int? OverrideBaseTq { get; set; }
+    [Parameter] public int? OverrideBaseCc { get; set; }
+
+    private int BaseHp => OverrideBaseHp ?? Projection?.BaseHP ?? 0;
+    private int BuildHp => Projection?.FinalHP ?? BaseHp;
+    private int BaseTq => OverrideBaseTq ?? Projection?.BaseTorque ?? 0;
+    private int BuildTq => Projection?.FinalTorque ?? BaseTq;
+    private int BaseCc => OverrideBaseCc ?? Projection?.BaseCC ?? 0;
+    private int BuildCc => Projection?.FinalCC ?? 0;
+
+    private int DisplayHpGain => BuildHp - BaseHp;
+    private int DisplayTqGain => BuildTq - BaseTq;
+    private int DisplayCcGain => BuildCc - BaseCc;
+
+    private int MaxVal => new[] { BuildHp, BaseHp, BuildTq, BaseTq, 10 }.Max();
+
+    private string MaxYLabel => (MaxVal * 1.15).ToString("F0");
+    private string MidYLabel => ((int)(MaxVal * 1.15 * 0.67)).ToString();
+    private string BaseYLabel => ((int)(MaxVal * 1.15 * 0.33)).ToString();
+    private const string MinRpmLabel = "3k";
+    private const string MidRpm1Label = "5k";
+    private const string MidRpm2Label = "7k";
+    private const string MidRpm3Label = "9k";
+    private const string MaxRpmLabel = "11k";
+
+    private const int ChartW = 270;
+    private const int ChartH = 135;
+    private const int PadL = 40;
+    private const int PadT = 20;
+
+    private double ScaleY(double val) => PadT + ChartH - (val / (MaxVal * 1.15) * ChartH);
+    private double ScaleX(double t) => PadL + (t / 100.0) * ChartW;
+
+    private string BaseHpPoints
+    {
+        get
+        {
+            var pts = new List<string>();
+            for (double t = 0; t <= 100; t += 5)
+            {
+                double hp = BaseHp * CurveFactor(t);
+                pts.Add($"{ScaleX(t):F1},{ScaleY(hp):F1}");
+            }
+            return string.Join(" ", pts);
+        }
+    }
+
+    private string BuildHpPoints
+    {
+        get
+        {
+            var pts = new List<string>();
+            for (double t = 0; t <= 100; t += 5)
+            {
+                double hp = BuildHp * CurveFactor(t);
+                pts.Add($"{ScaleX(t):F1},{ScaleY(hp):F1}");
+            }
+            return string.Join(" ", pts);
+        }
+    }
+
+    private string BuildHpAreaPoints
+    {
+        get
+        {
+            var pts = new List<string> { $"{ScaleX(0):F1},{ScaleY(0):F1}" };
+            for (double t = 0; t <= 100; t += 5)
+            {
+                double hp = BuildHp * CurveFactor(t);
+                pts.Add($"{ScaleX(t):F1},{ScaleY(hp):F1}");
+            }
+            pts.Add($"{ScaleX(100):F1},{ScaleY(0):F1}");
+            return string.Join(" ", pts);
+        }
+    }
+
+    private string BuildTqPoints
+    {
+        get
+        {
+            var pts = new List<string>();
+            for (double t = 0; t <= 100; t += 5)
+            {
+                double tq = BuildTq * CurveFactor(t);
+                pts.Add($"{ScaleX(t):F1},{ScaleY(tq):F1}");
+            }
+            return string.Join(" ", pts);
+        }
+    }
+
+    private static double CurveFactor(double t)
+    {
+        double norm = t / 100.0;
+        double peakDip = Math.Sin(norm * Math.PI);
+        return 0.15 + 0.85 * peakDip * (1 + 0.08 * (1 - Math.Pow(norm - 0.6, 2) * 4));
+    }
+}

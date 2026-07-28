@@ -1,0 +1,980 @@
+@using System.Net
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Authorization
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="build-wizard wizard-step-@currentStep">
+    @if (isCheckingAuth)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Checking authentication...</p>
+        </div>
+    }
+    else if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Loading build system...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="error-container">
+            <div class="error-icon">⚠</div>
+            <h3>Something went wrong</h3>
+            <p>@errorMessage</p>
+            <button class="nav-btn nav-btn-next" @onclick="LoadData">Try Again</button>
+            <button class="nav-btn nav-btn-back" @onclick="GoHome">Go Home</button>
+        </div>
+    }
+    else if (!setupComplete)
+    {
+        <div class="tuning-workspace">
+            <div class="tuning-topbar">
+                <div class="topbar-title">
+                    <span class="topbar-kicker">STOCKSENSE BUILD TUNER</span>
+                    <small>Estimated gains only. Final result depends on mechanic tuning, installation quality, and bike condition.</small>
+                </div>
+                <div class="topbar-actions">
+                    <button class="nav-btn nav-btn-back" @onclick="ResetBuildOnly" disabled="@isProcessing">Reset</button>
+                    <button class="nav-btn nav-btn-back" @onclick="GoToBuilds">My Builds</button>
+                </div>
+            </div>
+
+            <div class="tuning-control-grid">
+                <section class="tune-panel">
+                    <div class="panel-head"><strong>Motorcycle</strong></div>
+                    <select class="tuner-select wide" @bind="SelectedBikeId" @bind:after="HandleBikeSelectionChanged">
+                        <option value="0">Choose motorcycle...</option>
+                        @foreach (var bike in bikeModels.OrderBy(b => b.Brand).ThenBy(b => b.Model).ThenBy(b => b.YearStart))
+                        {
+                            <option value="@bike.Id">@bike.DisplayName</option>
+                        }
+                    </select>
+                    @if (selectedBike != null)
+                    {
+                        <div class="machine-specs">
+                            <span>@selectedBike.BaseCC cc</span>
+                            <span>@selectedBike.BaseHP HP</span>
+                            <span>@selectedBike.BaseTorque Nm</span>
+                            @if (!string.IsNullOrWhiteSpace(selectedBike.EngineCode))
+                            {
+                                <span>@selectedBike.EngineCode</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="panel-hint">Select a motorcycle to unlock compatible real shop products.</p>
+                    }
+                </section>
+
+                <section class="tune-panel">
+                    <div class="panel-head"><strong>Package Preset</strong></div>
+                    @if (SelectedBikeId <= 0)
+                    {
+                        <p class="panel-hint">Choose motorcycle first.</p>
+                    }
+                    else if (!PackagesForSelectedBike.Any())
+                    {
+                        <p class="panel-hint">No prebuilt package yet for this motorcycle. You can still select compatible parts manually below.</p>
+                    }
+                    else
+                    {
+                        <select class="tuner-select wide" @onchange="HandlePackageSelectChanged" value="@SelectedPackageId">
+                            <option value="0">No package selected</option>
+                            @foreach (var package in PackagesForSelectedBike)
+                            {
+                                <option value="@package.Id">@package.Name - PHP @package.TotalPrice.ToString("N0")</option>
+                            }
+                        </select>
+                        @if (SelectedPackage != null)
+                        {
+                            <p class="package-note">@SelectedPackage.Name loaded. Included parts are editable below.</p>
+                        }
+                    }
+                </section>
+            </div>
+
+            @if (SelectedBikeId <= 0)
+            {
+                <div class="tune-empty">
+                    <strong>Select a motorcycle to begin tuning.</strong>
+                    <span>The parts list, prebuilt packages, live gauges, cost, and maintenance projection will update on this page.</span>
+                </div>
+            }
+            else
+            {
+                <PartPicker
+                    Categories="categories"
+                    Parts="parts"
+                    AllParts="allParts"
+                    SelectedPartIds="SelectedPartIds"
+                    ActiveCategoryId="ActiveCategoryId"
+                    OnCategoryChange="OnCategoryChange"
+                    OnTogglePart="OnTogglePart"
+                    ValidationResult="validationResult"
+                    BikeModelId="SelectedBikeId"
+                    StageId="SelectedStageId"
+                    Projection="currentProjection"
+                    OnSaveDraft="SaveDraft"
+                    OnSubmit="SubmitBuild"
+                    OnSendQuote="SendEmailQuote"
+                    OnSubmitToShop="SubmitBuildToShop"
+                    IsDirty="isDirty"
+                    IsProcessing="isProcessing"
+                    CanSubmit="CanSubmit"
+                    StatusMessage="@statusMessage"
+                    StatusIsSuccess="@statusSuccess" />
+            }
+        </div>
+
+        <div class="wizard-progress">
+            @for (int i = 1; i <= totalSteps; i++)
+            {
+                <div class="progress-step @(i <= currentStep ? "active" : "") @(i < currentStep ? "completed" : "")" @onclick="() => GoToStep(i)">
+                    <div class="step-number">@i</div>
+                    <div class="step-label">@GetStepLabel(i)</div>
+                </div>
+            }
+        </div>
+
+        <div class="wizard-step-content">
+            @switch (currentStep)
+            {
+                case 1:
+                    <Step1_BikeSelector
+                        BikeModels="bikeModels"
+                        SelectedBikeId="SelectedBikeId"
+                        OnBikeSelected="HandleBikeSelected"
+                        BikeSearchTerm="@bikeSearchTerm"
+                        OnBikeSearch="HandleBikeSearch" />
+                    break;
+                case 2:
+                    <Step2_StageSelector
+                        Packages="preBuiltPackages"
+                        SelectedBike="selectedBike"
+                        SelectedPackageId="SelectedPackageId"
+                        BuildMode="BuildMode"
+                        OnPackageSelected="HandlePackageSelected"
+                        BuildModeChanged="HandleBuildModeChanged" />
+                    break;
+                case 3:
+                    <PartPicker
+                        Categories="categories"
+                        Parts="parts"
+                        SelectedPartIds="SelectedPartIds"
+                        ActiveCategoryId="ActiveCategoryId"
+                        OnCategoryChange="OnCategoryChange"
+                        OnTogglePart="OnTogglePart"
+                        ValidationResult="validationResult"
+                        BikeModelId="SelectedBikeId"
+                        StageId="SelectedStageId"
+                        Projection="currentProjection"
+                        OnSaveDraft="SaveDraft"
+                        OnSubmit="SubmitBuild"
+                        OnSendQuote="SendEmailQuote"
+                        OnSubmitToShop="SubmitBuildToShop"
+                        IsDirty="isDirty"
+                        IsProcessing="isProcessing"
+                        CanSubmit="CanSubmit"
+                        StatusMessage="@statusMessage"
+                        StatusIsSuccess="@statusSuccess" />
+                    break;
+            }
+        </div>
+
+        <div class="wizard-footer">
+            <div class="footer-left">
+                @if (currentStep > 1)
+                {
+                    <button class="nav-btn nav-btn-back" @onclick="PreviousStep">← Previous</button>
+                }
+                <button class="nav-btn nav-btn-back" @onclick="GoToBuilds" style="margin-left: @(currentStep > 1 ? "0.5rem" : "0")">My Builds</button>
+            </div>
+            <div class="footer-right">
+                @if (currentStep < totalSteps)
+                {
+                    <button class="nav-btn nav-btn-next" @onclick="NextStep" disabled="@(!CanProceed)">Next →</button>
+                }
+            </div>
+        </div>
+    }
+    else if (isProcessing)
+    {
+        <div class="processing-overlay">
+            <div class="processing-card">
+                <div class="spinner"></div>
+                <p>@processingMessage</p>
+            </div>
+        </div>
+    }
+    else if (isComplete)
+    {
+        <div class="completion-container">
+            <div class="completion-card">
+                <div class="completion-icon">✓</div>
+                <h3>Build Saved Successfully!</h3>
+                <p>Your motorcycle build configuration has been saved.</p>
+                @if (!string.IsNullOrEmpty(completionMessage))
+                {
+                    <div class="completion-status @(completionSuccess ? "success" : "error")">@completionMessage</div>
+                }
+                <div class="completion-actions">
+                    <button class="nav-btn nav-btn-next" @onclick="SubmitBuildToShop" disabled="@isProcessing">Submit Build to Shop</button>
+                    <button class="nav-btn nav-btn-back" @onclick="SendEmailQuote" disabled="@isProcessing">Send Quote to Email</button>
+                </div>
+                <div class="completion-secondary">
+                    <button class="nav-btn nav-btn-back" @onclick="ResetWizard">Start New Build</button>
+                    <button class="nav-btn nav-btn-back" @onclick="GoToBuilds">My Builds</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .build-wizard {
+        --tuner-bg: var(--background);
+        --tuner-panel: var(--card);
+        --tuner-panel-2: color-mix(in oklch, var(--card) 86%, var(--foreground) 6%);
+        --tuner-ink: var(--foreground);
+        --tuner-muted: var(--muted-foreground);
+        --tuner-border: var(--border);
+        --tuner-accent: var(--tuning-red, #dc2626);
+        --tuning-surface: var(--tuner-panel);
+        --tuning-border: var(--tuner-border);
+        min-height: calc(100vh - 120px);
+        display: flex;
+        flex-direction: column;
+        padding: var(--space-3);
+        max-width: 1760px;
+        margin: 0 auto;
+        width: 100%;
+        color: var(--tuner-ink);
+    }
+    .dark .build-wizard {
+        --tuner-bg: #050505;
+        --tuner-panel: #101113;
+        --tuner-panel-2: #17191d;
+        --tuner-ink: #f8fafc;
+        --tuner-muted: #a8b0bd;
+        --tuner-border: #30343a;
+        --tuner-accent: #ef2626;
+        --tuning-red: #ef2626;
+        --tuning-amber: #f59e0b;
+        --tuning-green: #22c55e;
+        --tuning-surface: var(--tuner-panel);
+        --tuning-border: var(--tuner-border);
+    }
+    .build-wizard .wizard-progress,
+    .build-wizard .wizard-step-content,
+    .build-wizard .wizard-footer { display: none; }
+
+    .tuning-workspace { display: flex; flex-direction: column; gap: var(--space-3); min-height: calc(100vh - 150px); background: var(--tuner-bg); }
+    .tuning-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3);
+        padding: var(--space-3);
+        border: 1px solid var(--tuner-border);
+        border-left: 5px solid var(--tuner-accent);
+        background: var(--tuner-panel);
+        border-radius: var(--radius-lg);
+    }
+    .topbar-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .topbar-kicker { color: var(--tuner-accent); font: 800 10px var(--tuning-mono); letter-spacing: .08em; }
+    .topbar-title strong { color: var(--tuner-ink); font-size: clamp(1rem, 1.4vw, 1.35rem); line-height: 1.15; }
+    .topbar-title small { color: var(--tuner-muted); font-size: var(--text-xs); }
+    .topbar-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
+
+    .tuning-control-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr); gap: var(--space-3); }
+    .tune-panel {
+        min-height: 136px;
+        padding: var(--space-3);
+        background: var(--tuner-panel);
+        border: 1px solid var(--tuner-border);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 10px 30px color-mix(in oklch, #000 7%, transparent);
+    }
+    .dark .tune-panel,
+    .dark .tuning-topbar,
+    .dark .tune-empty,
+    .dark .unauthorized-card,
+    .dark .completion-card,
+    .dark .error-container,
+    .dark .processing-card {
+        box-shadow: 0 18px 42px rgba(0, 0, 0, .32);
+    }
+    .panel-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+    .panel-head strong { color: var(--tuner-ink); font-size: var(--text-sm); text-transform: uppercase; letter-spacing: .04em; }
+    .tuner-select.wide { width: 100%; min-height: 42px; color: var(--tuner-ink); background: var(--tuner-panel-2); border: 1px solid var(--tuner-border); border-radius: var(--radius); padding: 0 var(--space-3); font-weight: 700; }
+    .tuner-select.wide:focus { outline: none; border-color: var(--tuner-accent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--tuner-accent) 18%, transparent); }
+    .machine-specs { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+    .machine-specs span { padding: 4px 8px; border: 1px solid var(--tuner-border); border-radius: 999px; color: var(--tuner-muted); background: var(--tuner-panel-2); font: 800 10px var(--tuning-mono); }
+    .panel-hint, .package-note { margin: var(--space-2) 0 0; color: var(--tuner-muted); font-size: var(--text-xs); line-height: 1.4; }
+    .package-note { color: var(--tuner-accent); font-weight: 700; }
+    .tune-empty { display: grid; place-items: center; gap: var(--space-1); min-height: 340px; border: 1px dashed var(--tuner-border); border-radius: var(--radius-lg); background: var(--tuner-panel); text-align: center; color: var(--tuner-muted); }
+    .tune-empty strong { color: var(--tuner-ink); font-size: var(--text-xl); }
+
+    .loading-container, .error-container, .unauthorized-container, .completion-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .loading-container .spinner, .processing-card .spinner { width: 48px; height: 48px; border: 4px solid var(--tuning-border); border-top-color: var(--tuning-red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto var(--space-4); }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+    .error-icon { font-size: 2rem; margin-bottom: var(--space-3); }
+    .error-container h3 { font-size: var(--text-xl); font-weight: var(--font-semibold); color: var(--foreground); }
+    .error-container p { color: var(--muted-foreground); margin-bottom: var(--space-4); }
+    .error-container .nav-btn-back { background: var(--tuning-surface); color: var(--foreground); border: 1px solid var(--tuning-border); }
+
+    .wizard-progress { display: flex; justify-content: center; gap: var(--space-2); margin-bottom: var(--space-4); padding: var(--space-3) 0; background: var(--tuning-surface); border: 1px solid var(--tuning-border); border-radius: var(--radius-xl); }
+    .progress-step { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; flex: 1; max-width: 140px; }
+    .progress-step::after { content: ''; position: absolute; top: 14px; left: calc(50% + 18px); right: calc(-50% + 18px); height: 2px; background: var(--tuning-border); }
+    .progress-step:last-child::after { display: none; }
+    .progress-step.active::after, .progress-step.completed::after { background: var(--tuning-red); }
+    .step-number { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--tuning-mono); font-weight: var(--font-bold); font-size: var(--text-xs); background: var(--tuning-border); color: var(--muted-foreground); margin-bottom: var(--space-1); transition: all 0.3s; }
+    .progress-step.active .step-number { background: var(--tuning-red); color: white; box-shadow: var(--tuning-glow-red); }
+    .progress-step.completed .step-number { background: var(--tuning-red); color: white; }
+    .step-label { font-family: var(--tuning-mono); font-size: 10px; color: var(--muted-foreground); text-align: center; }
+    .progress-step.active .step-label, .progress-step.completed .step-label { color: var(--foreground); font-weight: var(--font-bold); }
+
+    .wizard-step-content { flex: 1; background: transparent; padding: var(--space-4); overflow-y: auto; position: relative; }
+    .wizard-step-content > * { animation: fadeSlideIn 0.35s ease-out; }
+    .unauthorized-card, .completion-card, .error-container, .processing-card { background: var(--tuning-surface); border: 1px solid var(--tuning-border); border-radius: var(--radius-xl); padding: var(--space-8); max-width: 420px; text-align: center; }
+    .unauthorized-card h3, .completion-card h3 { font-size: var(--text-xl); font-weight: 800; color: var(--foreground); margin: 0 0 var(--space-2); }
+    .unauthorized-card p, .completion-card p { color: var(--muted-foreground); font-size: var(--text-sm); margin-bottom: var(--space-4); }
+    .completion-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--tuning-green); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin: 0 auto var(--space-4); box-shadow: 0 0 20px var(--tuning-glow-green); }
+    .completion-actions { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+    .completion-actions .nav-btn { font-size: var(--text-sm); padding: 10px 20px; width: 100%; }
+    .completion-secondary { display: flex; gap: var(--space-2); justify-content: center; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--tuning-border); }
+    .completion-secondary .nav-btn { font-size: var(--text-xs); padding: 8px 16px; }
+    .completion-status { font-size: var(--text-xs); padding: var(--space-2) var(--space-3); border-radius: var(--radius); margin-bottom: var(--space-3); }
+    .completion-status.success { background: color-mix(in oklch, var(--tuning-green) 15%, transparent); color: var(--tuning-green); border: 1px solid color-mix(in oklch, var(--tuning-green) 30%, transparent); }
+    .completion-status.error { background: color-mix(in oklch, var(--tuning-red) 15%, transparent); color: var(--tuning-red); border: 1px solid color-mix(in oklch, var(--tuning-red) 30%, transparent); }
+    .processing-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .processing-card { border: 1px solid var(--tuning-red); }
+    .processing-card p { color: var(--muted-foreground); }
+
+    .wizard-footer { display: flex; justify-content: space-between; align-items: center; padding: var(--space-3) 0; margin-top: var(--space-2); gap: var(--space-3); }
+    .footer-left { flex: 1; display: flex; justify-content: flex-start; }
+    .footer-right { flex: 1; display: flex; justify-content: flex-end; }
+    .nav-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); padding: 12px 28px; border-radius: var(--radius-lg); font-size: var(--text-base); font-weight: 700; font-family: inherit; cursor: pointer; transition: all 0.15s; border: none; }
+    .nav-btn-back { background: var(--tuning-surface); color: var(--foreground); border: 1px solid var(--tuning-border); }
+    .nav-btn-back:hover { border-color: var(--tuning-red); background: color-mix(in oklch, var(--tuning-red) 8%, var(--tuning-surface)); }
+    .nav-btn-next { background: var(--tuning-red); color: white; }
+    .nav-btn-next:hover { box-shadow: var(--tuning-glow-red); transform: translateY(-1px); }
+    .nav-btn-next:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    @@keyframes fadeSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    @@media (max-width: 1120px) { .tuning-control-grid { grid-template-columns: 1fr; } }
+    @@media (max-width: 767px) {
+        .build-wizard { padding: var(--space-2); }
+        .tuning-topbar { align-items: stretch; flex-direction: column; }
+        .topbar-actions { justify-content: stretch; }
+        .topbar-actions .nav-btn { flex: 1; }
+        .wizard-progress { gap: var(--space-1); padding: var(--space-2); }
+        .step-label { font-size: 8px; }
+        .wizard-step-content { padding: var(--space-2); }
+    }
+</style>
+
+@code {
+    private const int totalSteps = 3;
+
+    private List<BikeModel> bikeModels = new();
+    private List<UpgradeStage> stages = new();
+    private List<PreBuiltPackageDto> preBuiltPackages = new();
+    private List<UpgradeCategory> categories = new();
+    private List<UpgradePart> allParts = new();
+    private List<UpgradePart> parts = new();
+    private HashSet<int> SelectedPartIds = new();
+
+    private int currentStep = 1;
+    private int SelectedBikeId = 0;
+    private int SelectedStageId = 0;
+    private int SelectedPackageId = 0;
+    private bool isCheckingAuth = true;
+    private bool isAuthenticated = false;
+    private bool isLoading = false;
+    private bool setupComplete = false;
+    private bool isComplete = false;
+    private bool isProcessing = false;
+    private bool isDirty = false;
+    private bool BuildMode = false;
+    private string errorMessage = "";
+    private string processingMessage = "Processing...";
+    private string bikeSearchTerm = "";
+    private int savedBuildId = 0;
+    private int ActiveCategoryId = 0;
+    private string completionMessage = "";
+    private bool completionSuccess = true;
+    private string statusMessage = "";
+    private bool statusSuccess = true;
+
+    private BuildProjection? currentProjection;
+    private ValidationResult? validationResult;
+
+    private BikeModel? selectedBike => bikeModels.FirstOrDefault(b => b.Id == SelectedBikeId);
+    private PreBuiltPackageDto? SelectedPackage => preBuiltPackages.FirstOrDefault(p => p.Id == SelectedPackageId);
+    private List<UpgradePart> SelectedOutOfStockParts => allParts
+        .Where(part => SelectedPartIds.Contains(part.Id))
+        .Where(part => (part.Product?.CurrentStock ?? 0) <= 0)
+        .ToList();
+    private List<PreBuiltPackageDto> PackagesForSelectedBike => selectedBike == null
+        ? new()
+        : preBuiltPackages
+            .Where(package => package.IsActive)
+            .Where(package =>
+                string.Equals(package.CompatibleBrand, selectedBike.Brand, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(package.CompatibleModel, selectedBike.Model, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(package => package.TotalPrice)
+            .ToList();
+
+    private Dictionary<int, string> stageDescriptions = new()
+    {
+        { 1, "Entry-level upgrades: exhaust, intake, fuel controller (~10-20% power gain)" },
+        { 2, "Mid-level upgrades: camshaft, high-compression piston, ported head (~20-35% power gain)" },
+        { 3, "High-end: big bore kit, stroker crank, race head, performance transmission (~30-50%+ power gain)" }
+    };
+
+    private bool CanProceed => currentStep switch
+    {
+        1 => SelectedBikeId > 0,
+        2 => SelectedPackageId > 0 || BuildMode,
+        3 => SelectedPartIds.Any(),
+        _ => false
+    };
+
+    private bool CanSubmit => SelectedBikeId > 0 && SelectedPartIds.Any() && !SelectedOutOfStockParts.Any();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check auth by calling the status endpoint (uses actual cookie, not client-side state).
+            // Browsing the build catalog is public; saving/submitting still requires login.
+            try
+            {
+                var response = await Http.GetAsync("/api/auth/status");
+                isAuthenticated = response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                isAuthenticated = false;
+            }
+
+            isCheckingAuth = false;
+            StateHasChanged();
+            await LoadData();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = "";
+        try
+        {
+            bikeModels = await Http.GetFromJsonAsync<List<BikeModel>>("/api/build/bike-models") ?? new();
+            stages = await Http.GetFromJsonAsync<List<UpgradeStage>>("/api/build/stages/all") ?? new();
+            preBuiltPackages = await Http.GetFromJsonAsync<List<PreBuiltPackageDto>>("/api/prebuilts/all") ?? new();
+            categories = await Http.GetFromJsonAsync<List<UpgradeCategory>>("/api/build/categories") ?? new();
+            allParts = (await Http.GetFromJsonAsync<List<UpgradePart>>("/api/build/parts/all") ?? new())
+                .Where(part => part.IsActive && part.Product != null)
+                .ToList();
+
+            if (categories.Any())
+                ActiveCategoryId = categories[0].Id;
+
+            ResetSelectionState();
+            currentStep = 1;
+            setupComplete = false;
+            isComplete = false;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            redirectToLogin();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load build data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStepLabel(int step) => step switch
+    {
+        1 => "Select Motorcycle",
+        2 => "Choose Package",
+        3 => "Tune Build",
+        _ => ""
+    };
+
+    private async Task HandleBikeSelected(int bikeId)
+    {
+        SelectedBikeId = bikeId;
+        ClearBuild();
+        SelectedPackageId = 0;
+        SelectedStageId = 0;
+        BuildMode = true;
+        if (SelectedBikeId > 0)
+        {
+            if (ActiveCategoryId <= 0 && categories.Any())
+                ActiveCategoryId = categories[0].Id;
+            await UpdatePartsForCategory();
+            await RecalculateProjection();
+        }
+    }
+
+    private async Task HandleBikeSelectionChanged() => await HandleBikeSelected(SelectedBikeId);
+
+    private async Task HandlePackageSelectChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        var packageId = int.TryParse(value, out var parsed) ? parsed : 0;
+        if (packageId <= 0)
+        {
+            SelectedPackageId = 0;
+            return;
+        }
+
+        await HandlePackageSelected(packageId);
+    }
+
+    private void HandleBikeSearch(string term)
+    {
+        bikeSearchTerm = term;
+    }
+
+    private async Task HandlePackageSelected(int packageId)
+    {
+        SelectedPackageId = packageId;
+        BuildMode = false;
+        var package = preBuiltPackages.FirstOrDefault(p => p.Id == packageId);
+        if (package == null) return;
+
+        var productIds = package.IncludedProducts.Select(product => product.Id).ToHashSet();
+        SelectedPartIds = allParts
+            .Where(part => productIds.Contains(part.ProductId))
+            .Select(part => part.Id)
+            .ToHashSet();
+        SelectedStageId = FindClosestStageForPackage(package);
+        ActiveCategoryId = allParts.FirstOrDefault(part => SelectedPartIds.Contains(part.Id))?.UpgradeCategoryId
+            ?? categories.FirstOrDefault()?.Id
+            ?? 0;
+        isDirty = true;
+        await RecalculateProjection();
+        await UpdatePartsForCategory();
+        SetStatus($"{package.Name} loaded. You can fine tune the included parts on this page.", true);
+    }
+
+    private async Task HandleBuildModeChanged(bool mode)
+    {
+        BuildMode = mode;
+        if (mode)
+        {
+            SelectedPackageId = 0;
+            SelectedStageId = 0;
+            SelectedPartIds.Clear();
+            currentProjection = null;
+            parts.Clear();
+            isDirty = true;
+            SetStatus("Custom build mode selected. Choose compatible parts in the tuning step.", true);
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task OnCategoryChange(int categoryId)
+    {
+        ActiveCategoryId = categoryId;
+        await UpdatePartsForCategory();
+    }
+
+    private async Task UpdatePartsForCategory()
+    {
+        try
+        {
+            if (SelectedBikeId <= 0)
+            {
+                parts = allParts
+                    .Where(p => p.Product != null && p.UpgradeCategoryId == ActiveCategoryId)
+                    .ToList();
+                return;
+            }
+
+            var url = $"/api/build/parts?bikeModelId={SelectedBikeId}" +
+                      (SelectedStageId > 0 ? $"&stageId={SelectedStageId}" : "") +
+                      $"&categoryId={ActiveCategoryId}";
+            parts = (await Http.GetFromJsonAsync<List<UpgradePart>>(url) ?? new())
+                .Where(part => part.Product != null)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            parts = allParts.Where(p => p.Product != null && p.UpgradeCategoryId == ActiveCategoryId).ToList();
+            SetStatus($"Could not fetch parts from server: {ex.Message}", false);
+        }
+    }
+
+    private async Task OnTogglePart(int partId)
+    {
+        if (SelectedPartIds.Contains(partId))
+        {
+            SelectedPartIds.Remove(partId);
+        }
+        else
+        {
+            var part = allParts.FirstOrDefault(p => p.Id == partId);
+            if (part != null)
+            {
+                var cat = categories.FirstOrDefault(c => c.Id == part.UpgradeCategoryId);
+                if (cat?.AllowsMultiple == false)
+                {
+                    var toRemove = SelectedPartIds
+                        .Where(id => allParts.Any(p => p.Id == id && p.UpgradeCategoryId == part.UpgradeCategoryId))
+                        .ToList();
+                    foreach (var id in toRemove)
+                        SelectedPartIds.Remove(id);
+                }
+            }
+            SelectedPartIds.Add(partId);
+        }
+        isDirty = true;
+        await RecalculateProjection();
+    }
+
+    private async Task RecalculateProjection()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/build/calculate", new
+            {
+                BikeModelId = SelectedBikeId,
+                PartIds = SelectedPartIds.ToList()
+            });
+            if (response.IsSuccessStatusCode)
+            {
+                currentProjection = await response.Content.ReadFromJsonAsync<BuildProjection>();
+            }
+        }
+        catch (Exception ex) { SetStatus($"Calculation error: {ex.Message}", false); }
+    }
+
+    private async Task SaveDraft()
+    {
+        if (!isAuthenticated) { redirectToLogin(); return; }
+        if (SelectedBikeId <= 0) { SetStatus("Select a motorcycle first.", false); return; }
+        isProcessing = true;
+        processingMessage = "Saving draft...";
+        try
+        {
+            var partIdsJson = System.Text.Json.JsonSerializer.Serialize(SelectedPartIds.ToList());
+            var draft = new
+            {
+                BikeModelId = SelectedBikeId,
+                UpgradeStageId = SelectedStageId > 0 ? SelectedStageId : (int?)null,
+                SelectedPartIdsJson = partIdsJson,
+                Status = "Draft"
+            };
+
+            HttpResponseMessage response;
+            if (savedBuildId > 0)
+            {
+                response = await Http.PutAsJsonAsync($"/api/build/draft/{savedBuildId}", draft);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("/api/build/draft", draft);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                var saved = await response.Content.ReadFromJsonAsync<CustomerBuild>();
+                savedBuildId = saved?.Id ?? savedBuildId;
+                SetStatus("Draft saved.", true);
+                isDirty = false;
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                SetStatus($"Failed to save draft: {body}", false);
+            }
+        }
+        catch (Exception ex) { SetStatus($"Error: {ex.Message}", false); }
+        finally { isProcessing = false; }
+    }
+
+    private async Task SubmitBuild()
+    {
+        if (!isAuthenticated) { redirectToLogin(); return; }
+        if (SelectedBikeId <= 0) { SetStatus("Select a motorcycle first.", false); return; }
+        if (!SelectedPartIds.Any()) { SetStatus("Add at least one part.", false); return; }
+        if (SelectedOutOfStockParts.Any()) { SetStatus(BuildOutOfStockMessage(), false); return; }
+        isProcessing = true;
+        processingMessage = "Submitting build...";
+        try
+        {
+            // Save draft first if not yet saved
+            if (savedBuildId <= 0)
+            {
+                var partIdsJson = System.Text.Json.JsonSerializer.Serialize(SelectedPartIds.ToList());
+                var draft = new
+                {
+                    BikeModelId = SelectedBikeId,
+                    UpgradeStageId = SelectedStageId > 0 ? SelectedStageId : (int?)null,
+                    SelectedPartIdsJson = partIdsJson,
+                    Status = "Draft"
+                };
+                var saveResponse = await Http.PostAsJsonAsync("/api/build/draft", draft);
+                if (!saveResponse.IsSuccessStatusCode)
+                {
+                    var body = await saveResponse.Content.ReadAsStringAsync();
+                    SetStatus($"Failed to save draft: {body}", false);
+                    return;
+                }
+                var saved = await saveResponse.Content.ReadFromJsonAsync<CustomerBuild>();
+                savedBuildId = saved?.Id ?? 0;
+            }
+
+            // Submit via proper submit endpoint
+            var submitResponse = await Http.PostAsJsonAsync("/api/build/submit", new { DraftId = savedBuildId });
+            if (submitResponse.IsSuccessStatusCode)
+            {
+                isComplete = true;
+                setupComplete = true;
+                SetStatus("Build submitted successfully!", true);
+            }
+            else
+            {
+                var body = await submitResponse.Content.ReadAsStringAsync();
+                SetStatus($"Failed to submit: {body}", false);
+            }
+        }
+        catch (Exception ex) { SetStatus($"Error: {ex.Message}", false); }
+        finally { isProcessing = false; }
+    }
+
+    private void GoToStep(int step)
+    {
+        if (step == currentStep || step < 1 || step > totalSteps) return;
+        currentStep = step;
+        if (step == 3 && SelectedBikeId > 0)
+        {
+            _ = UpdatePartsForCategory();
+        }
+    }
+
+    private void NextStep()
+    {
+        if (!CanProceed || currentStep >= totalSteps) return;
+        currentStep++;
+        if (currentStep == 3 && SelectedBikeId > 0)
+        {
+            _ = UpdatePartsForCategory();
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (currentStep <= 1) return;
+        currentStep--;
+    }
+
+    private void ClearBuild()
+    {
+        SelectedPartIds.Clear();
+        parts.Clear();
+        currentProjection = null;
+        validationResult = null;
+        isDirty = false;
+    }
+
+    private void ResetSelectionState()
+    {
+        SelectedBikeId = 0;
+        SelectedStageId = 0;
+        SelectedPackageId = 0;
+        SelectedPartIds.Clear();
+        parts.Clear();
+        currentProjection = null;
+        validationResult = null;
+        BuildMode = true;
+        isDirty = false;
+        statusMessage = "";
+        completionMessage = "";
+    }
+
+    private async Task ResetBuildOnly()
+    {
+        SelectedPackageId = 0;
+        SelectedStageId = 0;
+        SelectedPartIds.Clear();
+        currentProjection = null;
+        validationResult = null;
+        isDirty = false;
+        statusMessage = "";
+        completionMessage = "";
+        if (SelectedBikeId > 0)
+        {
+            await UpdatePartsForCategory();
+            await RecalculateProjection();
+        }
+    }
+
+    private async Task SendEmailQuote()
+    {
+        if (!SelectedPartIds.Any()) { SetStatus("Add parts first.", false); return; }
+        if (SelectedOutOfStockParts.Any()) { SetStatus(BuildOutOfStockMessage(), false); return; }
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (!authState.User.Identity?.IsAuthenticated ?? false) { redirectToLogin(); return; }
+        isProcessing = true;
+        try
+        {
+            var userEmail = authState.User.Identity?.Name ?? "User";
+
+            // Get product IDs from the allParts list loaded via the API (includes Product navigation)
+            var productIds = allParts
+                .Where(p => SelectedPartIds.Contains(p.Id) && p.Product != null)
+                .Select(p => p.Product!.Id)
+                .Distinct()
+                .ToList();
+
+            if (!productIds.Any()) { SetStatus("Product data not loaded. Try refreshing.", false); return; }
+
+            var response = await Http.PostAsJsonAsync("/api/products/send-quote", new { UserEmail = userEmail, ProductIds = productIds });
+            if (response.IsSuccessStatusCode) { SetStatus("Quote sent to your email!", true); }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                SetStatus($"Failed: {body}", false);
+            }
+        }
+        catch (Exception ex) { SetStatus($"Error: {ex.Message}", false); }
+        finally { isProcessing = false; }
+    }
+
+    private async Task SubmitBuildToShop()
+    {
+        if (!SelectedPartIds.Any()) { SetStatus("Add parts first.", false); return; }
+        if (SelectedOutOfStockParts.Any()) { SetStatus(BuildOutOfStockMessage(), false); return; }
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (!authState.User.Identity?.IsAuthenticated ?? false) { redirectToLogin(); return; }
+        isProcessing = true;
+        try
+        {
+            string userEmail = authState.User.Identity?.Name ?? "Guest";
+
+            string realName = userEmail.Contains("@") ? userEmail.Split('@')[0] : userEmail;
+            try
+            {
+                var profile = await Http.GetFromJsonAsync<UserProfile>("/api/user/profile");
+                if (profile != null && !string.IsNullOrWhiteSpace(profile.FirstName))
+                {
+                    realName = $"{profile.FirstName} {profile.LastName}".Trim();
+                }
+            }
+            catch (Exception ex) { SetStatus($"Could not fetch profile: {ex.Message}", false); }
+
+            var selectedParts = allParts.Where(p => SelectedPartIds.Contains(p.Id) && p.Product != null).ToList();
+            if (!selectedParts.Any()) { SetStatus("Product data not loaded. Try refreshing.", false); return; }
+
+            var partsToSave = selectedParts.Select(p => p.Product!).ToList();
+            partsToSave.Add(new Product
+            {
+                Id = -999,
+                Name = "TYPE_CUSTOM",
+                Brand = "Custom Build",
+                ImageUrl = realName,
+                Category = "SYSTEM_METADATA",
+                Price = 0
+            });
+
+            var buildRequest = new BuildRequest
+            {
+                CustomerName = userEmail,
+                SelectedPartsJson = JsonSerializer.Serialize(partsToSave),
+                TotalPrice = selectedParts.Sum(p => p.ListPrice),
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/builds", buildRequest);
+            if (response.IsSuccessStatusCode) { SetStatus("Build submitted to shop successfully!", true); }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                SetStatus($"Failed: {body}", false);
+            }
+        }
+        catch (Exception ex) { SetStatus($"Error: {ex.Message}", false); }
+        finally { isProcessing = false; }
+    }
+
+    private void SetStatus(string message, bool success)
+    {
+        statusMessage = message;
+        statusSuccess = success;
+        completionMessage = message;
+        completionSuccess = success;
+    }
+
+    private string BuildOutOfStockMessage()
+    {
+        var names = SelectedOutOfStockParts
+            .Select(part => part.Product?.Name ?? "Selected part")
+            .Take(3);
+        return $"Estimate only: {string.Join(", ", names)} out of stock. Restock before final submit.";
+    }
+
+    private void ResetWizard()
+    {
+        ResetSelectionState();
+        currentStep = 1;
+        setupComplete = false;
+        isComplete = false;
+        errorMessage = "";
+    }
+
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private void ViewBuild()
+    {
+        Navigation.NavigateTo("/my-builds");
+    }
+
+    private void GoToBuilds()
+    {
+        if (!isAuthenticated) { redirectToLogin(); return; }
+        Navigation.NavigateTo("/my-builds");
+    }
+
+    private int FindClosestStageForPackage(PreBuiltPackageDto package)
+    {
+        var bikeStages = stages.Where(stage => stage.BikeModelId == SelectedBikeId).ToList();
+        if (!bikeStages.Any()) return 0;
+
+        var targetCc = 0;
+        _ = int.TryParse(new string(package.TargetCC.Where(char.IsDigit).ToArray()), out targetCc);
+        return bikeStages
+            .OrderBy(stage => Math.Abs(stage.TargetCC - targetCc))
+            .ThenBy(stage => stage.StageNumber)
+            .FirstOrDefault()?.Id ?? 0;
+    }
+
+    private void redirectToLogin()
+    {
+        Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}", true);
+    }
+}

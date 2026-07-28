@@ -4,12 +4,16 @@
 @using StockSense.Application.DTOs
 @using StockSense.Domain.Entities
 @using StockSense.Infrastructure.Data.Repositories
+@using StockSense.Infrastructure.Data
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.Text.Json
 @using BlazorBlueprint.Primitives.Services
 @using StockSense.Client.Layout
 
 @inject PreBuiltRepository PreBuiltRepo
 @inject ProductRepository ProductRepo
+@inject ApplicationDbContext Db
 
 @attribute [Authorize(Roles = "Employee, Admin")]
 
@@ -180,7 +184,7 @@ else
                             <select value="@newPackage.CompatibleBrand" @onchange="OnBrandChanged"
                                     style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground);">
                                 <option value="">Select Brand...</option>
-                                @foreach (var brand in motorDatabase.Keys)
+                                @foreach (var brand in BikeBrands)
                                 {
                                     <option value="@brand">@brand</option>
                                 }
@@ -192,9 +196,9 @@ else
                                     disabled="@string.IsNullOrEmpty(newPackage.CompatibleBrand)"
                                     style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: @(string.IsNullOrEmpty(newPackage.CompatibleBrand) ? "var(--muted)" : "var(--background)"); color: var(--foreground);">
                                 <option value="">Select Model...</option>
-                                @if (!string.IsNullOrEmpty(newPackage.CompatibleBrand) && motorDatabase.ContainsKey(newPackage.CompatibleBrand))
+                                @if (!string.IsNullOrEmpty(newPackage.CompatibleBrand))
                                 {
-                                    @foreach (var model in motorDatabase[newPackage.CompatibleBrand].Keys)
+                                    @foreach (var model in BikeModelsForSelectedBrand)
                                     {
                                         <option value="@model">@model</option>
                                     }
@@ -210,9 +214,9 @@ else
                                     disabled="@string.IsNullOrEmpty(newPackage.CompatibleModel)"
                                     style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: @(string.IsNullOrEmpty(newPackage.CompatibleModel) ? "var(--muted)" : "var(--background)"); color: var(--foreground);">
                                 <option value="">Select CC...</option>
-                                @if (!string.IsNullOrEmpty(newPackage.CompatibleBrand) && !string.IsNullOrEmpty(newPackage.CompatibleModel) && motorDatabase.ContainsKey(newPackage.CompatibleBrand) && motorDatabase[newPackage.CompatibleBrand].ContainsKey(newPackage.CompatibleModel))
+                                @if (CurrentBikeModel is not null)
                                 {
-                                    @foreach (var cc in motorDatabase[newPackage.CompatibleBrand][newPackage.CompatibleModel])
+                                    @foreach (var cc in TargetCcOptions)
                                     {
                                         <option value="@cc">@cc</option>
                                     }
@@ -233,7 +237,7 @@ else
                 <div style="flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; background: var(--card);">
 
                     <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--muted); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <span style="font-size: var(--text-sm); font-weight: bold; color: var(--foreground);">Select Products</span>
+                        <span style="font-size: var(--text-sm); font-weight: bold; color: var(--foreground);">Select Build Parts</span>
                         <span style="font-size: var(--text-xs); color: var(--primary); font-weight: bold; background: color-mix(in oklch, var(--primary) 10%, transparent); padding: 3px 8px; border-radius: 999px;">@newPackage.SelectedProductIds.Count selected</span>
                     </div>
 
@@ -263,7 +267,7 @@ else
                         else if (!FilteredModalProducts.Any())
                         {
                             <div style="padding: 20px; text-align: center; color: var(--muted-foreground); font-size: var(--text-sm);">
-                                No products match your search.
+                                No compatible build parts match your search.
                             </div>
                         }
                         else
@@ -326,42 +330,62 @@ else
 
     private List<PreBuiltPackageDto> existingPackages = new();
     private List<ProductDto>? allProducts;
+    private List<BikeModel> bikeModels = new();
+    private List<UpgradePart> buildParts = new();
     private CreatePreBuiltDto newPackage = new();
     private PreBuiltPackageDto? packageToDelete;
     private int editingPackageId;
 
-    private readonly Dictionary<string, Dictionary<string, List<string>>> motorDatabase = new()
+    private IEnumerable<string> BikeBrands => bikeModels
+        .Select(model => model.Brand)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(brand => brand);
+
+    private IEnumerable<string> BikeModelsForSelectedBrand => bikeModels
+        .Where(model => string.Equals(model.Brand, newPackage.CompatibleBrand, StringComparison.OrdinalIgnoreCase))
+        .Select(model => model.Model)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(model => model);
+
+    private BikeModel? CurrentBikeModel => bikeModels.FirstOrDefault(model =>
+        string.Equals(model.Brand, newPackage.CompatibleBrand, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(model.Model, newPackage.CompatibleModel, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<string> TargetCcOptions
     {
+        get
         {
-            "Yamaha", new()
-            {
-                { "Mio Sporty / Soul", new() { "59mm (150cc)", "63mm (180cc)", "65mm (200cc)" } },
-                { "Mio i125 / M3", new() { "59mm (150cc)", "63mm (180cc)" } },
-                { "Aerox / NMAX v1-v2", new() { "63mm (180cc)", "65mm (200cc)", "66mm+ (Racing)" } },
-                { "Sniper 150/155", new() { "62mm (180cc)", "65mm (200cc)", "Superhead Build" } }
-            }
-        },
-        {
-            "Honda", new()
-            {
-                { "Click 125i/150i", new() { "59mm (150cc)", "61mm (160cc)", "63mm (180cc)" } },
-                { "PCX / ADV 150", new() { "61mm (160cc)", "63mm (180cc)" } },
-                { "PCX / ADV 160", new() { "63mm (180cc)", "65mm (200cc)" } },
-                { "Beat 110", new() { "55mm (130cc)", "59mm (150cc)" } }
-            }
-        },
-        {
-            "Suzuki", new()
-            {
-                { "Raider 150 Carb", new() { "66mm (200cc)", "68mm (220cc)", "Open Spec" } },
-                { "Raider 150 FI", new() { "66mm (200cc)", "68mm (220cc)" } },
-                { "Smash / Skydrive", new() { "59mm (150cc)", "63mm (180cc)" } }
-            }
+            if (CurrentBikeModel is null)
+                return Array.Empty<string>();
+
+            var gains = CompatibleBuildParts
+                .Where(part => part.CCGain > 0)
+                .Select(part => CurrentBikeModel.BaseCC + part.CCGain)
+                .Append(CurrentBikeModel.BaseCC)
+                .Distinct()
+                .OrderBy(cc => cc)
+                .Select(cc => $"{cc}cc");
+
+            return gains;
         }
-    };
+    }
 
     private IEnumerable<string> ModalCategories => (allProducts ?? new List<ProductDto>())
         .Select(p => p.Category).Distinct().OrderBy(c => c);
+
+    private IEnumerable<UpgradePart> CompatibleBuildParts
+    {
+        get
+        {
+            if (CurrentBikeModel is null)
+                return Array.Empty<UpgradePart>();
+
+            return buildParts
+                .Where(part => part.Product != null && IsCompatibleWithBike(part, CurrentBikeModel))
+                .OrderBy(part => part.Category?.DisplayOrder ?? 0)
+                .ThenBy(part => part.Product!.Name);
+        }
+    }
 
     private IEnumerable<ProductDto> FilteredModalProducts
     {
@@ -369,7 +393,12 @@ else
         {
             if (allProducts == null) return Array.Empty<ProductDto>();
             
-            var query = allProducts.AsEnumerable();
+            var compatibleProductIds = CompatibleBuildParts
+                .Where(part => part.Product != null)
+                .Select(part => part.ProductId)
+                .ToHashSet();
+
+            var query = allProducts.Where(product => compatibleProductIds.Contains(product.Id)).AsEnumerable();
             
             if (productCategoryFilter != "All")
                 query = query.Where(p => p.Category == productCategoryFilter);
@@ -394,8 +423,32 @@ else
             var packages = await PreBuiltRepo.GetAllAsync();
             existingPackages = packages.Select(MapToDto).ToList();
 
-            var products = await ProductRepo.GetAllAsync();
-            allProducts = products.Select(p => new ProductDto(
+            bikeModels = await Db.BikeModels
+                .AsNoTracking()
+                .Where(model => model.IsActive)
+                .OrderBy(model => model.Brand)
+                .ThenBy(model => model.Model)
+                .ToListAsync();
+
+            buildParts = await Db.UpgradeParts
+                .AsNoTracking()
+                .Include(part => part.Product)
+                .Include(part => part.Category)
+                .Where(part => part.IsActive &&
+                               part.Product != null &&
+                               part.Category != null &&
+                               part.Category.IsActive)
+                .ToListAsync();
+
+            var buildProducts = buildParts
+                .Where(part => part.Product != null)
+                .Select(part => part.Product!)
+                .DistinctBy(product => product.Id)
+                .OrderBy(product => product.Category)
+                .ThenBy(product => product.Name)
+                .ToList();
+
+            allProducts = buildProducts.Select(p => new ProductDto(
                 p.Id, p.Name, p.Category, p.Brand, p.Price,
                 p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0,
                 p.Supplier?.Name ?? "", p.ImageUrl ?? "")).ToList();
@@ -503,16 +556,32 @@ else
         newPackage.CompatibleBrand = e.Value?.ToString() ?? string.Empty;
         newPackage.CompatibleModel = string.Empty;
         newPackage.TargetCC = string.Empty;
+        newPackage.SelectedProductIds.Clear();
     }
 
     private void OnModelChanged(ChangeEventArgs e)
     {
         newPackage.CompatibleModel = e.Value?.ToString() ?? string.Empty;
         newPackage.TargetCC = string.Empty;
+        newPackage.SelectedProductIds.Clear();
     }
 
     private void ToggleProductSelection(int productId)
     {
+        if (CurrentBikeModel is null)
+        {
+            errorMessage = "Choose a motorcycle before selecting build parts.";
+            return;
+        }
+
+        var compatibleProductIds = CompatibleBuildParts.Select(part => part.ProductId).ToHashSet();
+        if (!compatibleProductIds.Contains(productId))
+        {
+            errorMessage = "This product is not linked as a compatible build part for the selected motorcycle.";
+            return;
+        }
+
+        errorMessage = string.Empty;
         if (newPackage.SelectedProductIds.Contains(productId))
         {
             newPackage.SelectedProductIds.Remove(productId);
@@ -527,6 +596,35 @@ else
     {
         if (allProducts == null || !newPackage.SelectedProductIds.Any()) return 0;
         return allProducts.Where(p => newPackage.SelectedProductIds.Contains(p.Id)).Sum(p => p.Price);
+    }
+
+    private static bool IsCompatibleWithBike(UpgradePart part, BikeModel bike)
+    {
+        if (string.IsNullOrWhiteSpace(part.CompatibleModelsJson) || part.CompatibleModelsJson == "[]")
+            return true;
+
+        try
+        {
+            var ids = JsonSerializer.Deserialize<List<int>>(part.CompatibleModelsJson);
+            if (ids?.Contains(bike.Id) == true) return true;
+        }
+        catch
+        {
+            // Older seed data may contain model names.
+        }
+
+        try
+        {
+            var names = JsonSerializer.Deserialize<List<string>>(part.CompatibleModelsJson) ?? new();
+            return names.Any(name =>
+                name.Contains(bike.Model, StringComparison.OrdinalIgnoreCase) ||
+                bike.DisplayName.Contains(name, StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return part.CompatibleModelsJson.Contains(bike.Model, StringComparison.OrdinalIgnoreCase) ||
+                   part.CompatibleModelsJson.Contains(bike.DisplayName, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private async Task SubmitPackage()
@@ -549,7 +647,14 @@ else
 
         if (!newPackage.SelectedProductIds.Any())
         {
-            errorMessage = "You must select at least one product.";
+            errorMessage = "You must select at least one compatible build part.";
+            return;
+        }
+
+        var compatibleProductIds = CompatibleBuildParts.Select(part => part.ProductId).ToHashSet();
+        if (newPackage.SelectedProductIds.Any(productId => !compatibleProductIds.Contains(productId)))
+        {
+            errorMessage = "Every selected product must be a compatible build part for the selected motorcycle.";
             return;
         }
 

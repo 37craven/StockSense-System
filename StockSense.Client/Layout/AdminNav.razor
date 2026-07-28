@@ -213,7 +213,14 @@
                             <span style="white-space: nowrap;">Builds</span>
                         }
                     </a>
-                    <a href="/admin/orderslips" title="Generate Order Slips" style="@NavLinkStyle(IsActive("/admin/orderslips"), isCollapsed)">
+<a href="/admin/assistant" title="Assistant" style="@NavLinkStyle(IsActive("/admin/assistant"), isCollapsed)">
+                        <LucideIcon Name="bot" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Assistant</span>
+                        }
+                    </a>
+                    <a href="/admin/orderslips" title="Order Slips" style="@NavLinkStyle(IsActive("/admin/orderslips"), isCollapsed)">
                         <LucideIcon Name="clipboard-list" Size="16" />
                         @if (!isCollapsed)
                         {

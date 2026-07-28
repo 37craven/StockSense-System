@@ -1,0 +1,69 @@
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+
+<div class="maint-panel">
+    <div class="maint-head">
+        <span class="maint-icon">&#9881;</span>
+        <span class="maint-label">MAINTENANCE</span>
+        <span class="maint-tier @Projection.MaintenanceTier.ToLower()">@Projection.MaintenanceTier</span>
+    </div>
+
+    <div class="maint-grid">
+        <span class="mg-label">Oil Change</span><span class="mg-value">@Projection.OilChangeIntervalKm km</span>
+        <span class="mg-label">Oil Type</span><span class="mg-value">@Projection.OilType</span>
+        <span class="mg-label">Valve Check</span><span class="mg-value">@Projection.ValveClearanceCheckIntervalKm km</span>
+        <span class="mg-label">Valve Springs</span><span class="mg-value">@Projection.ValveSpringReplaceIntervalKm km</span>
+        <span class="mg-label">Piston Rings</span><span class="mg-value">@Projection.PistonRingIntervalKm km</span>
+        <span class="mg-label">Rod Bearings</span><span class="mg-value">@Projection.ConRodBearingIntervalKm km</span>
+        <span class="mg-label">Main Bearings</span><span class="mg-value">@Projection.MainBearingIntervalKm km</span>
+        <span class="mg-label">Fuel</span><span class="mg-value">@Projection.FuelRequirement</span>
+        <span class="mg-label">Chain</span><span class="mg-value">@Projection.ChainAdjustIntervalKm km</span>
+        <span class="mg-label">Sprockets</span><span class="mg-value">@Projection.SprocketReplaceIntervalKm km</span>
+        <span class="mg-label">Clutch</span><span class="mg-value">@Projection.ClutchPlateIntervalKm km</span>
+    </div>
+
+    @if (Projection.Warnings.Any())
+    {
+        <div class="maint-alerts">
+            @foreach (var w in Projection.Warnings)
+            {
+                <div class="maint-alert warn">&#9888; @w</div>
+            }
+        </div>
+    }
+
+    @if (Projection.Tips.Any())
+    {
+        <div class="maint-alerts">
+            @foreach (var t in Projection.Tips)
+            {
+                <div class="maint-alert tip">&#128161; @t</div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .maint-panel { display: flex; flex-direction: column; gap: var(--space-2); }
+    .maint-head { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+    .maint-icon { font-size: 12px; opacity: 0.6; }
+    .maint-label { font-family: var(--tuning-mono); font-size: 9px; font-weight: 700; color: var(--muted-foreground); letter-spacing: 0.1em; }
+    .maint-tier { font-family: var(--tuning-mono); font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: auto; }
+    .maint-tier.street { background: color-mix(in oklch, var(--tuning-green) 15%, transparent); color: var(--tuning-green); }
+    .maint-tier.sport { background: color-mix(in oklch, var(--tuning-amber) 15%, transparent); color: var(--tuning-amber); }
+    .maint-tier.race { background: color-mix(in oklch, var(--tuning-red) 15%, transparent); color: var(--tuning-red); }
+    .maint-tier.drag { background: color-mix(in oklch, var(--tuning-red) 20%, transparent); color: var(--tuning-red); }
+
+    .maint-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 4px; font-size: 9px; }
+    .mg-label { color: var(--muted-foreground); opacity: 0.8; }
+    .mg-value { font-family: var(--tuning-mono); font-weight: 700; color: var(--foreground); text-align: right; }
+
+    .maint-alerts { display: flex; flex-direction: column; gap: 2px; margin-top: var(--space-1); padding-top: var(--space-1); border-top: 1px solid var(--tuning-border); }
+    .maint-alert { font-size: 9px; display: flex; align-items: flex-start; gap: 3px; }
+    .maint-alert.warn { color: var(--tuning-amber); }
+    .maint-alert.tip { color: var(--muted-foreground); }
+</style>
+
+@code {
+    [Parameter] public MaintenanceProjection Projection { get; set; } = new();
+}

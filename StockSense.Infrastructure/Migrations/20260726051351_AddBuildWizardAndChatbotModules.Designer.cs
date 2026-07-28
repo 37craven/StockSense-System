@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StockSense.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using StockSense.Infrastructure.Data;
 namespace StockSense.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260726051351_AddBuildWizardAndChatbotModules")]
+    partial class AddBuildWizardAndChatbotModules
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -200,27 +203,15 @@ namespace StockSense.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("ContactNumber")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("CustomerEmail")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
                     b.Property<string>("CustomerName")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("CustomerUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
@@ -247,18 +238,7 @@ namespace StockSense.Infrastructure.Migrations
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int?>("TransactionId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("CustomerEmail");
-
-                    b.HasIndex("CustomerUserId");
-
-                    b.HasIndex("TransactionId")
-                        .IsUnique()
-                        .HasFilter("[TransactionId] IS NOT NULL");
 
                     b.ToTable("Appointments");
                 });
@@ -326,24 +306,12 @@ namespace StockSense.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("CustomerEmail")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
                     b.Property<string>("CustomerName")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("CustomerUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SelectedPartsJson")
                         .IsRequired()
@@ -356,23 +324,11 @@ namespace StockSense.Infrastructure.Migrations
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int?>("TransactionId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("CustomerEmail");
-
-                    b.HasIndex("CustomerUserId");
-
-                    b.HasIndex("TransactionId")
-                        .IsUnique()
-                        .HasFilter("[TransactionId] IS NOT NULL");
 
                     b.ToTable("BuildRequests");
                 });
 
-            modelBuilder.Entity("StockSense.Domain.Entities.HistoricalMonthlyProductSale", b =>
             modelBuilder.Entity("StockSense.Domain.Entities.CustomerBuild", b =>
                 {
                     b.Property<int>("Id")
@@ -381,99 +337,6 @@ namespace StockSense.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<byte>("Month")
-                        .HasColumnType("tinyint");
-
-                    b.Property<int>("QuantitySold")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ReportingProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SalesImportBatchId")
-                        .HasColumnType("int");
-
-                    b.Property<short>("Year")
-                        .HasColumnType("smallint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SalesImportBatchId");
-
-                    b.HasIndex("ReportingProductId", "Year", "Month")
-                        .IsUnique();
-
-                    b.ToTable("HistoricalMonthlyProductSales", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_HistoricalMonthlyProductSales_Month", "[Month] BETWEEN 1 AND 12");
-
-                            t.HasCheckConstraint("CK_HistoricalMonthlyProductSales_QuantitySold", "[QuantitySold] >= 0");
-
-                            t.HasCheckConstraint("CK_HistoricalMonthlyProductSales_Year", "[Year] BETWEEN 1900 AND 9999");
-                        });
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.HistoricalProductMapping", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ExternalProductKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("ReportingProductId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SourceSystem")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReportingProductId", "SourceSystem")
-                        .IsUnique();
-
-                    b.HasIndex("SourceSystem", "ExternalProductKey")
-                        .IsUnique();
-
-                    b.ToTable("HistoricalProductMappings", (string)null);
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.LiveProductMapping", b =>
-                {
-                    b.Property<int>("ReportingProductId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<DateTime>("UseTransactionsFrom")
-                        .HasColumnType("date");
-
-                    b.HasKey("ReportingProductId");
-
-                    b.HasIndex("ProductId")
-                        .IsUnique();
-
-                    b.ToTable("LiveProductMappings", (string)null);
                     b.Property<int?>("BikeModelId")
                         .HasColumnType("int");
 
@@ -481,6 +344,9 @@ namespace StockSense.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("CurrentCC")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CustomerMotorcycleId")
                         .HasColumnType("int");
 
                     b.Property<decimal>("EstimatedLaborCost")
@@ -543,6 +409,72 @@ namespace StockSense.Infrastructure.Migrations
                     b.ToTable("CustomerBuilds");
                 });
 
+            modelBuilder.Entity("StockSense.Domain.Entities.CustomerMotorcycle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BaseCC")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CurrentCC")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CurrentMileage")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LastOilChangeMileage")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LastServiceDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Nickname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("PurchaseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("VIN")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomerMotorcycles");
+                });
+
             modelBuilder.Entity("StockSense.Domain.Entities.Mechanic", b =>
                 {
                     b.Property<int>("Id")
@@ -571,90 +503,24 @@ namespace StockSense.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ApprovedByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<DateTime>("DateGenerated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ExpectedDeliveryDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("GeneratedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<bool>("IsReceived")
                         .HasColumnType("bit");
 
-                    b.Property<string>("LocationId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasDefaultValue("MAIN");
-
-                    b.Property<string>("OrderSlipNumber")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<DateTime?>("OrderedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Remarks")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
                     b.Property<string>("SlipNumber")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasDefaultValue("Draft");
-
                     b.Property<int>("SupplierId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("TotalEstimatedCost")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
-
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderSlipNumber")
-                        .IsUnique();
+                    b.HasIndex("SupplierId");
 
-                    b.HasIndex("SupplierId", "LocationId", "Status");
-
-                    b.ToTable("OrderSlips", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_OrderSlips_Status", "[Status] IN ('Draft','Approved','Ordered','PartiallyReceived','Completed','Cancelled')");
-
-                            t.HasCheckConstraint("CK_OrderSlips_TotalEstimatedCost", "[TotalEstimatedCost] >= 0");
-                        });
+                    b.ToTable("OrderSlips");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlipItem", b =>
@@ -664,13 +530,6 @@ namespace StockSense.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("AverageDailyDemandSnapshot")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<int>("BackorderStockSnapshot")
-                        .HasColumnType("int");
 
                     b.Property<string>("Brand")
                         .IsRequired()
@@ -685,39 +544,10 @@ namespace StockSense.Infrastructure.Migrations
                     b.Property<int>("CurrentStock")
                         .HasColumnType("int");
 
-                    b.Property<int>("CurrentStockSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("EstimatedLineTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("IncomingStockSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<int>("InventoryPositionSnapshot")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsPredictedHighDemand")
                         .HasColumnType("bit");
 
-                    b.Property<decimal>("LeadTimeDaysSnapshot")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<int>("MinimumOrderQuantitySnapshot")
-                        .HasColumnType("int");
-
                     b.Property<int>("OrderSlipId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("OrderedQuantity")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PackageSizeSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProductId")
                         .HasColumnType("int");
 
                     b.Property<string>("ProductName")
@@ -734,50 +564,14 @@ namespace StockSense.Infrastructure.Migrations
                     b.Property<int>("ReceivedQuantity")
                         .HasColumnType("int");
 
-                    b.Property<string>("RecommendationReason")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("ReorderPointSnapshot")
-                        .HasColumnType("int");
-
                     b.Property<int>("ReorderTarget")
                         .HasColumnType("int");
 
-                    b.Property<int>("ReservedStockSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SafetyStockSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SuggestedQuantity")
-                        .HasColumnType("int");
-
-                    b.Property<int>("TargetStockSnapshot")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("UnitCostSnapshot")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("OrderSlipId");
 
-                    b.HasIndex("OrderSlipId", "ProductId")
-                        .IsUnique();
-
-                    b.ToTable("OrderSlipItems", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_OrderSlipItems_Amounts", "[UnitCostSnapshot] >= 0 AND [EstimatedLineTotal] >= 0");
-
-                            t.HasCheckConstraint("CK_OrderSlipItems_OrderRules", "[PackageSizeSnapshot] >= 1 AND [MinimumOrderQuantitySnapshot] >= 1");
-
-                            t.HasCheckConstraint("CK_OrderSlipItems_Quantities", "[OrderedQuantity] > 0 AND [SuggestedQuantity] >= 0 AND [ReceivedQuantity] >= 0 AND [ReceivedQuantity] <= [OrderedQuantity]");
-
-                            t.HasCheckConstraint("CK_OrderSlipItems_StockSnapshots", "[CurrentStockSnapshot] >= 0 AND [IncomingStockSnapshot] >= 0 AND [ReservedStockSnapshot] >= 0 AND [BackorderStockSnapshot] >= 0");
-                        });
+                    b.ToTable("OrderSlipItems");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.PinnedSlip", b =>
@@ -856,11 +650,11 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.Property<string>("Brand")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Category")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("CurrentStock")
                         .HasColumnType("int");
@@ -874,301 +668,19 @@ namespace StockSense.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("ReorderTarget")
                         .HasColumnType("int");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
                     b.Property<int?>("SupplierId")
                         .HasColumnType("int");
-
-                    b.Property<decimal>("UnitCost")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
 
                     b.HasKey("Id");
 
                     b.HasIndex("SupplierId");
 
-                    b.HasIndex("Category", "Brand");
-
                     b.ToTable("Products");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.ProductInventoryMetric", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("AverageDailyDemand")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<decimal>("AverageLeadTimeDays")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<string>("CalculationReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("CalculationStage")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("CalculationVersion")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("ConfidenceLevel")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<decimal>("DemandStandardDeviation")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<DateTime>("LastCalculatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("LeadTimeStandardDeviation")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<string>("LocationId")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<int>("SafetyStock")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("TargetStock")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("TotalObservedDemand")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("UsableDataDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId", "LocationId")
-                        .IsUnique();
-
-                    b.ToTable("ProductInventoryMetrics", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ProductInventoryMetrics_Confidence", "[ConfidenceLevel] IN ('Low','Medium','High')");
-
-                            t.HasCheckConstraint("CK_ProductInventoryMetrics_Demand", "[AverageDailyDemand] >= 0 AND [DemandStandardDeviation] >= 0 AND [TotalObservedDemand] >= 0 AND [UsableDataDays] >= 0");
-
-                            t.HasCheckConstraint("CK_ProductInventoryMetrics_LeadTime", "[AverageLeadTimeDays] >= 0 AND [LeadTimeStandardDeviation] >= 0");
-
-                            t.HasCheckConstraint("CK_ProductInventoryMetrics_Stage", "[CalculationStage] IN ('ColdStart','Learning','DataDriven','Manual')");
-
-                            t.HasCheckConstraint("CK_ProductInventoryMetrics_Stock", "[SafetyStock] >= 0 AND [TargetStock] >= 0");
-                        });
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.ProductInventorySetting", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BufferDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(7);
-
-                    b.Property<string>("CalculationMode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasDefaultValue("Auto");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("DefaultLeadTimeDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(7);
-
-                    b.Property<decimal>("InitialEstimatedWeeklyDemand")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<DateTime>("InventoryTrackingStartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsAutomaticOrderEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("LocationId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasDefaultValue("MAIN");
-
-                    b.Property<int?>("ManualReorderPoint")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ManualSafetyStock")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("MaximumSafetyStock")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("MaximumStockLevel")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MinimumOrderQuantity")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
-
-                    b.Property<int>("MinimumSafetyStock")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("PackageSize")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ReviewPeriodDays")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(7);
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<decimal>("ServiceLevel")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(6, 4)
-                        .HasColumnType("decimal(6,4)")
-                        .HasDefaultValue(0.9500m);
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId", "LocationId")
-                        .IsUnique();
-
-                    b.ToTable("ProductInventorySettings", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ProductInventorySettings_Demand", "[InitialEstimatedWeeklyDemand] >= 0");
-
-                            t.HasCheckConstraint("CK_ProductInventorySettings_LeadReviewBuffer", "[DefaultLeadTimeDays] >= 1 AND [ReviewPeriodDays] >= 1 AND [BufferDays] >= 0");
-
-                            t.HasCheckConstraint("CK_ProductInventorySettings_ManualValues", "([ManualSafetyStock] IS NULL OR [ManualSafetyStock] >= 0) AND ([ManualReorderPoint] IS NULL OR [ManualReorderPoint] >= 0)");
-
-                            t.HasCheckConstraint("CK_ProductInventorySettings_Mode", "[CalculationMode] IN ('Auto', 'Manual')");
-
-                            t.HasCheckConstraint("CK_ProductInventorySettings_OrderRules", "[MinimumOrderQuantity] >= 1 AND [PackageSize] >= 1 AND ([MaximumStockLevel] IS NULL OR [MaximumStockLevel] > 0)");
-
-                            t.HasCheckConstraint("CK_ProductInventorySettings_SafetyLimits", "[MinimumSafetyStock] >= 0 AND ([MaximumSafetyStock] IS NULL OR [MaximumSafetyStock] >= [MinimumSafetyStock])");
-
-                            t.HasCheckConstraint("CK_ProductInventorySettings_ServiceLevel", "[ServiceLevel] >= 0.5000 AND [ServiceLevel] <= 0.9990");
-                        });
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.ReportingProduct", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Brand")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name");
-
-                    b.ToTable("ReportingProducts", (string)null);
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.SalesHistory", b =>
@@ -1217,70 +729,6 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("SalesHistory");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.SalesImportBatch", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("CompletedAtUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<string>("ContentSha256")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nchar(64)")
-                        .IsFixedLength();
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("nvarchar(260)");
-
-                    b.Property<int>("ReportingProductsCreated")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RowsInserted")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RowsRead")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RowsUpdated")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SourceSystem")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("StartedAtUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SourceSystem", "ContentSha256")
-                        .IsUnique();
-
-                    b.ToTable("SalesImportBatches", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_SalesImportBatches_RowCounts", "[RowsRead] >= 0 AND [RowsInserted] >= 0 AND [RowsUpdated] >= 0 AND [ReportingProductsCreated] >= 0");
-                        });
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.StoreService", b =>
@@ -1382,89 +830,19 @@ namespace StockSense.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<string>("InvoiceNumber")
                         .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("LocationId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasDefaultValue("MAIN");
-
-                    b.Property<int?>("OrderSlipId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PaymentMethod")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasDefaultValue("Cash");
-
-                    b.Property<string>("ReferenceNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Remarks")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<decimal>("ServiceAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("TotalAmount")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("TransactionType")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasDefaultValue("Sale");
-
-                    b.Property<string>("UserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("InvoiceNumber")
-                        .IsUnique();
-
-                    b.HasIndex("LocationId");
-
-                    b.HasIndex("OrderSlipId");
-
-                    b.HasIndex("TransactionDate");
-
-                    b.HasIndex("TransactionType");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("TransactionType", "TransactionDate");
-
-                    b.HasIndex("LocationId", "TransactionType", "TransactionDate");
-
-                    b.ToTable("Transactions", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Transactions_DiscountAmount", "[DiscountAmount] >= 0");
-
-                            t.HasCheckConstraint("CK_Transactions_ServiceAmount", "[ServiceAmount] >= 0");
-
-                            t.HasCheckConstraint("CK_Transactions_TotalAmount", "[TotalAmount] >= 0");
-                        });
+                    b.ToTable("Transactions");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.TransactionItem", b =>
@@ -1475,78 +853,27 @@ namespace StockSense.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("LineTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("LostSalesQuantity")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<int?>("OrderSlipItemId")
-                        .HasColumnType("int");
-
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
-                    b.Property<int?>("RequestedQuantity")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StockAfter")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StockBefore")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("StockoutOccurred")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
                     b.Property<int>("TransactionId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("UnitCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderSlipItemId");
-
-                    b.HasIndex("ProductId");
-
                     b.HasIndex("TransactionId");
 
-                    b.HasIndex("TransactionId", "ProductId");
-
-                    b.ToTable("TransactionItems", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_TransactionItems_Amounts", "[UnitPrice] >= 0 AND [UnitCost] >= 0 AND [DiscountAmount] >= 0 AND [LineTotal] >= 0");
-
-                            t.HasCheckConstraint("CK_TransactionItems_DemandAudit", "[LostSalesQuantity] >= 0 AND ([RequestedQuantity] IS NULL OR [RequestedQuantity] >= [Quantity])");
-
-                            t.HasCheckConstraint("CK_TransactionItems_Quantity", "[Quantity] > 0");
-
-                            t.HasCheckConstraint("CK_TransactionItems_StockAudit", "[StockBefore] >= 0 AND [StockAfter] >= 0");
-                        });
+                    b.ToTable("TransactionItem");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.UpgradeCategory", b =>
@@ -1588,6 +915,9 @@ namespace StockSense.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("PartCount")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -1908,73 +1238,6 @@ namespace StockSense.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("StockSense.Domain.Entities.Appointment", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.Transaction", "Transaction")
-                        .WithOne()
-                        .HasForeignKey("StockSense.Domain.Entities.Appointment", "TransactionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Transaction");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.BuildRequest", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.Transaction", "Transaction")
-                        .WithOne()
-                        .HasForeignKey("StockSense.Domain.Entities.BuildRequest", "TransactionId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Transaction");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.HistoricalMonthlyProductSale", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.ReportingProduct", "ReportingProduct")
-                        .WithMany("HistoricalMonthlySales")
-                        .HasForeignKey("ReportingProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("StockSense.Domain.Entities.SalesImportBatch", "SalesImportBatch")
-                        .WithMany("HistoricalMonthlySales")
-                        .HasForeignKey("SalesImportBatchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ReportingProduct");
-
-                    b.Navigation("SalesImportBatch");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.HistoricalProductMapping", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.ReportingProduct", "ReportingProduct")
-                        .WithMany("HistoricalMappings")
-                        .HasForeignKey("ReportingProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ReportingProduct");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.LiveProductMapping", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.Product", "Product")
-                        .WithOne()
-                        .HasForeignKey("StockSense.Domain.Entities.LiveProductMapping", "ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("StockSense.Domain.Entities.ReportingProduct", "ReportingProduct")
-                        .WithOne("LiveProductMapping")
-                        .HasForeignKey("StockSense.Domain.Entities.LiveProductMapping", "ReportingProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-
-                    b.Navigation("ReportingProduct");
             modelBuilder.Entity("StockSense.Domain.Entities.CustomerBuild", b =>
                 {
                     b.HasOne("StockSense.Domain.Entities.BikeModel", "BikeModel")
@@ -1995,7 +1258,7 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasOne("StockSense.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Supplier");
@@ -2003,90 +1266,29 @@ namespace StockSense.Infrastructure.Migrations
 
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlipItem", b =>
                 {
-                    b.HasOne("StockSense.Domain.Entities.OrderSlip", "OrderSlip")
+                    b.HasOne("StockSense.Domain.Entities.OrderSlip", null)
                         .WithMany("Items")
                         .HasForeignKey("OrderSlipId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("StockSense.Domain.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("OrderSlip");
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Product", b =>
                 {
                     b.HasOne("StockSense.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("SupplierId");
 
                     b.Navigation("Supplier");
                 });
 
-            modelBuilder.Entity("StockSense.Domain.Entities.ProductInventoryMetric", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.Product", "Product")
-                        .WithMany("InventoryMetrics")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.ProductInventorySetting", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.Product", "Product")
-                        .WithMany("InventorySettings")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.Transaction", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.OrderSlip", "OrderSlip")
-                        .WithMany("PurchaseReceipts")
-                        .HasForeignKey("OrderSlipId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("StockSense.Infrastructure.Data.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("OrderSlip");
-                });
-
             modelBuilder.Entity("StockSense.Domain.Entities.TransactionItem", b =>
                 {
-                    b.HasOne("StockSense.Domain.Entities.OrderSlipItem", "OrderSlipItem")
-                        .WithMany("ReceiptItems")
-                        .HasForeignKey("OrderSlipItemId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("StockSense.Domain.Entities.Product", null)
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("StockSense.Domain.Entities.Transaction", "Transaction")
                         .WithMany("Items")
                         .HasForeignKey("TransactionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("OrderSlipItem");
 
                     b.Navigation("Transaction");
                 });
@@ -2129,34 +1331,6 @@ namespace StockSense.Infrastructure.Migrations
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlip", b =>
                 {
                     b.Navigation("Items");
-
-                    b.Navigation("PurchaseReceipts");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.OrderSlipItem", b =>
-                {
-                    b.Navigation("ReceiptItems");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.Product", b =>
-                {
-                    b.Navigation("InventoryMetrics");
-
-                    b.Navigation("InventorySettings");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.ReportingProduct", b =>
-                {
-                    b.Navigation("HistoricalMappings");
-
-                    b.Navigation("HistoricalMonthlySales");
-
-                    b.Navigation("LiveProductMapping");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.SalesImportBatch", b =>
-                {
-                    b.Navigation("HistoricalMonthlySales");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Transaction", b =>

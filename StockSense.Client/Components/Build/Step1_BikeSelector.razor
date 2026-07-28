@@ -1,0 +1,333 @@
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+
+<div class="tuner-step">
+    @* Hero banner *@
+    <div class="tuner-hero">
+        <div class="hero-content">
+            <span class="hero-label">STEP 1</span>
+            <h1 class="hero-title">SELECT YOUR MACHINE</h1>
+            <p class="hero-sub">Choose your base motorcycle to unlock compatible performance upgrades</p>
+        </div>
+        <div class="hero-silhouette">
+            <svg viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M30 90 L40 50 L60 35 L90 30 L110 35 L140 50 L160 50 L170 55 L175 70 L170 80 L160 85 L155 90 L150 95 L140 85 L130 80 L120 85 L110 95 L100 100 L90 95 L80 85 L70 80 L60 85 L50 95 L40 90 Z" fill="currentColor" opacity="0.12"/>
+                <circle cx="60" cy="85" r="12" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+                <circle cx="140" cy="85" r="12" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+                <line x1="70" y1="38" x2="75" y2="30" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+                <line x1="80" y1="35" x2="82" y2="27" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+                <line x1="90" y1="33" x2="90" y2="25" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+                <line x1="100" y1="35" x2="98" y2="27" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+                <line x1="110" y1="38" x2="105" y2="30" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+            </svg>
+        </div>
+    </div>
+
+    @* Search bar *@
+    <div class="tuner-search">
+        <span class="search-cta">&#128269;</span>
+        <input type="text"
+               placeholder="Search by brand or model name..."
+               @bind="BikeSearchTerm"
+               @bind:after="() => OnBikeSearch.InvokeAsync(BikeSearchTerm)"
+               class="tuner-search-input" />
+    </div>
+
+    @if (AvailableBrands.Count == 0)
+    {
+        <div class="tuner-empty">
+            <p>No motorcycles found. Add active bike models to the build catalog, then refresh this page.</p>
+        </div>
+    }
+
+    @* --- STEP 1: BRAND STRIP --- *@
+    @if (string.IsNullOrEmpty(SelectedBrand))
+    {
+        <div class="brand-strip">
+            @foreach (var brand in AvailableBrands)
+            {
+                <button class="brand-chip" @onclick="() => SelectBrand(brand)">
+                    <span class="brand-dot" style="background: @GetBrandColor(brand)"></span>
+                    <span class="brand-name">@brand</span>
+                </button>
+            }
+        </div>
+    }
+
+    @* --- STEP 2: MODEL GRID --- *@
+    @if (!string.IsNullOrEmpty(SelectedBrand) && string.IsNullOrEmpty(SelectedModel))
+    {
+        <div class="model-grid">
+            <div class="grid-header">
+                <span class="grid-step-label">STEP 2</span>
+                <h2 class="grid-title">Choose Model</h2>
+                <button class="chip-clear" @onclick="ClearBrand">&#10005; @SelectedBrand</button>
+            </div>
+            @foreach (var model in ModelsForBrand)
+            {
+                var bikesInModel = BikesForModelByModel(model);
+                var first = bikesInModel.FirstOrDefault();
+                <button class="model-card" @onclick="() => SelectModel(model)">
+                    <div class="model-info">
+                        <span class="model-name">@model</span>
+                        @if (first != null)
+                        {
+                            <div class="model-stats">
+                                <span class="stat-item"><span class="stat-num">@first.BaseCC</span> cc</span>
+                                <span class="stat-divider">|</span>
+                                <span class="stat-item"><span class="stat-num">@first.BaseHP</span> HP</span>
+                                <span class="stat-divider">|</span>
+                                <span class="stat-item"><span class="stat-num">@first.BaseTorque</span> Nm</span>
+                            </div>
+                            <div class="model-years">
+                                <span class="year-pill">@first.YearStart – @first.YearEnd</span>
+                                @if (!string.IsNullOrEmpty(first.EngineCode))
+                                {
+                                    <span class="engine-pill">@first.EngineCode</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <span class="model-arrow">&#8594;</span>
+                </button>
+            }
+        </div>
+    }
+
+    @* --- STEP 3: YEAR/VERSION CHIPS --- *@
+    @if (!string.IsNullOrEmpty(SelectedModel))
+    {
+        <div class="year-section">
+            <div class="grid-header">
+                <span class="grid-step-label">STEP 3</span>
+                <h2 class="grid-title">Select Version</h2>
+                <button class="chip-clear" @onclick="ClearBrand">&#10005; @SelectedBrand</button>
+                <button class="chip-clear chip-clear-2" @onclick="ClearModel">&#10005; @SelectedModel</button>
+            </div>
+            <div class="year-strip">
+                @foreach (var bike in BikesForModel)
+                {
+                    <button class="year-chip @(SelectedBikeId == bike.Id ? "selected" : "")"
+                            @onclick="() => SelectBike(bike.Id)">
+                        <span class="year-range">@bike.YearStart – @bike.YearEnd</span>
+                        @if (!string.IsNullOrEmpty(bike.EngineCode))
+                        {
+                            <span class="engine-pill">@bike.EngineCode</span>
+                        }
+                    </button>
+                }
+            </div>
+        </div>
+    }
+
+    @* Selected bike banner *@
+    @if (SelectedBikeId > 0 && SelectedBike != null)
+    {
+        <div class="selected-banner">
+            <div class="banner-badge">CONFIRMED</div>
+            <div class="banner-body">
+                <div class="banner-icon-box">
+                    <svg viewBox="0 0 40 24" fill="none" width="40" height="24">
+                        <path d="M6 18 L8 10 L12 7 L18 6 L22 7 L28 10 L32 10 L34 11 L35 14 L34 16 L32 17 L31 18 L30 19 L28 17 L26 16 L24 17 L22 19 L20 20 L18 19 L16 17 L14 16 L12 17 L10 19 L8 18 Z" fill="var(--tuning-red)" opacity="0.3"/>
+                    </svg>
+                </div>
+                <div class="banner-info">
+                    <strong class="banner-name">@SelectedBike.Brand @SelectedBike.Model</strong>
+                    <div class="banner-specs">
+                        <span class="spec">@SelectedBike.BaseCC cc</span>
+                        <span class="spec-divider">&#8226;</span>
+                        <span class="spec">@SelectedBike.BaseHP HP</span>
+                        <span class="spec-divider">&#8226;</span>
+                        <span class="spec">@SelectedBike.BaseTorque Nm</span>
+                        <span class="spec-divider">&#8226;</span>
+                        <span class="spec">@SelectedBike.YearStart – @SelectedBike.YearEnd</span>
+                        @if (!string.IsNullOrEmpty(SelectedBike.EngineCode))
+                        {
+                            <span class="spec engine-spec">@SelectedBike.EngineCode</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .tuner-step { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-4); }
+
+    .tuner-hero { position: relative; background: var(--tuning-surface); border: 1px solid var(--tuning-border); border-radius: var(--radius-xl); padding: var(--space-6) var(--space-6); overflow: hidden; display: flex; justify-content: space-between; align-items: center; }
+    .hero-content { z-index: 1; }
+    .hero-label { font-family: var(--tuning-mono); font-size: 10px; font-weight: 700; color: var(--tuning-red); letter-spacing: 0.15em; margin-bottom: var(--space-2); display: block; }
+    .hero-title { font-size: var(--text-xl); font-weight: 900; color: var(--foreground); margin: 0; letter-spacing: -0.02em; }
+    .hero-sub { font-size: var(--text-xs); color: var(--muted-foreground); margin: var(--space-1) 0 0 0; max-width: 320px; }
+    .hero-silhouette { color: var(--foreground); flex-shrink: 0; width: 140px; opacity: 0.8; }
+    .hero-silhouette svg { width: 100%; height: auto; }
+
+    .tuner-search { position: relative; }
+    .tuner-search-input { width: 100%; padding: 12px 14px 12px 40px; border-radius: var(--radius-xl); border: 1px solid var(--tuning-border); background: var(--tuning-surface); color: var(--foreground); font-size: var(--text-sm); font-family: var(--font-sans); box-sizing: border-box; transition: border 0.2s; }
+    .tuner-search-input:focus { border-color: var(--tuning-red); outline: none; box-shadow: var(--tuning-glow-red); }
+    .tuner-search-input::placeholder { color: var(--muted-foreground); opacity: 0.6; }
+    .search-cta { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; opacity: 0.5; pointer-events: none; }
+
+    .tuner-empty { text-align: center; padding: var(--space-8); color: var(--muted-foreground); font-size: var(--text-sm); background: var(--tuning-surface); border: 1px dashed var(--tuning-border); border-radius: var(--radius-xl); }
+
+    .brand-strip { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .brand-chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: 10px 20px; border-radius: 9999px; border: 1px solid var(--tuning-border); background: var(--tuning-surface); color: var(--foreground); cursor: pointer; font-family: inherit; font-size: var(--text-sm); font-weight: 700; transition: all 0.15s; }
+    .brand-chip:hover { border-color: var(--tuning-red); background: color-mix(in oklch, var(--tuning-red) 15%, var(--tuning-surface)); box-shadow: var(--tuning-glow-red); }
+    .brand-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .brand-name { letter-spacing: 0.02em; }
+
+    .grid-header { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+    .grid-step-label { font-family: var(--tuning-mono); font-size: 9px; font-weight: 700; color: var(--tuning-red); letter-spacing: 0.12em; background: color-mix(in oklch, var(--tuning-red) 12%, transparent); padding: 2px 8px; border-radius: 4px; }
+    .grid-title { font-size: var(--text-base); font-weight: 800; color: var(--foreground); margin: 0; }
+    .chip-clear { font-family: var(--tuning-mono); font-size: 10px; padding: 3px 10px; border-radius: 9999px; border: 1px solid var(--tuning-border); background: transparent; color: var(--muted-foreground); cursor: pointer; transition: all 0.15s; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+    .chip-clear:hover { border-color: var(--tuning-red); color: var(--tuning-red); }
+    .chip-clear-2 { margin-left: 0; }
+
+    .model-grid { background: var(--tuning-surface); border: 1px solid var(--tuning-border); border-radius: var(--radius-xl); padding: var(--space-4); }
+    .model-card { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); border: 1px solid transparent; background: transparent; color: var(--foreground); cursor: pointer; font-family: inherit; text-align: left; transition: all 0.15s; margin-bottom: var(--space-2); }
+    .model-card:last-child { margin-bottom: 0; }
+    .model-card:hover { background: color-mix(in oklch, var(--tuning-red) 8%, var(--tuning-surface)); border-color: var(--tuning-border); }
+    .model-info { display: flex; flex-direction: column; gap: var(--space-1); }
+    .model-name { font-size: var(--text-base); font-weight: 700; }
+    .model-stats { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--muted-foreground); }
+    .stat-item { display: inline-flex; align-items: center; gap: 2px; }
+    .stat-num { font-family: var(--tuning-mono); font-weight: 700; color: var(--foreground); }
+    .stat-divider { opacity: 0.3; }
+    .model-years { display: flex; gap: var(--space-1); align-items: center; margin-top: 2px; }
+    .model-arrow { font-size: var(--text-lg); color: var(--muted-foreground); transition: transform 0.15s; opacity: 0.4; }
+    .model-card:hover .model-arrow { transform: translateX(4px); opacity: 1; color: var(--tuning-red); }
+
+    .year-section { background: var(--tuning-surface); border: 1px solid var(--tuning-border); border-radius: var(--radius-xl); padding: var(--space-4); }
+    .year-strip { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .year-chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: 10px 18px; border-radius: var(--radius-lg); border: 1px solid var(--tuning-border); background: transparent; color: var(--foreground); cursor: pointer; font-family: inherit; transition: all 0.15s; }
+    .year-chip:hover { border-color: var(--tuning-red); background: color-mix(in oklch, var(--tuning-red) 10%, transparent); }
+    .year-chip.selected { border-color: var(--tuning-red); background: var(--tuning-red); color: white; box-shadow: var(--tuning-glow-red); }
+    .year-chip.selected .engine-pill { background: rgba(255,255,255,0.2); color: white; }
+    .year-range { font-size: var(--text-sm); font-weight: 700; }
+    .engine-pill { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: color-mix(in oklch, var(--tuning-red) 12%, transparent); color: var(--tuning-red); font-family: var(--tuning-mono); }
+
+    .selected-banner { background: var(--tuning-surface); border: 1px solid var(--tuning-red); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--tuning-glow-red); }
+    .banner-badge { font-family: var(--tuning-mono); font-size: 9px; font-weight: 800; letter-spacing: 0.15em; background: var(--tuning-red); color: white; padding: 3px var(--space-4); text-align: center; }
+    .banner-body { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+    .banner-icon-box { flex-shrink: 0; }
+    .banner-info { display: flex; flex-direction: column; gap: 2px; }
+    .banner-name { font-size: var(--text-base); color: var(--foreground); }
+    .banner-specs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--muted-foreground); }
+    .spec { font-family: var(--tuning-mono); font-weight: 600; }
+    .spec-divider { opacity: 0.3; }
+    .engine-spec { background: color-mix(in oklch, var(--tuning-red) 12%, transparent); color: var(--tuning-red); padding: 1px 6px; border-radius: 4px; }
+
+    @@media (max-width: 600px) {
+        .tuner-hero { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+        .hero-silhouette { width: 100px; align-self: flex-end; }
+        .brand-strip { gap: var(--space-1); }
+        .brand-chip { padding: 8px 14px; font-size: var(--text-xs); }
+        .model-card { padding: var(--space-2) var(--space-3); }
+        .model-stats { font-size: 11px; }
+        .year-chip { padding: 8px 14px; }
+    }
+</style>
+
+@code {
+    [Parameter] public List<BikeModel> BikeModels { get; set; } = new();
+    [Parameter] public int SelectedBikeId { get; set; }
+    [Parameter] public EventCallback<int> OnBikeSelected { get; set; }
+    [Parameter] public string BikeSearchTerm { get; set; } = "";
+    [Parameter] public EventCallback<string> OnBikeSearch { get; set; }
+
+    private string SelectedBrand = "";
+    private string SelectedModel = "";
+
+    private BikeModel? SelectedBike => BikeModels.FirstOrDefault(b => b.Id == SelectedBikeId);
+
+    private List<BikeModel> FilteredBikes => string.IsNullOrWhiteSpace(BikeSearchTerm)
+        ? BikeModels
+        : BikeModels.Where(b =>
+            b.Brand.Contains(BikeSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+            b.Model.Contains(BikeSearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private List<string> AvailableBrands => FilteredBikes
+        .Select(b => b.Brand)
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    private List<string> ModelsForBrand => string.IsNullOrEmpty(SelectedBrand)
+        ? new()
+        : FilteredBikes
+            .Where(b => b.Brand == SelectedBrand)
+            .Select(b => b.Model)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+    private List<BikeModel> BikesForModel => string.IsNullOrEmpty(SelectedModel)
+        ? new()
+        : FilteredBikes
+            .Where(b => b.Brand == SelectedBrand && b.Model == SelectedModel)
+            .OrderBy(b => b.YearStart)
+            .ToList();
+
+    private List<BikeModel> BikesForModelByModel(string model) =>
+        FilteredBikes.Where(b => b.Brand == SelectedBrand && b.Model == model).OrderBy(b => b.YearStart).ToList();
+
+    private string GetBrandColor(string brand) => brand switch
+    {
+        "Yamaha" => "#0057B8",
+        "Honda" => "#CC0000",
+        "Suzuki" => "#FF6600",
+        "Kymco" => "#003399",
+        "Vespa" => "#006847",
+        "SYM" => "#C41E3A",
+        _ => "var(--tuning-red)"
+    };
+
+    private void SelectBrand(string brand)
+    {
+        SelectedBrand = brand;
+        SelectedModel = "";
+        if (SelectedBikeId > 0)
+        {
+            SelectedBikeId = 0;
+            OnBikeSelected.InvokeAsync(0);
+        }
+    }
+
+    private void ClearBrand()
+    {
+        SelectedBrand = "";
+        SelectedModel = "";
+        if (SelectedBikeId > 0)
+        {
+            SelectedBikeId = 0;
+            OnBikeSelected.InvokeAsync(0);
+        }
+    }
+
+    private void SelectModel(string model)
+    {
+        SelectedModel = model;
+        if (SelectedBikeId > 0)
+        {
+            SelectedBikeId = 0;
+            OnBikeSelected.InvokeAsync(0);
+        }
+    }
+
+    private void ClearModel()
+    {
+        SelectedModel = "";
+        if (SelectedBikeId > 0)
+        {
+            SelectedBikeId = 0;
+            OnBikeSelected.InvokeAsync(0);
+        }
+    }
+
+    private void SelectBike(int bikeId)
+    {
+        SelectedBikeId = bikeId;
+        OnBikeSelected.InvokeAsync(bikeId);
+    }
+}

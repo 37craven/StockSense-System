@@ -1,0 +1,94 @@
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+
+<div class="spec-gauge">
+    <div class="gauge-header">
+        <span class="gauge-label">@Label</span>
+        <span class="gauge-value">@Value @Unit</span>
+    </div>
+    <div class="gauge-bar">
+        <div class="gauge-fill" style="width: @FillPercent%; background: @GetColor();"></div>
+    </div>
+    <div class="gauge-base">
+        <span>Stock: @Base @Unit</span>
+        <span class="gauge-gain">Gain: +@(Value - Base) @Unit</span>
+    </div>
+</div>
+
+<style>
+    .spec-gauge {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: var(--space-3);
+    }
+
+    .gauge-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 4px;
+    }
+
+    .gauge-label {
+        font-size: var(--text-xs);
+        font-weight: var(--font-medium);
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .gauge-value {
+        font-size: var(--text-xl);
+        font-weight: 900;
+        color: var(--foreground);
+    }
+
+    .gauge-bar {
+        height: 6px;
+        width: 100%;
+        background: var(--muted);
+        border-radius: 3px;
+        overflow: hidden;
+        margin: var(--space-2) 0;
+    }
+
+    .gauge-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
+    .gauge-base {
+        display: flex;
+        justify-content: space-between;
+        font-size: var(--text-xs);
+        color: var(--muted-foreground);
+    }
+
+    .gauge-gain {
+        font-weight: bold;
+        color: var(--primary);
+    }
+</style>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public int Value { get; set; }
+    [Parameter] public string Unit { get; set; } = "";
+    [Parameter] public int Base { get; set; }
+    [Parameter] public int Max { get; set; } = 100;
+    [Parameter] public string Color { get; set; } = "primary";
+
+    private double FillPercent => Math.Clamp((double)Value / Max * 100, 0, 100);
+
+    private string GetColor() => Color switch
+    {
+        "primary" => "var(--primary)",
+        "amber" => "#f59e0b",
+        "emerald" => "#10b981",
+        "green" => "#10b981",
+        "red" => "var(--destructive)",
+        _ => "var(--primary)"
+    };
+}

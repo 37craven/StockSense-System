@@ -1,0 +1,33 @@
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+
+<div class="parts-grid">
+    @foreach (var part in Parts)
+    {
+        <PartCard Part="part" 
+                  IsSelected="IsSelected(part.Id)" 
+                  IsOutOfStock="IsOutOfStock(part)" 
+                  IsBlocked="BlockedPartIds.Contains(part.Id)"
+                  OnTogglePart="OnTogglePart" 
+                  ValidationResult="ValidationResult" />
+    }
+</div>
+
+<style>
+    .parts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: var(--space-4);
+    }
+</style>
+
+@code {
+    [Parameter] public List<UpgradePart> Parts { get; set; } = new();
+    [Parameter] public HashSet<int> SelectedPartIds { get; set; } = new();
+    [Parameter] public ValidationResult? ValidationResult { get; set; }
+    [Parameter] public EventCallback<int> OnTogglePart { get; set; }
+    [Parameter] public HashSet<int> BlockedPartIds { get; set; } = new();
+
+    private bool IsSelected(int partId) => SelectedPartIds.Contains(partId);
+    private bool IsOutOfStock(UpgradePart part) => part.Product?.CurrentStock <= 0;
+}

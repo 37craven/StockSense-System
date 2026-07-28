@@ -28,13 +28,22 @@ namespace StockSense.Infrastructure.Data
         public DbSet<LiveProductMapping> LiveProductMappings { get; set; }
         public DbSet<HistoricalMonthlyProductSale> HistoricalMonthlyProductSales { get; set; }
         public DbSet<SalesImportBatch> SalesImportBatches { get; set; }
+        public DbSet<UpgradeCategory> UpgradeCategories { get; set; }
+        public DbSet<BikeModel> BikeModels { get; set; }
+        public DbSet<UpgradeStage> UpgradeStages { get; set; }
+        public DbSet<UpgradePart> UpgradeParts { get; set; }
+        public DbSet<SynergyRule> SynergyRules { get; set; }
+        public DbSet<CustomerBuild> CustomerBuilds { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
             builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
-        }
 
+            builder.Entity<UpgradePart>()
+                .Property(p => p.EstimatedLaborHours)
+                .HasPrecision(4, 2);
+        }
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
