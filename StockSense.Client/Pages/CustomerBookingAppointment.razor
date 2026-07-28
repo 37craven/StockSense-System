@@ -23,7 +23,7 @@
 
         @if (isLoading)
         {
-            <Spinner Description="syncing with the server..." />
+            <LoadingState FullPage="true" Description="syncing with the server..." />
         }
 
         <div class="appt-layout" style="display: @(isLoading ? "none" : "flex"); height: calc(100vh - 3.5rem); overflow: hidden; animation: fadeIn 0.4s ease-in;">

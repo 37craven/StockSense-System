@@ -199,8 +199,7 @@ using (var scope = app.Services.CreateScope())
         {
             context.Database.Migrate();
         }
-
-if (context.Database.CanConnect())
+        if (context.Database.CanConnect())
         {
             var importer = services.GetRequiredService<IHistoricalSalesImporter>();
             await importer.ImportBundledDatasetAsync();
@@ -216,7 +215,6 @@ if (context.Database.CanConnect())
     {
         app.Logger.LogCritical(ex, "Database migration or startup import failed. Application startup is stopping.");
         throw;
-    }
     }
 }
 

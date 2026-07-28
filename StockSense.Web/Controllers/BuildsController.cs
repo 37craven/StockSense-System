@@ -20,15 +20,18 @@ public class BuildsController : ControllerBase
     private readonly BuildRequestRepository _buildRepo;
     private readonly IWorkOrderCheckoutService _checkoutService;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ApplicationDbContext _context;
 
     public BuildsController(
         BuildRequestRepository buildRepo,
         IWorkOrderCheckoutService checkoutService,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        ApplicationDbContext context)
     {
         _buildRepo = buildRepo;
         _checkoutService = checkoutService;
         _userManager = userManager;
+        _context = context;
     }
 
     [HttpPost]
@@ -83,6 +86,44 @@ public class BuildsController : ControllerBase
         build.Status = canonicalStatus;
         await _buildRepo.SaveChangesAsync();
         return Ok(new { message = "Status updated" });
+    }
+
+    [HttpPut("{id}/parts")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<IActionResult> UpdateParts(int id, [FromBody] List<int> productIds)
+    {
+        var build = await _buildRepo.GetByIdAsync(id);
+        if (build == null) return NotFound(ApiResponse.NotFound("Build"));
+
+        if (build.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled)
+            return BadRequest(ApiResponse.Error("Cannot modify parts on a completed or cancelled build."));
+
+        var products = await _context.Products
+            .Include(p => p.Supplier)
+            .Where(p => productIds.Contains(p.Id))
+            .ToListAsync();
+
+        if (products.Count != productIds.Count)
+            return BadRequest(ApiResponse.Error("One or more products not found."));
+
+        var partsJson = JsonSerializer.Serialize(products.Select(p => new
+        {
+            p.Id,
+            p.Name,
+            p.Category,
+            p.Brand,
+            p.Price,
+            p.CurrentStock,
+            p.ReorderTarget,
+            SupplierId = p.SupplierId ?? 0,
+            SupplierName = p.Supplier?.Name ?? "",
+            ImageUrl = p.ImageUrl ?? ""
+        }));
+
+        build.SelectedPartsJson = partsJson;
+        build.TotalPrice = products.Sum(p => p.Price);
+        await _buildRepo.SaveChangesAsync();
+        return Ok(new { message = "Parts updated.", totalPrice = build.TotalPrice });
     }
 
     [HttpPost("{id}/complete")]

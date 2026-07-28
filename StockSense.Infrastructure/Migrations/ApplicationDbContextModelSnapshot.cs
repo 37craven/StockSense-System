@@ -373,7 +373,6 @@ namespace StockSense.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.HistoricalMonthlyProductSale", b =>
-            modelBuilder.Entity("StockSense.Domain.Entities.CustomerBuild", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -474,6 +473,16 @@ namespace StockSense.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("LiveProductMappings", (string)null);
+                });
+
+            modelBuilder.Entity("StockSense.Domain.Entities.CustomerBuild", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
                     b.Property<int?>("BikeModelId")
                         .HasColumnType("int");
 
@@ -1975,6 +1984,8 @@ namespace StockSense.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("ReportingProduct");
+                });
+
             modelBuilder.Entity("StockSense.Domain.Entities.CustomerBuild", b =>
                 {
                     b.HasOne("StockSense.Domain.Entities.BikeModel", "BikeModel")

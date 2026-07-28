@@ -14,21 +14,19 @@
 <BbDialogProvider />
 
 <div class="flex flex-col gap-5">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h1 class="text-2xl font-bold text-foreground m-0">Safety Stock Dashboard</h1>
-            <p class="text-sm text-muted-foreground m-0 mt-1">Historical demand and inventory-policy calculations for the MAIN location.</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(busy || selectedIds.Count == 0)">
-                <LucideIcon Name="refresh-cw" Size="16" /> Recalculate selected
-            </BbButton>
-            <BbButton OnClick="RecalculateAll" Disabled="busy">
-                @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                <LucideIcon Name="calculator" Size="16" /> Recalculate all
-            </BbButton>
-        </div>
-    </div>
+    <PageHeader Title="Safety Stock Dashboard"
+                Subtitle="Historical demand and inventory-policy calculations for the MAIN location.">
+        <BbButton Variant="ButtonVariant.Default" OnClick="OpenNewProductModal">
+            <LucideIcon Name="package-plus" Size="16" /> New Product
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(busy || selectedIds.Count == 0)">
+            <LucideIcon Name="refresh-cw" Size="16" /> Recalculate selected
+        </BbButton>
+        <BbButton OnClick="RecalculateAll" Disabled="busy">
+            @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
+            <LucideIcon Name="calculator" Size="16" /> Recalculate all
+        </BbButton>
+    </PageHeader>
 
     @if (!string.IsNullOrWhiteSpace(message))
     {
@@ -88,7 +86,7 @@
 
     @if (rows == null)
     {
-        <div class="p-16 flex justify-center gap-3 text-muted-foreground"><BbSpinner /><span>Loading inventory metrics…</span></div>
+        <LoadingState Description="Loading inventory metrics…" />
     }
     else
     {
@@ -138,8 +136,7 @@
             <div class="p-8 flex flex-col items-center gap-3">
                 @if (string.IsNullOrWhiteSpace(settingsError))
                 {
-                    <BbSpinner />
-                    <span class="text-sm text-muted-foreground">Loading inventory settings...</span>
+                    <LoadingState Description="Loading inventory settings..." />
                 }
                 else
                 {
@@ -175,6 +172,87 @@
         }
     </BbDialogContent>
 </BbDialog>
+
+@* ── New Product Modal ── *@
+@if (showNewProductModal)
+{
+    <div @onclick="CloseNewProductModal" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-4);">
+        <div @onclick:stopPropagation style="background-color: var(--card); width: 520px; max-width: 100%; max-height: 88vh; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
+            <div style="padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0;">
+                <div>
+                    <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">New Product</h3>
+                    <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin-top: 4px;">Add a new product to inventory.</p>
+                </div>
+                <button @onclick="CloseNewProductModal" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: var(--space-1); border-radius: var(--radius); display: flex;">
+                    <LucideIcon Name="x" Size="18" />
+                </button>
+            </div>
+            <div style="padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-4);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Name</label>
+                        <input @bind="newProduct.Name" placeholder="Product name"
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Brand</label>
+                        <input @bind="newProduct.Brand" placeholder="Brand name"
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Category</label>
+                        <input @bind="newProduct.Category" placeholder="e.g. Engine, Brakes"
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Unit Price (₱)</label>
+                        <input type="number" step="0.01" @bind="newProduct.Price" placeholder="0.00"
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Unit Cost (₱)</label>
+                        <input type="number" step="0.01" @bind="newProduct.UnitCost" placeholder="0.00"
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Initial Stock</label>
+                        <input type="number" @bind="newProduct.InitialStock" placeholder="0"
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Safety Target</label>
+                        <input type="number" @bind="newProduct.ReorderTarget" placeholder="0"
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Image URL</label>
+                        <input @bind="newProduct.ImageUrl" placeholder="https://..."
+                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                    </div>
+                </div>
+            </div>
+            <div style="padding: var(--space-4) var(--space-6); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--space-2); flex-shrink: 0;">
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseNewProductModal">Cancel</BbButton>
+                <BbButton Variant="ButtonVariant.Default" OnClick="SaveNewProduct" Disabled="@(isSavingNewProduct)">
+                    @if (isSavingNewProduct)
+                    {
+                        <BbSpinner Size="SpinnerSize.Small" />
+                    }
+                    else
+                    {
+                        <span>Add Product</span>
+                    }
+                </BbButton>
+            </div>
+        </div>
+    </div>
+}
 
 <style>.field { width:100%; height:2.25rem; border:1px solid var(--input); border-radius:var(--radius); background:var(--background); color:var(--foreground); padding:0 var(--space-2); }</style>
 
@@ -294,4 +372,50 @@
     }
     private sealed class ApiError { public string? Error { get; set; } }
     private sealed record RecalculationOutcome(string ProductName, string Detail, bool IsError);
+
+    private bool showNewProductModal;
+    private bool isSavingNewProduct;
+    private CreateProductDto newProduct = new();
+
+    private void OpenNewProductModal()
+    {
+        newProduct = new();
+        showNewProductModal = true;
+    }
+
+    private void CloseNewProductModal()
+    {
+        showNewProductModal = false;
+    }
+
+    private async Task SaveNewProduct()
+    {
+        if (string.IsNullOrWhiteSpace(newProduct.Name)) return;
+        isSavingNewProduct = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/products", newProduct);
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<ProductDto>();
+                await LoadAsync();
+                CloseNewProductModal();
+
+                if (created != null)
+                {
+                    var safeName = string.Concat(created.Name.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
+                    await JS.InvokeVoidAsync("triggerDownload", $"api/products/{created.Id}/barcode-pdf", $"Barcode_{safeName}.pdf");
+                }
+            }
+            else
+            {
+                error = $"Create product failed ({(int)response.StatusCode}).";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        isSavingNewProduct = false;
+    }
 }

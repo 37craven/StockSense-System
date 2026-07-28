@@ -1,0 +1,45 @@
+@namespace StockSense.Client.Layout
+@inject NavigationManager Navigation
+
+<div class="flex flex-col gap-1 mb-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            @if (!string.IsNullOrEmpty(BackHref))
+            {
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                          OnClick='() => Navigation.NavigateTo(BackHref)'>
+                    <LucideIcon Name="arrow-left" Size="14" /> Back
+                </BbButton>
+            }
+            <div class="flex items-center gap-2 @(string.IsNullOrEmpty(BackHref) ? "" : "mt-2")">
+                <h1 class="text-2xl font-bold text-foreground m-0">@Title</h1>
+                @if (!string.IsNullOrEmpty(Badge))
+                {
+                    <span class="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap"
+                          style="background: @(BadgeColor ?? "var(--destructive)"); color: white;">
+                        @Badge
+                    </span>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(Subtitle))
+            {
+                <p class="text-sm text-muted-foreground m-0 mt-1">@Subtitle</p>
+            }
+        </div>
+        @if (ChildContent is not null)
+        {
+            <div class="flex flex-wrap gap-2">
+                @ChildContent
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? Badge { get; set; }
+    [Parameter] public string? BadgeColor { get; set; }
+    [Parameter] public string? BackHref { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
