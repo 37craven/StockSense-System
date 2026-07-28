@@ -11,22 +11,21 @@
 <PageTitle>Manage Services</PageTitle>
 
 <div>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); flex-wrap: wrap; gap: var(--space-3);">
-        <div>
-            <h1 style="font-size: var(--text-2xl); font-weight: var(--font-bold); color: var(--foreground); margin: 0;">Service Management</h1>
-            <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Define generic parts needed per service and link them to inventory products.</p>
-        </div>
+    <PageHeader Title="Service Management"
+                Subtitle="Define generic parts needed per service and link them to inventory products.">
         <BbButton Variant="ButtonVariant.Default" OnClick="OpenCreateModal">
             <LucideIcon Name="plus" Size="16"/>
             Create Service
         </BbButton>
-    </div>
+    </PageHeader>
 
     @if (services == null)
     {
-        <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
-            <LightSpinner Description="Loading Services..." />
-        </div>
+        <LoadingState Description="Loading Services..." />
+    }
+    else if (!services.Any())
+    {
+        <EmptyState Description="No services defined yet. Create one above." />
     }
     else
     {
@@ -140,7 +139,7 @@
                                 <div style="max-height: 200px; overflow-y: auto;">
                                     @if (allProducts == null)
                                     {
-                                        <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-sm);">Loading products...</div>
+                                        <LoadingState Description="Loading products..." />
                                     }
                                     else
                                     {
@@ -173,7 +172,7 @@
 
                                         @if (!filtered.Any())
                                         {
-                                            <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-sm);">No products match.</div>
+                                            <EmptyState Description="No products match." Title="" Icon="search-x" />
                                         }
                                     }
                                 </div>
@@ -192,10 +191,7 @@
                 }
                 else
                 {
-                    <div style="text-align: center; padding: var(--space-6); color: var(--muted-foreground); border: 1px dashed var(--border); border-radius: var(--radius);">
-                        <LucideIcon Name="package" Size="32" />
-                        <p style="font-size: var(--text-sm); margin: var(--space-2) 0 0 0;">No generic items defined yet. Add one above.</p>
-                    </div>
+                    <EmptyState Description="No generic items defined yet. Add one above." />
                 }
 
             </div>

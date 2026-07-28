@@ -11,11 +11,8 @@
 
 <PageTitle>System Management</PageTitle>
 
-<div>
-    <div style="display: flex; align-items: start; margin-bottom: var(--space-6); flex-direction: column;">
-        <h1 style="font-size: var(--text-2xl); font-weight: var(--font-bold); color: var(--foreground); margin: 0;">System Management</h1>
-        <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Manage users, employee roles, and shop mechanics.</p>
-    </div>
+<PageHeader Title="System Management"
+                Subtitle="Manage users, employee roles, and shop mechanics." />
 
     @* --- TABS & FILTERS --- *@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); gap: var(--space-4);">
@@ -57,9 +54,7 @@
 
             @if (users == null)
             {
-                <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
-                    <LightSpinner Description="Loading Personel..." />
-                </div>
+                <LoadingState Description="Loading Personnel..." />
             }
             else
             {
@@ -116,7 +111,7 @@
 
             @if (mechanics == null)
             {
-                <div style="color: var(--muted-foreground); text-align: center; padding: 20px;">Loading mechanics...</div>
+                <LoadingState Description="Loading mechanics..." />
             }
             else
             {
@@ -150,7 +145,6 @@
             }
         }
     </div>
-</div>
 
 @* --- DELETE CONFIRMATION MODAL --- *@
 @if (pendingDeleteTarget != null)

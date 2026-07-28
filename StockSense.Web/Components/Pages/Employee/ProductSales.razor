@@ -11,23 +11,13 @@
 <PageTitle>Product Sales Comparison</PageTitle>
 
 <main class="product-sales-page" aria-labelledby="product-sales-title">
-    <header class="product-sales-header">
-        <div>
-            <h1 id="product-sales-title">Product sales comparison</h1>
-            <p>Compare monthly quantity sold across historical and live transaction years.</p>
-        </div>
-        @if (dataset is not null)
-        {
-            <span class="dataset-note">@DatasetCoverageText</span>
-        }
-    </header>
+    <PageHeader Title="Product sales comparison"
+                Subtitle="Compare monthly quantity sold across historical and live transaction years."
+                Badge="@(dataset is not null ? DatasetCoverageText : null)" />
 
     @if (isLoading)
     {
-        <section class="status-card" role="status" aria-live="polite">
-            <BbSpinner Size="SpinnerSize.Large" />
-            <span>Loading product sales data...</span>
-        </section>
+        <LoadingState Description="Loading product sales data..." />
     }
     else if (loadError is not null)
     {
@@ -38,7 +28,7 @@
     }
     else if (dataset is null || dataset.Products.Count == 0)
     {
-        <section class="status-card" role="status">No product sales data is available.</section>
+        <EmptyState Icon="chart-no-axes-column" Title="No product sales data" Description="No product sales data is available." />
     }
     else
     {
@@ -146,12 +136,7 @@
 
         @if (FilteredProducts.Count == 0)
         {
-            <section class="status-card filtered-empty" role="status">
-                <div>
-                    <strong>No products match the current filters.</strong>
-                    <p>Change the search, category, or data-source filter.</p>
-                </div>
-            </section>
+            <EmptyState Icon="search-x" Title="No products match" Description="Change the search, category, or data-source filter." />
         }
         else if (SelectedProduct is { } selectedProduct)
         {
@@ -336,15 +321,11 @@
         color: var(--foreground);
     }
 
-    .product-sales-header, .chart-heading, .identity-card, .identity-heading, .mapping-actions {
+    .chart-heading, .identity-card, .identity-heading, .mapping-actions {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 1rem;
-    }
-
-    .product-sales-header {
-        margin-bottom: 1.5rem;
     }
 
     h1, h2, h3, p {
@@ -685,7 +666,7 @@
             padding: 1rem;
         }
 
-        .product-sales-header, .chart-heading, .identity-card {
+        .chart-heading, .identity-card {
             flex-direction: column;
         }
 

@@ -20,7 +20,7 @@
     <Authorized>
         @if (isLoading)
         {
-            <Spinner Description="syncing with the server..." />
+            <LoadingState FullPage="true" Description="syncing with the server..." />
         }
 
         <div class="build-layout" style="display: @(isLoading ? "none" : "flex"); animation: fadeIn 0.4s ease-in;">

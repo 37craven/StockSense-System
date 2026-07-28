@@ -422,6 +422,7 @@ namespace StockSense.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("LiveProductMappings", (string)null);
+
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Mechanic", b =>
@@ -1616,6 +1617,7 @@ namespace StockSense.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("ReportingProduct");
+
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlip", b =>

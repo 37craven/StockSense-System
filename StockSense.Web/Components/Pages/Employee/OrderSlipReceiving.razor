@@ -15,10 +15,13 @@
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <PageTitle>Receive Order Slip</PageTitle>
-@if (slip == null) { <div class="p-16 flex justify-center"><BbSpinner /></div> }
+@if (slip == null) { <LoadingState /> }
 else
 {
-<div class="flex flex-col gap-5 max-w-5xl mx-auto"><div><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick='() => Navigation.NavigateTo($"/admin/order-slips/{Id}")'><LucideIcon Name="arrow-left" Size="14" /> Back</BbButton><h1 class="text-2xl font-bold mt-2 mb-0">Record receipt · @Number</h1><p class="text-sm text-muted-foreground m-0">Enter quantities received in this delivery. Partial receipts remain open.</p></div>
+<div class="flex flex-col gap-5 max-w-5xl mx-auto">
+    <PageHeader Title="@("Record receipt · " + Number)"
+                Subtitle="Enter quantities received in this delivery. Partial receipts remain open."
+                BackHref="@("/admin/order-slips/" + Id)" />
 @if (!string.IsNullOrWhiteSpace(error)) { <div role="alert" class="rounded-md border p-3 text-sm" style="border-color:var(--destructive);color:var(--destructive)">@error</div> }
 <div class="grid grid-cols-1 md:grid-cols-3 gap-3"><label class="flex flex-col gap-1 text-sm">Received date<input type="date" @bind="receivedAt" @bind:format="yyyy-MM-dd" class="h-9 rounded-md border border-input bg-background px-2" /></label><label class="flex flex-col gap-1 text-sm">Supplier reference<input @bind="reference" maxlength="100" class="h-9 rounded-md border border-input bg-background px-2" /></label><label class="flex flex-col gap-1 text-sm">Remarks<input @bind="remarks" maxlength="500" class="h-9 rounded-md border border-input bg-background px-2" /></label></div>
 <div class="rounded-lg border border-border bg-card overflow-x-auto"><table class="w-full text-sm" style="border-collapse:collapse"><thead class="bg-muted/30"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-right">Ordered</th><th class="p-3 text-right">Previously received</th><th class="p-3 text-left">Receive now</th></tr></thead><tbody>@foreach (var item in slip.Items) { var remaining=Ordered(item)-item.ReceivedQuantity; <tr class="border-t border-border"><td class="p-3 font-medium">@item.ProductName</td><td class="p-3 text-right">@Ordered(item)</td><td class="p-3 text-right">@item.ReceivedQuantity</td><td class="p-3"><label class="sr-only" for="receive-@item.Id">Quantity received for @item.ProductName</label><input id="receive-@item.Id" type="number" min="0" max="@remaining" @bind="quantities[item.Id]" class="h-9 w-28 rounded-md border border-input bg-background px-2 text-right" /><span class="text-xs text-muted-foreground ml-2">of @remaining remaining</span></td></tr> }</tbody></table></div>

@@ -182,7 +182,6 @@ using (var scope = app.Services.CreateScope())
         {
             context.Database.Migrate();
         }
-
         if (context.Database.CanConnect())
         {
             var importer = services.GetRequiredService<IHistoricalSalesImporter>();
