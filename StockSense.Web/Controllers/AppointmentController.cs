@@ -133,7 +133,7 @@ public class AppointmentsController : ControllerBase
         if (string.Equals(newStatus, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse.Error("Use the completion checkout endpoint to complete an appointment."));
 
-        var canonicalStatus = new[] { WorkOrderStatuses.Confirmed, WorkOrderStatuses.Cancelled }
+        var canonicalStatus = new[] { WorkOrderStatuses.Pending, WorkOrderStatuses.Confirmed, WorkOrderStatuses.Cancelled }
             .SingleOrDefault(value => string.Equals(value, newStatus?.Trim(), StringComparison.OrdinalIgnoreCase));
         if (canonicalStatus is null) return BadRequest(ApiResponse.Error("Unsupported appointment status."));
         var transitionError = WorkOrderRules.ValidateStatusTransition(appointment.Status, canonicalStatus);

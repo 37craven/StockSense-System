@@ -8,7 +8,10 @@ public static class WorkOrderRules
         {
             (WorkOrderStatuses.Pending, WorkOrderStatuses.Confirmed) => true,
             (WorkOrderStatuses.Pending, WorkOrderStatuses.Cancelled) => true,
+            (WorkOrderStatuses.Confirmed, WorkOrderStatuses.Pending) => true,
             (WorkOrderStatuses.Confirmed, WorkOrderStatuses.Cancelled) => true,
+            (WorkOrderStatuses.Completed, WorkOrderStatuses.Pending) => true,
+            (WorkOrderStatuses.Cancelled, WorkOrderStatuses.Pending) => true,
             _ => false
         };
 

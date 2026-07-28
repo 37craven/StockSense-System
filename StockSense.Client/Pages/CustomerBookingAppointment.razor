@@ -10,6 +10,7 @@
 @using BlazorBlueprint.Primitives.Services
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 @attribute [Authorize]
 
@@ -181,7 +182,7 @@
                     @if (showSuccessNote)
                     {
                         <div style="margin-bottom: var(--space-4); padding: var(--space-3); background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: var(--radius); display: flex; align-items: center; gap: var(--space-2); animation: fadeIn 0.3s ease;">
-                            <LucideIcon Name="check-circle" Size="16" />
+                            <LucideIcon Name="circle-check" Size="16" />
                             <span style="font-size: var(--text-sm); font-weight: 600;">Booking successful!</span>
                         </div>
                     }
@@ -495,8 +496,10 @@
                     <BbDialogDescription>Choose a product for this service.</BbDialogDescription>
                 </BbDialogHeader>
                 <div style="flex: 1; overflow-y: auto; padding: var(--space-2) 0;">
-                    @if (productModalCategory != null && allProductsByCategory.TryGetValue(productModalCategory, out var prods) && prods.Any())
+                    @if (productModalCategory != null && productModalService != null)
                     {
+                        var linkedIds = productModalService.ItemLinkedProductIds.GetValueOrDefault(productModalCategory) ?? new();
+                        var filtered = allProductList.Where(p => linkedIds.Contains(p.Id)).ToList();
                         @* None option *@
                         <label @onclick="() => productModalPicked = null"
                                style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); cursor: pointer; background: @(productModalPicked == null ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent"); border: 1px solid @(productModalPicked == null ? "var(--primary)" : "transparent"); margin-bottom: 4px; transition: all 0.1s;">
@@ -508,20 +511,29 @@
                             </div>
                             <span style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--muted-foreground); flex-shrink: 0;">₱0</span>
                         </label>
-                        <div style="height: 1px; background: var(--border); margin: 4px 0;"></div>
-                        @foreach (var prod in prods)
+                        @if (filtered.Any())
                         {
-                            var isChosen = productModalPicked?.Id == prod.Id;
-                            <label @onclick="() => productModalPicked = prod"
-                                   style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); cursor: pointer; background: @(isChosen ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent"); border: 1px solid @(isChosen ? "var(--primary)" : "transparent"); margin-bottom: 4px; transition: all 0.1s;">
-                                <input type="radio" name="product-select" checked="@isChosen"
-                                       style="pointer-events: none; flex-shrink: 0;" />
-                                <div style="flex: 1; min-width: 0;">
-                                    <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">@prod.Name</div>
-                                    <div style="font-size: 10px; color: var(--muted-foreground);">@prod.Brand</div>
-                                </div>
-                                <span style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--primary); flex-shrink: 0;">₱@prod.Price.ToString("N0")</span>
-                            </label>
+                            <div style="height: 1px; background: var(--border); margin: 4px 0;"></div>
+                            @foreach (var prod in filtered)
+                            {
+                                var isChosen = productModalPicked?.Id == prod.Id;
+                                <label @onclick="() => productModalPicked = prod"
+                                       style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); cursor: pointer; background: @(isChosen ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent"); border: 1px solid @(isChosen ? "var(--primary)" : "transparent"); margin-bottom: 4px; transition: all 0.1s;">
+                                    <input type="radio" name="product-select" checked="@isChosen"
+                                           style="pointer-events: none; flex-shrink: 0;" />
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">@prod.Name</div>
+                                        <div style="font-size: 10px; color: var(--muted-foreground);">@prod.Brand</div>
+                                    </div>
+                                    <span style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--primary); flex-shrink: 0;">₱@prod.Price.ToString("N0")</span>
+                                </label>
+                            }
+                        }
+                        else
+                        {
+                            <div style="padding: var(--space-6); text-align: center; color: var(--muted-foreground); font-size: var(--text-sm);">
+                                No products available for this selection.
+                            </div>
                         }
                     }
                     else if (productModalCategory != null)
@@ -642,6 +654,7 @@
         public bool IsSelected { get; set; }
         public List<string> ProductCategories { get; set; } = new();
         public Dictionary<string, ProductDto?> PickedProducts { get; set; } = new();
+        public Dictionary<string, List<int>> ItemLinkedProductIds { get; set; } = new();
 
         public decimal TotalServicePrice => Price + PickedProducts.Values.Where(p => p != null).Sum(p => p!.Price);
         public decimal TotalPartsPrice => PickedProducts.Values.Where(p => p != null).Sum(p => p!.Price);
@@ -656,6 +669,14 @@
 
     private List<ServiceOption> availableServices = new();
     private Dictionary<string, List<ProductDto>> allProductsByCategory = new();
+    private List<ProductDto> allProductList = new();
+    private Dictionary<int, List<GenericItem>> serviceItemsMap = new();
+
+    public class GenericItem
+    {
+        public string Name { get; set; } = "";
+        public List<int> LinkedProductIds { get; set; } = new();
+    }
 
     // UPDATED: Now uses a precise interval list for overlap checks
     private List<(TimeSpan Start, TimeSpan End)> bookedIntervals = new();
@@ -675,6 +696,7 @@
         try
         {
             isLoading = true;
+            await LoadGenericItemsFromLocalStorage();
             await Task.WhenAll(LoadUserProfile(), LoadServices(), LoadProducts(), LoadMechanics(), FetchBookedSlots());
         }
         catch { errorMessage = "Connection error."; }
@@ -699,6 +721,21 @@
         }
     }
 
+    private async Task LoadGenericItemsFromLocalStorage()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "serviceItemsMap");
+            if (!string.IsNullOrEmpty(json))
+            {
+                var loaded = System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, List<GenericItem>>>(json);
+                if (loaded != null)
+                    serviceItemsMap = loaded;
+            }
+        }
+        catch { }
+    }
+
     private async Task LoadServices()
     {
         try
@@ -709,10 +746,27 @@
             {
                 availableServices = dbServices.Select(s =>
                 {
-                    var categories = s.RequiredProducts
-                        .Select(p => string.IsNullOrEmpty(p.Category) ? "Parts" : p.Category)
-                        .Distinct()
-                        .ToList();
+                    List<string> categories;
+                    Dictionary<string, List<int>> itemLinkedIds = new();
+
+                    if (serviceItemsMap.TryGetValue(s.Id, out var items) && items.Any())
+                    {
+                        categories = items.Select(i => i.Name).ToList();
+                        foreach (var item in items)
+                            itemLinkedIds[item.Name] = item.LinkedProductIds;
+                    }
+                    else
+                    {
+                        categories = s.RequiredProducts
+                            .Select(p => string.IsNullOrEmpty(p.Category) ? "Parts" : p.Category)
+                            .Distinct()
+                            .ToList();
+                        foreach (var cat in categories)
+                            itemLinkedIds[cat] = s.RequiredProducts
+                                .Where(p => (string.IsNullOrEmpty(p.Category) ? "Parts" : p.Category) == cat)
+                                .Select(p => p.Id).ToList();
+                    }
+
                     var picked = new Dictionary<string, ProductDto?>();
                     foreach (var cat in categories) picked[cat] = null;
                     return new ServiceOption
@@ -722,7 +776,8 @@
                         EstimatedMinutes = s.EstimatedMinutes > 0 ? s.EstimatedMinutes : 30,
                         IsSelected = false,
                         ProductCategories = categories,
-                        PickedProducts = picked
+                        PickedProducts = picked,
+                        ItemLinkedProductIds = itemLinkedIds
                     };
                 }).ToList();
             }
@@ -741,6 +796,7 @@
             var allProd = await Http.GetFromJsonAsync<List<ProductDto>>("api/products");
             if (allProd != null)
             {
+                allProductList = allProd;
                 allProductsByCategory = allProd
                     .GroupBy(p => string.IsNullOrEmpty(p.Category) ? "Parts" : p.Category)
                     .ToDictionary(g => g.Key, g => g.ToList());
@@ -753,8 +809,7 @@
     {
         productModalService = svc;
         productModalCategory = category;
-        productModalPicked = svc.PickedProducts.GetValueOrDefault(category)
-            ?? allProductsByCategory.GetValueOrDefault(category)?.FirstOrDefault();
+        productModalPicked = svc.PickedProducts.GetValueOrDefault(category);
         showProductModal = true;
     }
 

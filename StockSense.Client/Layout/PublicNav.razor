@@ -6,6 +6,9 @@
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthStateProvider
 
+<style>
+    .register-btn:hover { background-color: #8B0000 !important; }
+</style>
 <header style="position: sticky; top: 0; z-index: 50; width: 100%; border-bottom: 1px solid var(--border); background-color: var(--background); backdrop-filter: blur(8px); box-sizing: border-box;">
     <div class="header-wrapper" style="display: flex; height: 3.5rem; width: 100%; align-items: center; justify-content: space-between; box-sizing: border-box;">
 
@@ -25,9 +28,9 @@
 
         <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
             <div class="navbar-desktop-nav" style="padding: var(--space-2) var(--space-3); align-items: center; gap: 0.5rem;">
-                <AuthorizeView>
+                <AuthorizeView Context="authCtx">
                     <Authorized>
-                        <a href="/Account/Manage" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/Account/Manage") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Profile</a>
+                        <a href="@GetProfileLink(authCtx.User)" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive(GetProfileLink(authCtx.User)) ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">@GetProfileLabel(authCtx.User)</a>
 
                         <form action="Account/Logout" method="post" style="margin: 0; display: inline-flex;">
                             <AntiforgeryToken />
@@ -38,7 +41,7 @@
                     <NotAuthorized>
                         @* --- UPDATED DESKTOP AUTH BUTTONS --- *@
                         <a href="/Account/Login" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: transparent; text-decoration: none; white-space: nowrap;">Log In</a>
-                        <a href="/Account/Register" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--primary-foreground); background-color: var(--primary); text-decoration: none; white-space: nowrap;">Register</a>
+                        <a href="/Account/Register" class="register-btn navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--primary-foreground); background-color: var(--primary); text-decoration: none; white-space: nowrap;">Register</a>
                     </NotAuthorized>
                 </AuthorizeView>
             </div>
@@ -68,9 +71,9 @@
             <a href="/appointment" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/appointment") ? "var(--secondary)" : "transparent");">Appointment</a>
             <a href="/build" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/build") ? "var(--secondary)" : "transparent");">Build</a>
             <div style="border-top: 1px solid var(--border); margin: var(--space-1) 0;"></div>
-            <AuthorizeView>
+            <AuthorizeView Context="authCtx">
                 <Authorized>
-                    <a href="/Account/Manage" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none;">Profile</a>
+                    <a href="@GetProfileLink(authCtx.User)" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none;">@GetProfileLabel(authCtx.User)</a>
                     <form action="Account/Logout" method="post" style="margin: 0;">
                         <AntiforgeryToken />
                         <input type="hidden" name="ReturnUrl" value="@currentUrl" />
@@ -80,7 +83,7 @@
                 <NotAuthorized>
                     @* --- UPDATED MOBILE AUTH BUTTONS --- *@
                     <a href="/Account/Login" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none;">Sign In</a>
-                    <a href="/Account/Register" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--primary-foreground); background-color: var(--primary); text-decoration: none;">Register</a>
+                    <a href="/Account/Register" class="register-btn" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--primary-foreground); background-color: var(--primary); text-decoration: none;">Register</a>
                 </NotAuthorized>
             </AuthorizeView>
         </div>
@@ -203,6 +206,12 @@
         if (path == "/" && currentPath == "/") return true;
         return path != "/" && currentPath.StartsWith(path, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static string GetProfileLink(System.Security.Claims.ClaimsPrincipal user) =>
+        user.IsInRole("Employee") || user.IsInRole("Admin") ? "/dashboard" : "/Account/Manage";
+
+    private static string GetProfileLabel(System.Security.Claims.ClaimsPrincipal user) =>
+        user.IsInRole("Employee") || user.IsInRole("Admin") ? "Manage" : "Profile";
 
     public void Dispose()
     {

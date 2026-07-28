@@ -51,7 +51,10 @@
 
         <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
             <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; font-size: var(--text-sm); min-width: 850px;">
+                <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-sm); min-width: 850px;">
+                    <colgroup>
+                        <col style="width: 160px;" /><col style="width: 160px;" /><col style="width: 250px;" /><col style="width: 250px;" /><col style="width: 180px;" /><col style="width: 200px;" /><col style="width: 200px;" />
+                    </colgroup>
                     <thead>
                         <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
                             <th @onclick="@(() => ToggleSort("customer"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
@@ -117,8 +120,8 @@
                                 <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);">
                                     ₱@actualParts.Sum(p => p.Price).ToString("N2")
                                 </td>
-                                <td style="padding: 12px 16px;">
-                                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(build.Status); color: white;">
+                                <td style="padding: 12px 16px; max-width: 140px; overflow: hidden;">
+                                    <span style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(build.Status); color: white; width: 100%; max-width: 100px;">
                                         <span style="width: 6px; height: 6px; border-radius: 50%; background: white; opacity: 0.7;"></span>
                                         @build.Status
                                     </span>
@@ -135,12 +138,12 @@
                                         {
                                             <button @onclick="@(() => UpdateStatus(build, "Confirmed"))"
                                                     title="Confirm"
-                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                    style="min-width: 72px; max-width: 90px; padding: 6px 4px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
                                                 <LucideIcon Name="check" Size="12" /> Confirm
                                             </button>
                                             <button @onclick="@(() => UpdateStatus(build, "Cancelled"))"
                                                     title="Cancel"
-                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                    style="min-width: 72px; max-width: 90px; padding: 6px 4px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
                                                 <LucideIcon Name="x" Size="12" /> Cancel
                                             </button>
                                         }
@@ -148,18 +151,22 @@
                                         {
                                             <button @onclick="@(() => OpenDetail(build))"
                                                     title="Checkout"
-                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                    style="min-width: 72px; max-width: 90px; padding: 6px 4px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
                                                 <LucideIcon Name="circle-check" Size="12" /> Checkout
                                             </button>
-                                            <button @onclick="@(() => UpdateStatus(build, "Cancelled"))"
-                                                    title="Cancel"
-                                                    style="flex: 1; padding: 6px 4px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="x" Size="12" /> Cancel
+                                            <button @onclick="@(() => UpdateStatus(build, "Pending"))"
+                                                    title="Move to Pending"
+                                                    style="min-width: 72px; max-width: 90px; padding: 6px 4px; border-radius: 6px; border: none; background: #f59e0b; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                <LucideIcon Name="undo" Size="12" /> Unconfirm
                                             </button>
                                         }
-                                        else if (isCompleted && !string.IsNullOrWhiteSpace(build.InvoiceNumber))
+                                        else if (isCompleted || isCancelled)
                                         {
-                                            <span style="font-size: var(--text-xs); font-family: monospace;">@build.InvoiceNumber</span>
+                                            <button @onclick="@(() => UpdateStatus(build, "Pending"))"
+                                                    title="Reopen"
+                                                    style="min-width: 72px; max-width: 90px; padding: 6px 4px; border-radius: 6px; border: none; background: #3b82f6; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                <LucideIcon Name="rotate-ccw" Size="12" /> Reopen
+                                            </button>
                                         }
                                     </div>
                                 </td>
@@ -180,7 +187,7 @@
                 <BbDialogTitle>Build Details</BbDialogTitle>
                 @if (selectedBuild != null)
                 {
-                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(selectedBuild.Status); color: white;">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(selectedBuild.Status); color: white; min-width: 90px;">
                         @selectedBuild.Status
                     </span>
                 }
@@ -372,9 +379,16 @@
                                     style="padding: 6px 14px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
                                 <LucideIcon Name="circle-check" Size="12" /> @(isCheckingOut ? "..." : "Complete")
                             </button>
-                            <button @onclick="@(async () => { await UpdateStatus(s, "Cancelled"); showDetailModal = false; })"
-                                    style="padding: 6px 12px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
-                                <LucideIcon Name="x" Size="12" /> Cancel
+                            <button @onclick="@(async () => { await UpdateStatus(s, "Pending"); showDetailModal = false; })"
+                                    style="padding: 6px 12px; border-radius: 6px; border: none; background: #f59e0b; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
+                                <LucideIcon Name="undo" Size="12" /> Unconfirm
+                            </button>
+                        }
+                        else if (s.Status is "Completed" or "Cancelled")
+                        {
+                            <button @onclick="@(async () => { await UpdateStatus(s, "Pending"); showDetailModal = false; })"
+                                    style="padding: 6px 12px; border-radius: 6px; border: none; background: #3b82f6; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
+                                <LucideIcon Name="rotate-ccw" Size="12" /> Reopen
                             </button>
                         }
                     </div>
