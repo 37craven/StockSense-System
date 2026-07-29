@@ -213,6 +213,13 @@
                             <span style="white-space: nowrap;">Builds</span>
                         }
                     </a>
+                    <a href="/admin/assistance" title="Assistance" aria-current="@(IsActiveRoute("/admin/assistance") ? "page" : null)" style="@NavLinkStyle(IsActiveRoute("/admin/assistance"), isCollapsed)">
+                        <LucideIcon Name="message-circle-question" Size="16" />
+                        @if (!isCollapsed)
+                        {
+                            <span style="white-space: nowrap;">Assistance</span>
+                        }
+                    </a>
                     <a href="/admin/orderslips" title="Generate Order Slips" style="@NavLinkStyle(IsActive("/admin/orderslips"), isCollapsed)">
                         <LucideIcon Name="clipboard-list" Size="16" />
                         @if (!isCollapsed)
@@ -332,6 +339,15 @@
     {
         var current = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         return path != "/" && current.StartsWith(path, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsActiveRoute(string path)
+    {
+        var current = "/" + NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        return current.Equals(path, StringComparison.OrdinalIgnoreCase) ||
+               (current.StartsWith(path, StringComparison.OrdinalIgnoreCase) &&
+                current.Length > path.Length &&
+                current[path.Length] is '/' or '?' or '#');
     }
 
     private bool IsExact(string path) =>

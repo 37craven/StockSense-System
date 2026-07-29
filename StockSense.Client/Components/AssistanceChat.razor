@@ -1,0 +1,144 @@
+@using System.Text.Json
+@inject HttpClient Http
+
+<section class="assistance-chat" aria-labelledby="assistance-chat-heading">
+    <div class="assistance-chat__header">
+        <span class="assistance-chat__icon" aria-hidden="true">
+            <LucideIcon Name="bot" Size="22" />
+        </span>
+        <div>
+            <h2 id="assistance-chat-heading">StockSense Assistant</h2>
+            <p>Ask a question about StockSense.</p>
+        </div>
+    </div>
+
+    <div class="assistance-chat__messages"
+         role="log"
+         aria-live="polite"
+         aria-relevant="additions text"
+         aria-busy="@isSending">
+        @foreach (var chatMessage in messages)
+        {
+            <article @key="chatMessage" class="assistance-chat__message assistance-chat__message--@chatMessage.Role">
+                <span class="assistance-chat__sender">@(chatMessage.Role == "user" ? "You" : "Assistant")</span>
+                <p>@chatMessage.Content</p>
+            </article>
+        }
+
+        @if (isSending)
+        {
+            <div class="assistance-chat__status" role="status">
+                <BbSpinner Size="SpinnerSize.Small" />
+                <span>Assistant is thinking...</span>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="assistance-chat__error" role="alert">@errorMessage</div>
+    }
+
+    <form class="assistance-chat__composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
+        <label for="assistance-message">Message</label>
+        <textarea id="assistance-message"
+                  @bind="message"
+                  @bind:event="oninput"
+                  @onkeydown="HandleKeyDown"
+                  rows="3"
+                  maxlength="8000"
+                  disabled="@isSending"
+                  placeholder="Type your question..."
+                  aria-describedby="assistance-message-hint"></textarea>
+        <div class="assistance-chat__actions">
+            <span id="assistance-message-hint">Press Ctrl+Enter to send.</span>
+            <BbButton Type="ButtonType.Submit" Variant="ButtonVariant.Default" Disabled="@(isSending || string.IsNullOrWhiteSpace(message))">
+                <LucideIcon Name="send" Size="16" />
+                Send
+            </BbButton>
+        </div>
+    </form>
+</section>
+
+@code {
+    private readonly List<ChatMessage> messages =
+    [
+        new("assistant", "Hello! How can I assist you with StockSense today?")
+    ];
+
+    private string message = string.Empty;
+    private string? errorMessage;
+    private bool isSending;
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && (args.CtrlKey || args.MetaKey))
+            await SendAsync();
+    }
+
+    private async Task SendAsync()
+    {
+        var outgoingMessage = message.Trim();
+        if (isSending || string.IsNullOrWhiteSpace(outgoingMessage))
+            return;
+
+        messages.Add(new ChatMessage("user", outgoingMessage));
+        message = string.Empty;
+        errorMessage = null;
+        isSending = true;
+
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/assistance", new { message = outgoingMessage });
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await ReadErrorAsync(response);
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<AssistanceResponse>();
+            if (string.IsNullOrWhiteSpace(result?.Reply))
+            {
+                errorMessage = "The assistant returned an empty response. Please try again.";
+                return;
+            }
+
+            messages.Add(new ChatMessage("assistant", result.Reply));
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "The assistance service could not be reached. Please try again.";
+        }
+        catch (JsonException)
+        {
+            errorMessage = "The assistant returned an unexpected response. Please try again.";
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            using var payload = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            if (payload.RootElement.TryGetProperty("error", out var error) &&
+                !string.IsNullOrWhiteSpace(error.GetString()))
+            {
+                return error.GetString()!;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+            ? "Your session has expired. Please sign in again."
+            : "The assistant could not answer right now. Please try again.";
+    }
+
+    private sealed record ChatMessage(string Role, string Content);
+    private sealed record AssistanceResponse(string Reply);
+}

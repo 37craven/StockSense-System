@@ -12,6 +12,55 @@ public sealed class OrderSlipWorkflowSqlServerTests
     private const string ConnectionVariable = "STOCKSENSE_TEST_SQL_CONNECTION";
 
     [SqlServerFact]
+    public async Task ManualDraft_UsesDatabaseCostAndDoesNotRequireInventorySettings()
+    {
+        await using var fixture = await WorkflowFixture.CreateAsync();
+        await fixture.Context.ProductInventoryMetrics.Where(value => value.ProductId == fixture.ProductId).ExecuteDeleteAsync();
+        await fixture.Context.ProductInventorySettings.Where(value => value.ProductId == fixture.ProductId).ExecuteDeleteAsync();
+
+        var result = await fixture.Workflow.CreateManualDraftAsync(fixture.CreateManualDraftCommand(3));
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        var slip = result.Value!;
+        var item = Assert.Single(slip.Items);
+        Assert.Equal(OrderSlipStatuses.Draft, slip.Status);
+        Assert.Equal(10m, item.UnitCostSnapshot);
+        Assert.Equal(30m, item.EstimatedLineTotal);
+        Assert.Equal(30m, slip.TotalEstimatedCost);
+        Assert.Equal(fixture.ManualReason, slip.Remarks);
+    }
+
+    [SqlServerFact]
+    public async Task ManualDraft_InvalidConfiguredQuantityCreatesNothing()
+    {
+        await using var fixture = await WorkflowFixture.CreateAsync();
+        var setting = await fixture.Context.ProductInventorySettings.SingleAsync(value => value.ProductId == fixture.ProductId);
+        setting.MinimumOrderQuantity = 5;
+        setting.PackageSize = 5;
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await fixture.Workflow.CreateManualDraftAsync(fixture.CreateManualDraftCommand(3));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("INVALID_QUANTITY", result.ErrorCode);
+        Assert.Equal(0, await fixture.Context.OrderSlips.CountAsync(slip => slip.Remarks == fixture.ManualReason));
+    }
+
+    [SqlServerFact]
+    public async Task ManualDraft_ExistingOpenOrderBlocksEntireRequest()
+    {
+        await using var fixture = await WorkflowFixture.CreateAsync();
+        var first = await fixture.Workflow.CreateManualDraftAsync(fixture.CreateManualDraftCommand(5));
+
+        var second = await fixture.Workflow.CreateManualDraftAsync(fixture.CreateManualDraftCommand(6));
+
+        Assert.True(first.IsSuccess, first.ErrorMessage);
+        Assert.False(second.IsSuccess);
+        Assert.Equal("OPEN_ORDER_EXISTS", second.ErrorCode);
+        Assert.Equal(1, await fixture.Context.OrderSlips.CountAsync(slip => slip.Remarks == fixture.ManualReason));
+    }
+
+    [SqlServerFact]
     public async Task DuplicateDraftRequest_DoesNotCreateDuplicateOpenItem()
     {
         await using var fixture = await WorkflowFixture.CreateAsync();
@@ -136,6 +185,7 @@ public sealed class OrderSlipWorkflowSqlServerTests
         public OrderSlipWorkflowService Workflow { get; }
         public int SupplierId { get; private set; }
         public int ProductId { get; private set; }
+        public string ManualReason => $"Manual order {_token}";
 
         public static async Task<WorkflowFixture> CreateAsync()
         {
@@ -175,6 +225,15 @@ public sealed class OrderSlipWorkflowSqlServerTests
                     Items = [new CreateDraftOrderSlipItemCommand { ProductId = ProductId, OrderedQuantity = quantity }]
                 }
             ]
+        };
+
+        public CreateManualOrderSlipDraftCommand CreateManualDraftCommand(int quantity) => new()
+        {
+            LocationId = InventoryDefaults.LocationId,
+            SupplierId = SupplierId,
+            ExpectedDeliveryDate = DateTime.Today.AddDays(2),
+            Reason = ManualReason,
+            Items = [new CreateManualOrderSlipItemCommand { ProductId = ProductId, OrderedQuantity = quantity }]
         };
 
         public async Task<SlipToken> CreateDraftAsync(int quantity)

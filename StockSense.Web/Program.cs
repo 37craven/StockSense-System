@@ -15,6 +15,7 @@ using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Web.Services;
 using StockSense.Web.Utility.Security;
 using StockSense.Application.Interfaces;
+using StockSense.Web.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -127,7 +128,6 @@ builder.Services.AddScoped<BarcodeService>();
 builder.Services.AddScoped<OrderEmailSender>();
 builder.Services.AddSingleton<PdfDownloadCache>();
 builder.Services.AddScoped<IProductSalesDatasetService, ProductSalesReportingService>();
-builder.Services.AddScoped<IHistoricalSalesImporter, HistoricalSalesCsvImporter>();
 builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
 builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();
 builder.Services.AddScoped<IWorkOrderCheckoutService, WorkOrderCheckoutService>();
@@ -140,6 +140,21 @@ builder.Services.AddBlazorBlueprintComponents();
 builder.Services.AddBlazorBlueprintPrimitives();
 // ponytail: unconfigured HttpClient for prerendered layout components (PublicNav, NavBar, NavMenu)
 builder.Services.AddHttpClient();
+builder.Services.AddOptions<ChatbotOptions>()
+    .Bind(builder.Configuration.GetSection(ChatbotOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(options => options.BaseUrl.IsAbsoluteUri, "Chatbot:BaseUrl must be an absolute URL.")
+    .Validate(options => options.HasSupportedScheme(), "Chatbot:BaseUrl must use HTTP or HTTPS.")
+    .Validate(
+        options => string.IsNullOrEmpty(options.BaseUrl.Query) && string.IsNullOrEmpty(options.BaseUrl.Fragment),
+        "Chatbot:BaseUrl cannot contain a query string or fragment.")
+    .ValidateOnStart();
+builder.Services.AddHttpClient<IAssistanceClient, AssistanceClient>((services, client) =>
+{
+    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ChatbotOptions>>().Value;
+    client.BaseAddress = options.BaseUrl;
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+});
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -182,15 +197,10 @@ using (var scope = app.Services.CreateScope())
         {
             context.Database.Migrate();
         }
-        if (context.Database.CanConnect())
-        {
-            var importer = services.GetRequiredService<IHistoricalSalesImporter>();
-            await importer.ImportBundledDatasetAsync();
-        }
     }
     catch (Exception ex)
     {
-        app.Logger.LogCritical(ex, "Database migration or startup import failed. Application startup is stopping.");
+        app.Logger.LogCritical(ex, "Database migration failed. Application startup is stopping.");
         throw;
     }
 }

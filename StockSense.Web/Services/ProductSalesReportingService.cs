@@ -236,8 +236,15 @@ public sealed class ProductSalesReportingService : IProductSalesDatasetService
             throw new InvalidOperationException("That live product is already linked to another reporting product.");
         }
 
-        var cutover = useTransactionsFrom ?? await GetSuggestedCutoverAsync(reportingProductId, cancellationToken);
+        var minimumCutover = await GetSuggestedCutoverAsync(reportingProductId, cancellationToken);
+        var cutover = useTransactionsFrom ?? minimumCutover;
         cutover = new DateTime(cutover.Year, cutover.Month, 1);
+        if (cutover < minimumCutover)
+        {
+            throw new ArgumentException(
+                $"Live transactions cannot start before {minimumCutover:MMMM yyyy}, the month after the latest historical observation.",
+                nameof(useTransactionsFrom));
+        }
         reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         if (reason?.Length > 500)
         {

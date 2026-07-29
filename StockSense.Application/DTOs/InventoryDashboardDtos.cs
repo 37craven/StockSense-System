@@ -9,6 +9,9 @@ public sealed class InventoryDashboardRowDto
     public int? SupplierId { get; set; }
     public string SupplierName { get; set; } = string.Empty;
     public int CurrentStock { get; set; }
+    public decimal Price { get; set; }
+    public string ImageUrl { get; set; } = string.Empty;
+    public byte[] ProductRowVersion { get; set; } = [];
     public int IncomingStock { get; set; }
     public int InventoryPosition { get; set; }
     public decimal AverageDailyDemand { get; set; }

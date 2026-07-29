@@ -7,8 +7,10 @@
 @attribute [Authorize(Roles = "Employee, Admin")]
 @inject IProductSalesDatasetService ProductSalesDatasetService
 @inject ILogger<ProductSales> Logger
+@inject ToastService Toast
 
 <PageTitle>Product Sales Comparison</PageTitle>
+<BbToastProvider Position="ToastPosition.BottomRight" />
 
 <main class="product-sales-page" aria-labelledby="product-sales-title">
     <PageHeader Title="Product sales comparison"
@@ -151,7 +153,7 @@
                     <p>@selectedProduct.Brand · @selectedProduct.Category</p>
                     @if (selectedProduct.Mapping is { } mapping)
                     {
-                        <p>Live series: @mapping.LiveProductName from @mapping.UseTransactionsFrom.ToString("MMMM yyyy")</p>
+                        <p><strong>Connected:</strong> @mapping.LiveProductName · live transactions from @mapping.UseTransactionsFrom.ToString("MMMM yyyy")</p>
                     }
                 </div>
 
@@ -160,70 +162,122 @@
                         @if (selectedProduct.ReportingProductId is int)
                         {
                             <div class="mapping-controls" aria-labelledby="mapping-title">
-                                <h3 id="mapping-title">Live product mapping</h3>
-                                <label for="live-product-select">Live product</label>
-                                <select id="live-product-select"
-                                        value="@mappingLiveProductId"
-                                        @onchange="OnMappingProductChanged"
-                                        disabled="@(liveProductOptions.Count == 0)">
-                                    @if (liveProductOptions.Count == 0)
+                                <div class="mapping-heading">
+                                    <div>
+                                        <h3 id="mapping-title">Live product connection</h3>
+                                        <p>Connect once to continue this historical series with live sales.</p>
+                                    </div>
+                                    @if (selectedProduct.Mapping is not null)
                                     {
-                                        <option value="0">No live products found</option>
+                                        <span class="connection-status"><LucideIcon Name="circle-check" Size="14" aria-hidden="true" /> Connected</span>
                                     }
-                                    else
-                                    {
-                                        <option value="0">Select a live product</option>
+                                </div>
 
-                                        @foreach (var option in AvailableLiveProductOptions)
-                                        {
-                                            var mappedToAnotherProduct = IsMappedToAnotherReportingProduct(option);
-
-                                            @if (mappedToAnotherProduct)
+                                @if (selectedProduct.Mapping is { } currentMapping && !showMappingEditor)
+                                {
+                                    <div class="connected-summary">
+                                        <div><span>Live product</span><strong>@currentMapping.LiveProductName</strong></div>
+                                        <div><span>Live transactions from</span><strong>@currentMapping.UseTransactionsFrom.ToString("MMMM yyyy")</strong></div>
+                                    </div>
+                                    <div class="mapping-actions">
+                                        <button type="button" class="secondary-button" disabled="@isSavingMapping" @onclick="OpenMappingEditor">Change</button>
+                                        <button type="button" class="text-button danger-button" disabled="@isSavingMapping" @onclick="OpenUnlinkConfirmation">Unlink</button>
+                                    </div>
+                                }
+                                else if (SuggestedLiveProduct is { } suggestion && !showMappingEditor)
+                                {
+                                    <div class="suggested-connection">
+                                        <span class="suggestion-label">Suggested exact match</span>
+                                        <strong>@suggestion.ProductName</strong>
+                                        <small>@suggestion.Brand · @suggestion.Category</small>
+                                        <p>Name, brand, and category exactly match after normalization. Nothing is saved until you confirm.</p>
+                                        <button type="button" disabled="@isSavingMapping" @onclick="() => ConnectSuggestedAsync(suggestion.ProductId)">
+                                            @if (isSavingMapping) { <BbSpinner Size="SpinnerSize.Small" /> }
+                                            Connect
+                                        </button>
+                                    </div>
+                                    <button type="button" class="text-button" disabled="@isSavingMapping" @onclick="OpenMappingEditor">Choose a different live product</button>
+                                }
+                                else
+                                {
+                                    <div class="mapping-editor">
+                                        <label for="live-product-select">Live product</label>
+                                        <select id="live-product-select"
+                                                value="@mappingLiveProductId"
+                                                @onchange="OnMappingProductChanged"
+                                                disabled="@(isSavingMapping || liveProductOptions.Count == 0)">
+                                            @if (liveProductOptions.Count == 0)
                                             {
-                                                <option value="@option.ProductId" disabled>
-                                                    @GetLiveProductOptionLabel(option) — Already mapped
-                                                </option>
+                                                <option value="0">No live products found</option>
                                             }
                                             else
                                             {
-                                                <option value="@option.ProductId">
-                                                    @GetLiveProductOptionLabel(option)
-                                                </option>
+                                                <option value="0">Choose a live product</option>
+
+                                                @foreach (var option in AvailableLiveProductOptions)
+                                                {
+                                                    var mappedToAnotherProduct = IsMappedToAnotherReportingProduct(option);
+
+                                                    @if (mappedToAnotherProduct)
+                                                    {
+                                                        <option value="@option.ProductId" disabled>
+                                                            @GetLiveProductOptionLabel(option) — Already connected
+                                                        </option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@option.ProductId">
+                                                            @GetLiveProductOptionLabel(option)
+                                                        </option>
+                                                    }
+                                                }
                                             }
-                                        }
-                                    }
-                                </select>
-                                <small class="mapping-help">
-                                    @liveProductOptions.Count live product(s) loaded.
-                                    Products already linked to another historical product are shown but cannot be selected.
-                                </small>
+                                        </select>
+                                        <small class="mapping-help">Products already connected elsewhere cannot be selected.</small>
 
-                                <label for="mapping-cutover">Use transactions from</label>
-                                <input id="mapping-cutover" type="month" value="@mappingCutoverMonth" @onchange="OnCutoverChanged" />
+                                        <details class="mapping-advanced">
+                                            <summary>Advanced</summary>
+                                            <div class="advanced-fields">
+                                                <label for="mapping-cutover">Use live transactions from</label>
+                                                <input id="mapping-cutover" type="month" min="@MinimumCutoverMonth" value="@mappingCutoverMonth" @onchange="OnCutoverChanged" disabled="@isSavingMapping" />
+                                                <small>Defaults to the month immediately after the last historical observation.</small>
 
-                                <label for="mapping-reason">Reason (optional)</label>
-                                <input id="mapping-reason" maxlength="500" value="@mappingReason" @oninput="OnReasonChanged" />
+                                                <label for="mapping-reason">Reason <span>(optional)</span></label>
+                                                <input id="mapping-reason" maxlength="500" value="@mappingReason" @oninput="OnReasonChanged" disabled="@isSavingMapping" />
+                                            </div>
+                                        </details>
 
-                                <div class="mapping-actions">
-                                    <button type="button" disabled="@isSavingMapping" @onclick="SaveMappingAsync">
-                                        @(selectedProduct.Mapping is null ? "Link" : "Change") mapping
-                                    </button>
-                                    @if (selectedProduct.Mapping is not null)
-                                    {
-                                        <button type="button" class="secondary-button" disabled="@isSavingMapping" @onclick="UnlinkMappingAsync">
-                                            Unlink
-                                        </button>
-                                    }
-                                </div>
-                                @if (mappingFeedback is not null)
-                                {
-                                    <p class="mapping-feedback" role="status">@mappingFeedback</p>
-                                }
-                                @if (mappingError is not null)
-                                {
-                                    <p class="mapping-error" role="alert">@mappingError</p>
+                                        <div class="mapping-actions">
+                                            @if (selectedProduct.Mapping is not null || SuggestedLiveProduct is not null)
+                                            {
+                                                <button type="button" class="secondary-button" disabled="@isSavingMapping" @onclick="CancelMappingEditor">Cancel</button>
+                                            }
+                                            <button type="button" disabled="@(isSavingMapping || mappingLiveProductId <= 0)" @onclick="SaveMappingAsync">
+                                                @if (isSavingMapping) { <BbSpinner Size="SpinnerSize.Small" /> }
+                                                @(selectedProduct.Mapping is null ? "Connect" : "Save changes")
+                                            </button>
+                                        </div>
+                                    </div>
                                 }
                             </div>
+
+                            <BbDialog @bind-Open="confirmUnlinkOpen">
+                                <BbDialogContent Style="width:min(92vw,480px)">
+                                    <BbDialogHeader>
+                                        <BbDialogTitle>Disconnect live product?</BbDialogTitle>
+                                        <BbDialogDescription>
+                                            Disconnect @selectedProduct.Mapping?.LiveProductName from @selectedProduct.ProductName. Historical sales and the live product remain unchanged, but this combined reporting series will stop using live transactions.
+                                        </BbDialogDescription>
+                                    </BbDialogHeader>
+                                    <div class="confirm-actions">
+                                        <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelUnlinkConfirmation" Disabled="@isSavingMapping">Keep connected</BbButton>
+                                        <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmUnlinkAsync" Disabled="@isSavingMapping">
+                                            @if (isSavingMapping) { <BbSpinner Size="SpinnerSize.Small" /> }
+                                            Disconnect
+                                        </BbButton>
+                                    </div>
+                                </BbDialogContent>
+                            </BbDialog>
                         }
                         else
                         {
@@ -540,25 +594,165 @@
         }
 
     .mapping-controls {
-        width: min(30rem, 50%);
-        display: grid;
-        grid-template-columns: 9rem 1fr;
-        gap: .5rem .75rem;
-        align-items: center;
+        width: min(34rem, 55%);
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
     }
 
-        .mapping-controls h3, .mapping-actions, .mapping-feedback, .mapping-error {
-            grid-column: 1 / -1;
+    .mapping-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: .75rem;
+    }
+
+        .mapping-heading h3 {
+            margin-bottom: .2rem;
+            font-size: var(--text-base);
         }
 
-        .mapping-controls h3 {
-            margin-bottom: .25rem;
-            font-size: var(--text-base);
+        .mapping-heading p {
+            margin: 0;
+            color: var(--muted-foreground);
+            font-size: var(--text-xs);
+        }
+
+    .connection-status, .suggestion-label {
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        width: fit-content;
+        border-radius: 999px;
+        padding: .3rem .55rem;
+        background: color-mix(in srgb, var(--primary) 12%, transparent);
+        color: var(--primary);
+        font-size: var(--text-xs);
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .connected-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .6rem;
+    }
+
+        .connected-summary > div {
+            display: flex;
+            flex-direction: column;
+            gap: .2rem;
+            min-width: 0;
+            padding: .7rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--muted);
+        }
+
+        .connected-summary span, .connected-summary strong {
+            overflow-wrap: anywhere;
+        }
+
+        .connected-summary span {
+            color: var(--muted-foreground);
+            font-size: var(--text-xs);
+        }
+
+        .connected-summary strong {
+            font-size: var(--text-sm);
+        }
+
+    .suggested-connection {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: .25rem .75rem;
+        padding: .85rem;
+        border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
+        border-radius: var(--radius);
+        background: color-mix(in srgb, var(--primary) 5%, var(--card));
+    }
+
+        .suggested-connection .suggestion-label, .suggested-connection strong,
+        .suggested-connection small, .suggested-connection p {
+            grid-column: 1;
+        }
+
+        .suggested-connection button {
+            grid-column: 2;
+            grid-row: 1 / span 4;
+            align-self: center;
+        }
+
+        .suggested-connection small, .suggested-connection p {
+            color: var(--muted-foreground);
+            font-size: var(--text-xs);
+        }
+
+        .suggested-connection p {
+            margin: .25rem 0 0;
+        }
+
+    .mapping-editor {
+        display: flex;
+        flex-direction: column;
+        gap: .45rem;
+    }
+
+        .mapping-editor > label, .advanced-fields label {
+            font-size: var(--text-sm);
+            font-weight: 600;
+        }
+
+    .mapping-advanced {
+        margin-top: .3rem;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        padding: .6rem 0;
+    }
+
+        .mapping-advanced summary {
+            width: fit-content;
+            color: var(--muted-foreground);
+            cursor: pointer;
+            font-size: var(--text-sm);
+            font-weight: 600;
+        }
+
+        .mapping-advanced summary:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+
+    .advanced-fields {
+        display: grid;
+        grid-template-columns: 10rem minmax(0, 1fr);
+        gap: .5rem .75rem;
+        align-items: center;
+        padding-top: .75rem;
+    }
+
+        .advanced-fields small {
+            grid-column: 2;
+            margin-top: -.3rem;
+            color: var(--muted-foreground);
+            font-size: var(--text-xs);
+        }
+
+        .advanced-fields label span {
+            color: var(--muted-foreground);
+            font-weight: 400;
         }
 
     .mapping-actions {
         justify-content: flex-end;
         margin-top: .25rem;
+    }
+
+    .confirm-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: .5rem;
+        margin-top: 1rem;
     }
 
     button {
@@ -581,13 +775,25 @@
         border-color: var(--border);
     }
 
-    .mapping-feedback, .mapping-error, .read-only-note, .mapping-help {
+    .text-button {
+        width: fit-content;
+        padding: .2rem;
+        border-color: transparent;
+        background: transparent;
+        color: var(--primary);
+        text-decoration: underline;
+        text-underline-offset: .2rem;
+    }
+
+    .danger-button {
+        color: var(--destructive);
+    }
+
+    .read-only-note, .mapping-help {
         font-size: var(--text-xs) !important;
     }
 
     .mapping-help {
-        grid-column: 2;
-        margin-top: -.25rem;
         color: var(--muted-foreground);
         line-height: 1.4;
     }
@@ -689,11 +895,25 @@
 
         .mapping-controls {
             width: 100%;
+        }
+
+        .connected-summary, .advanced-fields {
             grid-template-columns: 1fr;
         }
 
-            .mapping-controls h3, .mapping-actions, .mapping-feedback, .mapping-error, .mapping-help {
+        .advanced-fields small {
+            grid-column: 1;
+        }
+
+        .suggested-connection {
+            grid-template-columns: 1fr;
+        }
+
+            .suggested-connection button {
                 grid-column: 1;
+                grid-row: auto;
+                width: 100%;
+                margin-top: .5rem;
             }
     }
 </style>
@@ -715,9 +935,9 @@
     private string mappingReason = string.Empty;
     private bool isLoading = true;
     private bool isSavingMapping;
+    private bool showMappingEditor;
+    private bool confirmUnlinkOpen;
     private string? loadError;
-    private string? mappingFeedback;
-    private string? mappingError;
 
     private ProductSalesProduct? SelectedProduct =>
         dataset?.Products.FirstOrDefault(product => product.SelectionKey == selectedProductKey);
@@ -767,6 +987,26 @@
         option.MappedReportingProductId.HasValue &&
         option.MappedReportingProductId != SelectedProduct?.ReportingProductId;
 
+    private LiveProductOption? SuggestedLiveProduct
+    {
+        get
+        {
+            var product = SelectedProduct;
+            if (product?.ReportingProductId is null || product.Mapping is not null) return null;
+
+            var reportingMatches = dataset?.Products
+                .Where(candidate => candidate.ReportingProductId.HasValue)
+                .Count(candidate => HasSameIdentity(product, candidate)) ?? 0;
+            if (reportingMatches != 1) return null;
+
+            var matches = liveProductOptions
+                .Where(option => IsExactIdentityMatch(product, option))
+                .Take(2)
+                .ToArray();
+            return matches.Length == 1 && !IsMappedToAnotherReportingProduct(matches[0]) ? matches[0] : null;
+        }
+    }
+
     private static string GetLiveProductOptionLabel(LiveProductOption option)
     {
         var parts = new[]
@@ -779,6 +1019,28 @@
 
         return string.Join(" · ", parts);
     }
+
+    private static bool IsExactIdentityMatch(ProductSalesProduct product, LiveProductOption option)
+    {
+        var productName = NormalizeIdentity(product.ProductName);
+        var productBrand = NormalizeIdentity(product.Brand);
+        var productCategory = NormalizeIdentity(product.Category);
+        return productName.Length > 0 && productBrand.Length > 0 && productCategory.Length > 0 &&
+               productName == NormalizeIdentity(option.ProductName) &&
+               productBrand == NormalizeIdentity(option.Brand) &&
+               productCategory == NormalizeIdentity(option.Category);
+    }
+
+    private static bool HasSameIdentity(ProductSalesProduct first, ProductSalesProduct second) =>
+        NormalizeIdentity(first.ProductName) == NormalizeIdentity(second.ProductName) &&
+        NormalizeIdentity(first.Brand) == NormalizeIdentity(second.Brand) &&
+        NormalizeIdentity(first.Category) == NormalizeIdentity(second.Category);
+
+    private static string NormalizeIdentity(string? value) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            (value ?? string.Empty).Normalize(System.Text.NormalizationForm.FormKC).Trim(),
+            @"\s+",
+            " ").ToUpperInvariant();
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -800,7 +1062,7 @@
         catch (Exception exception)
         {
             Logger.LogError(exception, "Failed to load product sales reporting data.");
-            loadError = "Verify the reporting migration, importer, and service registration, then reload the page.";
+            loadError = "Verify the reporting migration and service registration, then reload the page.";
         }
         finally
         {
@@ -909,12 +1171,11 @@
 
     private void ToggleYear(int year, ChangeEventArgs args)
     {
-        mappingError = null;
         if (args.Value is true)
         {
             if (selectedYears.Count >= 5)
             {
-                mappingError = "A maximum of five comparison years can be displayed.";
+                Toast.Warning("A maximum of five comparison years can be displayed.", "Year limit reached");
                 return;
             }
             selectedYears.Add(year);
@@ -991,22 +1252,50 @@
     {
         var product = SelectedProduct;
         mappingLiveProductId = product?.Mapping?.LiveProductId ?? 0;
-        var cutover = product?.Mapping?.UseTransactionsFrom ?? product?.SuggestedCutoverMonth;
+        var cutover = product?.Mapping?.UseTransactionsFrom ?? product?.SuggestedCutoverMonth ?? DefaultCutover(product);
         mappingCutoverMonth = cutover?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
         mappingReason = product?.Mapping?.Reason ?? string.Empty;
-        mappingFeedback = null;
-        mappingError = null;
+        showMappingEditor = false;
+        confirmUnlinkOpen = false;
+    }
+
+    private string MinimumCutoverMonth =>
+        (SelectedProduct?.SuggestedCutoverMonth ?? DefaultCutover(SelectedProduct))?.ToString("yyyy-MM", CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private static DateTime? DefaultCutover(ProductSalesProduct? product)
+    {
+        var latest = product?.Sales.OrderByDescending(sale => sale.Year).ThenByDescending(sale => sale.Month).FirstOrDefault();
+        return latest is null
+            ? new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1)
+            : new DateTime(latest.Year, latest.Month, 1).AddMonths(1);
     }
 
     private void OnMappingProductChanged(ChangeEventArgs args) => int.TryParse(args.Value?.ToString(), out mappingLiveProductId);
     private void OnCutoverChanged(ChangeEventArgs args) => mappingCutoverMonth = args.Value?.ToString() ?? string.Empty;
     private void OnReasonChanged(ChangeEventArgs args) => mappingReason = args.Value?.ToString() ?? string.Empty;
+    private void OpenMappingEditor() => showMappingEditor = true;
+    private void CancelMappingEditor() => InitializeMappingEditor();
+    private void OpenUnlinkConfirmation() => confirmUnlinkOpen = true;
+    private void CancelUnlinkConfirmation()
+    {
+        if (!isSavingMapping) confirmUnlinkOpen = false;
+    }
+    private async Task ConfirmUnlinkAsync()
+    {
+        await UnlinkMappingAsync();
+        confirmUnlinkOpen = false;
+    }
+    private async Task ConnectSuggestedAsync(int liveProductId)
+    {
+        mappingLiveProductId = liveProductId;
+        await SaveMappingAsync();
+    }
 
     private async Task SaveMappingAsync()
     {
         if (SelectedProduct?.ReportingProductId is not int reportingProductId || mappingLiveProductId <= 0)
         {
-            mappingError = "Select a live product to link.";
+            Toast.Error("Choose a live product to connect.", "Connection not saved");
             return;
         }
 
@@ -1015,35 +1304,41 @@
 
         if (selectedLiveProduct is null)
         {
-            mappingError = "The selected live product could not be found. Reload the page and try again.";
+            Toast.Error("The selected live product could not be found. Reload the page and try again.", "Connection not saved");
             return;
         }
 
         if (IsMappedToAnotherReportingProduct(selectedLiveProduct))
         {
-            mappingError = "That live product is already mapped to another historical product. Unlink it first before creating this mapping.";
+            Toast.Error("That live product is already connected to another historical product. Unlink it first.", "Connection not saved");
             return;
         }
 
         if (!DateTime.TryParseExact(mappingCutoverMonth + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var cutover))
         {
-            mappingError = "Choose a valid cutover month.";
+            Toast.Error("Choose a valid cutover month under Advanced.", "Connection not saved");
+            return;
+        }
+
+        var minimumCutover = SelectedProduct.SuggestedCutoverMonth ?? DefaultCutover(SelectedProduct);
+        if (minimumCutover.HasValue && cutover < minimumCutover.Value)
+        {
+            Toast.Error($"Live transactions must start in {minimumCutover.Value:MMMM yyyy} or later.", "Connection not saved");
             return;
         }
 
         isSavingMapping = true;
-        mappingError = null;
         try
         {
             var selection = selectedProductKey;
             await ProductSalesDatasetService.LinkLiveProductAsync(reportingProductId, mappingLiveProductId, cutover, mappingReason);
             await LoadAsync(selection);
-            mappingFeedback = "The live mapping was saved.";
+            Toast.Success($"{selectedLiveProduct.ProductName} is now connected.", "Live product connected");
         }
         catch (Exception exception)
         {
             Logger.LogError(exception, "Failed to save product sales mapping for reporting product {ReportingProductId}.", reportingProductId);
-            mappingError = exception.Message;
+            Toast.Error(exception.Message, "Connection not saved");
         }
         finally { isSavingMapping = false; }
     }
@@ -1052,18 +1347,17 @@
     {
         if (SelectedProduct?.ReportingProductId is not int reportingProductId) return;
         isSavingMapping = true;
-        mappingError = null;
         try
         {
             var selection = selectedProductKey;
             await ProductSalesDatasetService.UnlinkLiveProductAsync(reportingProductId);
             await LoadAsync(selection);
-            mappingFeedback = "The live mapping was removed.";
+            Toast.Success("The live product was disconnected. Historical sales were preserved.", "Connection removed");
         }
         catch (Exception exception)
         {
             Logger.LogError(exception, "Failed to unlink reporting product {ReportingProductId}.", reportingProductId);
-            mappingError = exception.Message;
+            Toast.Error(exception.Message, "Could not disconnect product");
         }
         finally { isSavingMapping = false; }
     }

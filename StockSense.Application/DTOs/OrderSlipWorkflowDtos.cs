@@ -80,6 +80,49 @@ public sealed record CreateDraftOrderSlipsResult(
     IReadOnlyList<OrderSlipDto> OrderSlips,
     IReadOnlyList<OrderSlipGenerationWarningDto> Warnings);
 
+public sealed class ManualOrderSlipCatalogDto
+{
+    public List<ManualOrderSlipSupplierDto> Suppliers { get; set; } = new();
+    public List<ManualOrderSlipProductDto> Products { get; set; } = new();
+}
+
+public sealed class ManualOrderSlipSupplierDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
+public sealed class ManualOrderSlipProductDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Brand { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public int SupplierId { get; set; }
+    public decimal UnitCost { get; set; }
+    public int CurrentStock { get; set; }
+    public int MinimumOrderQuantity { get; set; } = 1;
+    public int PackageSize { get; set; } = 1;
+    public int? MaximumStockLevel { get; set; }
+    public bool HasInventorySettings { get; set; }
+}
+
+public sealed class CreateManualOrderSlipDraftCommand
+{
+    public string LocationId { get; set; } = "MAIN";
+    public string? CreatedByUserId { get; set; }
+    public int SupplierId { get; set; }
+    public DateTime? ExpectedDeliveryDate { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public List<CreateManualOrderSlipItemCommand> Items { get; set; } = new();
+}
+
+public sealed class CreateManualOrderSlipItemCommand
+{
+    public int ProductId { get; set; }
+    public int OrderedQuantity { get; set; }
+}
+
 public sealed class OrderSlipTransitionCommand
 {
     public int OrderSlipId { get; set; }

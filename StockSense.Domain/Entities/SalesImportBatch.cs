@@ -9,7 +9,7 @@ public enum SalesImportStatus
 
 /// <summary>
 /// Audit record for a historical sales import. Source plus SHA-256 hash provides
-/// idempotency for repeated startup imports of the same file.
+/// idempotency for repeated imports of the same file.
 /// </summary>
 public sealed class SalesImportBatch
 {

@@ -12,6 +12,14 @@ public interface IOrderSlipWorkflowService
         CreateOrderSlipDraftsCommand command,
         CancellationToken cancellationToken = default);
 
+    Task<OperationResult<ManualOrderSlipCatalogDto>> GetManualCatalogAsync(
+        string locationId,
+        CancellationToken cancellationToken = default);
+
+    Task<OperationResult<OrderSlipDto>> CreateManualDraftAsync(
+        CreateManualOrderSlipDraftCommand command,
+        CancellationToken cancellationToken = default);
+
     Task<OperationResult<OrderSlipDto>> ApproveAsync(
         OrderSlipTransitionCommand command,
         CancellationToken cancellationToken = default);

@@ -12,57 +12,135 @@
 
 <PageTitle>Order Slip Generator</PageTitle>
 
-<div class="flex flex-col gap-5">
+<div class="order-page">
     <PageHeader Title="Order-Slip Generator"
-                Subtitle="Review recommendations before creating supplier drafts. Nothing is automatically approved or sent.">
+                Subtitle="Create an inventory recommendation or prepare a manual supplier draft. Nothing is automatically approved or sent.">
         <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/order-history")'>
             <LucideIcon Name="clipboard-list" Size="16" /> View order slips
         </BbButton>
-        <BbButton OnClick="LoadPreview" Disabled="busy">
-            @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
-            <LucideIcon Name="scan" Size="16" /> Generate preview
-        </BbButton>
     </PageHeader>
-    @if (!string.IsNullOrWhiteSpace(message)) { <div role="status" class="rounded-md border border-border bg-muted/30 p-3 text-sm">@message</div> }
-    @if (!string.IsNullOrWhiteSpace(error)) { <div role="alert" class="rounded-md border p-3 text-sm" style="border-color:var(--destructive);color:var(--destructive)">@error</div> }
 
-    @if (preview == null)
+    <div class="mode-selector" role="group" aria-label="Order creation method">
+        <button type="button" class="mode-button @(mode == CreationMode.Automatic ? "active" : null)"
+                aria-pressed="@(mode == CreationMode.Automatic)" @onclick="ShowAutomatic">
+            <LucideIcon Name="sparkles" Size="18" />
+            <span><strong>Automatic</strong><small>Use inventory recommendations</small></span>
+        </button>
+        <button type="button" class="mode-button @(mode == CreationMode.Manual ? "active" : null)"
+                aria-pressed="@(mode == CreationMode.Manual)" @onclick="ShowManual">
+            <LucideIcon Name="square-pen" Size="18" />
+            <span><strong>Manual</strong><small>Choose supplier, products and quantities</small></span>
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
     {
-        <EmptyState Icon="package-search" Title="No preview loaded" Description="Generate a preview to calculate inventory position and supplier quantities." />
+        <div role="status" class="notice">@message</div>
     }
-    else
+    @if (!string.IsNullOrWhiteSpace(error))
     {
-        @if (preview.Warnings.Count > 0)
+        <div role="alert" class="notice error">@error</div>
+    }
+
+    @if (mode == CreationMode.Automatic)
+    {
+        <div class="section-heading">
+            <div><h2>Recommended orders</h2><p>Review the latest stock calculations before creating supplier drafts.</p></div>
+            <BbButton OnClick="LoadPreview" Disabled="busy">
+                @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
+                <LucideIcon Name="scan" Size="16" /> Generate preview
+            </BbButton>
+        </div>
+        @if (preview == null)
         {
-            <div class="rounded-lg border border-border bg-card p-4"><h2 class="text-sm font-semibold m-0 mb-2">Skipped products and warnings</h2><ul class="text-sm text-muted-foreground m-0 pl-5">@foreach (var warning in preview.Warnings) { <li>@warning.ProductName: @warning.Message</li> }</ul></div>
+            <EmptyState Icon="package-search" Title="No preview loaded" Description="Generate a preview to calculate inventory position and supplier quantities." />
         }
-        @foreach (var group in preview.SupplierGroups)
+        else
         {
-            <section class="rounded-lg border border-border bg-card overflow-hidden" aria-labelledby="supplier-@group.SupplierId">
-                <header class="p-4 border-b border-border bg-muted/20 flex justify-between"><h2 id="supplier-@group.SupplierId" class="text-base font-semibold m-0">@group.SupplierName</h2><span class="font-medium">Selected total: ₱@SelectedTotal(group).ToString("N2")</span></header>
-                <div class="overflow-x-auto"><table class="w-full text-sm" style="border-collapse:collapse;min-width:1250px"><thead class="text-muted-foreground"><tr><th class="p-3 text-left">Include</th><th class="p-3 text-left">Product</th><th class="p-3 text-right">Current</th><th class="p-3 text-right">Incoming</th><th class="p-3 text-right">Position</th><th class="p-3 text-right">Safety</th><th class="p-3 text-right">Reorder</th><th class="p-3 text-right">Target</th><th class="p-3 text-right">Suggested</th><th class="p-3 text-left">Final quantity</th><th class="p-3 text-right">Unit cost</th><th class="p-3 text-right">Total</th></tr></thead>
-                    <tbody>@foreach (var item in group.Items) { <tr class="border-t border-border"><td class="p-3"><input type="checkbox" @bind="item.IsSelected" aria-label="Include @item.ProductName" /></td><td class="p-3"><div class="font-medium">@item.ProductName</div><div class="text-xs text-muted-foreground" title="@item.RecommendationReason">@item.Brand · @item.RecommendationReason</div></td><td class="p-3 text-right">@item.CurrentStock</td><td class="p-3 text-right">@item.IncomingStock</td><td class="p-3 text-right">@item.InventoryPosition</td><td class="p-3 text-right">@item.SafetyStock</td><td class="p-3 text-right">@item.ReorderPoint</td><td class="p-3 text-right">@item.TargetStock</td><td class="p-3 text-right">@item.SuggestedQuantity</td><td class="p-3"><label class="sr-only" for="qty-@item.ProductId">Final quantity for @item.ProductName</label><input id="qty-@item.ProductId" type="number" min="1" step="@item.PackageSize" @bind="item.FinalQuantity" class="h-9 w-24 rounded-md border border-input bg-background px-2 text-right" />@if (errors.TryGetValue(item.ProductId, out var itemError)) { <div role="alert" class="text-xs mt-1" style="color:var(--destructive)">@itemError</div> }</td><td class="p-3 text-right">₱@item.UnitCost.ToString("N2")</td><td class="p-3 text-right">₱@((item.FinalQuantity * item.UnitCost).ToString("N2"))</td></tr> }</tbody></table></div>
-            </section>
+            @if (preview.Warnings.Count > 0)
+            {
+                <section class="panel warnings"><h2>Skipped products and warnings</h2><ul>@foreach (var warning in preview.Warnings) { <li>@warning.ProductName: @warning.Message</li> }</ul></section>
+            }
+            @foreach (var group in preview.SupplierGroups)
+            {
+                <section class="panel" aria-labelledby="supplier-@group.SupplierId">
+                    <header class="panel-header"><h2 id="supplier-@group.SupplierId">@group.SupplierName</h2><span>Selected total: @Money(SelectedTotal(group))</span></header>
+                    <div class="table-scroll"><table><thead><tr><th>Include</th><th>Product</th><th class="number">Current</th><th class="number">Incoming</th><th class="number">Position</th><th class="number">Target</th><th class="number">Suggested</th><th>Final quantity</th><th class="number">Unit cost</th><th class="number">Total</th></tr></thead>
+                        <tbody>@foreach (var item in group.Items) { <tr><td><input type="checkbox" @bind="item.IsSelected" aria-label="Include @item.ProductName" /></td><td><strong>@item.ProductName</strong><small title="@item.RecommendationReason">@item.Brand · @item.RecommendationReason</small></td><td class="number">@item.CurrentStock</td><td class="number">@item.IncomingStock</td><td class="number">@item.InventoryPosition</td><td class="number">@item.TargetStock</td><td class="number">@item.SuggestedQuantity</td><td><label class="sr-only" for="qty-@item.ProductId">Final quantity for @item.ProductName</label><input id="qty-@item.ProductId" type="number" min="1" step="@item.PackageSize" @bind="item.FinalQuantity" />@if (item.IsSelected && errors.TryGetValue(item.ProductId, out var itemError)) { <small class="field-error" role="alert">@itemError</small> }</td><td class="number">@Money(item.UnitCost)</td><td class="number">@Money(item.FinalQuantity * item.UnitCost)</td></tr> }</tbody></table></div>
+                </section>
+            }
+            <div class="actions"><BbButton OnClick="CreateDrafts" Disabled="@(busy || !CanCreateAutomatic)"><LucideIcon Name="file-plus" Size="16" /> Create selected drafts</BbButton></div>
         }
-        <div class="flex justify-end"><BbButton OnClick="CreateDrafts" Disabled="@(busy || !CanCreate)"><LucideIcon Name="file-plus" Size="16" /> Create selected drafts</BbButton></div>
+    }
+    else if (manualLoading)
+    {
+        <div class="loading" role="status"><BbSpinner /> Loading suppliers and products…</div>
+    }
+    else if (manualCatalog != null)
+    {
+        <section class="panel manual-form" aria-labelledby="manual-title">
+            <header class="panel-header"><div><h2 id="manual-title">Manual order slip</h2><p>Costs are read from the product database when the draft is saved.</p></div><strong>@Money(ManualTotal)</strong></header>
+            <div class="form-grid">
+                <label>Supplier<span aria-hidden="true"> *</span><select @bind="manualSupplierId" @bind:after="SupplierChanged"><option value="0">Select supplier</option>@foreach (var supplier in manualCatalog.Suppliers) { <option value="@supplier.Id">@supplier.Name</option> }</select></label>
+                <label>Expected delivery date<input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="manualExpectedDate" /></label>
+            </div>
+            <div class="manual-lines">
+                <div class="lines-heading"><h3>Products</h3><BbButton Variant="ButtonVariant.Outline" OnClick="AddManualLine" Disabled="@(manualSupplierId == 0)"><LucideIcon Name="plus" Size="16" /> Add product</BbButton></div>
+                @if (manualLines.Count == 0)
+                {
+                    <p class="empty-copy">Select a supplier, then add at least one product.</p>
+                }
+                @foreach (var line in manualLines)
+                {
+                    var lineProduct = ProductFor(line.ProductId);
+                    <div class="manual-line">
+                        <label>Product<select @bind="line.ProductId"><option value="0">Select product</option>@foreach (var product in AvailableProducts(line)) { <option value="@product.Id">@product.Name (@product.Brand)</option> }</select></label>
+                        <label>Quantity<input type="number" min="1" @bind="line.Quantity" /></label>
+                        <div class="line-meta"><span>Unit cost</span><strong>@(lineProduct == null ? "—" : Money(lineProduct.UnitCost))</strong>@if (lineProduct?.HasInventorySettings == true) { <small>MOQ @lineProduct.MinimumOrderQuantity · pack @lineProduct.PackageSize@if (lineProduct.MaximumStockLevel.HasValue) { <text> · max @lineProduct.MaximumStockLevel</text> }</small> }</div>
+                        <div class="line-meta number"><span>Line total</span><strong>@(lineProduct == null ? "—" : Money(lineProduct.UnitCost * line.Quantity))</strong></div>
+                        <button type="button" class="remove-button" title="Remove product" aria-label="Remove product line" @onclick="() => RemoveManualLine(line)"><LucideIcon Name="trash-2" Size="17" /></button>
+                    </div>
+                }
+            </div>
+            <label class="reason">Reason<span aria-hidden="true"> *</span><textarea maxlength="500" rows="3" placeholder="Why is this manual order needed?" @bind="manualReason"></textarea><small>@manualReason.Length/500 characters</small></label>
+            <div class="actions"><BbButton OnClick="CreateManualDraft" Disabled="@(busy || !CanCreateManual)">@if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }<LucideIcon Name="file-plus" Size="16" /> Create manual draft</BbButton></div>
+        </section>
     }
 </div>
 
 @code {
+    private enum CreationMode { Automatic, Manual }
+    private sealed class ManualLine { public int ProductId { get; set; } public int Quantity { get; set; } = 1; }
+    private CreationMode mode;
     private OrderSlipPreviewDto? preview;
+    private ManualOrderSlipCatalogDto? manualCatalog;
+    private readonly List<ManualLine> manualLines = [];
     private readonly Dictionary<int, string> errors = [];
-    private bool busy;
-    private string message = "", error = "";
-    private bool CanCreate => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && errors.Count == 0;
+    private bool busy, manualLoading;
+    private int manualSupplierId;
+    private DateTime? manualExpectedDate;
+    private string manualReason = "", message = "", error = "";
+    private bool CanCreateAutomatic => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && !SelectedAutomaticItems.Any(x => errors.ContainsKey(x.ProductId));
+    private IEnumerable<OrderSlipPreviewItemDto> SelectedAutomaticItems => preview?.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected) ?? [];
+    private bool CanCreateManual => manualSupplierId > 0 && manualLines.Count > 0 && manualLines.All(x => x.ProductId > 0 && x.Quantity > 0) && manualLines.Select(x => x.ProductId).Distinct().Count() == manualLines.Count && !string.IsNullOrWhiteSpace(manualReason) && manualReason.Length <= 500;
+    private decimal ManualTotal => manualLines.Sum(line => (ProductFor(line.ProductId)?.UnitCost ?? 0) * line.Quantity);
 
+    private void ShowAutomatic() { mode = CreationMode.Automatic; error = message = ""; }
+    private async Task ShowManual() { mode = CreationMode.Manual; error = message = ""; if (manualCatalog == null) await LoadManualCatalog(); }
+    private async Task LoadManualCatalog()
+    {
+        manualLoading = true;
+        try { var result = await Workflow.GetManualCatalogAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage); manualCatalog = result.Value; }
+        catch (Exception ex) { error = ex.Message; }
+        finally { manualLoading = false; }
+    }
     private async Task LoadPreview()
     {
-        busy = true; error = ""; message = ""; errors.Clear();
+        busy = true; error = message = ""; errors.Clear();
         try { var result = await Workflow.PreviewAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage); preview = result.Value; message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations."; }
         catch (Exception ex) { error = ex.Message; }
         finally { busy = false; }
     }
-
     private void Validate(OrderSlipPreviewItemDto item)
     {
         errors.Remove(item.ProductId);
@@ -70,23 +148,39 @@
         else if (item.FinalQuantity % item.PackageSize != 0) errors[item.ProductId] = $"Quantity must be a multiple of package size {item.PackageSize}.";
         else if (item.MaximumStockLevel.HasValue && item.InventoryPosition + item.FinalQuantity > item.MaximumStockLevel) errors[item.ProductId] = $"Projected stock exceeds maximum {item.MaximumStockLevel}.";
     }
-
     private decimal SelectedTotal(OrderSlipPreviewGroupDto group) => group.Items.Where(x => x.IsSelected).Sum(x => x.FinalQuantity * x.UnitCost);
     private async Task CreateDrafts()
     {
         if (preview == null) return;
-        foreach (var item in preview.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected)) Validate(item);
-        if (errors.Count > 0) return;
+        errors.Clear(); foreach (var item in SelectedAutomaticItems) Validate(item); if (errors.Count > 0) return;
         busy = true; error = "";
         try
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
             var command = new CreateOrderSlipDraftsCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierGroups = preview.SupplierGroups.Select(group => new CreateDraftOrderSlipGroupCommand { SupplierId = group.SupplierId, Items = group.Items.Where(item => item.IsSelected).Select(item => new CreateDraftOrderSlipItemCommand { ProductId = item.ProductId, OrderedQuantity = item.FinalQuantity }).ToList() }).Where(group => group.Items.Count > 0).ToList() };
-            var result = await Workflow.CreateDraftsAsync(command);
-            if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage);
-            message = $"Created {result.Value.OrderSlips.Count} draft order slips."; preview = null;
+            var result = await Workflow.CreateDraftsAsync(command); if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage); message = $"Created {result.Value.OrderSlips.Count} draft order slips."; preview = null;
         }
         catch (Exception ex) { error = ex.Message; }
         finally { busy = false; }
     }
+    private Task SupplierChanged() { manualLines.Clear(); return Task.CompletedTask; }
+    private void AddManualLine() => manualLines.Add(new());
+    private void RemoveManualLine(ManualLine line) => manualLines.Remove(line);
+    private ManualOrderSlipProductDto? ProductFor(int id) => manualCatalog?.Products.FirstOrDefault(x => x.Id == id);
+    private IEnumerable<ManualOrderSlipProductDto> AvailableProducts(ManualLine line) => manualCatalog?.Products.Where(x => x.SupplierId == manualSupplierId && (x.Id == line.ProductId || manualLines.All(y => ReferenceEquals(y, line) || y.ProductId != x.Id))) ?? [];
+    private async Task CreateManualDraft()
+    {
+        if (!CanCreateManual) return;
+        busy = true; error = message = "";
+        try
+        {
+            var state = await AuthenticationState.GetAuthenticationStateAsync();
+            var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, ExpectedDeliveryDate = manualExpectedDate, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
+            if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage);
+            message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = ""; manualExpectedDate = null;
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { busy = false; }
+    }
+    private static string Money(decimal value) => $"₱{value:N2}";
 }

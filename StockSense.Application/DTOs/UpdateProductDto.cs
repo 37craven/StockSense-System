@@ -23,3 +23,32 @@ public class UpdateProductDto
 
     public string? Barcode { get; set; }
 }
+
+public sealed class UpdateProductInventoryDto
+{
+    [Required]
+    public int Id { get; set; }
+
+    [Range(typeof(decimal), "0.01", "9999999")]
+    public decimal Price { get; set; }
+
+    [Range(-999_999, 999_999)]
+    public int StockAdjustment { get; set; }
+
+    [Required, StringLength(500, MinimumLength = 1)]
+    public string Reason { get; set; } = string.Empty;
+
+    public byte[] ProductRowVersion { get; set; } = [];
+}
+
+public sealed record UpdateProductInventoryResultDto(
+    int Id,
+    decimal Price,
+    int CurrentStock,
+    byte[] ProductRowVersion,
+    string? Warning = null);
+
+public sealed record ProductImageUploadResultDto(
+    int Id,
+    string ImageUrl,
+    byte[] ProductRowVersion);

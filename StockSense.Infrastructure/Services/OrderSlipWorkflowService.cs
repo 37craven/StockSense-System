@@ -291,6 +291,157 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                 new(slips.Select(ToDto).ToArray(), warnings));
         }, cancellationToken);
 
+    public async Task<OperationResult<ManualOrderSlipCatalogDto>> GetManualCatalogAsync(
+        string locationId, CancellationToken cancellationToken = default)
+    {
+        locationId = NormalizeLocation(locationId);
+        var suppliers = await _context.Suppliers.AsNoTracking()
+            .OrderBy(supplier => supplier.Name)
+            .Select(supplier => new ManualOrderSlipSupplierDto { Id = supplier.Id, Name = supplier.Name })
+            .ToListAsync(cancellationToken);
+        var products = await _context.Products.AsNoTracking()
+            .Where(product => product.SupplierId.HasValue)
+            .OrderBy(product => product.Name)
+            .ToListAsync(cancellationToken);
+        var productIds = products.Select(product => product.Id).ToArray();
+        var settings = await _context.ProductInventorySettings.AsNoTracking()
+            .Where(setting => productIds.Contains(setting.ProductId) && setting.LocationId == locationId)
+            .ToDictionaryAsync(setting => setting.ProductId, cancellationToken);
+
+        return OperationResult<ManualOrderSlipCatalogDto>.Success(new ManualOrderSlipCatalogDto
+        {
+            Suppliers = suppliers,
+            Products = products.Select(product =>
+            {
+                var hasSetting = settings.TryGetValue(product.Id, out var setting);
+                return new ManualOrderSlipProductDto
+                {
+                    Id = product.Id,
+                    Name = product.Name,
+                    Brand = product.Brand,
+                    Category = product.Category,
+                    SupplierId = product.SupplierId!.Value,
+                    UnitCost = product.UnitCost,
+                    CurrentStock = product.CurrentStock,
+                    MinimumOrderQuantity = hasSetting ? setting!.MinimumOrderQuantity : 1,
+                    PackageSize = hasSetting ? setting!.PackageSize : 1,
+                    MaximumStockLevel = hasSetting ? setting!.MaximumStockLevel : null,
+                    HasInventorySettings = hasSetting
+                };
+            }).ToList()
+        });
+    }
+
+    public Task<OperationResult<OrderSlipDto>> CreateManualDraftAsync(
+        CreateManualOrderSlipDraftCommand command, CancellationToken cancellationToken = default) =>
+        ExecuteWriteAsync(async ct =>
+        {
+            var locationId = NormalizeLocation(command.LocationId);
+            var reason = command.Reason?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(reason))
+                return OperationResult<OrderSlipDto>.Failure("REASON_REQUIRED", "Enter a reason for this manual order.");
+            if (reason.Length > 500)
+                return OperationResult<OrderSlipDto>.Failure("REASON_TOO_LONG", "The manual order reason cannot exceed 500 characters.");
+            if (command.ExpectedDeliveryDate.HasValue && command.ExpectedDeliveryDate.Value.Date < DateTime.Today)
+                return OperationResult<OrderSlipDto>.Failure("INVALID_EXPECTED_DATE", "Expected delivery date cannot be in the past.");
+            if (command.SupplierId <= 0 || command.Items.Count == 0
+                || command.Items.Any(item => item.ProductId <= 0 || item.OrderedQuantity <= 0)
+                || command.Items.Select(item => item.ProductId).Distinct().Count() != command.Items.Count)
+                return OperationResult<OrderSlipDto>.Failure("INVALID_ORDER", "Select a supplier and add unique products with positive quantities.");
+
+            var supplier = await _context.Suppliers.SingleOrDefaultAsync(value => value.Id == command.SupplierId, ct);
+            if (supplier is null)
+                return OperationResult<OrderSlipDto>.Failure("SUPPLIER_NOT_FOUND", "The selected supplier no longer exists.");
+
+            var productIds = command.Items.Select(item => item.ProductId).ToArray();
+            var products = await _context.Products.Where(product => productIds.Contains(product.Id))
+                .ToDictionaryAsync(product => product.Id, ct);
+            if (products.Count != productIds.Length)
+                return OperationResult<OrderSlipDto>.Failure("PRODUCT_NOT_FOUND", "One or more selected products no longer exist.");
+            if (products.Values.Any(product => product.SupplierId != command.SupplierId))
+                return OperationResult<OrderSlipDto>.Failure("SUPPLIER_MISMATCH", "Every product must be assigned to the selected supplier.");
+
+            var existingProductIds = await _context.OrderSlipItems.AsNoTracking()
+                .Where(item => productIds.Contains(item.ProductId)
+                               && item.OrderSlip.LocationId == locationId
+                               && OpenStatuses.Contains(item.OrderSlip.Status))
+                .Select(item => item.ProductId).Distinct().ToArrayAsync(ct);
+            if (existingProductIds.Length > 0)
+                return OperationResult<OrderSlipDto>.Failure("OPEN_ORDER_EXISTS", "A selected product already has an open order slip.");
+
+            var settings = await _context.ProductInventorySettings.AsNoTracking()
+                .Where(setting => productIds.Contains(setting.ProductId) && setting.LocationId == locationId)
+                .ToDictionaryAsync(setting => setting.ProductId, ct);
+            var metrics = await _context.ProductInventoryMetrics.AsNoTracking()
+                .Where(metric => productIds.Contains(metric.ProductId) && metric.LocationId == locationId)
+                .ToDictionaryAsync(metric => metric.ProductId, ct);
+
+            foreach (var requested in command.Items)
+            {
+                if (!settings.TryGetValue(requested.ProductId, out var setting)) continue;
+                if (setting.MinimumOrderQuantity <= 0 || setting.PackageSize <= 0)
+                    return OperationResult<OrderSlipDto>.Failure("INVALID_SETTINGS", "A selected product has invalid order quantity settings.");
+                var validation = OrderSlipMath.ValidateOrderedQuantity(
+                    requested.OrderedQuantity, setting.MinimumOrderQuantity, setting.PackageSize,
+                    products[requested.ProductId].CurrentStock, setting.MaximumStockLevel);
+                if (validation is not null)
+                    return OperationResult<OrderSlipDto>.Failure("INVALID_QUANTITY", $"{products[requested.ProductId].Name}: {validation}");
+            }
+
+            var now = DateTime.Now;
+            var slipNumber = $"OS-{now:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..35].ToUpperInvariant();
+            var slip = new OrderSlip
+            {
+                SlipNumber = slipNumber,
+                OrderSlipNumber = slipNumber,
+                DateGenerated = now,
+                GeneratedAt = now,
+                SupplierId = supplier.Id,
+                Supplier = supplier,
+                LocationId = locationId,
+                Status = OrderSlipStatuses.Draft,
+                ExpectedDeliveryDate = command.ExpectedDeliveryDate?.Date,
+                CreatedByUserId = command.CreatedByUserId,
+                Remarks = reason
+            };
+            foreach (var requested in command.Items)
+            {
+                var product = products[requested.ProductId];
+                settings.TryGetValue(product.Id, out var setting);
+                metrics.TryGetValue(product.Id, out var metric);
+                var lineTotal = checked(product.UnitCost * requested.OrderedQuantity);
+                slip.Items.Add(new OrderSlipItem
+                {
+                    ProductId = product.Id,
+                    ProductName = product.Name,
+                    Brand = product.Brand,
+                    Category = product.Category,
+                    CurrentStock = product.CurrentStock,
+                    ReorderTarget = product.ReorderTarget,
+                    Quantity = requested.OrderedQuantity,
+                    OrderedQuantity = requested.OrderedQuantity,
+                    CurrentStockSnapshot = product.CurrentStock,
+                    InventoryPositionSnapshot = product.CurrentStock,
+                    AverageDailyDemandSnapshot = metric?.AverageDailyDemand ?? 0,
+                    LeadTimeDaysSnapshot = metric?.AverageLeadTimeDays ?? 0,
+                    SafetyStockSnapshot = metric?.SafetyStock ?? 0,
+                    ReorderPointSnapshot = product.ReorderTarget,
+                    TargetStockSnapshot = metric?.TargetStock ?? product.ReorderTarget,
+                    SuggestedQuantity = requested.OrderedQuantity,
+                    PackageSizeSnapshot = setting?.PackageSize ?? 1,
+                    MinimumOrderQuantitySnapshot = setting?.MinimumOrderQuantity ?? 1,
+                    UnitCostSnapshot = product.UnitCost,
+                    EstimatedLineTotal = lineTotal,
+                    RecommendationReason = $"Manual order: {reason}"
+                });
+                slip.TotalEstimatedCost = checked(slip.TotalEstimatedCost + lineTotal);
+            }
+
+            await _context.OrderSlips.AddAsync(slip, ct);
+            await _context.SaveChangesAsync(ct);
+            return OperationResult<OrderSlipDto>.Success(ToDto(slip));
+        }, cancellationToken);
+
     public Task<OperationResult<OrderSlipDto>> ApproveAsync(OrderSlipTransitionCommand command, CancellationToken cancellationToken = default) =>
         TransitionAsync(command, OrderSlipStatuses.Draft, OrderSlipStatuses.Approved, cancellationToken);
 

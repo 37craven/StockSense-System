@@ -6,23 +6,28 @@
 @using StockSense.Client.Layout
 @inject HttpClient Http
 @inject IJSRuntime JS
+@inject ToastService Toast
 @attribute [Authorize(Roles = "Admin, Employee")]
+@implements IDisposable
 
 <PageTitle>Safety Stock</PageTitle>
 
 <BbPortalHost />
 <BbDialogProvider />
+<BbToastProvider Position="ToastPosition.BottomRight" />
 
 <div class="flex flex-col gap-5">
     <PageHeader Title="Safety Stock Dashboard"
                 Subtitle="Historical demand and inventory-policy calculations for the MAIN location.">
-        <BbButton Variant="ButtonVariant.Default" OnClick="OpenNewProductModal">
-            <LucideIcon Name="package-plus" Size="16" /> New Product
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(busy || selectedIds.Count == 0)">
+        <AuthorizeView Roles="Admin">
+            <BbButton Variant="ButtonVariant.Default" OnClick="OpenNewProductModal">
+                <LucideIcon Name="package-plus" Size="16" /> New Product
+            </BbButton>
+        </AuthorizeView>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(ModalOperationLocked || selectedIds.Count == 0)">
             <LucideIcon Name="refresh-cw" Size="16" /> Recalculate selected
         </BbButton>
-        <BbButton OnClick="RecalculateAll" Disabled="busy">
+        <BbButton OnClick="RecalculateAll" Disabled="ModalOperationLocked">
             @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
             <LucideIcon Name="calculator" Size="16" /> Recalculate all
         </BbButton>
@@ -84,91 +89,171 @@
         <label class="flex items-center gap-2 self-end h-9 text-sm text-foreground"><input type="checkbox" @bind="automaticOnly" /> Automatic only</label>
     </div>
 
-    @if (rows == null)
+    @if (loadFailed)
+    {
+        <div class="inventory-empty" role="alert"><LucideIcon Name="circle-alert" Size="24" /><div><strong>Inventory data could not be loaded</strong><p>@error</p></div><BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync">Try again</BbButton></div>
+    }
+    else if (rows == null)
     {
         <LoadingState Description="Loading inventory metrics…" />
     }
+    else if (!FilteredRows.Any())
+    {
+        <div class="inventory-empty" role="status"><LucideIcon Name="package-search" Size="24" /><div><strong>No products match these filters</strong><p>Adjust the search or inventory filters to see products.</p></div></div>
+    }
     else
     {
-        <div class="rounded-lg border border-border bg-card overflow-x-auto">
-            <table class="w-full text-sm" style="border-collapse: collapse; min-width: 1200px;">
-                <thead class="bg-muted/30 text-muted-foreground">
-                    <tr>
-                        <th class="p-3 text-left"><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th>
-                        <th class="p-3 text-left">Product</th><th class="p-3 text-left">Supplier</th>
-                        <th class="p-3 text-right">Current</th><th class="p-3 text-right">Incoming</th><th class="p-3 text-right">Position</th>
-                        <th class="p-3 text-right">Avg/day</th><th class="p-3 text-right">Variability</th><th class="p-3 text-right">Safety</th>
-                        <th class="p-3 text-right">Reorder point</th><th class="p-3 text-right">Target</th><th class="p-3 text-left">Stage</th>
-                        <th class="p-3 text-left">Calculated</th><th class="p-3"><span class="sr-only">Actions</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in FilteredRows)
-                    {
-                        <tr class="border-t border-border">
-                            <td class="p-3"><input type="checkbox" aria-label="Select @row.ProductName" checked="@selectedIds.Contains(row.ProductId)" @onchange="e => Toggle(row.ProductId, e)" /></td>
-                            <td class="p-3"><div class="font-medium text-foreground">@row.ProductName</div><div class="text-xs text-muted-foreground">@row.Brand · @row.Category</div></td>
-                            <td class="p-3">@(string.IsNullOrWhiteSpace(row.SupplierName) ? "Missing" : row.SupplierName)</td>
-                            <td class="p-3 text-right">@row.CurrentStock</td><td class="p-3 text-right">@row.IncomingStock</td>
-                            <td class="p-3 text-right font-medium" style="color: @(row.InventoryPosition <= row.ReorderPoint ? "var(--destructive)" : "var(--foreground)")">@row.InventoryPosition</td>
-                            <td class="p-3 text-right">@row.AverageDailyDemand.ToString("0.####")</td><td class="p-3 text-right">@row.DemandStandardDeviation.ToString("0.####")</td>
-                            <td class="p-3 text-right">@row.SafetyStock</td><td class="p-3 text-right">@row.ReorderPoint</td><td class="p-3 text-right">@row.TargetStock</td>
-                            <td class="p-3"><BbBadge Variant="BadgeVariant.Secondary">@row.CalculationStage · @row.ConfidenceLevel</BbBadge></td>
-                            <td class="p-3 text-xs" title="@row.CalculationExplanation">@(row.LastCalculatedAt?.ToString("MMM d, yyyy h:mm tt") ?? "Never")</td>
-                            <td class="p-3"><div class="flex gap-1 justify-end">
-                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => DownloadBarcodePdf(row.ProductId, row.ProductName)" title="@($"Print label for {row.ProductName}")"><LucideIcon Name="barcode" Size="14" /></BbButton>
-                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => RecalculateOne(row.ProductId)" Disabled="busy" title="@($"Recalculate {row.ProductName}")"><LucideIcon Name="refresh-cw" Size="14" /></BbButton>
-                                <AuthorizeView Roles="Admin"><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenSettings(row)" Disabled="busy" title="@($"Edit settings for {row.ProductName}")"><LucideIcon Name="settings" Size="14" /></BbButton></AuthorizeView>
-                            </div></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="inventory-list-shell">
+            <div class="inventory-list-summary"><span>@FilteredRows.Count() of @rows.Count products</span><span>Select a product to view metrics and settings</span></div>
+            <div class="inventory-table-wrap">
+                <table class="inventory-table">
+                    <thead><tr><th><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th><th>Product</th><th>Stock</th><th>Position</th><th>Reorder</th><th>Calculation</th><th><span class="sr-only">Open</span></th></tr></thead>
+                    <tbody>
+                        @foreach (var row in FilteredRows)
+                        {
+                            <tr class="inventory-row" @onclick="() => OpenDetails(row)">
+                                <td @onclick:stopPropagation><input type="checkbox" aria-label="Select @row.ProductName for recalculation" checked="@selectedIds.Contains(row.ProductId)" @onchange="e => Toggle(row.ProductId, e)" /></td>
+                                <td data-label="Product"><strong>@row.ProductName</strong><small>@row.Brand · @row.Category</small></td>
+                                <td data-label="Stock">@row.CurrentStock <small>+@row.IncomingStock incoming</small></td>
+                                <td data-label="Position" class="metric-emphasis @(row.InventoryPosition <= row.ReorderPoint ? "metric-risk" : "")">@row.InventoryPosition</td>
+                                <td data-label="Reorder">@row.ReorderPoint</td>
+                                <td data-label="Calculation"><BbBadge Variant="BadgeVariant.Secondary">@row.CalculationStage · @row.ConfidenceLevel</BbBadge></td>
+                                <td @onclick:stopPropagation><button type="button" class="row-details-button" @onclick="() => OpenDetails(row)" aria-label="View inventory details for @row.ProductName"><LucideIcon Name="chevron-right" Size="16" /></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
     }
 </div>
 
-<BbDialog @bind-Open="settingsOpen">
-    <BbDialogContent Style="width: min(96vw, 760px); max-height: 90vh; overflow-y: auto;">
-        <BbDialogHeader><BbDialogTitle>Inventory settings · @editingName</BbDialogTitle><BbDialogDescription>Changes recalculate the product immediately. Reorder point remains distinct from safety stock.</BbDialogDescription></BbDialogHeader>
-        @if (settings == null)
+<BbDialog @bind-Open="detailOpen">
+    <BbDialogContent Style="width:min(96vw,900px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+        <BbDialogHeader><BbDialogTitle>@(selectedRow?.ProductName ?? "Inventory details")</BbDialogTitle><BbDialogDescription>@(selectedRow is null ? "Product inventory and safety-stock details." : $"{selectedRow.Brand} · {selectedRow.Category} · MAIN location")</BbDialogDescription></BbDialogHeader>
+        @if (selectedRow is not null)
         {
-            <div class="p-8 flex flex-col items-center gap-3">
-                @if (string.IsNullOrWhiteSpace(settingsError))
-                {
-                    <LoadingState Description="Loading inventory settings..." />
-                }
-                else
-                {
-                    <p role="alert" style="color: var(--destructive);" class="text-sm m-0">@settingsError</p>
-                    <BbButton Variant="ButtonVariant.Ghost" OnClick="() => settingsOpen = false">Close</BbButton>
-                }
+            <div class="detail-scroll">
+                <section class="product-image-section" aria-labelledby="product-image-heading">
+                    <div class="product-image-frame">
+                        @if (string.IsNullOrWhiteSpace(CurrentImagePreview)) { <LucideIcon Name="image" Size="30" /> }
+                        else { <img src="@CurrentImagePreview" alt="Product image for @selectedRow.ProductName" /> }
+                    </div>
+                    <div class="product-image-copy"><h3 id="product-image-heading">Product image</h3>
+                        <AuthorizeView Roles="Admin"><Authorized>
+                            @if (ModalOperationLocked)
+                            {
+                                <InputFile @key="imageInputKey" id="product-image-input" class="upload-input" OnChange="HandleImageSelected" accept="image/jpeg,image/png,image/webp" aria-describedby="product-image-help product-image-status" disabled />
+                            }
+                            else
+                            {
+                                <InputFile @key="imageInputKey" id="product-image-input" class="upload-input" OnChange="HandleImageSelected" accept="image/jpeg,image/png,image/webp" aria-describedby="product-image-help product-image-status" />
+                            }
+                            <label class="upload-card @(ModalOperationLocked ? "is-disabled" : null)" for="product-image-input" aria-disabled="@ModalOperationLocked">
+                                <span class="upload-card-visual" aria-hidden="true">
+                                    @if (selectedImageFile is not null && !string.IsNullOrWhiteSpace(imagePreviewUrl))
+                                    {
+                                        <img src="@imagePreviewUrl" alt="" />
+                                    }
+                                    else
+                                    {
+                                        <LucideIcon Name="image-up" Size="24" />
+                                    }
+                                </span>
+                                <span class="upload-card-copy">
+                                    <strong>@(selectedImageFile is not null ? "Choose a different image" : string.IsNullOrWhiteSpace(selectedRow.ImageUrl) ? "Choose product image" : "Replace image")</strong>
+                                    <span id="product-image-help">JPEG, PNG, or WebP · maximum 5 MB</span>
+                                </span>
+                            </label>
+                            <div id="product-image-status" class="upload-selection" aria-live="polite" aria-atomic="true">
+                                @if (selectedImageFile is null)
+                                {
+                                    <span>No new image selected</span>
+                                }
+                                else
+                                {
+                                    <span class="selected-file-name"><LucideIcon Name="circle-check" Size="15" /> @selectedImageFile.Name</span>
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearImageSelection" Disabled="@ModalOperationLocked" aria-label="Remove selected image">Remove</BbButton>
+                                }
+                            </div>
+                            @if (imageUploading) { <progress aria-label="Uploading product image" class="image-progress"></progress> }
+                            @if (!string.IsNullOrWhiteSpace(imageUploadError)) { <p role="alert" class="form-error">@imageUploadError</p> }
+                            <div class="image-save-row">
+                                <BbButton Variant="ButtonVariant.Default" OnClick="UploadProductImage" Disabled="@(ModalOperationLocked || selectedImageFile is null)">@if (imageUploading) { <BbSpinner Size="SpinnerSize.Small" /> } Save image</BbButton>
+                                @if (ModalOperationLocked)
+                                {
+                                    <span>Please wait for the current operation to finish.</span>
+                                }
+                                else if (selectedImageFile is null)
+                                {
+                                    <span>Choose a valid image to enable Save image.</span>
+                                }
+                            </div>
+                        </Authorized></AuthorizeView>
+                    </div>
+                </section>
+                <section aria-labelledby="stock-metrics-heading">
+                    <div class="section-heading"><div><h3 id="stock-metrics-heading">Inventory position</h3><p>Live stock and replenishment thresholds.</p></div><BbBadge Variant="BadgeVariant.Secondary">@selectedRow.CalculationStage · @selectedRow.ConfidenceLevel</BbBadge></div>
+                    <dl class="metric-grid">
+                        <div><dt>On hand</dt><dd>@selectedRow.CurrentStock</dd></div><div><dt>Confirmed incoming</dt><dd>@selectedRow.IncomingStock</dd></div><div><dt>Inventory position</dt><dd>@selectedRow.InventoryPosition</dd></div>
+                        <div><dt>Safety stock</dt><dd>@selectedRow.SafetyStock</dd></div><div><dt>Reorder point</dt><dd>@selectedRow.ReorderPoint</dd></div><div><dt>Target stock</dt><dd>@selectedRow.TargetStock</dd></div>
+                        <div><dt>Average demand / day</dt><dd>@selectedRow.AverageDailyDemand.ToString("0.####")</dd></div><div><dt>Demand variability</dt><dd>@selectedRow.DemandStandardDeviation.ToString("0.####")</dd></div><div><dt>Supplier</dt><dd>@(string.IsNullOrWhiteSpace(selectedRow.SupplierName) ? "Missing" : selectedRow.SupplierName)</dd></div>
+                        <div><dt>Selling price</dt><dd>₱@selectedRow.Price.ToString("N2")</dd></div><div><dt>Order policy</dt><dd>@(selectedRow.IsAutomaticOrderEnabled ? "Automatic" : "Manual review")</dd></div>
+                    </dl>
+                    <div class="calculation-note"><strong>Calculation details</strong><p>@(string.IsNullOrWhiteSpace(selectedRow.CalculationExplanation) ? "No calculation explanation is available." : selectedRow.CalculationExplanation)</p><small>Last calculated: @(selectedRow.LastCalculatedAt?.ToString("MMM d, yyyy h:mm tt") ?? "Never")</small></div>
+                </section>
+                <AuthorizeView Roles="Admin">
+                  <Authorized>
+                    <section aria-labelledby="inventory-values-heading">
+                        <div class="section-heading"><div><h3 id="inventory-values-heading">Price and stock</h3><p>Changes are audited and require a reason.</p></div></div>
+                        <div class="editor-grid two-fields"><label for="edit-price">Selling price<input id="edit-price" class="field" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock">Current stock<input id="edit-stock" class="field" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
+                        <label class="editor-label" for="stock-reason">Reason for change<textarea id="stock-reason" class="field textarea" rows="2" maxlength="500" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/500 characters</small></label>
+                        @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="form-error">@productEditorError</p> }
+                        <div class="section-actions"><BbButton OnClick="SaveProductInventory" Disabled="@(ModalOperationLocked || !ProductEditorValid || !ProductWillChange)">@if (productSaving) { <BbSpinner Size="SpinnerSize.Small" /> } Save inventory values</BbButton></div>
+                    </section>
+                    <section aria-labelledby="policy-settings-heading">
+                        <div class="section-heading"><div><h3 id="policy-settings-heading">Safety-stock settings</h3><p>Saving recalculates this product immediately.</p></div></div>
+                        @if (settings == null)
+                        {
+                            @if (string.IsNullOrWhiteSpace(settingsError)) { <LoadingState Description="Loading inventory settings…" /> } else { <p role="alert" class="form-error">@settingsError</p> }
+                        }
+                        else
+                        {
+                            <div class="editor-grid policy-grid">
+                                <label>Calculation mode<select @bind="settings.CalculationMode" class="field"><option>Auto</option><option>Manual</option></select></label><label>Weekly demand estimate<input type="number" min="0" step="0.0001" @bind="settings.InitialEstimatedWeeklyDemand" class="field" /></label><label>Supplier lead time (days)<input type="number" min="1" @bind="settings.DefaultLeadTimeDays" class="field" /></label>
+                                <label>Review period (days)<input type="number" min="1" @bind="settings.ReviewPeriodDays" class="field" /></label><label>Buffer days<input type="number" min="0" @bind="settings.BufferDays" class="field" /></label><label>Service level<input type="number" min="0.5" max="0.999" step="0.0001" @bind="settings.ServiceLevel" class="field" /></label>
+                                <label>Minimum safety stock<input type="number" min="0" @bind="settings.MinimumSafetyStock" class="field" /></label><label>Maximum safety stock<input type="number" min="0" @bind="settings.MaximumSafetyStock" class="field" /></label><label>Minimum order quantity<input type="number" min="1" @bind="settings.MinimumOrderQuantity" class="field" /></label>
+                                <label>Package size<input type="number" min="1" @bind="settings.PackageSize" class="field" /></label><label>Maximum stock level<input type="number" min="1" @bind="settings.MaximumStockLevel" class="field" /></label><label>Tracking start date<input type="date" @bind="settings.InventoryTrackingStartDate" @bind:format="yyyy-MM-dd" class="field" /></label>
+                                @if (settings.CalculationMode == "Manual") { <label>Manual safety stock<input type="number" min="0" @bind="settings.ManualSafetyStock" class="field" /></label><label>Manual reorder point<input type="number" min="0" @bind="settings.ManualReorderPoint" class="field" /></label> }
+                            </div>
+                            <label class="checkbox-label"><input type="checkbox" @bind="settings.IsAutomaticOrderEnabled" /> Automatic order recommendations enabled</label>
+                            @if (!string.IsNullOrWhiteSpace(settingsError)) { <p role="alert" class="form-error">@settingsError</p> }
+                            <div class="section-actions"><BbButton OnClick="SaveSettings" Disabled="ModalOperationLocked">Save settings and recalculate</BbButton></div>
+                        }
+                    </section>
+                  </Authorized>
+                  <NotAuthorized>
+                    <section aria-labelledby="policy-readonly-heading">
+                        <div class="section-heading"><div><h3 id="policy-readonly-heading">Safety-stock settings</h3><p>Policy settings are read-only for employees.</p></div></div>
+                        @if (settings == null)
+                        {
+                            @if (string.IsNullOrWhiteSpace(settingsError)) { <LoadingState Description="Loading inventory settings…" /> } else { <p role="alert" class="form-error">@settingsError</p> }
+                        }
+                        else
+                        {
+                            <dl class="metric-grid">
+                                <div><dt>Calculation mode</dt><dd>@settings.CalculationMode</dd></div><div><dt>Weekly demand estimate</dt><dd>@settings.InitialEstimatedWeeklyDemand.ToString("0.####")</dd></div><div><dt>Lead time</dt><dd>@settings.DefaultLeadTimeDays days</dd></div>
+                                <div><dt>Review period</dt><dd>@settings.ReviewPeriodDays days</dd></div><div><dt>Buffer</dt><dd>@settings.BufferDays days</dd></div><div><dt>Service level</dt><dd>@settings.ServiceLevel.ToString("P2")</dd></div>
+                                <div><dt>Minimum safety</dt><dd>@settings.MinimumSafetyStock</dd></div><div><dt>Maximum safety</dt><dd>@(settings.MaximumSafetyStock?.ToString() ?? "None")</dd></div><div><dt>Minimum order</dt><dd>@settings.MinimumOrderQuantity</dd></div>
+                                <div><dt>Package size</dt><dd>@settings.PackageSize</dd></div><div><dt>Maximum stock</dt><dd>@(settings.MaximumStockLevel?.ToString() ?? "None")</dd></div><div><dt>Tracking since</dt><dd>@settings.InventoryTrackingStartDate.ToString("MMM d, yyyy")</dd></div>
+                            </dl>
+                        }
+                    </section>
+                    <p class="read-only-note"><LucideIcon Name="eye" Size="15" /> Contact an administrator to change inventory values or policy settings.</p>
+                  </NotAuthorized>
+                </AuthorizeView>
             </div>
-        }
-        else
-        {
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Calculation mode<select @bind="settings.CalculationMode" class="field"><option>Auto</option><option>Manual</option></select></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Weekly demand estimate<input type="number" min="0" step="0.0001" @bind="settings.InitialEstimatedWeeklyDemand" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Supplier lead time (days)<input type="number" min="1" @bind="settings.DefaultLeadTimeDays" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Review period (days)<input type="number" min="1" @bind="settings.ReviewPeriodDays" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Buffer days<input type="number" min="0" @bind="settings.BufferDays" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Service level<input type="number" min="0.5" max="0.999" step="0.0001" @bind="settings.ServiceLevel" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Minimum safety stock<input type="number" min="0" @bind="settings.MinimumSafetyStock" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Maximum safety stock<input type="number" min="0" @bind="settings.MaximumSafetyStock" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Minimum order quantity<input type="number" min="1" @bind="settings.MinimumOrderQuantity" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Package size<input type="number" min="1" @bind="settings.PackageSize" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Maximum stock level<input type="number" min="1" @bind="settings.MaximumStockLevel" class="field" /></label>
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground">Tracking start date<input type="date" @bind="settings.InventoryTrackingStartDate" @bind:format="yyyy-MM-dd" class="field" /></label>
-                @if (settings.CalculationMode == "Manual")
-                {
-                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Manual safety stock<input type="number" min="0" @bind="settings.ManualSafetyStock" class="field" /></label>
-                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Manual reorder point<input type="number" min="0" @bind="settings.ManualReorderPoint" class="field" /></label>
-                }
-            </div>
-            <label class="flex items-center gap-2 mt-4 text-sm"><input type="checkbox" @bind="settings.IsAutomaticOrderEnabled" /> Automatic order recommendations enabled</label>
-            @if (!string.IsNullOrWhiteSpace(settingsError)) { <p role="alert" style="color: var(--destructive);" class="text-sm">@settingsError</p> }
-            <div class="flex justify-end gap-2 mt-5"><BbButton Variant="ButtonVariant.Ghost" OnClick="() => settingsOpen = false">Cancel</BbButton><BbButton OnClick="SaveSettings" Disabled="busy">Save and recalculate</BbButton></div>
+            <div class="detail-footer"><BbButton Variant="ButtonVariant.Ghost" OnClick="() => DownloadBarcodePdf(selectedRow.ProductId, selectedRow.ProductName)"><LucideIcon Name="barcode" Size="14" /> Print label</BbButton><BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateDetail" Disabled="ModalOperationLocked"><LucideIcon Name="refresh-cw" Size="14" /> Recalculate</BbButton><span class="footer-spacer"></span><BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDetails" Disabled="ModalOperationLocked">Close</BbButton></div>
         }
     </BbDialogContent>
 </BbDialog>
@@ -212,12 +297,7 @@
                                style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4);">
-                    <div>
-                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Unit Cost (₱)</label>
-                        <input type="number" step="0.01" @bind="newProduct.UnitCost" placeholder="0.00"
-                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
-                    </div>
+                <div style="display: grid; grid-template-columns: 1fr; gap: var(--space-4);">
                     <div>
                         <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Initial Stock</label>
                         <input type="number" @bind="newProduct.InitialStock" placeholder="0"
@@ -259,11 +339,42 @@
 @code {
     private List<InventoryDashboardRowDto>? rows;
     private readonly HashSet<int> selectedIds = [];
-    private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", message = "", error = "", settingsError = "", editingName = "", recalculationState = "";
-    private bool belowReorder, missingSupplier, automaticOnly, busy, settingsOpen;
+    private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", message = "", error = "", settingsError = "", recalculationState = "";
+    private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed;
+    private bool detailOpen
+    {
+        get => _detailOpen;
+        set
+        {
+            if (_detailOpen == value || (!value && ModalOperationLocked)) return;
+            _detailOpen = value;
+            if (!value) ClearDetailSelection();
+        }
+    }
+    private InventoryDashboardRowDto? selectedRow;
+    private CancellationTokenSource? detailSettingsCts;
+    private long detailGeneration;
     private ProductInventorySettingDto? settings;
     private int recalculationTotal, recalculationCompleted;
     private readonly List<RecalculationOutcome> recalculationResults = [];
+    private bool productSaving, imageUploading;
+    private IBrowserFile? selectedImageFile;
+    private const long MaxImageBytes = 5 * 1024 * 1024;
+    private int editingProductId, originalStock, imageInputKey;
+    private decimal originalPrice;
+    private byte[] editingProductRowVersion = [];
+    private string editingProductName = "", editPriceText = "", editStockText = "", stockCorrectionReason = "", productEditorError = "", imagePreviewUrl = "", imageUploadError = "";
+    private bool TryPrice(out decimal value) => decimal.TryParse(editPriceText, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, out value);
+    private bool TryStock(out int value) => int.TryParse(editStockText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.CurrentCulture, out value);
+    private bool editPriceInvalid => !TryPrice(out var value) || value <= 0 || decimal.Round(value, 2) != value;
+    private bool editStockInvalid => !TryStock(out var value) || value < 0 || value > 999_999;
+    private bool reasonInvalid => string.IsNullOrWhiteSpace(stockCorrectionReason) || stockCorrectionReason.Length > 500;
+    private bool StockWillChange => TryStock(out var value) && value != originalStock;
+    private bool ProductWillChange => (TryPrice(out var price) && price != originalPrice)
+                                      || StockWillChange;
+    private bool ProductEditorValid => !editPriceInvalid && !editStockInvalid && !reasonInvalid;
+    private bool ModalOperationLocked => busy || productSaving || imageUploading;
+    private string CurrentImagePreview => string.IsNullOrWhiteSpace(imagePreviewUrl) ? selectedRow?.ImageUrl ?? string.Empty : imagePreviewUrl;
 
     protected override Task OnInitializedAsync() => LoadAsync();
     private IEnumerable<InventoryDashboardRowDto> FilteredRows => (rows ?? [])
@@ -281,13 +392,188 @@
     private IEnumerable<string> Brands => (rows ?? []).Select(x => x.Brand).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Order();
     private IEnumerable<string> Suppliers => (rows ?? []).Where(x => x.SupplierId.HasValue).Select(x => x.SupplierName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Order();
 
-    private async Task LoadAsync() { rows = await Http.GetFromJsonAsync<List<InventoryDashboardRowDto>>("api/inventory/dashboard"); }
+    private async Task LoadAsync()
+    {
+        loadFailed = false;
+        try
+        {
+            rows = await Http.GetFromJsonAsync<List<InventoryDashboardRowDto>>("api/inventory/dashboard") ?? [];
+            error = "";
+        }
+        catch (Exception ex)
+        {
+            rows = null;
+            error = ex.Message;
+            loadFailed = true;
+        }
+    }
     private void Toggle(int id, ChangeEventArgs e) { if (e.Value is true) selectedIds.Add(id); else selectedIds.Remove(id); }
     private void ToggleAll(ChangeEventArgs e) { foreach (var row in FilteredRows) { if (e.Value is true) selectedIds.Add(row.ProductId); else selectedIds.Remove(row.ProductId); } }
     private async Task DownloadBarcodePdf(int productId, string productName)
     {
         var safeName = string.Concat(productName.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
         await JS.InvokeVoidAsync("triggerDownload", $"api/products/{productId}/barcode-pdf", $"Barcode_{safeName}.pdf");
+    }
+    private async Task OpenDetails(InventoryDashboardRowDto row)
+    {
+        if (ModalOperationLocked) return;
+        InvalidateSettingsLoad();
+        var generation = detailGeneration;
+        detailSettingsCts = new CancellationTokenSource();
+        var cancellationToken = detailSettingsCts.Token;
+        selectedRow = row;
+        detailOpen = true;
+        InitializeProductEditor(row);
+        await InvokeAsync(StateHasChanged);
+        await LoadSettingsAsync(row.ProductId, generation, cancellationToken);
+    }
+    private void InitializeProductEditor(InventoryDashboardRowDto row)
+    {
+        editingProductId = row.ProductId;
+        editingProductName = row.ProductName;
+        originalPrice = row.Price;
+        originalStock = row.CurrentStock;
+        editingProductRowVersion = row.ProductRowVersion.ToArray();
+        editPriceText = row.Price.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture);
+        editStockText = row.CurrentStock.ToString(System.Globalization.CultureInfo.CurrentCulture);
+        stockCorrectionReason = "";
+        productEditorError = "";
+        selectedImageFile = null;
+        imagePreviewUrl = "";
+        imageUploadError = "";
+        imageInputKey++;
+    }
+    private void CloseDetails()
+    {
+        if (ModalOperationLocked) return;
+        detailOpen = false;
+    }
+    private void ClearDetailSelection()
+    {
+        InvalidateSettingsLoad();
+        selectedRow = null;
+        settings = null;
+        settingsError = "";
+        selectedImageFile = null;
+        imagePreviewUrl = "";
+        imageUploadError = "";
+        imageInputKey++;
+    }
+    private void InvalidateSettingsLoad()
+    {
+        detailGeneration++;
+        detailSettingsCts?.Cancel();
+        detailSettingsCts?.Dispose();
+        detailSettingsCts = null;
+    }
+    private bool IsCurrentDetail(int productId, long generation, CancellationToken cancellationToken) =>
+        !cancellationToken.IsCancellationRequested
+        && generation == detailGeneration
+        && detailOpen
+        && selectedRow?.ProductId == productId;
+    private async Task SaveProductInventory()
+    {
+        if (ModalOperationLocked || selectedRow is null || selectedRow.ProductId != editingProductId
+            || !ProductEditorValid || !ProductWillChange
+            || !TryPrice(out var price) || !TryStock(out var stock)) return;
+
+        var targetProductId = selectedRow.ProductId;
+        productSaving = true;
+        productEditorError = "";
+        try
+        {
+            var command = new UpdateProductInventoryDto
+            {
+                Id = targetProductId,
+                Price = price,
+                StockAdjustment = checked(stock - originalStock),
+                Reason = stockCorrectionReason.Trim(),
+                ProductRowVersion = editingProductRowVersion
+            };
+            using var response = await Http.PutAsJsonAsync($"api/products/{targetProductId}/inventory-values", command);
+            await EnsureSuccess(response);
+            var result = await response.Content.ReadFromJsonAsync<UpdateProductInventoryResultDto>()
+                ?? throw new InvalidOperationException("The server returned an empty product update result.");
+            error = "";
+            await LoadAsync();
+            if (!RefreshSelectedRow()) return;
+            message = string.IsNullOrWhiteSpace(result.Warning)
+                ? $"Price and stock saved for {editingProductName}."
+                : $"Price and stock saved for {editingProductName}. {result.Warning}";
+        }
+        catch (Exception ex)
+        {
+            productEditorError = ex.Message;
+        }
+        finally
+        {
+            productSaving = false;
+        }
+    }
+    private async Task HandleImageSelected(InputFileChangeEventArgs args)
+    {
+        selectedImageFile = null;
+        imagePreviewUrl = "";
+        imageUploadError = "";
+        var file = args.File;
+        if (file.Size > MaxImageBytes)
+        {
+            imageUploadError = "The image cannot exceed 5 MB.";
+            return;
+        }
+        if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
+        {
+            imageUploadError = "Choose a JPEG, PNG, or WebP image.";
+            return;
+        }
+        try
+        {
+            await using var source = file.OpenReadStream(MaxImageBytes);
+            using var buffer = new MemoryStream();
+            await source.CopyToAsync(buffer);
+            imagePreviewUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer.ToArray())}";
+            selectedImageFile = file;
+        }
+        catch (Exception ex) { imageUploadError = $"The preview could not be loaded. {ex.Message}"; }
+    }
+    private void ClearImageSelection()
+    {
+        if (ModalOperationLocked) return;
+        selectedImageFile = null;
+        imagePreviewUrl = "";
+        imageUploadError = "";
+        imageInputKey++;
+    }
+    private async Task UploadProductImage()
+    {
+        if (ModalOperationLocked || selectedRow is null || selectedImageFile is null) return;
+        var productId = selectedRow.ProductId;
+        var rowVersion = selectedRow.ProductRowVersion.ToArray();
+        var file = selectedImageFile;
+        imageUploading = true;
+        imageUploadError = "";
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            using var imageContent = new StreamContent(file.OpenReadStream(MaxImageBytes));
+            imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            var safeUploadName = file.ContentType switch { "image/jpeg" => "product-image.jpg", "image/png" => "product-image.png", "image/webp" => "product-image.webp", _ => "product-image" };
+            form.Add(imageContent, "file", safeUploadName);
+            form.Add(new StringContent(Convert.ToBase64String(rowVersion)), "rowVersion");
+            using var response = await Http.PostAsync($"api/products/{productId}/image", form);
+            await EnsureSuccess(response);
+            var result = await response.Content.ReadFromJsonAsync<ProductImageUploadResultDto>()
+                ?? throw new InvalidOperationException("The server returned an empty image result.");
+            if (selectedRow?.ProductId != productId) return;
+            await LoadAsync();
+            if (!RefreshSelectedRow()) return;
+            imagePreviewUrl = result.ImageUrl;
+            selectedImageFile = null;
+            imageInputKey++;
+            Toast.Success("The product image is now up to date.", "Image uploaded");
+        }
+        catch (Exception ex) { imageUploadError = ex.Message; }
+        finally { imageUploading = false; }
     }
     private async Task RecalculateOne(int id) => await RecalculateIds([id]);
     private async Task RecalculateSelected() => await RecalculateIds(selectedIds.Order().ToArray());
@@ -310,59 +596,134 @@
         }
         recalculationState = "Recalculation finished."; message = $"Completed {recalculationResults.Count(x => !x.IsError)}; errors {recalculationResults.Count(x => x.IsError)}; skipped 0."; busy = false; await LoadAsync();
     }
-    private async Task RecalculateAll() => await Run(async () =>
+    private async Task RecalculateAll()
     {
-        recalculationResults.Clear(); recalculationTotal = rows?.Count ?? 0; recalculationCompleted = 0; recalculationState = "Calculating all products…";
-        var response = await Http.PostAsync("api/inventory/recalculate-all", null); await EnsureSuccess(response);
-        var summary = await response.Content.ReadFromJsonAsync<InventoryRecalculationSummaryDto>();
-        if (summary != null) foreach (var result in summary.Results) recalculationResults.Add(new(result.ProductName, $"{result.CalculationStage}; safety {result.SafetyStock}, reorder {result.ReorderPoint}, target {result.TargetStock}.", false));
-        recalculationCompleted = summary?.CompletedCount ?? recalculationTotal;
-        var skipped = Math.Max(0, (summary?.RequestedCount ?? recalculationTotal) - (summary?.CompletedCount ?? 0));
-        recalculationState = "Recalculation finished."; message = $"Completed {recalculationCompleted}; errors 0; skipped {skipped}.";
-    });
+        if (ModalOperationLocked) return;
+        busy = true; error = ""; message = ""; recalculationResults.Clear(); recalculationTotal = 0; recalculationCompleted = 0;
+        try
+        {
+            using var response = await Http.PostAsync("api/inventory/recalculate-all", null);
+            await EnsureSuccess(response);
+            var summary = await response.Content.ReadFromJsonAsync<InventoryRecalculationSummaryDto>();
+            var requested = summary?.RequestedCount ?? rows?.Count ?? 0;
+            var completed = summary?.CompletedCount ?? 0;
+            var remaining = Math.Max(0, requested - completed);
+            await LoadAsync();
+            if (loadFailed) return;
+            Toast.Success(remaining == 0 ? $"Completed {completed} of {requested} products." : $"Completed {completed} of {requested}; {remaining} not completed.", "Inventory recalculated");
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { busy = false; }
+    }
     private async Task Run(Func<Task> action) { busy = true; error = ""; message = ""; try { await action(); await LoadAsync(); } catch (Exception ex) { error = ex.Message; } finally { busy = false; } }
-    private async Task OpenSettings(InventoryDashboardRowDto row)
+    private async Task LoadSettingsAsync(int productId, long generation, CancellationToken cancellationToken)
     {
+        if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
         settings = null;
-        settingsOpen = true;
-        editingName = row.ProductName;
         settingsError = "";
-        busy = true;
 
         try
         {
-            var settingsUrl = $"api/inventory/products/{row.ProductId}/settings";
-            var response = await Http.GetAsync(settingsUrl);
+            var settingsUrl = $"api/inventory/products/{productId}/settings";
+            var response = await Http.GetAsync(settingsUrl, cancellationToken);
+            var initialized = false;
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 response.Dispose();
-                using var initializeResponse = await Http.PostAsync($"api/inventory/recalculate/{row.ProductId}", null);
+                using var initializeResponse = await Http.PostAsync($"api/inventory/recalculate/{productId}", null, cancellationToken);
                 await EnsureSuccess(initializeResponse);
-                response = await Http.GetAsync(settingsUrl);
+                initialized = true;
+                response = await Http.GetAsync(settingsUrl, cancellationToken);
             }
 
             using var finalResponse = response;
             await EnsureSuccess(response);
-            settings = await response.Content.ReadFromJsonAsync<ProductInventorySettingDto>()
+            var loadedSettings = await response.Content.ReadFromJsonAsync<ProductInventorySettingDto>(cancellationToken: cancellationToken)
                 ?? throw new InvalidOperationException("The server returned empty inventory settings.");
+            if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
+            settings = loadedSettings;
+            if (initialized)
+            {
+                await LoadAsync();
+                if (IsCurrentDetail(productId, generation, cancellationToken)) RefreshSelectedRow();
+            }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            settingsError = ex.Message;
-        }
-        finally
-        {
-            busy = false;
+            if (IsCurrentDetail(productId, generation, cancellationToken)) settingsError = ex.Message;
         }
     }
     private async Task SaveSettings()
     {
-        if (settings == null) return;
+        if (ModalOperationLocked || settings == null || selectedRow is null || settings.ProductId != selectedRow.ProductId) return;
+        var productId = selectedRow.ProductId;
         busy = true; settingsError = "";
-        try { await EnsureSuccess(await Http.PutAsJsonAsync($"api/inventory/products/{settings.ProductId}/settings", settings)); settingsOpen = false; message = "Inventory settings saved and recalculated."; await LoadAsync(); }
+        try { await EnsureSuccess(await Http.PutAsJsonAsync($"api/inventory/products/{productId}/settings", settings)); await LoadAsync(); if (!RefreshSelectedRow()) return; await LoadSettingsAsync(productId, detailGeneration, detailSettingsCts?.Token ?? CancellationToken.None); message = "Inventory settings saved and recalculated."; }
         catch (Exception ex) { settingsError = ex.Message; }
         finally { busy = false; }
+    }
+    private async Task RecalculateDetail()
+    {
+        if (ModalOperationLocked || selectedRow is null) return;
+        var productId = selectedRow.ProductId;
+        var productName = selectedRow.ProductName;
+        var generation = detailGeneration;
+        var cancellationToken = detailSettingsCts?.Token ?? CancellationToken.None;
+        busy = true;
+        settingsError = "";
+        productEditorError = "";
+        recalculationResults.Clear();
+        recalculationTotal = 0;
+        recalculationCompleted = 0;
+        recalculationState = "";
+        try
+        {
+            using var response = await Http.PostAsync($"api/inventory/recalculate/{productId}", null, cancellationToken);
+            await EnsureSuccess(response);
+            var result = await response.Content.ReadFromJsonAsync<SafetyStockCalculationResult>(cancellationToken: cancellationToken);
+            if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
+            await LoadAsync();
+            if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
+            if (!RefreshSelectedRow()) return;
+            await LoadSettingsAsync(productId, generation, cancellationToken);
+            if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
+            if (result is null)
+                Toast.Warning($"{productName} recalculated, but no calculation summary was returned.", "Inventory recalculated");
+            else
+                Toast.Success($"{productName} recalculated — safety {result.SafetyStock}, reorder {result.ReorderPoint}, target {result.TargetStock}.", "Inventory recalculated");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            if (IsCurrentDetail(productId, generation, cancellationToken))
+                Toast.Error($"{productName}: {ex.Message}", "Recalculation failed");
+        }
+        finally { busy = false; }
+    }
+    private bool RefreshSelectedRow()
+    {
+        if (selectedRow is null) return false;
+        if (loadFailed || rows is null)
+        {
+            ForceCloseDetails();
+            return false;
+        }
+        var refreshed = rows?.FirstOrDefault(row => row.ProductId == selectedRow.ProductId);
+        if (refreshed is null)
+        {
+            ForceCloseDetails();
+            return false;
+        }
+        selectedRow = refreshed;
+        InitializeProductEditor(refreshed);
+        return true;
+    }
+    private void ForceCloseDetails()
+    {
+        _detailOpen = false;
+        ClearDetailSelection();
     }
     private static async Task EnsureSuccess(HttpResponseMessage response)
     {
@@ -372,6 +733,7 @@
     }
     private sealed class ApiError { public string? Error { get; set; } }
     private sealed record RecalculationOutcome(string ProductName, string Detail, bool IsError);
+    public void Dispose() => InvalidateSettingsLoad();
 
     private bool showNewProductModal;
     private bool isSavingNewProduct;

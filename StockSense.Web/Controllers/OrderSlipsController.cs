@@ -54,6 +54,19 @@ public sealed class OrderSlipsController : ControllerBase
         return ToActionResult(await _workflow.CreateDraftsAsync(command, cancellationToken));
     }
 
+    [HttpGet("manual-catalog")]
+    public async Task<IActionResult> GetManualCatalog(CancellationToken cancellationToken) =>
+        ToActionResult(await _workflow.GetManualCatalogAsync(InventoryDefaults.LocationId, cancellationToken));
+
+    [HttpPost("manual-draft")]
+    public async Task<IActionResult> CreateManualDraft(
+        CreateManualOrderSlipDraftCommand command, CancellationToken cancellationToken)
+    {
+        command.LocationId = InventoryDefaults.LocationId;
+        command.CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return ToActionResult(await _workflow.CreateManualDraftAsync(command, cancellationToken));
+    }
+
     [HttpPost("{id:int}/approve")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Approve(int id, OrderSlipTransitionCommand command, CancellationToken cancellationToken)

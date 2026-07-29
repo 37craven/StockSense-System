@@ -14,6 +14,15 @@
 <PageHeader Title="System Management"
                 Subtitle="Manage users, employee roles, and shop mechanics." />
 
+@if (!string.IsNullOrWhiteSpace(managementMessage))
+{
+    <div role="status" style="margin-bottom:var(--space-4);padding:var(--space-3);border:1px solid var(--border);border-radius:var(--radius);background:var(--card);">@managementMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(managementError))
+{
+    <div role="alert" style="margin-bottom:var(--space-4);padding:var(--space-3);border:1px solid var(--destructive);border-radius:var(--radius);color:var(--destructive);">@managementError</div>
+}
+
     @* --- TABS & FILTERS --- *@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); gap: var(--space-4);">
         <div style="display: flex; gap: var(--space-2);">
@@ -76,23 +85,46 @@
                                     <div style="color: var(--muted-foreground); font-size: 0.8rem;">@user.Email</div>
                                 </td>
                                 <td style="padding: 12px;">
-                                    <select @onchange="@(e => ChangeUserRole(user, e.Value?.ToString()))"
-                                            style="padding: 6px; background: var(--background); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px;">
-                                        <option value="Customer" selected="@(user.Role == "Customer")">Customer</option>
-                                        <option value="Employee" selected="@(user.Role == "Employee")">Employee</option>
-                                        <option value="Admin" selected="@(user.Role == "Admin")">Admin</option>
-                                    </select>
+                                    @if (user.IsCurrentUser)
+                                    {
+                                        <div><strong>@user.Role</strong><div style="margin-top:3px;color:var(--muted-foreground);font-size:var(--text-xs);">You cannot change your own role.</div></div>
+                                    }
+                                    else
+                                    {
+                                        <select aria-label="Change role for @user.FullName" @onchange="@(e => ChangeUserRole(user, e.Value?.ToString()))"
+                                                disabled="@roleUpdates.Contains(user.Id)"
+                                                style="padding: 6px; background: var(--background); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px;">
+                                            <option value="Customer" selected="@(user.Role == "Customer")">Customer</option>
+                                            <option value="Employee" selected="@(user.Role == "Employee")">Employee</option>
+                                            <option value="Admin" selected="@(user.Role == "Admin")">Admin</option>
+                                        </select>
+                                    }
                                 </td>
                                 <td style="padding: 12px; text-align: center; min-width: 100px;">
-                                    <button @onclick="() => ToggleBlockUser(user)"
-                                            style="padding: 4px 8px; border: 1px solid var(--border); background: transparent; color: @(user.IsBlocked ? "var(--destructive)" : "#4CAF50"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;">
-                                        @(user.IsBlocked ? "Blocked" : "Active")
-                                    </button>
+                                    @if (user.IsCurrentUser)
+                                    {
+                                        <span style="color:@(user.IsBlocked ? "var(--destructive)" : "#4CAF50");font-size:0.7rem;font-weight:bold;text-transform:uppercase;">@(user.IsBlocked ? "Blocked" : "Active")</span>
+                                        <div style="margin-top:3px;color:var(--muted-foreground);font-size:var(--text-xs);">You cannot change your own status.</div>
+                                    }
+                                    else
+                                    {
+                                        <button @onclick="() => ToggleBlockUser(user)"
+                                                style="padding: 4px 8px; border: 1px solid var(--border); background: transparent; color: @(user.IsBlocked ? "var(--destructive)" : "#4CAF50"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;">
+                                            @(user.IsBlocked ? "Blocked" : "Active")
+                                        </button>
+                                    }
                                 </td>
                                 <td style="padding: 12px; text-align: right;">
-                                    <button @onclick="() => ConfirmDelete(user, user.FullName)" style="padding: 6px 12px; background: rgba(244, 67, 54, 0.1); color: #f44336; border: 1px solid #f44336; border-radius: 4px; cursor: pointer;">
-                                        Delete
-                                    </button>
+                                    @if (user.IsCurrentUser)
+                                    {
+                                        <span style="color:var(--muted-foreground);font-size:var(--text-xs);">Your account is protected.</span>
+                                    }
+                                    else
+                                    {
+                                        <button @onclick="() => ConfirmDelete(user, user.FullName)" style="padding: 6px 12px; background: rgba(244, 67, 54, 0.1); color: #f44336; border: 1px solid #f44336; border-radius: 4px; cursor: pointer;">
+                                            Delete
+                                        </button>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -279,6 +311,8 @@
     private bool showEmployeeModal = false;
     private bool showMechanicModal = false;
     private string modalError = "";
+    private string managementMessage = "", managementError = "";
+    private readonly HashSet<string> roleUpdates = [];
     private CreateEmployeeDto newEmp = new();
     private string newMechanicName = "";
 
@@ -301,8 +335,10 @@
     {
         if (pendingDeleteTarget is UserDto user)
         {
+            if (user.IsCurrentUser) { managementError = "You cannot delete your own admin account."; pendingDeleteTarget = null; return; }
             var res = await Http.DeleteAsync($"api/admin/users/{user.Id}");
-            if (res.IsSuccessStatusCode) await LoadUsers();
+            if (res.IsSuccessStatusCode) { await LoadUsers(); managementMessage = $"Deleted {user.FullName}."; managementError = ""; }
+            else { var apiError = await res.Content.ReadFromJsonAsync<ManagementApiError>(); managementError = apiError?.Error ?? $"Delete failed ({(int)res.StatusCode})."; }
         }
         else if (pendingDeleteTarget is Mechanic mech)
         {
@@ -314,15 +350,37 @@
 
     private async Task ChangeUserRole(UserDto user, string? newRole)
     {
-        if (string.IsNullOrEmpty(newRole)) return;
-        await Http.PostAsJsonAsync($"api/admin/change-role", new { UserId = user.Id, NewRole = newRole });
-        user.Role = newRole;
+        if (user.IsCurrentUser || string.IsNullOrEmpty(newRole) || newRole == user.Role || !roleUpdates.Add(user.Id)) return;
+        managementError = managementMessage = "";
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/admin/change-role", new { UserId = user.Id, NewRole = newRole });
+            if (!response.IsSuccessStatusCode)
+            {
+                var apiError = await response.Content.ReadFromJsonAsync<ManagementApiError>();
+                throw new InvalidOperationException(apiError?.Error ?? $"Role update failed ({(int)response.StatusCode}).");
+            }
+            user.Role = newRole;
+            managementMessage = $"Role updated for {user.FullName}.";
+        }
+        catch (Exception ex)
+        {
+            managementError = ex.Message;
+            try { await LoadUsers(); }
+            catch (Exception refreshException) { managementError += $" Could not refresh users: {refreshException.Message}"; }
+        }
+        finally
+        {
+            roleUpdates.Remove(user.Id);
+        }
     }
 
     private async Task ToggleBlockUser(UserDto user)
     {
+        if (user.IsCurrentUser) { managementError = "You cannot change your own account status."; return; }
         var response = await Http.PostAsync($"api/admin/toggle-block/{user.Id}", null);
-        if (response.IsSuccessStatusCode) user.IsBlocked = !user.IsBlocked;
+        if (response.IsSuccessStatusCode) { user.IsBlocked = !user.IsBlocked; managementMessage = $"Account status updated for {user.FullName}."; managementError = ""; }
+        else { var apiError = await response.Content.ReadFromJsonAsync<ManagementApiError>(); managementError = apiError?.Error ?? $"Status update failed ({(int)response.StatusCode})."; }
     }
 
     private void OpenEmployeeModal() { newEmp = new() { Role = "Employee" }; modalError = ""; showEmployeeModal = true; }
@@ -350,4 +408,6 @@
         mech.IsActive = !mech.IsActive;
         await Http.PutAsJsonAsync($"api/mechanics/{mech.Id}", mech);
     }
+
+    private sealed class ManagementApiError { public string? Error { get; set; } }
 }
