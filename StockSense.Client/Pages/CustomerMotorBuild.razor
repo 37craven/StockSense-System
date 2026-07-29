@@ -9,6 +9,7 @@
 @using System.Text.RegularExpressions
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using StockSense.Client.Components.BuildEngine
 @inject HttpClient Http
 @inject NavigationManager Nav
 
@@ -18,6 +19,12 @@
 
 <AuthorizeView>
     <Authorized>
+        @if (buildRoute == "Engine")
+        {
+            <EngineBuildWorkspace OnBack="ReturnToBuildRoutes" />
+        }
+        else
+        {
         @if (isLoading)
         {
             <Spinner Description="syncing with the server..." />
@@ -233,10 +240,10 @@
                             <h1 style="font-size: var(--text-3xl); font-weight: 900; color: var(--foreground); margin-bottom: var(--space-2); letter-spacing: -0.02em; text-align: center;">How do you want to build?</h1>
                             <p style="color: var(--muted-foreground); margin-bottom: var(--space-8); font-size: var(--text-base); text-align: center;">Choose a guided pre-build package or start from scratch.</p>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-6); max-width: 800px; width: 100%;">
-                                <div @onclick='() => SelectBuildRoute("PreBuilt")' style="cursor: pointer; background: var(--card); border: 2px solid @(buildRoute == "PreBuilt" ? "var(--primary)" : "var(--border)"); border-radius: var(--radius); padding: var(--space-8); transition: all 0.2s; text-align: center;">
+                                <div @onclick='() => SelectBuildRoute("Engine")' style="cursor: pointer; background: var(--card); border: 2px solid @(buildRoute == "Engine" ? "var(--primary)" : "var(--border)"); border-radius: var(--radius); padding: var(--space-8); transition: all 0.2s; text-align: center;">
                                     <div style="width: 64px; height: 64px; border-radius: 50%; background-color: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4) auto;"><LucideIcon Name="zap" Size="32" /></div>
-                                    <h3 style="font-size: var(--text-xl); font-weight: bold; color: var(--foreground); margin-bottom: var(--space-2);">Engine Pre-Builds</h3>
-                                    <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Get a complete package tailored to your motor's specs and budget.</p>
+                                    <h3 style="font-size: var(--text-xl); font-weight: bold; color: var(--foreground); margin-bottom: var(--space-2);">Build Engine</h3>
+                                    <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Choose an engine prebuilt or create a custom engine setup.</p>
                                 </div>
                                 <div @onclick='() => SelectBuildRoute("Custom")' style="cursor: pointer; background: var(--card); border: 2px solid @(buildRoute == "Custom" ? "var(--primary)" : "var(--border)"); border-radius: var(--radius); padding: var(--space-8); transition: all 0.2s; text-align: center;">
                                     <div style="width: 64px; height: 64px; border-radius: 50%; background-color: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4) auto;"><LucideIcon Name="wrench" Size="32" /></div>
@@ -429,6 +436,7 @@
 
             </div>
         </div>
+        }
 
     </Authorized>
 
@@ -626,6 +634,13 @@
         selectedParts.Clear();
         selectedPackageId = null;
         _ = NextStep();
+    }
+
+    private void ReturnToBuildRoutes()
+    {
+        buildRoute = null;
+        currentStep = 1;
+        mobileDrawerOpen = false;
     }
 
     private async Task NextStep()

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StockSense.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using StockSense.Infrastructure.Data;
 namespace StockSense.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260727052125_ImportBuildWizardAssistant")]
+    partial class ImportBuildWizardAssistant
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -311,9 +314,6 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Brand", "Model", "YearStart", "YearEnd")
-                        .IsUnique();
-
                     b.ToTable("BikeModels");
                 });
 
@@ -386,9 +386,6 @@ namespace StockSense.Infrastructure.Migrations
                     b.Property<int?>("BikeModelId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("BuildRequestId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -396,7 +393,6 @@ namespace StockSense.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("EstimatedLaborCost")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("MaintenanceProjectionJson")
@@ -426,7 +422,6 @@ namespace StockSense.Infrastructure.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal>("TotalPartsCost")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -452,13 +447,7 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.HasIndex("BikeModelId");
 
-                    b.HasIndex("BuildRequestId")
-                        .IsUnique()
-                        .HasFilter("[BuildRequestId] IS NOT NULL");
-
                     b.HasIndex("UpgradeStageId");
-
-                    b.HasIndex("UserId", "Status", "UpdatedAt");
 
                     b.ToTable("CustomerBuilds");
                 });
@@ -1614,11 +1603,6 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DisplayOrder");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
                     b.ToTable("UpgradeCategories");
                 });
 
@@ -1671,7 +1655,6 @@ namespace StockSense.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("ListPrice")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("PresetTemplate")
@@ -1715,10 +1698,9 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId")
-                        .IsUnique();
+                    b.HasIndex("ProductId");
 
-                    b.HasIndex("UpgradeCategoryId", "IsActive");
+                    b.HasIndex("UpgradeCategoryId");
 
                     b.ToTable("UpgradeParts");
                 });
@@ -1740,7 +1722,6 @@ namespace StockSense.Infrastructure.Migrations
                         .HasColumnType("nvarchar(1000)");
 
                     b.Property<decimal>("EstimatedCost")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("EstimatedHP")
@@ -1776,8 +1757,7 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BikeModelId", "StageNumber")
-                        .IsUnique();
+                    b.HasIndex("BikeModelId");
 
                     b.ToTable("UpgradeStages");
                 });
@@ -1964,22 +1944,13 @@ namespace StockSense.Infrastructure.Migrations
                 {
                     b.HasOne("StockSense.Domain.Entities.BikeModel", "BikeModel")
                         .WithMany()
-                        .HasForeignKey("BikeModelId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("StockSense.Domain.Entities.BuildRequest", "BuildRequest")
-                        .WithOne()
-                        .HasForeignKey("StockSense.Domain.Entities.CustomerBuild", "BuildRequestId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("BikeModelId");
 
                     b.HasOne("StockSense.Domain.Entities.UpgradeStage", "UpgradeStage")
                         .WithMany()
-                        .HasForeignKey("UpgradeStageId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("UpgradeStageId");
 
                     b.Navigation("BikeModel");
-
-                    b.Navigation("BuildRequest");
 
                     b.Navigation("UpgradeStage");
                 });
@@ -2139,13 +2110,13 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasOne("StockSense.Domain.Entities.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("StockSense.Domain.Entities.UpgradeCategory", "Category")
                         .WithMany("UpgradeParts")
                         .HasForeignKey("UpgradeCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Category");

@@ -19,15 +19,18 @@ public class BuildsController : ControllerBase
 {
     private readonly BuildRequestRepository _buildRepo;
     private readonly IWorkOrderCheckoutService _checkoutService;
+    private readonly IBuildRequestSubmissionService _submissionService;
     private readonly UserManager<ApplicationUser> _userManager;
 
     public BuildsController(
         BuildRequestRepository buildRepo,
         IWorkOrderCheckoutService checkoutService,
+        IBuildRequestSubmissionService submissionService,
         UserManager<ApplicationUser> userManager)
     {
         _buildRepo = buildRepo;
         _checkoutService = checkoutService;
+        _submissionService = submissionService;
         _userManager = userManager;
     }
 
@@ -53,6 +56,34 @@ public class BuildsController : ControllerBase
         await _buildRepo.AddAsync(request);
         await _buildRepo.SaveChangesAsync();
         return Ok(MapToDto(request));
+    }
+
+    [HttpPost("engine")]
+    public async Task<IActionResult> CreateEngineBuild(
+        [FromBody] CreateBuildRequestDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (dto == null) return BadRequest(ApiResponse.Error("Request is empty."));
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+
+        try
+        {
+            var request = await _submissionService.QueueAsync(
+                dto,
+                new BuildCustomerIdentity(customer.Id, customer.Email, GetFullName(customer)),
+                cancellationToken);
+            await _buildRepo.SaveChangesAsync(cancellationToken);
+            return Ok(MapToDto(request));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(ApiResponse.Error(exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Conflict(ApiResponse.Error(exception.Message));
+        }
     }
 
     [HttpGet("all")]

@@ -131,6 +131,9 @@ builder.Services.AddScoped<IHistoricalSalesImporter, HistoricalSalesCsvImporter>
 builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
 builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();
 builder.Services.AddScoped<IWorkOrderCheckoutService, WorkOrderCheckoutService>();
+builder.Services.AddScoped<IBuildRequestSubmissionService, BuildRequestSubmissionService>();
+builder.Services.AddScoped<ICompatibilityEngine, CompatibilityEngine>();
+builder.Services.AddScoped<IPerformanceCalculator, PerformanceCalculator>();
 
 // --- HELPERS (concrete, no interfaces) ---
 builder.Services.AddScoped<OrderSlipHelper>();
