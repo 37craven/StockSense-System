@@ -42,6 +42,10 @@
     else
     {
         <div class="engine-workspace__grid">
+            <aside class="engine-selected-rail">
+                <EngineSelectedParts Parts="SelectedParts" OnRemove="TogglePartAsync" />
+            </aside>
+
             <main class="engine-catalog">
                 <section class="engine-panel">
                     <div class="engine-field">
@@ -201,12 +205,9 @@
                 <EngineBuildSummary Bike="SelectedBike"
                                     Projection="projection"
                                     SelectedParts="SelectedParts"
-                                    Warnings="Warnings"
                                     TotalPrice="TotalPrice"
                                     CanSubmit="CanSubmit"
                                     IsProcessing="isProcessing"
-                                    StatusMessage="statusMessage"
-                                    OnRemovePart="TogglePartAsync"
                                     OnReset="ResetBuildAsync"
                                     OnSendQuote="SendQuoteAsync"
                                     OnSubmit="SubmitToShopAsync" />
@@ -244,12 +245,9 @@
                     <EngineBuildSummary Bike="SelectedBike"
                                         Projection="projection"
                                         SelectedParts="SelectedParts"
-                                        Warnings="Warnings"
                                         TotalPrice="TotalPrice"
                                         CanSubmit="CanSubmit"
                                         IsProcessing="isProcessing"
-                                        StatusMessage="statusMessage"
-                                        OnRemovePart="TogglePartAsync"
                                         OnReset="ResetBuildAsync"
                                         OnSendQuote="SendQuoteAsync"
                                         OnSubmit="SubmitToShopAsync" />
@@ -318,7 +316,7 @@
 
     .engine-workspace__grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
+        grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(300px, 360px);
         align-items: start;
         gap: var(--space-4);
     }
@@ -331,6 +329,7 @@
     }
 
     .engine-panel,
+    .engine-selected-rail,
     .engine-dashboard {
         padding: var(--space-4);
         border: 1px solid var(--border);
@@ -338,6 +337,7 @@
         background: var(--card);
     }
 
+    .engine-selected-rail,
     .engine-dashboard {
         position: sticky;
         top: var(--space-4);
@@ -572,6 +572,12 @@
             display: none;
         }
 
+        .engine-selected-rail {
+            position: static;
+            max-height: none;
+            overflow: visible;
+        }
+
         .engine-summary-trigger {
             position: fixed;
             right: var(--space-3);
@@ -682,7 +688,6 @@
     private string searchTerm = string.Empty;
     private string sortBy = "name";
     private string loadError = string.Empty;
-    private string statusMessage = string.Empty;
     private EngineBuildProjection? projection;
 
     private EngineBikeModel? SelectedBike => bikeModels.FirstOrDefault(item => item.Id == selectedBikeId);
@@ -757,26 +762,6 @@
     private bool HasOutOfStockSelection => SelectedParts.Any(item => (item.Product?.CurrentStock ?? 0) <= 0);
     private bool CanSubmit => selectedBikeId > 0 && selectedPartIds.Any() && !HasOutOfStockSelection;
 
-    private IReadOnlyList<string> Warnings
-    {
-        get
-        {
-            var warnings = new List<string>();
-            if (SelectedParts.Any(IsAdvancedEnginePart))
-            {
-                warnings.Add("Head, crank, block, cam, or stroker upgrades require guidance from an experienced mechanic.");
-            }
-
-            if (HasOutOfStockSelection)
-            {
-                warnings.Add("Out-of-stock products are included for estimate purposes only and must be restocked before submission.");
-            }
-
-            warnings.AddRange(projection?.ValidationErrors ?? []);
-            warnings.AddRange(projection?.ValidationWarnings ?? []);
-            return warnings.Distinct().ToList();
-        }
-    }
 
     protected override Task OnInitializedAsync() => LoadDataAsync();
 
@@ -816,7 +801,6 @@
         selectedPackageId = 0;
         selectedPartIds.Clear();
         projection = CreateBaseProjection();
-        statusMessage = string.Empty;
         activeCategoryId = categories.OrderBy(item => item.DisplayOrder).FirstOrDefault()?.Id ?? 0;
         await LoadCategoryPartsAsync();
         await RecalculateAsync();
@@ -833,9 +817,6 @@
         selectedPackageId = 0;
         selectedPartIds.Clear();
         projection = CreateBaseProjection();
-        statusMessage = prebuilt
-            ? "Choose an Engine Prebuilt package."
-            : "Custom Engine Setup selected. Choose compatible products below.";
         await RecalculateAsync();
     }
 
@@ -857,7 +838,6 @@
         activeCategoryId = SelectedParts.FirstOrDefault()?.UpgradeCategoryId
             ?? categories.OrderBy(item => item.DisplayOrder).FirstOrDefault()?.Id
             ?? 0;
-        statusMessage = $"{SelectedPackage.Name} loaded. You can add or remove compatible products.";
         await LoadCategoryPartsAsync();
         await RecalculateAsync();
     }
@@ -882,9 +862,9 @@
             categoryParts = await Http.GetFromJsonAsync<List<EngineUpgradePart>>(
                 $"/api/build/parts?bikeModelId={selectedBikeId}&categoryId={activeCategoryId}") ?? [];
         }
-        catch (Exception ex)
+        catch
         {
-            statusMessage = $"Compatible products could not be loaded: {ex.Message}";
+            categoryParts = [];
         }
         finally
         {
@@ -984,7 +964,6 @@
     {
         selectedPackageId = 0;
         selectedPartIds.Clear();
-        statusMessage = string.Empty;
         projection = CreateBaseProjection();
         await RecalculateAsync();
     }
@@ -1001,16 +980,15 @@
         {
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             var userEmail = authState.User.Identity?.Name ?? "User";
-            var response = await Http.PostAsJsonAsync("/api/products/send-quote", new
+            await Http.PostAsJsonAsync("/api/products/send-quote", new
             {
                 UserEmail = userEmail,
                 ProductIds = SelectedParts.Select(item => item.ProductId).Distinct().ToList()
             });
-            statusMessage = response.IsSuccessStatusCode ? "Quote sent to your email." : "The quote could not be sent.";
         }
-        catch (Exception ex)
+        catch
         {
-            statusMessage = $"The quote could not be sent: {ex.Message}";
+            // Keep the quote action non-blocking when the mail endpoint is unavailable.
         }
         finally
         {
@@ -1022,9 +1000,6 @@
     {
         if (!CanSubmit)
         {
-            statusMessage = HasOutOfStockSelection
-                ? "Out-of-stock products can be estimated but cannot be submitted."
-                : "Select at least one engine product.";
             return;
         }
 
@@ -1078,13 +1053,14 @@
             };
 
             var response = await Http.PostAsJsonAsync("/api/builds/engine", request);
-            statusMessage = response.IsSuccessStatusCode
-                ? "Engine build submitted to the shop."
-                : $"The engine build could not be submitted: {await response.Content.ReadAsStringAsync()}";
+            if (response.IsSuccessStatusCode)
+            {
+                Navigation.NavigateTo("/my-builds");
+            }
         }
-        catch (Exception ex)
+        catch
         {
-            statusMessage = $"The engine build could not be submitted: {ex.Message}";
+            // Submission can be retried without discarding the selected parts.
         }
         finally
         {
@@ -1095,18 +1071,6 @@
     private int SelectedCount(int categoryId) =>
         SelectedParts.Count(item => item.UpgradeCategoryId == categoryId);
 
-    private static bool IsAdvancedEnginePart(EngineUpgradePart part)
-    {
-        var category = part.Category?.Name ?? part.Product?.Category ?? string.Empty;
-        var name = part.Product?.Name ?? string.Empty;
-        return category.Contains("Engine", StringComparison.OrdinalIgnoreCase) ||
-               category.Contains("Big Bore", StringComparison.OrdinalIgnoreCase) ||
-               name.Contains("head", StringComparison.OrdinalIgnoreCase) ||
-               name.Contains("crank", StringComparison.OrdinalIgnoreCase) ||
-               name.Contains("block", StringComparison.OrdinalIgnoreCase) ||
-               name.Contains("cam", StringComparison.OrdinalIgnoreCase) ||
-               name.Contains("stroker", StringComparison.OrdinalIgnoreCase);
-    }
 
     private void CloseSummary() => summaryOpen = false;
 

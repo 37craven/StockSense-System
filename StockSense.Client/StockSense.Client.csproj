@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
     <StaticWebAssetProjectMode>Default</StaticWebAssetProjectMode>
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <WasmBuildNative>false</WasmBuildNative>
   </PropertyGroup>
 
   <ItemGroup>

@@ -20,12 +20,6 @@ public sealed class CalculateStageRequest
     public List<int>? CustomPartIds { get; set; }
 }
 
-public sealed class MaintenanceRequest
-{
-    public int BikeModelId { get; set; }
-    public List<int> PartIds { get; set; } = new();
-}
-
 public sealed class SubmitEngineBuildRequest
 {
     public int DraftId { get; set; }

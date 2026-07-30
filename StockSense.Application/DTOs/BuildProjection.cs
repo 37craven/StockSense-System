@@ -19,9 +19,7 @@ public class BuildProjection
     public decimal TotalCost { get; set; }
     public int? MatchedStageNumber { get; set; }
     public string MatchedStageName { get; set; } = string.Empty;
-    public MaintenanceProjection? Maintenance { get; set; }
     public List<string> ValidationErrors { get; set; } = new();
-    public List<string> ValidationWarnings { get; set; } = new();
     public List<string> ValidationSuggestions { get; set; } = new();
     public bool IsValid { get; set; }
 }

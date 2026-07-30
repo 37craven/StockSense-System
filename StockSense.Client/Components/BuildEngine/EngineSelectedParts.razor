@@ -1,0 +1,47 @@
+<section class="engine-selected" aria-label="Selected engine parts">
+    <div class="engine-selected__heading">
+        <h2>Selected parts</h2>
+        <span>@Parts.Count</span>
+    </div>
+
+    @if (!Parts.Any())
+    {
+        <p>No engine parts selected.</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var part in Parts)
+            {
+                <li>
+                    <div>
+                        <strong>@part.Product?.Name</strong>
+                        <small>@part.Product?.Brand</small>
+                        <small>PHP @part.EffectivePrice.ToString("N0")</small>
+                    </div>
+                    <button type="button" title="Remove @part.Product?.Name" aria-label="Remove @part.Product?.Name" @onclick="() => OnRemove.InvokeAsync(part.Id)">
+                        <LucideIcon Name="x" Size="15" />
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<style>
+    .engine-selected { display: flex; flex-direction: column; gap: var(--space-3); }
+    .engine-selected__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+    .engine-selected h2, .engine-selected p { margin: 0; }
+    .engine-selected h2 { font-size: var(--text-lg); }
+    .engine-selected__heading span, .engine-selected p, .engine-selected small { color: var(--muted-foreground); font-size: var(--text-xs); }
+    .engine-selected ul { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+    .engine-selected li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); }
+    .engine-selected strong, .engine-selected small { display: block; overflow-wrap: anywhere; }
+    .engine-selected strong { font-size: var(--text-xs); }
+    .engine-selected button { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); color: var(--foreground); cursor: pointer; }
+</style>
+
+@code {
+    [Parameter] public IReadOnlyList<EngineUpgradePart> Parts { get; set; } = [];
+    [Parameter] public EventCallback<int> OnRemove { get; set; }
+}

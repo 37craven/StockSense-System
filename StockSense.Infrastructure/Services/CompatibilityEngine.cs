@@ -50,8 +50,6 @@ public sealed class CompatibilityEngine : ICompatibilityEngine
         {
             if (!IsCompatibleWithBike(part, bike))
                 result.Errors.Add($"{part.Product.Name} is not compatible with {bike.DisplayName}.");
-            if (part.Product.CurrentStock <= 0)
-                result.Warnings.Add($"{part.Product.Name} is out of stock and can only be used for an estimate.");
         }
 
         var selectedIds = foundIds;

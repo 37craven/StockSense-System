@@ -231,23 +231,6 @@ public sealed class BuildApiController : ControllerBase
         }
     }
 
-    [HttpPost("maintenance")]
-    public async Task<ActionResult<MaintenanceProjection>> GetMaintenance(
-        [FromBody] MaintenanceRequest request,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            return Ok(await _performance.CalculateMaintenanceAsync(
-                request.BikeModelId,
-                request.PartIds,
-                cancellationToken));
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(exception.Message);
-        }
-    }
 
     [Authorize]
     [HttpPost("draft")]
@@ -431,10 +414,8 @@ public sealed class BuildApiController : ControllerBase
         draft.ReliabilityScore = projection.ReliabilityScore;
         draft.TotalPartsCost = projection.TotalPartsCost;
         draft.EstimatedLaborCost = projection.EstimatedLaborCost;
-        draft.ValidationWarningsJson = JsonSerializer.Serialize(validation.Warnings);
         draft.ValidationErrorsJson = JsonSerializer.Serialize(validation.Errors);
         draft.MissingRequirementsJson = JsonSerializer.Serialize(validation.MissingRequirements);
-        draft.MaintenanceProjectionJson = JsonSerializer.Serialize(projection.Maintenance);
         draft.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -463,10 +444,8 @@ public sealed class BuildApiController : ControllerBase
         draft.ReliabilityScore = projection.ReliabilityScore;
         draft.TotalPartsCost = projection.TotalPartsCost;
         draft.EstimatedLaborCost = projection.EstimatedLaborCost;
-        draft.ValidationWarningsJson = JsonSerializer.Serialize(validation.Warnings);
         draft.ValidationErrorsJson = JsonSerializer.Serialize(validation.Errors);
         draft.MissingRequirementsJson = JsonSerializer.Serialize(validation.MissingRequirements);
-        draft.MaintenanceProjectionJson = JsonSerializer.Serialize(projection.Maintenance);
     }
 
     private static List<int> DeserializePartIds(string? json)

@@ -1,9 +1,6 @@
 <section class="engine-summary" aria-label="Build summary">
     <div class="engine-summary__heading">
-        <div>
-            <h2>Build summary</h2>
-            <p>Estimated values require final mechanic validation.</p>
-        </div>
+        <h2>Build summary</h2>
         <span>@SelectedParts.Count part@(SelectedParts.Count == 1 ? string.Empty : "s")</span>
     </div>
 
@@ -14,75 +11,10 @@
         <EnginePerformanceGauge Label="Reliability" Value="@Reliability" Base="100" Max="100" Unit="%" ShowBase="false" />
     </div>
 
-    <EngineDynoChart Projection="Projection" />
-
-    @if (Projection?.Maintenance is not null)
-    {
-        <section class="engine-summary__section">
-            <h3>Maintenance projection</h3>
-            <dl class="engine-summary__metrics">
-                <dt>Maintenance tier</dt><dd>@Projection.Maintenance.MaintenanceTier</dd>
-                <dt>Oil change</dt><dd>@Projection.Maintenance.OilChangeIntervalKm km</dd>
-                <dt>Oil type</dt><dd>@Projection.Maintenance.OilType</dd>
-                <dt>Valve check</dt><dd>@Projection.Maintenance.ValveClearanceCheckIntervalKm km</dd>
-                <dt>Fuel</dt><dd>@Projection.Maintenance.FuelRequirement</dd>
-            </dl>
-        </section>
-    }
-
-    <section class="engine-summary__section">
-        <div class="engine-summary__section-heading">
-            <h3>Selected parts</h3>
-            <strong>PHP @TotalPrice.ToString("N0")</strong>
-        </div>
-
-        @if (!SelectedParts.Any())
-        {
-            <p class="engine-summary__empty">No engine parts selected.</p>
-        }
-        else
-        {
-            <ul class="engine-summary__parts">
-                @foreach (var part in SelectedParts)
-                {
-                    <li>
-                        <div>
-                            <strong>@part.Product?.Name</strong>
-                            <small>
-                                @part.Product?.Brand - PHP @part.EffectivePrice.ToString("N0")
-                                @if ((part.Product?.CurrentStock ?? 0) <= 0)
-                                {
-                                    <span> - Out of stock</span>
-                                }
-                            </small>
-                        </div>
-                        <button type="button"
-                                title="Remove @part.Product?.Name"
-                                aria-label="Remove @part.Product?.Name"
-                                @onclick="() => OnRemovePart.InvokeAsync(part.Id)">
-                            <LucideIcon Name="x" Size="15" />
-                        </button>
-                    </li>
-                }
-            </ul>
-        }
+    <section class="engine-summary__total">
+        <h3>Parts total</h3>
+        <strong>PHP @TotalPrice.ToString("N0")</strong>
     </section>
-
-    @if (Warnings.Any())
-    {
-        <section class="engine-summary__warnings" role="status">
-            <h3>Warnings</h3>
-            @foreach (var warning in Warnings)
-            {
-                <p>@warning</p>
-            }
-        </section>
-    }
-
-    @if (!string.IsNullOrWhiteSpace(StatusMessage))
-    {
-        <p class="engine-summary__status" role="status">@StatusMessage</p>
-    }
 
     <div class="engine-summary__actions">
         <button type="button" @onclick="OnReset" disabled="@IsProcessing">Reset</button>
@@ -102,7 +34,7 @@
     }
 
     .engine-summary__heading,
-    .engine-summary__section-heading {
+    .engine-summary__total {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
@@ -110,8 +42,7 @@
     }
 
     .engine-summary h2,
-    .engine-summary h3,
-    .engine-summary p {
+    .engine-summary h3 {
         margin: 0;
     }
 
@@ -121,13 +52,6 @@
 
     .engine-summary h3 {
         font-size: var(--text-sm);
-    }
-
-    .engine-summary__heading p,
-    .engine-summary__empty {
-        margin-top: var(--space-1);
-        color: var(--muted-foreground);
-        font-size: var(--text-xs);
     }
 
     .engine-summary__heading > span {
@@ -142,90 +66,11 @@
         gap: var(--space-2);
     }
 
-    .engine-summary__section,
-    .engine-summary__warnings {
+    .engine-summary__total {
         padding: var(--space-3);
         border: 1px solid var(--border);
         border-radius: var(--radius);
         background: var(--card);
-    }
-
-    .engine-summary__metrics {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: var(--space-1) var(--space-3);
-        margin: var(--space-3) 0 0;
-        font-size: var(--text-xs);
-    }
-
-    .engine-summary__metrics dt {
-        color: var(--muted-foreground);
-    }
-
-    .engine-summary__metrics dd {
-        margin: 0;
-        text-align: right;
-    }
-
-    .engine-summary__parts {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        margin: var(--space-3) 0 0;
-        padding: 0;
-        list-style: none;
-    }
-
-    .engine-summary__parts li {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--space-2);
-        padding-top: var(--space-2);
-        border-top: 1px solid var(--border);
-    }
-
-    .engine-summary__parts strong,
-    .engine-summary__parts small {
-        display: block;
-        font-size: var(--text-xs);
-    }
-
-    .engine-summary__parts small {
-        margin-top: 2px;
-        color: var(--muted-foreground);
-    }
-
-    .engine-summary__parts button {
-        display: grid;
-        place-items: center;
-        width: 32px;
-        height: 32px;
-        flex: 0 0 32px;
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        background: var(--background);
-        color: var(--foreground);
-        cursor: pointer;
-    }
-
-    .engine-summary__warnings {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-    }
-
-    .engine-summary__warnings p,
-    .engine-summary__status {
-        color: var(--muted-foreground);
-        font-size: var(--text-xs);
-        line-height: 1.5;
-    }
-
-    .engine-summary__status {
-        padding: var(--space-3);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
     }
 
     .engine-summary__actions {
@@ -263,12 +108,9 @@
     [Parameter] public EngineBikeModel? Bike { get; set; }
     [Parameter] public EngineBuildProjection? Projection { get; set; }
     [Parameter] public IReadOnlyList<EngineUpgradePart> SelectedParts { get; set; } = [];
-    [Parameter] public IReadOnlyList<string> Warnings { get; set; } = [];
     [Parameter] public decimal TotalPrice { get; set; }
     [Parameter] public bool CanSubmit { get; set; }
     [Parameter] public bool IsProcessing { get; set; }
-    [Parameter] public string StatusMessage { get; set; } = string.Empty;
-    [Parameter] public EventCallback<int> OnRemovePart { get; set; }
     [Parameter] public EventCallback OnReset { get; set; }
     [Parameter] public EventCallback OnSendQuote { get; set; }
     [Parameter] public EventCallback OnSubmit { get; set; }

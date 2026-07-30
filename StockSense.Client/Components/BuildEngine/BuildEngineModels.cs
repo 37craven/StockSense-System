@@ -74,26 +74,4 @@ public sealed class EngineBuildProjection
     public decimal TotalCost { get; set; }
     public string MatchedStageName { get; set; } = string.Empty;
     public int? MatchedStageNumber { get; set; }
-    public EngineMaintenanceProjection? Maintenance { get; set; }
-    public List<string> ValidationErrors { get; set; } = [];
-    public List<string> ValidationWarnings { get; set; } = [];
-    public List<string> ValidationSuggestions { get; set; } = [];
-}
-
-public sealed class EngineMaintenanceProjection
-{
-    public int OilChangeIntervalKm { get; set; }
-    public string OilType { get; set; } = string.Empty;
-    public int ValveClearanceCheckIntervalKm { get; set; }
-    public int ValveSpringReplaceIntervalKm { get; set; }
-    public int PistonRingIntervalKm { get; set; }
-    public int ConRodBearingIntervalKm { get; set; }
-    public int MainBearingIntervalKm { get; set; }
-    public string FuelRequirement { get; set; } = string.Empty;
-    public int ChainAdjustIntervalKm { get; set; }
-    public int SprocketReplaceIntervalKm { get; set; }
-    public int ClutchPlateIntervalKm { get; set; }
-    public string MaintenanceTier { get; set; } = string.Empty;
-    public List<string> Warnings { get; set; } = [];
-    public List<string> Tips { get; set; } = [];
 }

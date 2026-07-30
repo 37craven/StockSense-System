@@ -14,9 +14,4 @@ public interface IPerformanceCalculator
         int stageId,
         IReadOnlyCollection<int>? customPartIds = null,
         CancellationToken cancellationToken = default);
-
-    Task<MaintenanceProjection> CalculateMaintenanceAsync(
-        int bikeModelId,
-        IReadOnlyCollection<int> partIds,
-        CancellationToken cancellationToken = default);
 }

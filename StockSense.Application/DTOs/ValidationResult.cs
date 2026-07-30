@@ -4,7 +4,6 @@ public class ValidationResult
 {
     public bool IsValid { get; set; }
     public List<string> Errors { get; set; } = new();
-    public List<string> Warnings { get; set; } = new();
     public List<string> Suggestions { get; set; } = new();
     public List<MissingRequirement> MissingRequirements { get; set; } = new();
     public List<BuildPartConflict> Conflicts { get; set; } = new();
