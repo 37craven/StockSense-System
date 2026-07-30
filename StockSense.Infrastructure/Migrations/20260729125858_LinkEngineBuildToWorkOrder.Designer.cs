@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StockSense.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using StockSense.Infrastructure.Data;
 namespace StockSense.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260729125858_LinkEngineBuildToWorkOrder")]
+    partial class LinkEngineBuildToWorkOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -564,7 +567,6 @@ namespace StockSense.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("LiveProductMappings", (string)null);
-
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Mechanic", b =>
@@ -2032,7 +2034,6 @@ namespace StockSense.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("ReportingProduct");
-
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlip", b =>

@@ -2,17 +2,16 @@
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 @layout PublicLayout
 @using StockSense.Client.Layout
+@using StockSense.Client.Components.BuildEngine
+@using Microsoft.AspNetCore.Authorization
 @inject NavigationManager Nav
 
-<PageTitle>Engine Builds — Coming Soon</PageTitle>
+@attribute [Authorize]
 
-<div style="min-height: calc(100dvh - 3.5rem); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--space-8) var(--space-4); background: var(--background); text-align: center;">
-    <div style="width: 80px; height: 80px; border-radius: 50%; background-color: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-6) auto;">
-        <LucideIcon Name="zap" Size="40" />
-    </div>
-    <h1 style="font-size: var(--text-3xl); font-weight: 900; color: var(--foreground); margin-bottom: var(--space-2);">Engine Parts & Prebuilts</h1>
-    <p style="color: var(--muted-foreground); margin-bottom: var(--space-8); max-width: 400px;">This section is under construction. You'll be able to browse engine-specific packages and performance parts here soon.</p>
-    <button @onclick='() => Nav.NavigateTo("/build")' style="padding: 12px 24px; background: var(--primary); color: var(--primary-foreground); border: none; border-radius: var(--radius); cursor: pointer; font-size: var(--text-sm); display: inline-flex; align-items: center; gap: 6px;">
-        <LucideIcon Name="arrow-left" Size="16" /> Back to Build Center
-    </button>
-</div>
+<PageTitle>Build Engine</PageTitle>
+
+<EngineBuildWorkspace OnBack="ReturnToBuildCenter" />
+
+@code {
+    private void ReturnToBuildCenter() => Nav.NavigateTo("/build");
+}

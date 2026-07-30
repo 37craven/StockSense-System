@@ -1,0 +1,80 @@
+<div class="engine-dyno">
+    <div class="engine-dyno__header">
+        <strong>Dyno estimate</strong>
+        <span>Stock vs build</span>
+    </div>
+    <svg viewBox="0 0 340 180" role="img" aria-label="Estimated stock and build horsepower curves">
+        <line x1="40" y1="18" x2="40" y2="145" stroke="var(--border)" />
+        <line x1="40" y1="145" x2="315" y2="145" stroke="var(--border)" />
+        <line x1="40" y1="55" x2="315" y2="55" stroke="var(--border)" stroke-dasharray="4 4" />
+        <line x1="40" y1="95" x2="315" y2="95" stroke="var(--border)" stroke-dasharray="4 4" />
+        <polyline points="@StockPoints"
+                  fill="none"
+                  stroke="var(--muted-foreground)"
+                  stroke-width="2"
+                  stroke-dasharray="5 4" />
+        <polyline points="@BuildPoints"
+                  fill="none"
+                  stroke="var(--foreground)"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round" />
+        <text x="40" y="162" fill="var(--muted-foreground)" font-size="8">3k</text>
+        <text x="170" y="162" fill="var(--muted-foreground)" font-size="8">7k</text>
+        <text x="298" y="162" fill="var(--muted-foreground)" font-size="8">11k RPM</text>
+    </svg>
+</div>
+
+<style>
+    .engine-dyno {
+        padding: var(--space-3);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+    }
+
+    .engine-dyno__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        color: var(--foreground);
+        font-size: var(--text-xs);
+    }
+
+    .engine-dyno__header span {
+        color: var(--muted-foreground);
+    }
+
+    .engine-dyno svg {
+        display: block;
+        width: 100%;
+        min-height: 180px;
+    }
+</style>
+
+@code {
+    [Parameter] public EngineBuildProjection? Projection { get; set; }
+
+    private int BaseHp => Projection?.BaseHP ?? 0;
+    private int BuildHp => Projection?.FinalHP ?? BaseHp;
+    private int Maximum => Math.Max(10, Math.Max(BaseHp, BuildHp));
+
+    private string StockPoints => BuildCurve(BaseHp);
+    private string BuildPoints => BuildCurve(BuildHp);
+
+    private string BuildCurve(int peak)
+    {
+        var points = new List<string>();
+        for (var step = 0; step <= 20; step++)
+        {
+            var progress = step / 20d;
+            var curve = 0.16 + (0.84 * Math.Sin(progress * Math.PI));
+            var x = 40 + (progress * 275);
+            var y = 145 - ((peak * curve / (Maximum * 1.15)) * 127);
+            points.Add($"{x:F1},{y:F1}");
+        }
+
+        return string.Join(" ", points);
+    }
+}
