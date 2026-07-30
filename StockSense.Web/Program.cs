@@ -59,7 +59,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 // --- 3. DATABASE ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    ?? "Server=localhost;Database=StockSense;User Id=sa;Password=YourPassword123!;TrustServerCertificate=True;MultipleActiveResultSets=true";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString, sqlOptions =>

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
 
+// ponytail: docker run -d --hostname=stocksense-db --name stocksense-db -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=YourPassword123! -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
 
 namespace StockSense.Infrastructure.Data
 {

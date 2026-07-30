@@ -1,95 +1,104 @@
 @using System.Text.Json
 @inject HttpClient Http
+@inject IJSRuntime JS
 
-<section class="assistance-chat" aria-labelledby="assistance-chat-heading">
-    <div class="assistance-chat__header">
-        <span class="assistance-chat__icon" aria-hidden="true">
-            <LucideIcon Name="bot" Size="22" />
-        </span>
-        <div>
-            <h2 id="assistance-chat-heading">StockSense Assistant</h2>
-            <p>Ask a question about StockSense.</p>
-        </div>
-    </div>
-
-    <div class="assistance-chat__messages"
-         role="log"
-         aria-live="polite"
-         aria-relevant="additions text"
-         aria-busy="@isSending">
-        @foreach (var chatMessage in messages)
+<div class="flex flex-col h-full w-full max-w-3xl mx-auto">
+    <div class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-1 scroll-smooth"
+         @ref="messagesElement">
+        @foreach (var msg in messages)
         {
-            <article @key="chatMessage" class="assistance-chat__message assistance-chat__message--@chatMessage.Role">
-                <span class="assistance-chat__sender">@(chatMessage.Role == "user" ? "You" : "Assistant")</span>
-                <p>@chatMessage.Content</p>
-            </article>
+            <div class="flex gap-3 py-1.5 @(msg.Role == "user" ? "flex-row-reverse" : "")">
+                @if (msg.Role != "user")
+                {
+                    <div class="flex items-center justify-center w-7 h-7 rounded-full bg-muted text-muted-foreground shrink-0 mt-1">
+                        <LucideIcon Name="bot" Size="16" />
+                    </div>
+                }
+                <div class="max-w-[85%] sm:max-w-[75%]">
+                    @if (msg.Role == "user")
+                    {
+                        <p class="text-sm leading-relaxed whitespace-pre-wrap break-words bg-primary text-primary-foreground rounded-lg px-3 py-2">@msg.Content</p>
+                    }
+                    else
+                    {
+                        <p class="text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground py-1">@msg.Content</p>
+                    }
+                </div>
+            </div>
         }
 
         @if (isSending)
         {
-            <div class="assistance-chat__status" role="status">
-                <BbSpinner Size="SpinnerSize.Small" />
-                <span>Assistant is thinking...</span>
+            <div class="flex gap-3 py-1.5">
+                <div class="flex items-center justify-center w-7 h-7 rounded-full bg-muted text-muted-foreground shrink-0 mt-1">
+                    <LucideIcon Name="bot" Size="16" />
+                </div>
+                <div class="max-w-[85%] sm:max-w-[75%]">
+                    <span class="typing-dots text-muted-foreground text-lg tracking-wider py-1">...</span>
+                </div>
             </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="mx-2 mb-2 px-3 py-2 text-xs rounded-lg bg-destructive-muted text-destructive">@errorMessage</div>
         }
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(errorMessage))
-    {
-        <div class="assistance-chat__error" role="alert">@errorMessage</div>
-    }
-
-    <form class="assistance-chat__composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
-        <label for="assistance-message">Message</label>
-        <textarea id="assistance-message"
-                  @bind="message"
-                  @bind:event="oninput"
+    <div class="flex items-end gap-2 px-4 py-3 border-t border-border bg-background">
+        <textarea @bind="message" @bind:event="oninput"
                   @onkeydown="HandleKeyDown"
-                  rows="3"
+                  rows="1"
                   maxlength="8000"
                   disabled="@isSending"
-                  placeholder="Type your question..."
-                  aria-describedby="assistance-message-hint"></textarea>
-        <div class="assistance-chat__actions">
-            <span id="assistance-message-hint">Press Ctrl+Enter to send.</span>
-            <BbButton Type="ButtonType.Submit" Variant="ButtonVariant.Default" Disabled="@(isSending || string.IsNullOrWhiteSpace(message))">
-                <LucideIcon Name="send" Size="16" />
-                Send
-            </BbButton>
-        </div>
-    </form>
-</section>
+                  placeholder="Message StockSense..."
+                  aria-label="Message"
+                  class="flex-1 resize-none px-3 py-2 border border-input rounded-lg bg-background text-foreground text-sm leading-relaxed outline-none min-h-[2.25rem] max-h-48 focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
+        <button @onclick="SendAsync"
+                disabled="@(isSending || string.IsNullOrWhiteSpace(message))"
+                title="Send message"
+                class="flex items-center justify-center w-9 h-9 rounded-full bg-primary text-primary-foreground border-none cursor-pointer shrink-0 disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-85 transition-opacity">
+            <LucideIcon Name="arrow-up" Size="16" />
+        </button>
+    </div>
+</div>
+
+<style>
+    @@keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+    .typing-dots { display: inline-flex; gap: 2px; }
+    .typing-dots span { animation: blink 1.4s infinite both; }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+</style>
 
 @code {
-    private readonly List<ChatMessage> messages =
-    [
-        new("assistant", "Hello! How can I assist you with StockSense today?")
-    ];
-
+    private readonly List<ChatMessage> messages = [];
     private string message = string.Empty;
     private string? errorMessage;
     private bool isSending;
+    private ElementReference messagesElement;
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
-        if (args.Key == "Enter" && (args.CtrlKey || args.MetaKey))
+        if (args.Key == "Enter" && !args.ShiftKey)
             await SendAsync();
     }
 
     private async Task SendAsync()
     {
-        var outgoingMessage = message.Trim();
-        if (isSending || string.IsNullOrWhiteSpace(outgoingMessage))
+        var outgoing = message.Trim();
+        if (isSending || string.IsNullOrWhiteSpace(outgoing))
             return;
 
-        messages.Add(new ChatMessage("user", outgoingMessage));
+        messages.Add(new ChatMessage("user", outgoing));
         message = string.Empty;
         errorMessage = null;
         isSending = true;
+        await ScrollToBottom();
 
         try
         {
-            using var response = await Http.PostAsJsonAsync("api/assistance", new { message = outgoingMessage });
+            using var response = await Http.PostAsJsonAsync("api/assistance", new { message = outgoing });
             if (!response.IsSuccessStatusCode)
             {
                 errorMessage = await ReadErrorAsync(response);
@@ -116,7 +125,14 @@
         finally
         {
             isSending = false;
+            await ScrollToBottom();
         }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await Task.Delay(20);
+        await JS.InvokeVoidAsync("stockSenseScrollToBottom", messagesElement);
     }
 
     private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
@@ -126,14 +142,9 @@
             using var payload = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
             if (payload.RootElement.TryGetProperty("error", out var error) &&
                 !string.IsNullOrWhiteSpace(error.GetString()))
-            {
                 return error.GetString()!;
-            }
         }
-        catch (JsonException)
-        {
-        }
-
+        catch (JsonException) { }
         return response.StatusCode == System.Net.HttpStatusCode.Unauthorized
             ? "Your session has expired. Please sign in again."
             : "The assistant could not answer right now. Please try again.";
