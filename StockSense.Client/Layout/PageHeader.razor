@@ -11,14 +11,21 @@
                     <LucideIcon Name="arrow-left" Size="14" /> Back
                 </BbButton>
             }
-            <div class="flex items-center gap-2 @(string.IsNullOrEmpty(BackHref) ? "" : "mt-2")">
+            <div class="flex items-center gap-1.5 @(string.IsNullOrEmpty(BackHref) ? "" : "mt-2")">
                 <h1 class="text-2xl font-bold text-foreground m-0">@Title</h1>
                 @if (!string.IsNullOrEmpty(Badge))
                 {
-                    <span class="px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap"
-                          style="background: @(BadgeColor ?? "var(--destructive)"); color: white;">
-                        @Badge
+                <span class="px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap"
+                      style="background: @(BadgeColor ?? "var(--destructive)"); color: white;">
+                    @Badge
+                </span>
+                @if (!string.IsNullOrEmpty(Badge2))
+                {
+                    <span class="px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap"
+                          style="background: @(Badge2Color ?? "var(--primary)"); color: white;">
+                        @Badge2
                     </span>
+                }
                 }
             </div>
             @if (!string.IsNullOrEmpty(Subtitle))
@@ -40,6 +47,8 @@
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public string? Badge { get; set; }
     [Parameter] public string? BadgeColor { get; set; }
+    [Parameter] public string? Badge2 { get; set; }
+    [Parameter] public string? Badge2Color { get; set; }
     [Parameter] public string? BackHref { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

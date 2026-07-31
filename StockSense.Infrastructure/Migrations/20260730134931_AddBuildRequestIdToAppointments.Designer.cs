@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StockSense.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using StockSense.Infrastructure.Data;
 namespace StockSense.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260730134931_AddBuildRequestIdToAppointments")]
+    partial class AddBuildRequestIdToAppointments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -348,31 +351,6 @@ namespace StockSense.Infrastructure.Migrations
                     b.ToTable("Mechanics");
                 });
 
-            modelBuilder.Entity("StockSense.Domain.Entities.Motorcycle", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("BaseCC")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Brand")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Model")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Motorcycles");
-                });
-
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlip", b =>
                 {
                     b.Property<int>("Id")
@@ -622,61 +600,35 @@ namespace StockSense.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CompatibleBrand")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompatibleModel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("EstimatedAddedCC")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<int>("MaxAddedCC")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MinAddedCC")
-                        .HasColumnType("int");
-
                     b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TargetCC")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
                     b.ToTable("PreBuiltPackages");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.PreBuiltPackageMotor", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Brand")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Model")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("MotorcycleId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PreBuiltPackageId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("StockCC")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MotorcycleId");
-
-                    b.HasIndex("PreBuiltPackageId");
-
-                    b.ToTable("PreBuiltPackageMotor");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Product", b =>
@@ -1410,22 +1362,6 @@ namespace StockSense.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("StockSense.Domain.Entities.PreBuiltPackageMotor", b =>
-                {
-                    b.HasOne("StockSense.Domain.Entities.Motorcycle", "Motorcycle")
-                        .WithMany()
-                        .HasForeignKey("MotorcycleId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("StockSense.Domain.Entities.PreBuiltPackage", null)
-                        .WithMany("CompatibleMotors")
-                        .HasForeignKey("PreBuiltPackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Motorcycle");
-                });
-
             modelBuilder.Entity("StockSense.Domain.Entities.Product", b =>
                 {
                     b.HasOne("StockSense.Domain.Entities.Supplier", "Supplier")
@@ -1512,11 +1448,6 @@ namespace StockSense.Infrastructure.Migrations
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlipItem", b =>
                 {
                     b.Navigation("ReceiptItems");
-                });
-
-            modelBuilder.Entity("StockSense.Domain.Entities.PreBuiltPackage", b =>
-                {
-                    b.Navigation("CompatibleMotors");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Product", b =>

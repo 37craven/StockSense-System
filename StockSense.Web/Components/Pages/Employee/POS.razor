@@ -22,59 +22,9 @@
 <div class="pos-wrapper no-print">
 
     @* --- PRODUCT CATALOG --- *@
-    <div class="pos-catalog">
-        <div style="flex-shrink: 0; padding: var(--space-4) var(--space-4); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-3);">
-
-            <input type="text"
-                   @bind="searchTerm"
-                   @bind:event="oninput"
-                   placeholder="Search products or brands..."
-                   style="width: 100%; padding: 10px 15px; border-radius: var(--radius); border: 1px solid var(--border); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); outline: none;" />
-
-            <div style="display: flex; flex-wrap: nowrap; gap: var(--space-1); overflow-x: auto; padding-bottom: var(--space-1);">
-                <button type="button" @onclick="() => selectedCategory = null"
-                        style="padding: var(--space-1) var(--space-3); border-radius: 9999px; font-size: var(--text-xs); font-weight: var(--font-medium); border: 1px solid @(selectedCategory == null ? "var(--primary)" : "var(--border)"); cursor: pointer; background-color: @(selectedCategory == null ? "var(--primary)" : "transparent"); color: @(selectedCategory == null ? "var(--primary-foreground)" : "var(--foreground)"); white-space: nowrap; flex-shrink: 0;">
-                    All
-                </button>
-                @foreach (var cat in categories)
-                {
-                    <button type="button" @onclick="() => selectedCategory = cat"
-                            style="padding: var(--space-1) var(--space-3); border-radius: 9999px; font-size: var(--text-xs); font-weight: var(--font-medium); border: 1px solid @(selectedCategory == cat ? "var(--primary)" : "var(--border)"); cursor: pointer; background-color: @(selectedCategory == cat ? "var(--primary)" : "transparent"); color: @(selectedCategory == cat ? "var(--primary-foreground)" : "var(--foreground)"); white-space: nowrap; flex-shrink: 0;">
-                        @cat
-                    </button>
-                }
-            </div>
-        </div>
-
-        <div style="flex: 1; overflow-y: auto; padding: var(--space-4);">
-            @if (allProducts.Count == 0 && !isLoaded)
-            {
-                <LoadingState Description="Loading products..." />
-            }
-            else if (!FilteredProducts.Any())
-            {
-                <EmptyState Icon="package-search" Description="No products match your search." Title="" />
-            }
-            else
-            {
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-3);">
-                    @foreach (var p in FilteredProducts)
-                    {
-                        <div @onclick="() => AddToCart(p)"
-                             style="padding: var(--space-3); border-radius: var(--radius); border: 2px solid @(cart.Any(i => i.ProductId == p.Id) ? "var(--primary)" : "var(--border)"); background-color: @(cart.Any(i => i.ProductId == p.Id) ? "var(--accent)" : "var(--background)"); cursor: @(p.CurrentStock <= 0 ? "not-allowed" : "pointer"); opacity: @(p.CurrentStock <= 0 ? "0.5" : "1"); text-align: center; transition: border-color 0.15s;">
-                            <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="@p.Name">@p.Name</div>
-                            <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin: var(--space-1) 0;">@p.Brand</div>
-                            <div style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--primary);">₱@p.Price.ToString("N2")</div>
-                            <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-1); margin-top: var(--space-1);">
-                                <span style="width: 8px; height: 8px; border-radius: 9999px; flex-shrink: 0; background-color: @GetStockColor(p);"></span>
-                                <span style="font-size: var(--text-xs); color: var(--muted-foreground);">Stock: @p.CurrentStock</span>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-    </div>
+    <ProductCatalog @ref="catalog"
+                    OnProductClick="AddToCart"
+                    IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
 
     @* --- RIGHT COLUMN (desktop): order summary + scanner card --- *@
     <div class="pos-right">
@@ -425,12 +375,8 @@
         </div>
     </div>;
 
-    private List<Product> allProducts = new();
-    private bool isLoaded;
-    private List<string> categories = new();
+    private ProductCatalog? catalog;
     private List<CartItemDto> cart = new();
-    private string? selectedCategory;
-    private string searchTerm = "";
     private bool isProcessing = false;
     private string? statusMessage;
     private bool cartOpen = false;
@@ -438,11 +384,6 @@
     private string? referenceNumber;
     private string? remarks;
     private string? authenticatedUserId;
-
-    private string GetStockColor(Product p) =>
-        p.CurrentStock <= 2 ? "#ef4444" :
-        p.CurrentStock < p.ReorderTarget ? "#eab308" :
-        "#22c55e";
 
     private bool showOrderSummaryModal = false;
     private ReceiptDto? completedTransaction;
@@ -528,26 +469,7 @@
     {
         var authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
         authenticatedUserId = authenticationState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        await LoadData();
     }
-
-    private async Task LoadData()
-    {
-        allProducts = await ProductRepo.GetAllAsync();
-        isLoaded = true;
-        categories = allProducts
-            .Select(p => p.Category)
-            .Where(c => !string.IsNullOrEmpty(c))
-            .Distinct()
-            .OrderBy(c => c)
-            .ToList();
-    }
-
-    private IEnumerable<Product> FilteredProducts => allProducts
-        .Where(p => (string.IsNullOrEmpty(selectedCategory) || p.Category == selectedCategory) &&
-                    (string.IsNullOrWhiteSpace(searchTerm) ||
-                    (p.Name != null && p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-                    (p.Brand != null && p.Brand.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))));
 
     private decimal SubtotalAmount => cart.Sum(item => item.Price * item.Quantity);
     private decimal TotalDiscount => cart.Sum(item => item.DiscountAmount);
@@ -580,23 +502,14 @@
     {
         if (int.TryParse(e.Value?.ToString(), out int newQty))
         {
-            var product = allProducts.FirstOrDefault(p => p.Id == item.ProductId);
-            if (product != null)
-            {
-                if (newQty > product.CurrentStock)
-                {
-                    item.Quantity = product.CurrentStock;
-                    statusMessage = $"Adjusted to max stock ({product.CurrentStock}) for {item.ProductName}.";
-                }
-                else if (newQty <= 0) cart.Remove(item);
-                else item.Quantity = newQty;
+            if (newQty <= 0) cart.Remove(item);
+            else item.Quantity = newQty;
 
-                var maximumDiscount = item.Price * item.Quantity;
-                if (item.DiscountAmount > maximumDiscount)
-                {
-                    item.DiscountAmount = maximumDiscount;
-                    statusMessage = $"Discount adjusted to the line amount for {item.ProductName}.";
-                }
+            var maximumDiscount = item.Price * item.Quantity;
+            if (item.DiscountAmount > maximumDiscount)
+            {
+                item.DiscountAmount = maximumDiscount;
+                statusMessage = $"Discount adjusted to the line amount for {item.ProductName}.";
             }
         }
     }
@@ -651,7 +564,7 @@
             referenceNumber = null;
             remarks = null;
 
-            await LoadData();
+            if (catalog is not null) await catalog.ReloadAsync();
         }
         catch (Exception ex)
         {

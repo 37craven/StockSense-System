@@ -20,20 +20,21 @@ namespace StockSense.Infrastructure.Data
         public DbSet<Supplier> Suppliers { get; set; }
         public DbSet<Mechanic> Mechanics { get; set; }
         public DbSet<PreBuiltPackage> PreBuiltPackages { get; set; }
-        public DbSet<SalesHistory> SalesHistory { get; set; }
+        public DbSet<Motorcycle> Motorcycles { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<TransactionItem> TransactionItems { get; set; }
         public DbSet<PinnedSlip> PinnedSlips { get; set; }
-        public DbSet<ReportingProduct> ReportingProducts { get; set; }
-        public DbSet<HistoricalProductMapping> HistoricalProductMappings { get; set; }
-        public DbSet<LiveProductMapping> LiveProductMappings { get; set; }
-        public DbSet<HistoricalMonthlyProductSale> HistoricalMonthlyProductSales { get; set; }
-        public DbSet<SalesImportBatch> SalesImportBatches { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
             builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+            builder.Entity<PreBuiltPackageMotor>()
+                .HasOne(m => m.Motorcycle)
+                .WithMany()
+                .HasForeignKey(m => m.MotorcycleId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
 

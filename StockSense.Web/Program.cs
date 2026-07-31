@@ -113,6 +113,7 @@ builder.Services.AddAntiforgery(options =>
 
 // --- CONCRETE REPOSITORIES ---
 builder.Services.AddScoped<PreBuiltRepository>();
+builder.Services.AddScoped<MotorcycleRepository>();
 builder.Services.AddScoped<OrderSlipRepository>();
 builder.Services.AddScoped<TransactionRepository>();
 builder.Services.AddScoped<AppointmentRepository>();
@@ -127,7 +128,6 @@ builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<BarcodeService>();
 builder.Services.AddScoped<OrderEmailSender>();
 builder.Services.AddSingleton<PdfDownloadCache>();
-builder.Services.AddScoped<IProductSalesDatasetService, ProductSalesReportingService>();
 builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
 builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();
 builder.Services.AddScoped<IWorkOrderCheckoutService, WorkOrderCheckoutService>();

@@ -49,14 +49,30 @@ namespace StockSense.Web.Controllers
             };
 
             var result = await _userManager.CreateAsync(user, dto.Password);
-            if (result.Succeeded)
+            if (!result.Succeeded)
             {
-                await _userManager.AddToRoleAsync(user, dto.Role);
-                return Ok();
+                var firstError = result.Errors.FirstOrDefault()?.Description ?? "Registration failed";
+                return BadRequest(ApiResponse.Error(firstError));
             }
 
-            var firstError = result.Errors.FirstOrDefault()?.Description ?? "Registration failed";
-            return BadRequest(ApiResponse.Error(firstError));
+            try
+            {
+                var roleResult = await _userManager.AddToRoleAsync(user, dto.Role);
+                if (!roleResult.Succeeded)
+                {
+                    await _userManager.DeleteAsync(user);
+                    var roleError = roleResult.Errors.FirstOrDefault()?.Description
+                        ?? $"Could not assign role '{dto.Role}'. Ensure the role exists in the system.";
+                    return BadRequest(ApiResponse.Error(roleError));
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                await _userManager.DeleteAsync(user);
+                return BadRequest(ApiResponse.Error($"Role '{dto.Role}' does not exist in the system. Contact an administrator to seed roles."));
+            }
+
+            return Ok();
         }
 
         [HttpPost("change-role")]

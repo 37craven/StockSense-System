@@ -10,6 +10,7 @@
 
 @inject PreBuiltRepository PreBuiltRepo
 @inject ProductRepository ProductRepo
+@inject MotorcycleRepository MotorcycleRepo
 
 @attribute [Authorize(Roles = "Employee, Admin")]
 
@@ -18,6 +19,10 @@
 @* ── Page Header ── *@
 <PageHeader Title="Pre-Built Packages"
             Subtitle="Create and manage guided motor build packages.">
+    <BbButton Variant="ButtonVariant.Outline" OnClick="() => showMotorcycleModal = true">
+        <LucideIcon Name="bike" Size="16"/>
+        Manage Motorcycles
+    </BbButton>
     <BbButton Variant="ButtonVariant.Default" OnClick="OpenCreateModal">
         <LucideIcon Name="package-plus" Size="16"/>
         Create Package
@@ -73,10 +78,18 @@ else
                 <p style="font-size: var(--text-xs); color: var(--muted-foreground); margin: 0;">@pkg.Description</p>
 
                 <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                    <span style="font-size: 10px; background: var(--muted); padding: 2px 6px; border-radius: 4px; color: var(--foreground);">@pkg.CompatibleBrand</span>
-                    <span style="font-size: 10px; background: var(--muted); padding: 2px 6px; border-radius: 4px; color: var(--foreground);">@pkg.CompatibleModel</span>
-                    <span style="font-size: 10px; background: var(--muted); padding: 2px 6px; border-radius: 4px; color: var(--foreground);">@pkg.TargetCC</span>
-                    <span style="font-size: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 6px; border-radius: 4px; color: #3b82f6; font-weight: bold;">+@pkg.EstimatedAddedCC CC</span>
+                    @foreach (var motor in pkg.CompatibleMotors.Take(3))
+                    {
+                        <span style="font-size: 10px; background: var(--muted); padding: 2px 6px; border-radius: 4px; color: var(--foreground);">@motor.Brand · @motor.Model · @motor.StockCC</span>
+                    }
+                    @if (pkg.CompatibleMotors.Count > 3)
+                    {
+                        <span style="font-size: 10px; background: var(--muted); padding: 2px 6px; border-radius: 4px; color: var(--muted-foreground);">+@(pkg.CompatibleMotors.Count - 3) more</span>
+                    }
+                    @if (pkg.MinAddedCC > 0)
+                    {
+                        <span style="font-size: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 6px; border-radius: 4px; color: #3b82f6; font-weight: bold;">+@pkg.MinAddedCC–@pkg.MaxAddedCC CC</span>
+                    }
                 </div>
 
                 <div>
@@ -99,6 +112,58 @@ else
         }
     </div>
 }
+
+@* ── Manage Motorcycles Dialog ── *@
+<BbDialog @bind-Open="showMotorcycleModal">
+    <BbDialogContent Style="width: min(94vw, 520px); padding: var(--space-5); display: flex; flex-direction: column; max-height: 90dvh;">
+        <BbDialogHeader>
+            <BbDialogTitle>Manage Motorcycles</BbDialogTitle>
+            <BbDialogDescription>Add or remove motorcycle brands, models, and base CC for the package picker.</BbDialogDescription>
+        </BbDialogHeader>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: var(--space-2); margin: var(--space-4) 0;">
+            <input type="text" @bind="newMotorBrand" placeholder="Brand (e.g., Yamaha)"
+                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"/>
+            <input type="text" @bind="newMotorModel" placeholder="Model (e.g., Aerox 155)"
+                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"/>
+            <input type="text" @bind="newMotorBaseCC" placeholder="Base CC (e.g., 155cc)"
+                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"/>
+            <BbButton Variant="ButtonVariant.Default" OnClick="AddMotorcycle" Disabled="isProcessing">
+                <LucideIcon Name="plus" Size="14"/>
+            </BbButton>
+        </div>
+        @if (!string.IsNullOrEmpty(motorErrorMessage))
+        {
+            <div style="margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive-muted-foreground); font-size: var(--text-xs);">@motorErrorMessage</div>
+        }
+
+        <div style="flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius);">
+            @if (!motorcycles.Any())
+            {
+                <div style="padding: var(--space-8); text-align: center; color: var(--muted-foreground); font-size: var(--text-xs);">No motorcycles yet. Add one above.</div>
+            }
+            else
+            {
+                @foreach (var motor in motorcycles)
+                {
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--muted);">
+                        <div style="min-width: 0;">
+                            <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@motor.Brand — @motor.Model</div>
+                            <div style="font-size: 10px; color: var(--muted-foreground);">Base CC: @motor.BaseCC</div>
+                        </div>
+                        <button @onclick="() => DeleteMotorcycle(motor)" style="background: none; border: none; cursor: pointer; color: var(--destructive); padding: 4px; display: flex; flex-shrink: 0;" title="Delete @motor.Brand @motor.Model">
+                            <LucideIcon Name="trash-2" Size="14"/>
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: var(--space-4);">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showMotorcycleModal = false">Close</BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
 
 @* ── Delete Confirmation Dialog ── *@
 <BbDialog @bind-Open="showDeleteConfirm">
@@ -132,8 +197,8 @@ else
 
 @* ── Create / Edit Package Modal ── *@
 <BbDialog @bind-Open="showCreateModal">
-    <BbDialogContent Style="display: flex; flex-direction: column; max-height: 92dvh; width: min(96vw, 900px); padding: var(--space-4);">
-
+    <BbDialogContent Style="display: flex; flex-direction: row; max-height: 70dvh; width: fit-content; min-width: min(96vw, 480px); max-width: 96vw;">
+        <div>
         <BbDialogHeader>
             <BbDialogTitle>@(isEditMode ? "Edit Package" : "Create Pre-Built Package")</BbDialogTitle>
             <BbDialogDescription>Combine existing inventory products into a single guided package.</BbDialogDescription>
@@ -146,7 +211,7 @@ else
             </div>
         }
 
-        <div style="flex: 1; overflow-y: auto; padding: var(--space-4) var(--space-1); display: flex; flex-direction: column; gap: var(--space-4);">
+        <div style="flex: 1; overflow-y: hidden; display: flex; flex-direction: column; gap: var(--space-4);">
             <div style="display: flex; flex-wrap: wrap; gap: var(--space-4);">
 
                 @* LEFT: Package Details *@
@@ -163,116 +228,51 @@ else
                                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); resize: none; box-sizing: border-box;"></textarea>
                     </div>
 
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <div style="flex: 1; min-width: 120px;">
-                            <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Motor Brand</label>
-                            <select value="@newPackage.CompatibleBrand" @onchange="OnBrandChanged"
-                                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground);">
-                                <option value="">Select Brand...</option>
-                                @foreach (var brand in motorDatabase.Keys)
+                    <div>
+                        <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Compatible Motors</label>
+                        <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius);">
+                            @if (!motorcycles.Any())
+                            {
+                                <div style="padding: var(--space-6); text-align: center; color: var(--muted-foreground); font-size: var(--text-xs);">No motorcycles yet. Add them under Manage Motorcycles.</div>
+                            }
+                            else
+                            {
+                                @foreach (var motor in motorcycles)
                                 {
-                                    <option value="@brand">@brand</option>
+                                    var isSelected = IsMotorSelected(motor);
+                                    <label style="display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--muted); cursor: pointer;">
+                                        <input type="checkbox" checked="@isSelected" @onchange="() => ToggleMotor(motor)" style="accent-color: var(--primary); flex-shrink: 0;"/>
+                                        <span style="font-size: var(--text-xs); color: var(--foreground);">@motor.Brand — @motor.Model <span style="color: var(--muted-foreground);">· @motor.BaseCC</span></span>
+                                    </label>
                                 }
-                            </select>
+                            }
                         </div>
-                        <div style="flex: 1; min-width: 120px;">
-                            <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Motor Model</label>
-                            <select value="@newPackage.CompatibleModel" @onchange="OnModelChanged"
-                                    disabled="@string.IsNullOrEmpty(newPackage.CompatibleBrand)"
-                                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: @(string.IsNullOrEmpty(newPackage.CompatibleBrand) ? "var(--muted)" : "var(--background)"); color: var(--foreground);">
-                                <option value="">Select Model...</option>
-                                @if (!string.IsNullOrEmpty(newPackage.CompatibleBrand) && motorDatabase.ContainsKey(newPackage.CompatibleBrand))
-                                {
-                                    @foreach (var model in motorDatabase[newPackage.CompatibleBrand].Keys)
-                                    {
-                                        <option value="@model">@model</option>
-                                    }
-                                }
-                            </select>
-                        </div>
+                        <p style="font-size: 10px; color: var(--muted-foreground); margin: 4px 0 0 0;">@newPackage.CompatibleMotors.Count motor(s) selected.</p>
                     </div>
 
                     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
                         <div style="flex: 1; min-width: 120px;">
-                            <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Target CC Range</label>
-                            <select @bind="newPackage.TargetCC"
-                                    disabled="@string.IsNullOrEmpty(newPackage.CompatibleModel)"
-                                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: @(string.IsNullOrEmpty(newPackage.CompatibleModel) ? "var(--muted)" : "var(--background)"); color: var(--foreground);">
-                                <option value="">Select CC...</option>
-                                @if (!string.IsNullOrEmpty(newPackage.CompatibleBrand) && !string.IsNullOrEmpty(newPackage.CompatibleModel) && motorDatabase.ContainsKey(newPackage.CompatibleBrand) && motorDatabase[newPackage.CompatibleBrand].ContainsKey(newPackage.CompatibleModel))
-                                {
-                                    @foreach (var cc in motorDatabase[newPackage.CompatibleBrand][newPackage.CompatibleModel])
-                                    {
-                                        <option value="@cc">@cc</option>
-                                    }
-                                }
-                            </select>
+                            <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Min Estimated Added CC</label>
+                            <input type="number" @bind="newPackage.MinAddedCC" placeholder="e.g., 20"
+                                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;"/>
                         </div>
                         <div style="flex: 1; min-width: 120px;">
-                            <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Estimated Added CC</label>
-                            <input type="number" @bind="newPackage.EstimatedAddedCC" placeholder="e.g., 30"
+                            <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Max Estimated Added CC</label>
+                            <input type="number" @bind="newPackage.MaxAddedCC" placeholder="e.g., 30"
                                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;"/>
                         </div>
                     </div>
 
-                    <p style="font-size: 10px; color: var(--muted-foreground); margin: -4px 0 0 0;">Added CC powers the dynamic stats bar (Power/Speed/Reliability) on the build page.</p>
+                    <p style="font-size: 10px; color: var(--muted-foreground); margin: -4px 0 0 0;">CC gain range shows customers how much displacement the build adds to their stock engine.</p>
+                </div>
                 </div>
 
-                @* RIGHT: Product Picker *@
-                <div style="flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; background: var(--card);">
-
-                    <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--muted); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <span style="font-size: var(--text-sm); font-weight: bold; color: var(--foreground);">Select Products</span>
-                        <span style="font-size: var(--text-xs); color: var(--primary); font-weight: bold; background: color-mix(in oklch, var(--primary) 10%, transparent); padding: 3px 8px; border-radius: 999px;">@newPackage.SelectedProductIds.Count selected</span>
-                    </div>
-
-                    <div style="padding: 8px 10px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; background: var(--background); flex-shrink: 0;">
-                        <div style="position: relative; flex: 1; min-width: 140px;">
-                            <LucideIcon Name="search" Size="14" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground);"/>
-                            <input type="text" @bind="productSearchQuery" @bind:event="oninput" placeholder="Search name or brand..."
-                                   style="width: 100%; padding: 6px 8px 6px 28px; border-radius: 4px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"/>
-                        </div>
-                        <select @bind="productCategoryFilter"
-                                style="flex: 1; min-width: 110px; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); font-size: var(--text-xs);">
-                            <option value="All">All Categories</option>
-                            @foreach (var cat in ModalCategories)
-                            {
-                                <option value="@cat">@cat</option>
-                            }
-                        </select>
-                    </div>
-
-                    <div style="flex: 1; overflow-y: auto; min-height: 180px; max-height: 280px; padding: 6px;">
-                        @if (allProducts == null)
-                        {
-                            <div style="padding: 20px; text-align: center;">
-                                <BbSpinner Size="SpinnerSize.Small"/>
-                            </div>
-                        }
-                        else if (!FilteredModalProducts.Any())
-                        {
-                            <EmptyState Icon="search-x" Description="No products match your search." Title="" />
-                        }
-                        else
-                        {
-                            @foreach (var product in FilteredModalProducts)
-                            {
-                                bool isChecked = newPackage.SelectedProductIds.Contains(product.Id);
-                                <div @onclick="() => ToggleProductSelection(product.Id)"
-                                     style="display: flex; align-items: center; justify-content: space-between; padding: 8px 6px; border-radius: 4px; cursor: pointer; background: @(isChecked ? "color-mix(in oklch, var(--primary) 10%, transparent)" : "transparent"); border-bottom: 1px solid var(--muted);">
-                                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-                                        <input type="checkbox" checked="@isChecked" style="pointer-events: none; flex-shrink: 0;"/>
-                                        <div style="min-width: 0;">
-                                            <div style="font-size: var(--text-sm); color: var(--foreground); font-weight: @(isChecked ? "bold" : "normal"); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@product.Name</div>
-                                            <div style="font-size: 10px; color: var(--muted-foreground);">@product.Category • @product.Brand</div>
-                                        </div>
-                                    </div>
-                                    <span style="font-size: var(--text-xs); font-weight: bold; color: var(--foreground); flex-shrink: 0; margin-left: 8px;">₱@product.Price.ToString("N0")</span>
-                                </div>
-                            }
-                        }
-                    </div>
-                </div>
+<ProductCatalog Columns="3"
+                OnProductClick="p => ToggleProductSelection(p.Id)"
+                IsSelected="p => newPackage.SelectedProductIds.Contains(p.Id)"
+                ShowCheckbox="false"
+                IsDisabled="_ => false"
+                AllowDisabledClick="true" />
 
             </div>
         </div>
@@ -308,68 +308,19 @@ else
     private bool isEditMode = false;
     private string errorMessage = string.Empty;
 
-    private string productSearchQuery = string.Empty;
-    private string productCategoryFilter = "All";
-
     private List<PreBuiltPackageDto> existingPackages = new();
     private List<ProductDto>? allProducts;
+    private List<Motorcycle> motorcycles = new();
     private CreatePreBuiltDto newPackage = new();
     private PreBuiltPackageDto? packageToDelete;
     private int editingPackageId;
 
-    private readonly Dictionary<string, Dictionary<string, List<string>>> motorDatabase = new()
-    {
-        {
-            "Yamaha", new()
-            {
-                { "Mio Sporty / Soul", new() { "59mm (150cc)", "63mm (180cc)", "65mm (200cc)" } },
-                { "Mio i125 / M3", new() { "59mm (150cc)", "63mm (180cc)" } },
-                { "Aerox / NMAX v1-v2", new() { "63mm (180cc)", "65mm (200cc)", "66mm+ (Racing)" } },
-                { "Sniper 150/155", new() { "62mm (180cc)", "65mm (200cc)", "Superhead Build" } }
-            }
-        },
-        {
-            "Honda", new()
-            {
-                { "Click 125i/150i", new() { "59mm (150cc)", "61mm (160cc)", "63mm (180cc)" } },
-                { "PCX / ADV 150", new() { "61mm (160cc)", "63mm (180cc)" } },
-                { "PCX / ADV 160", new() { "63mm (180cc)", "65mm (200cc)" } },
-                { "Beat 110", new() { "55mm (130cc)", "59mm (150cc)" } }
-            }
-        },
-        {
-            "Suzuki", new()
-            {
-                { "Raider 150 Carb", new() { "66mm (200cc)", "68mm (220cc)", "Open Spec" } },
-                { "Raider 150 FI", new() { "66mm (200cc)", "68mm (220cc)" } },
-                { "Smash / Skydrive", new() { "59mm (150cc)", "63mm (180cc)" } }
-            }
-        }
-    };
-
-    private IEnumerable<string> ModalCategories => (allProducts ?? new List<ProductDto>())
-        .Select(p => p.Category).Distinct().OrderBy(c => c);
-
-    private IEnumerable<ProductDto> FilteredModalProducts
-    {
-        get
-        {
-            if (allProducts == null) return Array.Empty<ProductDto>();
-            
-            var query = allProducts.AsEnumerable();
-            
-            if (productCategoryFilter != "All")
-                query = query.Where(p => p.Category == productCategoryFilter);
-                
-            if (!string.IsNullOrWhiteSpace(productSearchQuery))
-            {
-                var s = productSearchQuery.ToLower();
-                query = query.Where(p => p.Name.ToLower().Contains(s) || p.Brand.ToLower().Contains(s));
-            }
-
-            return query.OrderBy(p => p.Category).ThenBy(p => p.Name);
-        }
-    }
+    private bool showMotorcycleModal = false;
+    private bool isMotorProcessing = false;
+    private string motorErrorMessage = string.Empty;
+    private string newMotorBrand = string.Empty;
+    private string newMotorModel = string.Empty;
+    private string newMotorBaseCC = string.Empty;
 
     protected override async Task OnInitializedAsync() => await LoadData();
 
@@ -386,6 +337,8 @@ else
                 p.Id, p.Name, p.Category, p.Brand, p.Price,
                 p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0,
                 p.Supplier?.Name ?? "", p.ImageUrl ?? "")).ToList();
+
+            motorcycles = await MotorcycleRepo.GetAllAsync();
         }
         catch (Exception ex)
         {
@@ -400,9 +353,12 @@ else
     private static PreBuiltPackageDto MapToDto(PreBuiltPackage p) => new()
     {
         Id = p.Id, Name = p.Name, Description = p.Description,
-        CompatibleBrand = p.CompatibleBrand, CompatibleModel = p.CompatibleModel,
-        TargetCC = p.TargetCC, EstimatedAddedCC = p.EstimatedAddedCC,
+        MinAddedCC = p.MinAddedCC, MaxAddedCC = p.MaxAddedCC,
         IsActive = p.IsActive, TotalPrice = p.TotalPrice,
+        CompatibleMotors = p.CompatibleMotors.Select(m => new CompatibleMotorDto
+        {
+            Id = m.Id, Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+        }).ToList(),
         IncludedProducts = p.IncludedProducts.Select(prod => new PreBuiltProductDto
         {
             Id = prod.Id, Name = prod.Name, Brand = prod.Brand, Price = prod.Price,
@@ -415,8 +371,6 @@ else
         isEditMode = false;
         editingPackageId = 0;
         newPackage = new CreatePreBuiltDto();
-        productSearchQuery = string.Empty;
-        productCategoryFilter = "All";
         errorMessage = string.Empty;
         showCreateModal = true;
     }
@@ -429,15 +383,18 @@ else
         {
             Name = pkg.Name ?? string.Empty,
             Description = pkg.Description ?? string.Empty,
-            CompatibleBrand = pkg.CompatibleBrand ?? string.Empty,
-            CompatibleModel = pkg.CompatibleModel ?? string.Empty,
-            TargetCC = pkg.TargetCC ?? string.Empty,
-            EstimatedAddedCC = pkg.EstimatedAddedCC,
+            MinAddedCC = pkg.MinAddedCC,
+            MaxAddedCC = pkg.MaxAddedCC,
+            CompatibleMotors = pkg.CompatibleMotors?.Select(m => new CompatibleMotorDto
+            {
+                Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+            }).ToList() ?? new List<CompatibleMotorDto>(),
             SelectedProductIds = pkg.IncludedProducts?.Select(p => p.Id).ToList() ?? new List<int>()
         };
-        
-        productSearchQuery = string.Empty;
-        productCategoryFilter = "All";
+        var knownMotors = motorcycles.Select(m => (m.Brand, m.Model, m.BaseCC)).ToHashSet();
+        newPackage.CompatibleMotors = newPackage.CompatibleMotors
+            .Where(m => knownMotors.Contains((m.Brand, m.Model, m.StockCC))).ToList();
+
         errorMessage = string.Empty;
         showCreateModal = true;
     }
@@ -485,17 +442,61 @@ else
         }
     }
 
-    private void OnBrandChanged(ChangeEventArgs e)
+    private bool IsMotorSelected(Motorcycle motor)
+        => newPackage.CompatibleMotors.Any(m => m.Brand == motor.Brand && m.Model == motor.Model && m.StockCC == motor.BaseCC);
+
+    private void ToggleMotor(Motorcycle motor)
     {
-        newPackage.CompatibleBrand = e.Value?.ToString() ?? string.Empty;
-        newPackage.CompatibleModel = string.Empty;
-        newPackage.TargetCC = string.Empty;
+        var existing = newPackage.CompatibleMotors
+            .FirstOrDefault(m => m.Brand == motor.Brand && m.Model == motor.Model && m.StockCC == motor.BaseCC);
+        if (existing != null)
+            newPackage.CompatibleMotors.Remove(existing);
+        else
+            newPackage.CompatibleMotors.Add(new CompatibleMotorDto { Brand = motor.Brand, Model = motor.Model, StockCC = motor.BaseCC });
     }
 
-    private void OnModelChanged(ChangeEventArgs e)
+    private async Task AddMotorcycle()
     {
-        newPackage.CompatibleModel = e.Value?.ToString() ?? string.Empty;
-        newPackage.TargetCC = string.Empty;
+        motorErrorMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(newMotorBrand) || string.IsNullOrWhiteSpace(newMotorModel) || string.IsNullOrWhiteSpace(newMotorBaseCC))
+        {
+            motorErrorMessage = "Brand, Model, and Base CC are all required.";
+            return;
+        }
+        isMotorProcessing = true;
+        try
+        {
+            await MotorcycleRepo.AddAsync(new Motorcycle { Brand = newMotorBrand.Trim(), Model = newMotorModel.Trim(), BaseCC = newMotorBaseCC.Trim() });
+            newMotorBrand = newMotorModel = newMotorBaseCC = string.Empty;
+            motorcycles = await MotorcycleRepo.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            motorErrorMessage = "Failed to add motorcycle: " + ex.Message;
+        }
+        finally
+        {
+            isMotorProcessing = false;
+        }
+    }
+
+    private async Task DeleteMotorcycle(Motorcycle motor)
+    {
+        isMotorProcessing = true;
+        motorErrorMessage = string.Empty;
+        try
+        {
+            await MotorcycleRepo.DeleteAsync(motor.Id);
+            motorcycles = await MotorcycleRepo.GetAllAsync();
+        }
+        catch (Exception)
+        {
+            motorErrorMessage = $"\"{motor.Brand} — {motor.Model}\" is used by existing packages and cannot be deleted.";
+        }
+        finally
+        {
+            isMotorProcessing = false;
+        }
     }
 
     private void ToggleProductSelection(int productId)
@@ -526,11 +527,28 @@ else
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(newPackage.CompatibleBrand) || 
-            string.IsNullOrWhiteSpace(newPackage.CompatibleModel) || 
-            string.IsNullOrWhiteSpace(newPackage.TargetCC))
+        var validMotors = newPackage.CompatibleMotors
+            .Where(m => !string.IsNullOrWhiteSpace(m.Brand) && !string.IsNullOrWhiteSpace(m.Model) && !string.IsNullOrWhiteSpace(m.StockCC))
+            .ToList();
+        if (!validMotors.Any())
         {
-            errorMessage = "Brand, Model, and CC specs are required.";
+            errorMessage = "Add at least one compatible motor (brand, model, and CC).";
+            return;
+        }
+
+        var motorLookup = motorcycles.ToDictionary(m => (m.Brand, m.Model, m.BaseCC), m => m.Id);
+        foreach (var m in validMotors)
+        {
+            if (!motorLookup.TryGetValue((m.Brand, m.Model, m.StockCC), out _))
+            {
+                errorMessage = $"Motorcycle \"{m.Brand} — {m.Model} ({m.StockCC})\" does not exist in the database. Add it under Manage Motorcycles first.";
+                return;
+            }
+        }
+
+        if (newPackage.MaxAddedCC < newPackage.MinAddedCC)
+        {
+            errorMessage = "Max estimated CC must be greater than or equal to Min estimated CC.";
             return;
         }
 
@@ -549,10 +567,13 @@ else
                 if (package == null) { errorMessage = "Package not found."; return; }
                 package.Name = newPackage.Name;
                 package.Description = newPackage.Description;
-                package.CompatibleBrand = newPackage.CompatibleBrand;
-                package.CompatibleModel = newPackage.CompatibleModel;
-                package.TargetCC = newPackage.TargetCC;
-                package.EstimatedAddedCC = newPackage.EstimatedAddedCC;
+                package.MinAddedCC = newPackage.MinAddedCC;
+                package.MaxAddedCC = newPackage.MaxAddedCC;
+                package.CompatibleMotors = validMotors.Select(m => new PreBuiltPackageMotor
+                {
+                    Brand = m.Brand, Model = m.Model, StockCC = m.StockCC,
+                    MotorcycleId = motorLookup[(m.Brand, m.Model, m.StockCC)]
+                }).ToList();
                 package.IncludedProducts = await PreBuiltRepo.GetProductsByIdsAsync(newPackage.SelectedProductIds);
                 await PreBuiltRepo.UpdateAsync(package);
             }
@@ -563,11 +584,14 @@ else
                 {
                     Name = newPackage.Name,
                     Description = newPackage.Description,
-                    CompatibleBrand = newPackage.CompatibleBrand,
-                    CompatibleModel = newPackage.CompatibleModel,
-                    TargetCC = newPackage.TargetCC,
-                    EstimatedAddedCC = newPackage.EstimatedAddedCC,
+                    MinAddedCC = newPackage.MinAddedCC,
+                    MaxAddedCC = newPackage.MaxAddedCC,
                     IsActive = true,
+                    CompatibleMotors = validMotors.Select(m => new PreBuiltPackageMotor
+                    {
+                        Brand = m.Brand, Model = m.Model, StockCC = m.StockCC,
+                        MotorcycleId = motorLookup[(m.Brand, m.Model, m.StockCC)]
+                    }).ToList(),
                     IncludedProducts = products
                 };
                 await PreBuiltRepo.AddAsync(package);

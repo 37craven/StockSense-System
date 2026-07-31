@@ -64,3 +64,24 @@ public class MechanicAssignmentDto
     [Range(15, 480)]
     public int DurationMinutes { get; set; }
 }
+
+public class ScheduleAppointmentRequest
+{
+    [Required]
+    public int MechanicId { get; set; }
+
+    [Required]
+    public string MechanicName { get; set; } = string.Empty;
+
+    [Required]
+    public DateTime AppointmentDate { get; set; }
+
+    [Required]
+    [RegularExpression(@"^\d{2}:\d{2}$", ErrorMessage = "Time slot must be in HH:mm format.")]
+    public string TimeSlot { get; set; } = string.Empty;
+
+    [Required]
+    public string ServicesRequested { get; set; } = string.Empty;
+
+    public int DurationMinutes { get; set; } = 120;
+}

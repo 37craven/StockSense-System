@@ -22,6 +22,9 @@
             <button class="action action-secondary" @onclick="LoadAsync" disabled="@isLoading">
                 <LucideIcon Name="refresh-cw" Size="16" /> Refresh
             </button>
+            <button class="action action-secondary" @onclick="() => showCatalog = true">
+                <LucideIcon Name="package-search" Size="16" /> Product catalog
+            </button>
             <a class="action action-secondary" href="/admin/stock">
                 <LucideIcon Name="sliders-horizontal" Size="16" /> Manage inventory
             </a>
@@ -224,8 +227,26 @@
     }
 </main>
 
+@if (showCatalog)
+{
+    <div class="pc-backdrop" @onclick="() => showCatalog = false"></div>
+    <div class="pc-modal" role="dialog" aria-modal="true" aria-label="Product catalog">
+        <div class="pc-modal-header">
+            <div>
+                <p class="eyebrow">DEBUG</p>
+                <h2>Product Catalog</h2>
+            </div>
+            <button class="action action-secondary" @onclick="() => showCatalog = false">
+                <LucideIcon Name="x" Size="16" /> Close
+            </button>
+        </div>
+        <ProductCatalog Columns="3" />
+    </div>
+}
+
 @code {
     private bool isLoading = true;
+    private bool showCatalog;
     private string? errorMessage;
     private DateTime? lastUpdated;
     private List<Product> products = [];

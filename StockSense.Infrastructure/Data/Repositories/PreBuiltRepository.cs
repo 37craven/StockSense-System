@@ -15,7 +15,8 @@ public class PreBuiltRepository
     public async Task<List<PreBuiltPackage>> GetAllAsync()
     {
         return await _context.PreBuiltPackages
-            .Include(p => p.IncludedProducts) 
+            .Include(p => p.IncludedProducts)
+            .Include(p => p.CompatibleMotors)
             .ToListAsync();
     }
 
@@ -23,6 +24,7 @@ public class PreBuiltRepository
     {
         return await _context.PreBuiltPackages
             .Include(p => p.IncludedProducts)
+            .Include(p => p.CompatibleMotors)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 

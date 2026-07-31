@@ -16,4 +16,5 @@ public class BuildRequest
     public DateTime? CompletedAt { get; set; }
     public int? TransactionId { get; set; }
     public Transaction? Transaction { get; set; }
+    public Appointment? Appointment { get; set; }
 }

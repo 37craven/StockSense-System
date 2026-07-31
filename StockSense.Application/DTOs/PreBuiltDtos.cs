@@ -2,18 +2,25 @@ using System.ComponentModel.DataAnnotations;
 
 namespace StockSense.Application.DTOs;
 
+public class CompatibleMotorDto
+{
+    public int Id { get; set; }
+    public string Brand { get; set; } = string.Empty;
+    public string Model { get; set; } = string.Empty;
+    public string StockCC { get; set; } = string.Empty;
+}
+
 public class PreBuiltPackageDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public string CompatibleBrand { get; set; } = string.Empty;
-    public string CompatibleModel { get; set; } = string.Empty;
-    public string TargetCC { get; set; } = string.Empty;
-    public int EstimatedAddedCC { get; set; }
+    public int MinAddedCC { get; set; }
+    public int MaxAddedCC { get; set; }
     public bool IsActive { get; set; }
-    public decimal TotalPrice { get; set; } 
-    
+    public decimal TotalPrice { get; set; }
+
+    public List<CompatibleMotorDto> CompatibleMotors { get; set; } = new();
     public List<PreBuiltProductDto> IncludedProducts { get; set; } = new();
 }
 
@@ -35,22 +42,17 @@ public class CreatePreBuiltDto
     [StringLength(1000)]
     public string Description { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Compatible brand is required.")]
-    [StringLength(100)]
-    public string CompatibleBrand { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Compatible model is required.")]
-    [StringLength(100)]
-    public string CompatibleModel { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Target CC is required.")]
-    [StringLength(50)]
-    public string TargetCC { get; set; } = string.Empty;
+    [Range(0, 500)]
+    public int MinAddedCC { get; set; }
 
     [Range(0, 500)]
-    public int EstimatedAddedCC { get; set; }
-    
+    public int MaxAddedCC { get; set; }
+
+    [Required(ErrorMessage = "At least one compatible motor is required.")]
+    [MinLength(1)]
+    public List<CompatibleMotorDto> CompatibleMotors { get; set; } = new();
+
     [Required(ErrorMessage = "At least one product must be selected.")]
     [MinLength(1)]
-    public List<int> SelectedProductIds { get; set; } = new(); 
+    public List<int> SelectedProductIds { get; set; } = new();
 }

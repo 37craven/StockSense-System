@@ -34,3 +34,8 @@
 @media (max-width:850px){.dashboard-header{flex-direction:column}.dashboard-actions{justify-content:flex-start}.dashboard-grid{grid-template-columns:1fr}.span-two,.span-full{grid-column:auto}.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:540px){.inventory-dashboard{padding:.85rem}.dashboard-actions,.action{width:100%}.kpi-grid{grid-template-columns:1fr}.kpi-card{min-height:auto}.order-grid{grid-template-columns:1fr}.freshness{align-items:flex-start}.inventory-empty{align-items:flex-start;flex-wrap:wrap}.inventory-empty .action{margin-left:0}}
 @media (prefers-reduced-motion:reduce){.spinner{animation:none}}
+.pc-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100; }
+.pc-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 101; width: min(1100px, 94vw); max-height: 90vh; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--border); border-radius: .85rem; overflow: hidden; box-shadow: 0 20px 50px rgb(0 0 0 / .3); }
+.pc-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
+.pc-modal-header h2 { margin: 0; font-size: 1.1rem; }
+@media (max-width: 767px) { .pc-modal { width: 96vw; max-height: 92vh; } }

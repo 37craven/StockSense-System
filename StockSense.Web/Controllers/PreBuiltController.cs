@@ -25,8 +25,11 @@ public class PreBuiltController : ControllerBase
     {
         var allPackages = await _repo.GetAllAsync();
         var matching = allPackages
-            .Where(p => p.CompatibleBrand == brand && p.CompatibleModel == model && p.TargetCC == cc && p.IsActive)
-            .Where(p => p.TotalPrice >= minBudget && p.TotalPrice <= maxBudget)
+            .Where(p => p.IsActive && p.TotalPrice >= minBudget && p.TotalPrice <= maxBudget)
+            .Where(p => p.CompatibleMotors.Any(m =>
+                m.Brand.Equals(brand, StringComparison.OrdinalIgnoreCase) &&
+                m.Model.Equals(model, StringComparison.OrdinalIgnoreCase) &&
+                m.StockCC.Equals(cc, StringComparison.OrdinalIgnoreCase)))
             .Select(MapToDto).ToList();
         return Ok(matching);
     }
@@ -47,9 +50,13 @@ public class PreBuiltController : ControllerBase
         var selectedProducts = await _repo.GetProductsByIdsAsync(dto.SelectedProductIds);
         var package = new PreBuiltPackage
         {
-            Name = dto.Name, Description = dto.Description, CompatibleBrand = dto.CompatibleBrand,
-            CompatibleModel = dto.CompatibleModel, TargetCC = dto.TargetCC,
-            EstimatedAddedCC = dto.EstimatedAddedCC, IsActive = true,
+            Name = dto.Name, Description = dto.Description,
+            MinAddedCC = dto.MinAddedCC, MaxAddedCC = dto.MaxAddedCC,
+            IsActive = true,
+            CompatibleMotors = dto.CompatibleMotors.Select(m => new PreBuiltPackageMotor
+            {
+                Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+            }).ToList(),
             IncludedProducts = selectedProducts
         };
 
@@ -64,8 +71,11 @@ public class PreBuiltController : ControllerBase
         if (package == null) return NotFound(ApiResponse.NotFound("Package"));
 
         package.Name = dto.Name; package.Description = dto.Description;
-        package.CompatibleBrand = dto.CompatibleBrand; package.CompatibleModel = dto.CompatibleModel;
-        package.TargetCC = dto.TargetCC; package.EstimatedAddedCC = dto.EstimatedAddedCC;
+        package.MinAddedCC = dto.MinAddedCC; package.MaxAddedCC = dto.MaxAddedCC;
+        package.CompatibleMotors = dto.CompatibleMotors.Select(m => new PreBuiltPackageMotor
+        {
+            Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+        }).ToList();
         package.IncludedProducts = await _repo.GetProductsByIdsAsync(dto.SelectedProductIds);
 
         await _repo.UpdateAsync(package);
@@ -94,9 +104,12 @@ public class PreBuiltController : ControllerBase
     private static PreBuiltPackageDto MapToDto(PreBuiltPackage p) => new()
     {
         Id = p.Id, Name = p.Name, Description = p.Description,
-        CompatibleBrand = p.CompatibleBrand, CompatibleModel = p.CompatibleModel,
-        TargetCC = p.TargetCC, EstimatedAddedCC = p.EstimatedAddedCC,
+        MinAddedCC = p.MinAddedCC, MaxAddedCC = p.MaxAddedCC,
         IsActive = p.IsActive, TotalPrice = p.TotalPrice,
+        CompatibleMotors = p.CompatibleMotors.Select(m => new CompatibleMotorDto
+        {
+            Id = m.Id, Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+        }).ToList(),
         IncludedProducts = p.IncludedProducts.Select(prod => new PreBuiltProductDto
         {
             Id = prod.Id, Name = prod.Name, Brand = prod.Brand, Price = prod.Price

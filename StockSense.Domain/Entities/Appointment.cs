@@ -25,4 +25,6 @@ public class Appointment
     public DateTime? CompletedAt { get; set; }
     public int? TransactionId { get; set; }
     public Transaction? Transaction { get; set; }
+    public int? BuildRequestId { get; set; }
+    public BuildRequest? BuildRequest { get; set; }
 }
