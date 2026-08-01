@@ -9,7 +9,7 @@ namespace StockSense.Web.Helpers;
 public class TransactionHelper
 {
     private static readonly HashSet<string> SupportedPaymentMethods =
-        new(StringComparer.OrdinalIgnoreCase) { "Cash", "GCash", "Card" };
+        new(StringComparer.OrdinalIgnoreCase) { "Cash", "Online" };
 
     private readonly TransactionRepository _repo;
     private readonly ISafetyStockCalculationService _calculationService;
@@ -56,7 +56,7 @@ public class TransactionHelper
         // Generated outside the retry delegate so a transient retry reuses the same
         // public transaction number instead of creating a second logical sale.
         var transactionDate = DateTime.Now;
-        var invoiceNumber = $"TXN-{transactionDate:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
+        var invoiceNumber = $"TXN-{transactionDate:yyMMdd-HHss}-{InvoiceHelper.ShortCode()}";
 
         ReceiptDto receipt;
         try

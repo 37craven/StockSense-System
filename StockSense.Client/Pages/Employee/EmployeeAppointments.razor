@@ -16,6 +16,36 @@
 <BbPortalHost />
 <BbDialogProvider />
 
+<style>
+.col-cust { width: 20%; }
+.col-sched { width: 22%; }
+.col-svc { width: 20%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-total { width: 12%; }
+.col-stat { width: 10%; }
+.col-act { width: 16%; }
+@@media (max-width: 1024px) {
+    .col-cust { width: 25%; }
+    .col-sched { width: 25%; }
+    .col-svc { display: none; }
+    .col-total { width: 18%; }
+    .col-stat { width: 15%; }
+    .col-act { width: 22%; }
+}
+@@media (max-width: 768px) {
+    .col-cust { width: 35%; }
+    .col-sched { width: 35%; }
+    .col-total { display: none; }
+    .col-stat { width: 30%; }
+    .col-act { width: 35%; }
+}
+@@media (max-width: 640px) {
+    .col-cust { width: 50%; }
+    .col-sched { display: none; }
+    .col-stat { display: none; }
+    .col-act { width: 50%; }
+}
+</style>
+
 <div>
     <PageHeader Title="Manage Appointments"
                 Subtitle="Review and manage customer appointment requests."
@@ -41,46 +71,38 @@
                 </button>
             </div>
 
-            @if (currentTab == "History")
-            {
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" @bind="showAllHistory" id="archiveToggle" />
-                    <label for="archiveToggle" style="font-size: var(--text-xs); color: var(--muted-foreground); cursor: pointer;">Show older than 30 days</label>
-                </div>
-            }
         </div>
 
         <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
             <div style="overflow-x: auto;">
-                <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-sm); min-width: 750px;">
+                <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-sm);">
                     <colgroup>
-                        <col style="width: 160px;" /><col style="width: 120px;" /><col style="width: 250px;" /><col style="width: 180px;" /><col style="width: 180px;" /><col style="width: 200px;" /><col style="width: 200px;" />
+                        <col class="col-cust" /><col class="col-sched" /><col class="col-svc" /><col class="col-total" /><col class="col-stat" /><col class="col-act" />
                     </colgroup>
                     <thead>
                         <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
-                            <th @onclick="@(() => ToggleSort("customer"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                            <th @onclick="@(() => ToggleSort("customer"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-cust">
                                 Customer @SortArrow("customer")
                             </th>
-                            <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground);">Mechanic</th>
-                            <th @onclick="@(() => ToggleSort("schedule"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                            <th @onclick="@(() => ToggleSort("schedule"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-sched">
                                 Schedule @SortArrow("schedule")
                             </th>
-                            <th @onclick="@(() => ToggleSort("services"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                            <th @onclick="@(() => ToggleSort("services"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-svc">
                                 Services @SortArrow("services")
                             </th>
-                            <th @onclick="@(() => ToggleSort("total"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                            <th @onclick="@(() => ToggleSort("total"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-total">
                                 Total Value @SortArrow("total")
                             </th>
-                            <th @onclick="@(() => ToggleSort("status"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;">
+                            <th @onclick="@(() => ToggleSort("status"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-stat">
                                 Status @SortArrow("status")
                             </th>
-                            <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground);">Actions</th>
+                            <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground);" class="col-act">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (!DisplayAppointments.Any())
                         {
-                            <tr><td colspan="7" style="padding: 0;"><EmptyState Description="No appointments found in this section." Title="" /></td></tr>
+                            <tr><td colspan="6" style="padding: 0;"><EmptyState Description="No appointments found in this section." Title="" /></td></tr>
                         }
                         @foreach (var appt in DisplayAppointments)
                         {
@@ -88,71 +110,70 @@
                                 style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;"
                                 onmouseover="this.style.backgroundColor='color-mix(in oklch, var(--primary) 5%, transparent)'"
                                 onmouseout="this.style.backgroundColor='transparent'">
-                                <td style="padding: 12px 16px; color: var(--foreground);">
+                                <td style="padding: 12px 16px; color: var(--foreground);" class="col-cust">
                                     <div style="font-weight: bold;">@appt.CustomerName</div>
                                     @if (!string.IsNullOrWhiteSpace(appt.CustomerEmail))
                                     {
                                         <div style="font-size: var(--text-xs); color: var(--muted-foreground);">@appt.CustomerEmail</div>
                                     }
                                 </td>
-                                <td style="padding: 12px 16px; color: var(--foreground); font-size: var(--text-xs);">@FormatMechanicName(appt.MechanicName)</td>
-                                <td style="padding: 12px 16px; white-space: nowrap;">
+                                <td style="padding: 12px 16px; white-space: nowrap;" class="col-sched">
                                     <span style="color: var(--foreground);">@appt.AppointmentDate.ToString("MMM dd, yyyy")</span>
                                     <span style="color: #3b82f6; font-weight: bold; margin-left: 6px;">@appt.TimeSlot</span>
                                     <span style="color: var(--muted-foreground); margin-left: 4px;">(@appt.DurationMinutes mins)</span>
                                 </td>
-                                <td style="padding: 12px 16px;">
-                                    <div style="color: var(--muted-foreground); font-size: var(--text-sm);">@appt.ServicesRequested</div>
+                                <td style="padding: 12px 16px;" class="col-svc">
+                                    <div style="color: var(--muted-foreground); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@appt.ServicesRequested</div>
                                 </td>
-                                <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);">
+                                <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);" class="col-total">
                                     ₱@appt.TotalAmount.ToString("N2")
                                 </td>
-                                <td style="padding: 12px 16px; max-width: 140px; overflow: hidden;">
-                                    <span style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(appt.Status); color: white; width: 100%; max-width: 100px;">
+                                <td style="padding: 12px 16px;" class="col-stat">
+                                     <span style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(appt.Status); color: white; width: 100%;">
                                         <span style="width: 6px; height: 6px; border-radius: 50%; background: white; opacity: 0.7;"></span>
                                         @appt.Status
                                     </span>
                                 </td>
-                                <td style="padding: 12px 16px;" @onclick:stopPropagation>
+                                <td style="padding: 12px 16px;" class="col-act" @onclick:stopPropagation>
                                     @{
                                         var isPending = appt.Status == "Pending";
                                         var isConfirmed = appt.Status == "Confirmed";
                                         var isCompleted = appt.Status == "Completed";
                                         var isCancelled = appt.Status == "Cancelled";
                                     }
-                                    <div style="display: flex; gap: 6px; flex-wrap: nowrap;">
+                                    <div style="display: flex; gap: 4px; flex-wrap: nowrap;">
                                         @if (isPending)
                                         {
                                             <button @onclick="@(() => UpdateStatus(appt, "Confirmed"))"
                                                     title="Confirm"
-                                                    style="flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="check" Size="12" /> Confirm
+                                                    style="flex: 1; padding: 6px 0; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                Confirm
                                             </button>
                                             <button @onclick="@(() => UpdateStatus(appt, "Cancelled"))"
                                                     title="Cancel"
-                                                    style="flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="x" Size="12" /> Cancel
+                                                    style="flex: 1; padding: 6px 0; border-radius: 6px; border: none; background: #ef4444; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                Cancel
                                             </button>
                                         }
                                         else if (isConfirmed)
                                         {
                                             <button @onclick="@(() => OpenDetail(appt))"
                                                     title="Checkout"
-                                                    style="flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="circle-check" Size="12" /> Checkout
+                                                    style="flex: 1; padding: 6px 0; border-radius: 6px; border: none; background: #10b981; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                Checkout
                                             </button>
                                             <button @onclick="@(() => UpdateStatus(appt, "Pending"))"
                                                     title="Move to Pending"
-                                                    style="flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: #f59e0b; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="undo" Size="12" /> Unconfirm
+                                                    style="flex: 1; padding: 6px 0; border-radius: 6px; border: none; background: #f59e0b; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                                                Unconfirm
                                             </button>
                                         }
                                         else if (isCompleted || isCancelled)
                                         {
                                             <button @onclick="@(() => UpdateStatus(appt, "Pending"))"
                                                     title="Reopen"
-                                                    style="flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: #3b82f6; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
-                                                <LucideIcon Name="rotate-ccw" Size="12" /> Reopen
+                                                    style="width: 50%; padding: 6px 0; border-radius: 6px; border: none; background: #3b82f6; color: white; cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;">
+                                                Reopen
                                             </button>
                                         }
                                     </div>
@@ -163,6 +184,10 @@
                 </table>
             </div>
         </div>
+        @if (currentTab == "History")
+        {
+            <div style="text-align: right; font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-2);">Showing the last 30 days of history.</div>
+        }
     }
 </div>
 
@@ -264,7 +289,7 @@
                 @if (s.Status == "Confirmed")
                 {
                     <select @bind="checkoutPaymentMethod" aria-label="Payment method" style="padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--background); color:var(--foreground);">
-                        <option>Cash</option><option>GCash</option><option>Card</option>
+                        <option>Cash</option><option>Online</option>
                     </select>
                     <input @bind="checkoutReference" maxlength="100" aria-label="Payment reference" placeholder="Reference (optional)" style="padding:8px; border:1px solid var(--border); border-radius:6px; background:var(--background); color:var(--foreground);" />
                     @if (!string.IsNullOrWhiteSpace(checkoutError))
@@ -311,7 +336,7 @@
 @code {
     private List<AppointmentDto>? allAppointments;
     private string currentTab = "Active";
-    private bool showAllHistory = false;
+
     private bool showDetailModal = false;
     private AppointmentDto? selectedAppointment;
     private string sortColumn = "created";
@@ -330,11 +355,8 @@
         {
             if (allAppointments == null) return Enumerable.Empty<AppointmentDto>();
             var query = allAppointments.Where(a => a.Status == "Completed" || a.Status == "Cancelled");
-            if (!showAllHistory)
-            {
-                var limitDate = DateTime.Now.AddDays(-30);
-                query = query.Where(a => a.AppointmentDate >= limitDate);
-            }
+            var limitDate = DateTime.Now.AddDays(-30);
+            query = query.Where(a => a.AppointmentDate >= limitDate);
             return query;
         }
     }
@@ -399,7 +421,16 @@
     private async Task UpdateStatus(AppointmentDto appt, string newStatus)
     {
         var response = await Http.PutAsJsonAsync($"api/appointments/{appt.Id}/status", newStatus);
-        if (response.IsSuccessStatusCode) appt.Status = newStatus;
+        if (response.IsSuccessStatusCode)
+        {
+            appt.Status = newStatus;
+            if (newStatus == "Pending")
+            {
+                appt.TransactionId = null;
+                appt.CompletedAt = null;
+                appt.InvoiceNumber = null;
+            }
+        }
         StateHasChanged();
     }
 

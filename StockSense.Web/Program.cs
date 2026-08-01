@@ -158,6 +158,7 @@ builder.Services.AddHttpClient<IAssistanceClient, AssistanceClient>((services, c
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.Converters.Add(new PhDateTimeConverter());
     });

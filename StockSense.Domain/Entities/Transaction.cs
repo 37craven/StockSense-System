@@ -19,4 +19,5 @@ public class Transaction
     public int? OrderSlipId { get; set; }
     public OrderSlip? OrderSlip { get; set; }
     public List<TransactionItem> Items { get; set; } = new();
+    public bool IsVoided { get; set; }
 }

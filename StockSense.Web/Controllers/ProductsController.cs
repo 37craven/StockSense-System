@@ -180,7 +180,7 @@ public class ProductsController : ControllerBase
             var changedAt = DateTime.Now;
             _context.Transactions.Add(new Transaction
             {
-                InvoiceNumber = $"ADJ-{changedAt:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}",
+                InvoiceNumber = $"ADJ-{changedAt:yyMMdd-HHss}-{InvoiceHelper.ShortCode()}",
                 TransactionDate = changedAt,
                 TransactionType = TransactionTypes.StockCorrection,
                 PaymentMethod = "N/A",
@@ -283,7 +283,7 @@ public class ProductsController : ControllerBase
         var changedAt = DateTime.Now;
         var adjustment = new Transaction
         {
-            InvoiceNumber = $"ADJ-{changedAt:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}",
+            InvoiceNumber = $"ADJ-{changedAt:yyMMdd-HHss}-{InvoiceHelper.ShortCode()}",
             TransactionDate = changedAt,
             TransactionType = dto.StockAdjustment == 0 ? TransactionTypes.Adjustment : TransactionTypes.StockCorrection,
             PaymentMethod = "N/A",

@@ -71,8 +71,16 @@ public class BuildsController : ControllerBase
     [Authorize(Roles = "Employee,Admin")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
     {
-        var build = await _buildRepo.GetByIdAsync(id);
+        var build = await _context.BuildRequests.FindAsync(id);
         if (build == null) return NotFound(ApiResponse.NotFound("Build"));
+
+        if (build.TransactionId.HasValue)
+        {
+            var txn = await _context.Transactions
+                .Include(t => t.Items)
+                .FirstOrDefaultAsync(t => t.Id == build.TransactionId.Value);
+            build.Transaction = txn;
+        }
 
         if (string.Equals(newStatus, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse.Error("Use the completion checkout endpoint to complete a build."));
@@ -83,9 +91,68 @@ public class BuildsController : ControllerBase
         var transitionError = WorkOrderRules.ValidateStatusTransition(build.Status, canonicalStatus);
         if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
 
-        build.Status = canonicalStatus;
-        await _buildRepo.SaveChangesAsync();
-        return Ok(new { message = "Status updated" });
+        try
+        {
+            if (canonicalStatus == WorkOrderStatuses.Pending && build.Transaction is not null)
+            {
+                await RestoreStockFromTransaction(build.Transaction);
+                await _context.Transactions
+                    .Where(t => t.Id == build.Transaction!.Id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.IsVoided, true));
+                build.TransactionId = null;
+                build.CompletedAt = null;
+            }
+
+            build.Status = canonicalStatus;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Status updated" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse.Error($"Reopen failed: {ex.Message}"));
+        }
+    }
+
+    private async Task RestoreStockFromTransaction(Transaction txn)
+    {
+        var now = DateTime.Now;
+        var productIds = txn.Items.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+        var lookup = products.ToDictionary(p => p.Id);
+
+        var reversal = new Transaction
+        {
+            InvoiceNumber = $"RVT-{now:yyMMdd-HHss}-{InvoiceHelper.ShortCode()}",
+            TransactionDate = now,
+            TransactionType = TransactionTypes.StockCorrection,
+            PaymentMethod = "N/A",
+            LocationId = txn.LocationId,
+            Remarks = $"Stock restored from voided sale {txn.InvoiceNumber}",
+            TotalAmount = 0,
+            IsVoided = false
+        };
+
+        foreach (var item in txn.Items)
+        {
+            if (lookup.TryGetValue(item.ProductId, out var product))
+            {
+                var stockBefore = product.CurrentStock;
+                product.AddStock(item.Quantity);
+                reversal.Items.Add(new TransactionItem
+                {
+                    ProductId = item.ProductId,
+                    ProductName = item.ProductName,
+                    UnitPrice = item.UnitPrice,
+                    UnitCost = item.UnitCost,
+                    Quantity = item.Quantity,
+                    StockBefore = stockBefore,
+                    StockAfter = product.CurrentStock,
+                    LineTotal = 0
+                });
+            }
+        }
+
+        _context.Transactions.Add(reversal);
     }
 
     [HttpPut("{id}/parts")]

@@ -12,7 +12,7 @@ namespace StockSense.Infrastructure.Services;
 public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
 {
     private static readonly HashSet<string> SupportedPaymentMethods =
-        new(StringComparer.OrdinalIgnoreCase) { "Cash", "GCash", "Card" };
+        new(StringComparer.OrdinalIgnoreCase) { "Cash", "Online" };
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private readonly ApplicationDbContext _context;
@@ -72,7 +72,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
         CancellationToken cancellationToken)
     {
         var completedAt = DateTime.Now;
-        var invoiceNumber = $"APT-{appointmentId}-{completedAt:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
+        var invoiceNumber = $"APT-{appointmentId}-{completedAt:yyMMddHHss}-{InvoiceHelper.ShortCode()}";
         var result = await ExecuteAsync(async () =>
         {
             var appointment = await _context.Appointments
@@ -125,7 +125,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
         CancellationToken cancellationToken)
     {
         var completedAt = DateTime.Now;
-        var invoiceNumber = $"BLD-{buildId}-{completedAt:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
+        var invoiceNumber = $"BLD-{buildId}-{completedAt:yyMMddHHss}-{InvoiceHelper.ShortCode()}";
         var result = await ExecuteAsync(async () =>
         {
             var build = await _context.BuildRequests

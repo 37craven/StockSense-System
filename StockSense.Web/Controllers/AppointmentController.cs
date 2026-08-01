@@ -21,18 +21,22 @@ public class AppointmentsController : ControllerBase
     private readonly StoreServiceRepository _serviceRepo;
     private readonly IWorkOrderCheckoutService _checkoutService;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ApplicationDbContext _context;
     private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     public AppointmentsController(
         AppointmentRepository repo,
         StoreServiceRepository serviceRepo,
         IWorkOrderCheckoutService checkoutService,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        ApplicationDbContext context)
     {
         _repo = repo;
         _serviceRepo = serviceRepo;
         _checkoutService = checkoutService;
         _userManager = userManager;
+        _context = context;
     }
 
     [HttpPost]
@@ -51,13 +55,25 @@ public class AppointmentsController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(dto.SelectedProductsJson))
             {
-                var breakdown = JsonSerializer.Deserialize<List<ServiceProductBreakdown>>(dto.SelectedProductsJson);
+                var breakdown = JsonSerializer.Deserialize<List<ServiceProductBreakdown>>(dto.SelectedProductsJson, JsonOpts);
                 if (breakdown != null)
                     productTotal = breakdown.Sum(s => s.Products.Where(p => p.Selected).Sum(p => p.Price));
             }
 
             int totalDuration = matchedServices.Sum(s => s.EstimatedMinutes);
             DateTime phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
+
+            if (TimeSpan.TryParse(dto.TimeSlot, out var requestedStart))
+            {
+                var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(totalDuration));
+                var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
+                var conflict = existing.Any(a =>
+                    TimeSpan.TryParse(a.TimeSlot, out var existingStart) &&
+                    (requestedStart < existingStart.Add(TimeSpan.FromMinutes(a.DurationMinutes))) &&
+                    (requestedEnd > existingStart));
+                if (conflict)
+                    return Conflict(ApiResponse.Error("The selected time slot overlaps with an existing booking."));
+            }
 
             var appointment = new Appointment
             {
@@ -127,8 +143,16 @@ public class AppointmentsController : ControllerBase
     [Authorize(Roles = "Employee,Admin")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
     {
-        var appointment = await _repo.GetByIdAsync(id);
+        var appointment = await _context.Appointments.FindAsync(id);
         if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
+
+        if (appointment.TransactionId.HasValue)
+        {
+            var txn = await _context.Transactions
+                .Include(t => t.Items)
+                .FirstOrDefaultAsync(t => t.Id == appointment.TransactionId.Value);
+            appointment.Transaction = txn;
+        }
 
         if (string.Equals(newStatus, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse.Error("Use the completion checkout endpoint to complete an appointment."));
@@ -139,9 +163,68 @@ public class AppointmentsController : ControllerBase
         var transitionError = WorkOrderRules.ValidateStatusTransition(appointment.Status, canonicalStatus);
         if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
 
-        appointment.Status = canonicalStatus;
-        await _repo.UpdateAsync(appointment);
-        return Ok(new { message = "Status updated" });
+        try
+        {
+            if (canonicalStatus == WorkOrderStatuses.Pending && appointment.Transaction is not null)
+            {
+                await RestoreStockFromTransaction(appointment.Transaction);
+                await _context.Transactions
+                    .Where(t => t.Id == appointment.Transaction!.Id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.IsVoided, true));
+                appointment.TransactionId = null;
+                appointment.CompletedAt = null;
+            }
+
+            appointment.Status = canonicalStatus;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Status updated" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse.Error($"Reopen failed: {ex.Message}"));
+        }
+    }
+
+    private async Task RestoreStockFromTransaction(Transaction txn)
+    {
+        var now = DateTime.Now;
+        var productIds = txn.Items.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+        var lookup = products.ToDictionary(p => p.Id);
+
+        var reversal = new Transaction
+        {
+            InvoiceNumber = $"RVT-{now:yyMMdd-HHss}-{InvoiceHelper.ShortCode()}",
+            TransactionDate = now,
+            TransactionType = TransactionTypes.StockCorrection,
+            PaymentMethod = "N/A",
+            LocationId = txn.LocationId,
+            Remarks = $"Stock restored from voided sale {txn.InvoiceNumber}",
+            TotalAmount = 0,
+            IsVoided = false
+        };
+
+        foreach (var item in txn.Items)
+        {
+            if (lookup.TryGetValue(item.ProductId, out var product))
+            {
+                var stockBefore = product.CurrentStock;
+                product.AddStock(item.Quantity);
+                reversal.Items.Add(new TransactionItem
+                {
+                    ProductId = item.ProductId,
+                    ProductName = item.ProductName,
+                    UnitPrice = item.UnitPrice,
+                    UnitCost = item.UnitCost,
+                    Quantity = item.Quantity,
+                    StockBefore = stockBefore,
+                    StockAfter = product.CurrentStock,
+                    LineTotal = 0
+                });
+            }
+        }
+
+        _context.Transactions.Add(reversal);
     }
 
     [HttpPost("{id}/complete")]

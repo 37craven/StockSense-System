@@ -51,7 +51,8 @@ public class AppointmentRepository
     public async Task<List<Appointment>> GetAppointmentsByDateAndMechanicAsync(DateTime date, string? mechanic)
     {
         var query = _context.Appointments
-            .Where(a => a.AppointmentDate.Date == date.Date && a.Status == "Confirmed");
+            .Where(a => a.AppointmentDate.Date == date.Date
+                && (a.Status == "Confirmed" || a.Status == "Pending"));
 
         if (!string.IsNullOrEmpty(mechanic) && mechanic != "Any Available")
         {
