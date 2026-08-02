@@ -462,7 +462,7 @@
                 .OrderBy(b => b.CreatedAt).ToListAsync();
 
             incomingByProduct = openSlips
-                .Where(s => s.Status == OrderSlipStatuses.Ordered || s.Status == OrderSlipStatuses.PartiallyReceived)
+                .Where(s => s.Status == OrderSlipStatuses.Ordered)
                 .SelectMany(s => s.Items).Where(i => ids.Contains(i.ProductId))
                 .GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(i => Math.Max(0, (i.OrderedQuantity > 0 ? i.OrderedQuantity : i.Quantity) - i.ReceivedQuantity)));
             Calculate();
@@ -505,7 +505,7 @@
     private static string FormatTimeSlot(string value) => TimeOnly.TryParse(value, out var time) ? time.ToString("h:mm tt") : value;
     private static string DisplaySlipNumber(OrderSlip slip) => !string.IsNullOrWhiteSpace(slip.OrderSlipNumber) ? slip.OrderSlipNumber : !string.IsNullOrWhiteSpace(slip.SlipNumber) ? slip.SlipNumber : $"Slip #{slip.Id}";
     private static string GetBuildStatusColor(string status) => status switch { "Pending" => "#f59e0b", "Confirmed" => "#3b82f6", "Completed" => "#10b981", "Cancelled" => "#ef4444", _ => "gray" };
-    private static string GetOrderStatusColor(string status) => status switch { "Draft" => "#f59e0b", "Approved" => "#3b82f6", "Ordered" => "#8b5cf6", "PartiallyReceived" => "#06b6d4", "Completed" => "#10b981", "Cancelled" => "#ef4444", _ => "gray" };
+    private static string GetOrderStatusColor(string status) => status switch { "Draft" => "#f59e0b", "Ordered" => "#3b82f6", "Completed" => "#10b981", "Cancelled" => "#ef4444", _ => "gray" };
     private sealed record BrandSalesRow(string Brand, int Units, decimal Revenue);
     private sealed record ReplenishmentRow(string Name, string Brand, int OnHand, int Incoming, int ReorderPoint, int Position, int Gap);
 }

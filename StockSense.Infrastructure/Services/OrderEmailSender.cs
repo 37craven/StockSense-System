@@ -26,7 +26,7 @@ public class OrderEmailSender
 
         var builder = new BodyBuilder { HtmlBody = body };
 
-        if (attachment != null)
+        if (attachment is { Length: > 0 } && !string.IsNullOrWhiteSpace(fileName))
         {
             builder.Attachments.Add(fileName, attachment);
         }

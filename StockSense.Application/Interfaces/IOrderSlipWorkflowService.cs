@@ -20,12 +20,12 @@ public interface IOrderSlipWorkflowService
         CreateManualOrderSlipDraftCommand command,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult<OrderSlipDto>> ApproveAsync(
-        OrderSlipTransitionCommand command,
+    Task<OperationResult<OrderSlipDto>> PlaceOrderAsync(
+        PlaceOrderCommand command,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult<OrderSlipDto>> MarkOrderedAsync(
-        OrderSlipTransitionCommand command,
+    Task<OperationResult<OrderSlipDto>> CloseShortAsync(
+        CancelOrderSlipCommand command,
         CancellationToken cancellationToken = default);
 
     Task<OperationResult<OrderSlipDto>> CancelAsync(

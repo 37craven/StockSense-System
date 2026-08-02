@@ -171,33 +171,20 @@
     {
         <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
             <div style="padding: var(--space-4); border-bottom: 1px solid var(--border); background: var(--muted);">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Manual Order Slip</h2>
-                        <p style="font-size: var(--text-xs); color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Costs are read from the product database when the draft is saved.</p>
-                    </div>
-                    <strong style="font-size: var(--text-lg); color: var(--primary);">₱@ManualTotal.ToString("N2")</strong>
-                </div>
+                <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Manual Order Slip</h2>
             </div>
             <div style="padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4);">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
-                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">
-                        Supplier <span style="color: var(--destructive);">*</span>
-                        <select @bind="manualSupplierId" @bind:after="SupplierChanged"
-                                style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);">
-                            <option value="0">Select supplier</option>
-                            @foreach (var supplier in manualCatalog.Suppliers)
-                            {
-                                <option value="@supplier.Id">@supplier.Name</option>
-                            }
-                        </select>
-                    </label>
-                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">
-                        Expected Delivery
-                        <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="manualExpectedDate"
-                               style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);" />
-                    </label>
-                </div>
+                <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">
+                    Supplier <span style="color: var(--destructive);">*</span>
+                    <select @bind="manualSupplierId" @bind:after="SupplierChanged"
+                            style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); max-width: 400px;">
+                        <option value="0">Select supplier</option>
+                        @foreach (var supplier in manualCatalog.Suppliers)
+                        {
+                            <option value="@supplier.Id">@supplier.Name</option>
+                        }
+                    </select>
+                </label>
 
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
@@ -219,8 +206,8 @@
                             @foreach (var line in manualLines)
                             {
                                 var lineProduct = ProductFor(line.ProductId);
-                                <div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); flex-wrap: wrap;">
-                                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-xs); flex: 2; min-width: 160px;">
+                                <div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background);">
+                                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-xs); flex: 3; min-width: 160px;">
                                         Product
                                         <select @bind="line.ProductId"
                                                 style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);">
@@ -231,23 +218,19 @@
                                             }
                                         </select>
                                     </label>
-                                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-xs); flex: 1; min-width: 100px;">
-                                        Quantity
+                                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-xs); flex: 1; min-width: 80px;">
+                                        Qty
                                         <input type="number" min="1" @bind="line.Quantity"
                                                style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);" />
                                     </label>
-                                    <div style="display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--muted-foreground); flex: 1; min-width: 120px;">
-                                        <span>Unit Cost</span>
-                                        <strong style="color: var(--foreground);">@(lineProduct == null ? "—" : $"₱{lineProduct.UnitCost:N2}")</strong>
-                                        @if (lineProduct?.HasInventorySettings == true)
-                                        {
-                                            <small>MOQ @lineProduct.MinimumOrderQuantity · pack @lineProduct.PackageSize@if (lineProduct.MaximumStockLevel.HasValue) { <text> · max @lineProduct.MaximumStockLevel</text> }</small>
-                                        }
-                                    </div>
-                                    <div style="display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--muted-foreground); flex: 1; min-width: 100px; text-align: right;">
-                                        <span>Line Total</span>
-                                        <strong style="color: var(--foreground);">@(lineProduct == null ? "—" : $"₱{(lineProduct.UnitCost * line.Quantity):N2}")</strong>
-                                    </div>
+                                    @if (lineProduct?.HasInventorySettings == true)
+                                    {
+                                        <small style="font-size: 10px; color: var(--muted-foreground); flex: 1; min-width: 100px;">MOQ @lineProduct.MinimumOrderQuantity · pack @lineProduct.PackageSize@if (lineProduct.MaximumStockLevel.HasValue) { <text> · max @lineProduct.MaximumStockLevel</text> }</small>
+                                    }
+                                    else
+                                    {
+                                        <div style="flex: 1; min-width: 100px;"></div>
+                                    }
                                     <button type="button" title="Remove product" aria-label="Remove product line" @onclick="() => RemoveManualLine(line)"
                                             style="padding: var(--space-2); border-radius: var(--radius); border: none; background: transparent; color: var(--muted-foreground); cursor: pointer; flex-shrink: 0;">
                                         <LucideIcon Name="trash-2" Size="17" />
@@ -260,15 +243,15 @@
 
                 <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">
                     Reason <span style="color: var(--destructive);">*</span>
-                    <textarea maxlength="500" rows="3" placeholder="Why is this manual order needed?" @bind="manualReason"
-                              style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); resize: vertical; min-height: 60px;"></textarea>
+                    <textarea maxlength="500" rows="2" placeholder="Why is this manual order needed?" @bind="manualReason"
+                              style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); resize: vertical; min-height: 50px;"></textarea>
                     <small style="color: var(--muted-foreground);">@manualReason.Length/500 characters</small>
                 </label>
 
                 <div style="display: flex; justify-content: flex-end; padding-top: var(--space-2);">
                     <BbButton OnClick="CreateManualDraft" Disabled="@(busy || !CanCreateManual)">
                         @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                        <LucideIcon Name="file-plus" Size="16" /> Create Manual Draft
+                        <LucideIcon Name="file-plus" Size="16" /> Create Draft
                     </BbButton>
                 </div>
             </div>
@@ -286,12 +269,10 @@
     private readonly Dictionary<int, string> errors = [];
     private bool busy, manualLoading;
     private int manualSupplierId;
-    private DateTime? manualExpectedDate;
     private string manualReason = "", message = "", error = "";
     private bool CanCreateAutomatic => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && !SelectedAutomaticItems.Any(x => errors.ContainsKey(x.ProductId));
     private IEnumerable<OrderSlipPreviewItemDto> SelectedAutomaticItems => preview?.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected) ?? [];
     private bool CanCreateManual => manualSupplierId > 0 && manualLines.Count > 0 && manualLines.All(x => x.ProductId > 0 && x.Quantity > 0) && manualLines.Select(x => x.ProductId).Distinct().Count() == manualLines.Count && !string.IsNullOrWhiteSpace(manualReason) && manualReason.Length <= 500;
-    private decimal ManualTotal => manualLines.Sum(line => (ProductFor(line.ProductId)?.UnitCost ?? 0) * line.Quantity);
 
     private void ShowAutomatic() { mode = CreationMode.Automatic; error = message = ""; }
     private async Task ShowManual() { mode = CreationMode.Manual; error = message = ""; if (manualCatalog == null) await LoadManualCatalog(); }
@@ -343,9 +324,9 @@
         try
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
-            var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, ExpectedDeliveryDate = manualExpectedDate, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
+            var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
             if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slip could not be created.");
-            message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = ""; manualExpectedDate = null;
+            message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = ""; 
         }
         catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slip could not be created."); }
         finally { busy = false; }

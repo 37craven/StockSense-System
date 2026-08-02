@@ -143,11 +143,12 @@
     private ElementReference textareaElement;
     private ElementReference sendButtonElement;
     private IReadOnlyList<AssistanceSuggestion> suggestions = AssistanceSuggestions.ForRole(null);
+    private string role = "Customer";
 
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        var role = user.IsInRole("Admin") ? "Admin" : user.IsInRole("Employee") ? "Employee" : "Customer";
+        role = user.IsInRole("Admin") ? "Admin" : user.IsInRole("Employee") ? "Employee" : "Customer";
         suggestions = AssistanceSuggestions.ForRole(role);
     }
 
@@ -215,8 +216,8 @@
         {
             await ScrollToBottomAsync();
             using var response = await Http.PostAsJsonAsync(
-                "api/assistance",
-                new AssistanceRequest(outgoing, history),
+                "https://stocksense-chatbot-eteze2dwh4hzfqg8.malaysiawest-01.azurewebsites.net/api/chat",
+                new { message = outgoing, user_role = role, history },
                 componentLifetime.Token);
 
             if (isDisposed)

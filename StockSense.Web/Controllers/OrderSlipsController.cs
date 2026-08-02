@@ -2,10 +2,12 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using StockSense.Application.DTOs;
 using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
+using StockSense.Infrastructure.Services;
 
 namespace StockSense.Web.Controllers;
 
@@ -16,11 +18,17 @@ public sealed class OrderSlipsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IOrderSlipWorkflowService _workflow;
+    private readonly DocumentService _docService;
+    private readonly PdfDownloadCache _pdfCache;
+    private readonly ILogger<OrderSlipsController> _logger;
 
-    public OrderSlipsController(ApplicationDbContext context, IOrderSlipWorkflowService workflow)
+    public OrderSlipsController(ApplicationDbContext context, IOrderSlipWorkflowService workflow, DocumentService docService, PdfDownloadCache pdfCache, ILogger<OrderSlipsController> logger)
     {
         _context = context;
         _workflow = workflow;
+        _docService = docService;
+        _pdfCache = pdfCache;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -39,7 +47,19 @@ public sealed class OrderSlipsController : ControllerBase
         var slip = await _context.OrderSlips.AsNoTracking()
             .Include(x => x.Supplier).Include(x => x.Items)
             .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-        return slip == null ? NotFound(new { error = "Order slip was not found." }) : Ok(ToDto(slip));
+        return slip is null ? NotFound() : Ok(ToDto(slip));
+    }
+
+    [HttpGet("{id:int}/download-pdf")]
+    public async Task<IActionResult> DownloadPdf(int id, CancellationToken cancellationToken)
+    {
+        var slip = await _context.OrderSlips.AsNoTracking()
+            .Include(x => x.Supplier).Include(x => x.Items)
+            .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (slip is null) return NotFound();
+        var bytes = _docService.GenerateOrderSlipPdf(ToDto(slip));
+        var token = _pdfCache.Store(bytes);
+        return Ok(new { token });
     }
 
     [HttpGet("preview")]
@@ -67,19 +87,44 @@ public sealed class OrderSlipsController : ControllerBase
         return ToActionResult(await _workflow.CreateManualDraftAsync(command, cancellationToken));
     }
 
-    [HttpPost("{id:int}/approve")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Approve(int id, OrderSlipTransitionCommand command, CancellationToken cancellationToken)
+    [HttpPost("{id:int}/place-order")]
+    [Authorize(Roles = "Admin, Employee")]
+    public async Task<IActionResult> PlaceOrder(int id, [FromBody] PlaceOrderCommand? command, CancellationToken cancellationToken)
     {
-        Prepare(command, id, OrderSlipStatuses.Approved);
-        return ToActionResult(await _workflow.ApproveAsync(command, cancellationToken));
+        command ??= new PlaceOrderCommand();
+        command.OrderSlipId = id;
+        try
+        {
+            var result = await _workflow.PlaceOrderAsync(command, cancellationToken);
+            return !result.IsSuccess
+                ? StatusCode(result.IsConcurrencyConflict ? 409 : 400, ApiResponse.Error(result.ErrorMessage ?? "The order could not be placed."))
+                : Ok(new { message = "Order placed and email sent to supplier." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Placing order slip {OrderSlipId} failed.", id);
+            return StatusCode(500, ApiResponse.Error("The order could not be placed. Please try again."));
+        }
     }
 
-    [HttpPost("{id:int}/mark-ordered")]
-    public async Task<IActionResult> MarkOrdered(int id, OrderSlipTransitionCommand command, CancellationToken cancellationToken)
+    [HttpPost("{id:int}/close-short")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CloseShort(int id, [FromBody] CancelOrderSlipCommand? command, CancellationToken cancellationToken)
     {
-        Prepare(command, id, OrderSlipStatuses.Ordered);
-        return ToActionResult(await _workflow.MarkOrderedAsync(command, cancellationToken));
+        command ??= new CancelOrderSlipCommand();
+        command.OrderSlipId = id;
+        try
+        {
+            var result = await _workflow.CloseShortAsync(command, cancellationToken);
+            return !result.IsSuccess
+                ? StatusCode(result.IsConcurrencyConflict ? 409 : 400, ApiResponse.Error(result.ErrorMessage ?? "The order slip could not be closed short."))
+                : Ok(new { message = "Order closed short." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Closing short order slip {OrderSlipId} failed.", id);
+            return StatusCode(500, ApiResponse.Error("The order slip could not be closed short. Please try again."));
+        }
     }
 
     [HttpPost("{id:int}/cancel")]

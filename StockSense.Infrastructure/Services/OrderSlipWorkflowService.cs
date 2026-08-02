@@ -13,21 +13,24 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
     private const string ConcurrencyMessage =
         "The order slip was changed by another user. Reload the latest data and try again.";
     private static readonly string[] OpenStatuses =
-        [OrderSlipStatuses.Draft, OrderSlipStatuses.Approved, OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived];
+        [OrderSlipStatuses.Draft, OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived];
     private static readonly string[] IncomingStatuses =
-        [OrderSlipStatuses.Approved, OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived];
+        [OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived];
 
     private readonly ApplicationDbContext _context;
     private readonly ISafetyStockCalculationService _calculationService;
+    private readonly OrderEmailSender _emailSender;
     private readonly ILogger<OrderSlipWorkflowService> _logger;
 
     public OrderSlipWorkflowService(
         ApplicationDbContext context,
         ISafetyStockCalculationService calculationService,
+        OrderEmailSender emailSender,
         ILogger<OrderSlipWorkflowService> logger)
     {
         _context = context;
         _calculationService = calculationService;
+        _emailSender = emailSender;
         _logger = logger;
     }
 
@@ -443,11 +446,94 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             return OperationResult<OrderSlipDto>.Success(ToDto(slip));
         }, cancellationToken);
 
-    public Task<OperationResult<OrderSlipDto>> ApproveAsync(OrderSlipTransitionCommand command, CancellationToken cancellationToken = default) =>
-        TransitionAsync(command, OrderSlipStatuses.Draft, OrderSlipStatuses.Approved, cancellationToken);
+    public async Task<OperationResult<OrderSlipDto>> PlaceOrderAsync(
+        PlaceOrderCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteWriteAsync(async ct =>
+        {
+            var slip = await LoadSlipAsync(command.OrderSlipId, ct);
+            if (slip is null) return OperationResult<OrderSlipDto>.Failure("NOT_FOUND", "Order slip was not found.");
+            if (slip.Status != OrderSlipStatuses.Draft)
+                return OperationResult<OrderSlipDto>.Failure("INVALID_STATUS", "Only draft order slips can be placed.");
 
-    public Task<OperationResult<OrderSlipDto>> MarkOrderedAsync(OrderSlipTransitionCommand command, CancellationToken cancellationToken = default) =>
-        TransitionAsync(command, OrderSlipStatuses.Approved, OrderSlipStatuses.Ordered, cancellationToken);
+            var supplierEmail = slip.Supplier?.Email;
+            if (string.IsNullOrWhiteSpace(supplierEmail))
+                return OperationResult<OrderSlipDto>.Failure("NO_SUPPLIER_EMAIL",
+                    "This supplier has no email configured. Please add an email before placing the order.");
+
+            try { await SendOrderEmailAsync(slip, ct); }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send order email for slip {Id}.", slip.Id);
+                return OperationResult<OrderSlipDto>.Failure("EMAIL_FAILED",
+                    $"Failed to send the email: {ex.Message}");
+            }
+
+            ApplyRowVersion(slip, command.RowVersion);
+            slip.Status = OrderSlipStatuses.Ordered;
+            slip.OrderedAt = DateTime.Now;
+            if (command.ExpectedDeliveryDate.HasValue) slip.ExpectedDeliveryDate = command.ExpectedDeliveryDate;
+            slip.Remarks = string.IsNullOrWhiteSpace(command.Remarks) ? slip.Remarks : command.Remarks.Trim();
+            await _context.SaveChangesAsync(ct);
+            return OperationResult<OrderSlipDto>.Success(ToDto(slip));
+        }, cancellationToken);
+    }
+
+    public async Task<OperationResult<OrderSlipDto>> CloseShortAsync(
+        CancelOrderSlipCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await ExecuteWriteAsync(async ct =>
+        {
+            var slip = await LoadSlipAsync(command.OrderSlipId, ct);
+            if (slip is null) return OperationResult<OrderSlipDto>.Failure("NOT_FOUND", "Order slip was not found.");
+            if (slip.Status != OrderSlipStatuses.PartiallyReceived)
+                return OperationResult<OrderSlipDto>.Failure("INVALID_STATUS", "Only partially received order slips can be closed short.");
+            var reason = command.Reason?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(reason))
+                return OperationResult<OrderSlipDto>.Failure("REASON_REQUIRED", "A reason is required to close short.");
+            ApplyRowVersion(slip, command.RowVersion);
+            slip.Status = OrderSlipStatuses.ClosedShort;
+            slip.Remarks = AppendRemark(slip.Remarks, reason);
+            await _context.SaveChangesAsync(ct);
+            return OperationResult<OrderSlipDto>.Success(ToDto(slip));
+        }, cancellationToken);
+
+        if (result.IsSuccess && result.Value is not null)
+            await TryRecalculateProductsAsync(
+                result.Value.Items.Select(item => item.ProductId),
+                result.Value.LocationId,
+                "close-short");
+        return result;
+    }
+
+    private async Task SendOrderEmailAsync(OrderSlip slip, CancellationToken cancellationToken)
+    {
+        var supplierEmail = slip.Supplier?.Email;
+        if (string.IsNullOrWhiteSpace(supplierEmail)) return;
+
+        var number = string.IsNullOrWhiteSpace(slip.OrderSlipNumber) ? slip.SlipNumber : slip.OrderSlipNumber;
+        var subject = $"Purchase Order {number} - {(slip.Supplier?.Name ?? "Supplier")}";
+        var body = "<html><body style='font-family: sans-serif;'>" +
+            $"<h2>Purchase Order: {number}</h2>" +
+            $"<p><strong>Supplier:</strong> {(slip.Supplier?.Name ?? "")}<br/>" +
+            $"<strong>Date:</strong> {slip.GeneratedAt:MMMM dd, yyyy}<br/>" +
+            $"<strong>Expected Delivery:</strong> {(slip.ExpectedDeliveryDate?.ToString("MMMM dd, yyyy") ?? "Not specified")}</p>" +
+            "<table style='border-collapse:collapse;width:100%;'>" +
+            "<tr style='background:#f3f4f6;'><th style='padding:8px;text-align:left;border-bottom:1px solid #e5e7eb;'>Product</th><th style='padding:8px;text-align:right;border-bottom:1px solid #e5e7eb;'>Qty</th></tr>";
+        foreach (var item in slip.Items)
+        {
+            var qty = item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity;
+            body += $"<tr><td style='padding:8px;border-bottom:1px solid #e5e7eb;'>{item.ProductName}</td><td style='padding:8px;text-align:right;border-bottom:1px solid #e5e7eb;'>{qty}</td></tr>";
+        }
+        body += "</table>" +
+            (string.IsNullOrWhiteSpace(slip.Remarks) ? "" : $"<p><strong>Remarks:</strong> {slip.Remarks}</p>") +
+            "<p style='color:#6b7280;font-size:12px;margin-top:24px;'>This order was generated by StockSense. Please confirm receipt and delivery schedule.</p>" +
+            "</body></html>";
+
+        await _emailSender.SendEmailWithAttachmentAsync(supplierEmail, subject, body, Array.Empty<byte>(), string.Empty);
+    }
 
     public async Task<OperationResult<OrderSlipDto>> CancelAsync(
         CancelOrderSlipCommand command,
@@ -487,7 +573,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             var slip = await LoadSlipAsync(command.OrderSlipId, ct);
             if (slip is null) return OperationResult<OrderSlipReceiptResult>.Failure("NOT_FOUND", "Order slip was not found.");
             if (slip.Status is not (OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived))
-                return OperationResult<OrderSlipReceiptResult>.Failure("INVALID_STATUS", "Only ordered slips can receive stock.");
+                return OperationResult<OrderSlipReceiptResult>.Failure("INVALID_STATUS", "Only ordered or partially received slips can receive stock.");
             if (!string.Equals(slip.LocationId, NormalizeLocation(command.LocationId), StringComparison.OrdinalIgnoreCase))
                 return OperationResult<OrderSlipReceiptResult>.Failure("LOCATION_MISMATCH", "Receipt location must match the order slip location.");
             if (command.Items.Count == 0 || command.Items.Any(item => item.QuantityReceived <= 0)
@@ -543,8 +629,6 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             slip.Status = slip.Items.All(item =>
                     item.ReceivedQuantity == OrderSlipMath.ResolveOrderedQuantity(item.OrderedQuantity, item.Quantity))
                 ? OrderSlipStatuses.Completed : OrderSlipStatuses.PartiallyReceived;
-            // A partial receipt may leave the textual status unchanged. Force an UPDATE so the
-            // order-slip rowversion still serializes concurrent receipts for the same slip.
             _context.Entry(slip).Property(value => value.Status).IsModified = true;
             if (slip.Status == OrderSlipStatuses.Completed)
             {
@@ -579,12 +663,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             slip.Status = newStatus;
             slip.Remarks = string.IsNullOrWhiteSpace(command.Remarks) ? slip.Remarks : command.Remarks.Trim();
             if (command.ExpectedDeliveryDate.HasValue) slip.ExpectedDeliveryDate = command.ExpectedDeliveryDate;
-            if (newStatus == OrderSlipStatuses.Approved)
-            {
-                slip.ApprovedAt = DateTime.Now;
-                slip.ApprovedByUserId = command.ActingUserId;
-            }
-            else slip.OrderedAt = DateTime.Now;
+            slip.OrderedAt = DateTime.Now;
             await _context.SaveChangesAsync(ct);
             return OperationResult<OrderSlipDto>.Success(ToDto(slip));
         }, cancellationToken);
@@ -720,3 +799,4 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
         }).ToList()
     };
 }
+
