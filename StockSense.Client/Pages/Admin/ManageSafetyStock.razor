@@ -310,9 +310,35 @@
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr; gap: var(--space-4);">
                     <div>
-                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Image URL</label>
-                        <input @bind="newProduct.ImageUrl" placeholder="https://..."
-                               style="width: 100%; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--input); background: var(--background); font-size: var(--text-sm); color: var(--foreground); outline: none;" />
+                        <label style="display: block; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px;">Image</label>
+                        <InputFile @key="newProductImageInputKey" id="new-product-image-input" class="upload-input" OnChange="HandleNewProductImageSelected" accept="image/jpeg,image/png,image/webp" />
+                        <label class="upload-card" for="new-product-image-input">
+                            <span class="upload-card-visual" aria-hidden="true">
+                                @if (newProductImageFile is not null && !string.IsNullOrWhiteSpace(newProductImagePreview))
+                                {
+                                    <img src="@newProductImagePreview" alt="" />
+                                }
+                                else
+                                {
+                                    <LucideIcon Name="image-up" Size="24" />
+                                }
+                            </span>
+                            <span class="upload-card-copy">
+                                <strong>@(newProductImageFile is not null ? "Change image" : "Upload product image")</strong>
+                                <span>JPEG, PNG, or WebP · max 5 MB</span>
+                            </span>
+                        </label>
+                        @if (newProductImageFile is not null)
+                        {
+                            <div class="upload-selection" style="margin-top: var(--space-2);">
+                                <span class="selected-file-name"><LucideIcon Name="circle-check" Size="15" /> @newProductImageFile.Name</span>
+                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearNewProductImage" aria-label="Remove selected image">Remove</BbButton>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(newProductImageError))
+                        {
+                            <p role="alert" class="form-error">@newProductImageError</p>
+                        }
                     </div>
                 </div>
             </div>
@@ -743,10 +769,18 @@
     private CreateProductDto newProduct = new();
     private IEnumerable<(int Id, string Name)> NewProductSuppliers =>
         (rows ?? []).Where(x => x.SupplierId.HasValue).Select(x => (Id: x.SupplierId!.Value, x.SupplierName)).Distinct().OrderBy(x => x.SupplierName);
+    private IBrowserFile? newProductImageFile;
+    private string newProductImagePreview = "";
+    private string newProductImageError = "";
+    private int newProductImageInputKey;
 
     private void OpenNewProductModal()
     {
         newProduct = new();
+        newProductImageFile = null;
+        newProductImagePreview = "";
+        newProductImageError = "";
+        newProductImageInputKey++;
         showNewProductModal = true;
     }
 
@@ -770,6 +804,10 @@
 
                 if (created != null)
                 {
+                    if (newProductImageFile != null)
+                    {
+                        await UploadNewProductImage(created.Id, created.RowVersion ?? []);
+                    }
                     var safeName = string.Concat(created.Name.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
                     await JS.InvokeVoidAsync("triggerDownload", $"api/products/{created.Id}/barcode-pdf?format=barcode", $"Barcode_{safeName}.pdf");
                 }
@@ -784,5 +822,57 @@
             error = ApiErrorMessage.FromException(ex, "The product could not be created. Please try again.");
         }
         isSavingNewProduct = false;
+    }
+
+    private async Task UploadNewProductImage(int productId, byte[] rowVersion)
+    {
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            using var imageContent = new StreamContent(newProductImageFile!.OpenReadStream(MaxImageBytes));
+            imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(newProductImageFile.ContentType);
+            var safeUploadName = newProductImageFile.ContentType switch { "image/jpeg" => "product-image.jpg", "image/png" => "product-image.png", "image/webp" => "product-image.webp", _ => "product-image" };
+            form.Add(imageContent, "file", safeUploadName);
+            form.Add(new StringContent(Convert.ToBase64String(rowVersion)), "rowVersion");
+            using var response = await Http.PostAsync($"api/products/{productId}/image", form);
+            await EnsureSuccess(response);
+            await LoadAsync();
+        }
+        catch { /* image upload is best-effort */ }
+    }
+
+    private void ClearNewProductImage()
+    {
+        newProductImageFile = null;
+        newProductImagePreview = "";
+        newProductImageError = "";
+        newProductImageInputKey++;
+    }
+
+    private async Task HandleNewProductImageSelected(InputFileChangeEventArgs args)
+    {
+        newProductImageFile = null;
+        newProductImagePreview = "";
+        newProductImageError = "";
+        var file = args.File;
+        if (file.Size > MaxImageBytes)
+        {
+            newProductImageError = "The image cannot exceed 5 MB.";
+            return;
+        }
+        if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
+        {
+            newProductImageError = "Choose a JPEG, PNG, or WebP image.";
+            return;
+        }
+        try
+        {
+            await using var source = file.OpenReadStream(MaxImageBytes);
+            using var buffer = new MemoryStream();
+            await source.CopyToAsync(buffer);
+            newProductImagePreview = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer.ToArray())}";
+            newProductImageFile = file;
+        }
+        catch (Exception ex) { newProductImageError = ApiErrorMessage.FromException(ex, "The image preview could not be loaded."); }
     }
 }

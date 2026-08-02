@@ -301,6 +301,8 @@ public class AppointmentsController : ControllerBase
         if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
         if (appointment.Status is "Completed" or "Cancelled")
             return Conflict(ApiResponse.Error("Cannot edit parts for completed or cancelled appointments."));
+        if (string.Equals(appointment.Category, "Build", StringComparison.OrdinalIgnoreCase))
+            return Conflict(ApiResponse.Error("Build installation appointments do not support parts editing."));
 
         appointment.SelectedProductsJson = dto.SelectedProductsJson;
         appointment.TotalAmount = dto.TotalAmount;

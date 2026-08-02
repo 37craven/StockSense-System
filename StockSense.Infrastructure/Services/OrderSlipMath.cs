@@ -5,10 +5,11 @@ namespace StockSense.Infrastructure.Services;
 public static class OrderSlipMath
 {
     public static bool IsOpenOrderStatus(string status) => status is
-        OrderSlipStatuses.Draft or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived;
+        OrderSlipStatuses.Draft or OrderSlipStatuses.Approved or OrderSlipStatuses.Ordered
+        or OrderSlipStatuses.PartiallyReceived;
 
     public static bool CountsAsIncoming(string status) => status is
-        OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived;
+        OrderSlipStatuses.Approved or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived;
 
     public static int ResolveOrderedQuantity(int orderedQuantity, int legacyQuantity) =>
         orderedQuantity > 0 ? orderedQuantity : legacyQuantity;
@@ -84,12 +85,12 @@ public static class OrderSlipMath
     {
         var allowed = (currentStatus, targetStatus) switch
         {
-            (OrderSlipStatuses.Draft, OrderSlipStatuses.Ordered) => true,
+            (OrderSlipStatuses.Draft, OrderSlipStatuses.Approved) => true,
+            (OrderSlipStatuses.Approved, OrderSlipStatuses.Ordered) => true,
             (OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived) => true,
             (OrderSlipStatuses.Ordered, OrderSlipStatuses.Completed) => true,
             (OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.PartiallyReceived) => true,
             (OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.Completed) => true,
-            (OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.ClosedShort) => true,
             _ => false
         };
         return allowed ? null : $"An order slip cannot transition from {currentStatus} to {targetStatus}.";
@@ -98,9 +99,10 @@ public static class OrderSlipMath
     public static string? ValidateCancellation(string status, bool hasReceivedItems, string? reason)
     {
         if (string.IsNullOrWhiteSpace(reason)) return "A cancellation reason is required.";
-        if (status is OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled or OrderSlipStatuses.ClosedShort)
-            return "A completed, cancelled, or closed-short order slip cannot be cancelled.";
-        if (status is not (OrderSlipStatuses.Draft or OrderSlipStatuses.Ordered))
+        if (status is OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled)
+            return "A completed or cancelled order slip cannot be cancelled.";
+        if (status is not (OrderSlipStatuses.Draft or OrderSlipStatuses.Approved
+            or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived))
             return $"An order slip with status {status} cannot be cancelled.";
         return null;
     }

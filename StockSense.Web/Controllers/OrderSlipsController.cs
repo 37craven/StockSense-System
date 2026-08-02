@@ -87,46 +87,6 @@ public sealed class OrderSlipsController : ControllerBase
         return ToActionResult(await _workflow.CreateManualDraftAsync(command, cancellationToken));
     }
 
-    [HttpPost("{id:int}/place-order")]
-    [Authorize(Roles = "Admin, Employee")]
-    public async Task<IActionResult> PlaceOrder(int id, [FromBody] PlaceOrderCommand? command, CancellationToken cancellationToken)
-    {
-        command ??= new PlaceOrderCommand();
-        command.OrderSlipId = id;
-        try
-        {
-            var result = await _workflow.PlaceOrderAsync(command, cancellationToken);
-            return !result.IsSuccess
-                ? StatusCode(result.IsConcurrencyConflict ? 409 : 400, ApiResponse.Error(result.ErrorMessage ?? "The order could not be placed."))
-                : Ok(new { message = "Order placed and email sent to supplier." });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Placing order slip {OrderSlipId} failed.", id);
-            return StatusCode(500, ApiResponse.Error("The order could not be placed. Please try again."));
-        }
-    }
-
-    [HttpPost("{id:int}/close-short")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> CloseShort(int id, [FromBody] CancelOrderSlipCommand? command, CancellationToken cancellationToken)
-    {
-        command ??= new CancelOrderSlipCommand();
-        command.OrderSlipId = id;
-        try
-        {
-            var result = await _workflow.CloseShortAsync(command, cancellationToken);
-            return !result.IsSuccess
-                ? StatusCode(result.IsConcurrencyConflict ? 409 : 400, ApiResponse.Error(result.ErrorMessage ?? "The order slip could not be closed short."))
-                : Ok(new { message = "Order closed short." });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Closing short order slip {OrderSlipId} failed.", id);
-            return StatusCode(500, ApiResponse.Error("The order slip could not be closed short. Please try again."));
-        }
-    }
-
     [HttpPost("{id:int}/cancel")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Cancel(int id, CancelOrderSlipCommand command, CancellationToken cancellationToken)

@@ -163,26 +163,12 @@
                                                 Details
                                             </BbButton>
 
-                                            @if (slip.Status == OrderSlipStatuses.Draft)
-                                            {
-                                                <BbButton Size="ButtonSize.Small" OnClick="() => OpenPlaceOrder(slip)" Style="background: #3b82f6; border-color: #3b82f6;">
-                                                    Place Order
-                                                </BbButton>
-                                            }
                                             @if (slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
                                             {
                                                 <BbButton Size="ButtonSize.Small" OnClick="() => OpenDetailForReceive(slip)" Style="background: #8b5cf6; border-color: #8b5cf6;">
                                                     Receive
                                                 </BbButton>
                                             }
-                                            <AuthorizeView Roles="Admin">
-                                                @if (slip.Status == OrderSlipStatuses.PartiallyReceived)
-                                                {
-                                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenCloseShort(slip)" Style="color: #6b7280;">
-                                                        Close Short
-                                                    </BbButton>
-                                                }
-                                            </AuthorizeView>
                                             <AuthorizeView Roles="Admin">
                                                 @if (slip.Status is not (OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled))
                                                 {
@@ -324,12 +310,6 @@
             <div style="display: flex; gap: var(--space-2);">
             @if (selectedSlip != null)
             {
-                @if (selectedSlip?.Status == OrderSlipStatuses.Draft)
-                {
-                    <BbButton Size="ButtonSize.Small" OnClick="() => OpenPlaceOrder(selectedSlip)" Style="background: #3b82f6; border-color: #3b82f6;">
-                        Place Order
-                    </BbButton>
-                }
                 @if (selectedSlip?.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
                 {
                     <BbButton Size="ButtonSize.Small" OnClick="OpenReceiveModal" Style="background: #8b5cf6; border-color: #8b5cf6;">
@@ -338,38 +318,6 @@
                 }
             }
             </div>
-        </div>
-    </BbDialogContent>
-</BbDialog>
-
-@* PLACE ORDER MODAL *@
-<BbDialog @bind-Open="placeOrderOpen">
-    <BbDialogContent Style="width: min(96vw, 440px); display: flex; flex-direction: column;">
-        @{
-            var supplierEmail = placingOrder?.Supplier?.Email;
-        }
-        <BbDialogHeader>
-            <BbDialogTitle>Place Order</BbDialogTitle>
-            <BbDialogDescription>
-                @if (string.IsNullOrWhiteSpace(supplierEmail))
-                {
-                    <span style="color: var(--destructive);">No email configured for this supplier. Please add an email before placing the order.</span>
-                }
-                else
-                {
-                    <text>Ready to place this order? An email will be sent to <strong>@supplierEmail</strong>.</text>
-                }
-            </BbDialogDescription>
-        </BbDialogHeader>
-        @if (!string.IsNullOrWhiteSpace(placeOrderError))
-        {
-            <div style="padding: var(--space-3); color: var(--destructive); font-size: var(--text-sm);">@placeOrderError</div>
-        }
-        <div style="display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) 0; border-top: 1px solid var(--border);">
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => placeOrderOpen = false">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="PlaceOrder" Disabled="@string.IsNullOrWhiteSpace(supplierEmail)" Style="background: #3b82f6; border-color: #3b82f6;">
-                Place Order &amp; Send Email
-            </BbButton>
         </div>
     </BbDialogContent>
 </BbDialog>
@@ -454,34 +402,6 @@
     </BbDialogContent>
 </BbDialog>
 
-@* CLOSE SHORT MODAL *@
-<BbDialog @bind-Open="closeShortOpen">
-    <BbDialogContent Style="width: min(96vw, 440px); display: flex; flex-direction: column;">
-        <BbDialogHeader>
-            <BbDialogTitle>Close Short</BbDialogTitle>
-            <BbDialogDescription>This order is partially received. Closing short will stop expecting remaining inventory.</BbDialogDescription>
-        </BbDialogHeader>
-        <div style="padding: var(--space-2) 0; display: flex; flex-direction: column; gap: var(--space-3);">
-            @if (!string.IsNullOrWhiteSpace(closeShortError))
-            {
-                <div style="color: var(--destructive); font-size: var(--text-sm);">@closeShortError</div>
-            }
-            <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium);">
-                Reason
-                <textarea @bind="closeShortReason" rows="3" maxlength="500"
-                          style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); resize: vertical; min-height: 60px;"
-                          placeholder="Why is this order being closed short?"></textarea>
-            </label>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border);">
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => closeShortOpen = false">Back</BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="CloseShort" Disabled="@string.IsNullOrWhiteSpace(closeShortReason)" Style="background: #6b7280; border-color: #6b7280;">
-                Close Short
-            </BbButton>
-        </div>
-    </BbDialogContent>
-</BbDialog>
-
 @* CANCEL DIALOG *@
 <BbDialog @bind-Open="cancelOpen">
     <BbDialogContent Style="width: min(96vw, 440px); display: flex; flex-direction: column;">
@@ -507,7 +427,7 @@
 </BbDialog>
 
 @code {
-    private static readonly string[] Statuses = [OrderSlipStatuses.Draft, OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.Completed, OrderSlipStatuses.ClosedShort, OrderSlipStatuses.Cancelled];
+    private static readonly string[] Statuses = [OrderSlipStatuses.Draft, OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.Completed, OrderSlipStatuses.Cancelled];
     private List<OrderSlip>? slips;
     private List<OrderSlip> filteredSlips = new();
     private string statusFilter = "";
@@ -525,13 +445,6 @@
     private bool receiveBusy;
     private string sortColumn = "generated";
     private bool sortAsc;
-    private bool placeOrderOpen;
-    private OrderSlip? placingOrder;
-    private string placeOrderError = "";
-    private bool closeShortOpen;
-    private OrderSlip? closingShort;
-    private string closeShortReason = "";
-    private string closeShortError = "";
 
     private void ToggleSort(string column)
     {
@@ -682,53 +595,6 @@
 
     private async Task<string?> UserId() =>
         (await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-    private void OpenPlaceOrder(OrderSlip s) { placingOrder = s; placeOrderError = ""; placeOrderOpen = true; }
-
-    private async Task PlaceOrder()
-    {
-        if (placingOrder == null) return;
-        placeOrderError = "";
-        try
-        {
-            var result = await Workflow.PlaceOrderAsync(new PlaceOrderCommand
-            {
-                OrderSlipId = placingOrder.Id,
-                ActingUserId = await UserId(),
-                RowVersion = placingOrder.RowVersion
-            });
-            if (!result.IsSuccess) { placeOrderError = result.ErrorMessage ?? "Failed to place order."; return; }
-            placeOrderOpen = false;
-            await Load();
-            if (selectedSlip?.Id == placingOrder.Id)
-                selectedSlip = slips?.FirstOrDefault(s => s.Id == placingOrder.Id);
-        }
-        catch (Exception ex) { placeOrderError = $"Failed to place order: {ex.Message}"; }
-    }
-
-    private void OpenCloseShort(OrderSlip s) { closingShort = s; closeShortReason = ""; closeShortError = ""; closeShortOpen = true; }
-
-    private async Task CloseShort()
-    {
-        if (closingShort == null) return;
-        closeShortError = "";
-        try
-        {
-            var result = await Workflow.CloseShortAsync(new CancelOrderSlipCommand
-            {
-                OrderSlipId = closingShort.Id,
-                ActingUserId = await UserId(),
-                Reason = closeShortReason,
-                RowVersion = closingShort.RowVersion
-            });
-            if (!result.IsSuccess) { closeShortError = result.ErrorMessage ?? "Failed to close short."; return; }
-            closeShortOpen = false;
-            await Load();
-            if (selectedSlip?.Id == closingShort.Id)
-                selectedSlip = slips?.FirstOrDefault(s => s.Id == closingShort.Id);
-        }
-        catch (Exception ex) { closeShortError = $"Failed to close short: {ex.Message}"; }
-    }
 
     private void OpenCancel(OrderSlip s) { cancelling = s; cancelReason = ""; cancelOpen = true; }
 
