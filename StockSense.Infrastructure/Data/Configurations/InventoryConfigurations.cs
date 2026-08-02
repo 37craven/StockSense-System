@@ -106,7 +106,7 @@ public sealed class OrderSlipItemConfiguration : IEntityTypeConfiguration<OrderS
         {
             table.HasCheckConstraint("CK_OrderSlipItems_Quantities", "[OrderedQuantity] > 0 AND [SuggestedQuantity] >= 0 AND [ReceivedQuantity] >= 0 AND [ReceivedQuantity] <= [OrderedQuantity]");
             table.HasCheckConstraint("CK_OrderSlipItems_OrderRules", "[PackageSizeSnapshot] >= 1 AND [MinimumOrderQuantitySnapshot] >= 1");
-            table.HasCheckConstraint("CK_OrderSlipItems_StockSnapshots", "[CurrentStockSnapshot] >= 0 AND [IncomingStockSnapshot] >= 0 AND [ReservedStockSnapshot] >= 0 AND [BackorderStockSnapshot] >= 0");
+            table.HasCheckConstraint("CK_OrderSlipItems_StockSnapshots", "[CurrentStockSnapshot] >= 0 AND [IncomingStockSnapshot] >= 0 AND [ReservedStockSnapshot] >= 0");
             table.HasCheckConstraint("CK_OrderSlipItems_Amounts", "[UnitCostSnapshot] >= 0 AND [EstimatedLineTotal] >= 0");
         });
         builder.Property(item => item.AverageDailyDemandSnapshot).HasPrecision(18, 4);

@@ -17,4 +17,6 @@ public class BuildRequest
     public int? TransactionId { get; set; }
     public Transaction? Transaction { get; set; }
     public Appointment? Appointment { get; set; }
+    public int? MotorcycleId { get; set; }
+    public Motorcycle? Motorcycle { get; set; }
 }

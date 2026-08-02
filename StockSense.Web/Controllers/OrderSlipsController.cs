@@ -146,7 +146,6 @@ public sealed class OrderSlipsController : ControllerBase
             CurrentStockSnapshot = item.CurrentStockSnapshot,
             IncomingStockSnapshot = item.IncomingStockSnapshot,
             ReservedStockSnapshot = item.ReservedStockSnapshot,
-            BackorderStockSnapshot = item.BackorderStockSnapshot,
             InventoryPositionSnapshot = item.InventoryPositionSnapshot,
             AverageDailyDemandSnapshot = item.AverageDailyDemandSnapshot,
             LeadTimeDaysSnapshot = item.LeadTimeDaysSnapshot,

@@ -246,7 +246,7 @@
 
         @* ── BODY ── *@
         <div style="flex: 1; overflow: hidden; padding: var(--space-4); display: flex; gap: var(--space-3); min-height: 0;">
-            <div style="width: fit-content; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);">
+            <div style="min-width: 0; width: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);">
                 @BuildDetailContent()
             </div>
             @if (isEditingParts)
@@ -254,8 +254,7 @@
                 <div style="min-width: 0; display: flex; flex-direction: column;">
                     <div style="border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; flex: 1;">
                         <ProductCatalog Columns="3"
-                                        Products="allProducts"
-                                        OnProductClick="p => ToggleEditPart(p.Id)"
+                                        OnProductClick="p => ToggleEditPart(p)"
                                         IsSelected="p => editPartIds.Contains(p.Id)"
                                         ShowCheckbox="false"
                                         IsDisabled="_ => false"
@@ -330,7 +329,6 @@
 
     // Edit-parts state
     private bool isEditingParts;
-    private List<Product>? allProducts;
     private List<int> editPartIds = new();
     private decimal editPartsTotal;
     private Dictionary<int, decimal> editedPrices = new();
@@ -343,36 +341,35 @@
         if (decimal.TryParse(e.Value?.ToString(), out var v))
         {
             editedPrices[productId] = v;
-            editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, allProducts?.FirstOrDefault(p => p.Id == id)?.Price ?? 0));
+            editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0));
         }
     }
 
     private async Task BeginEditParts()
     {
         if (selectedBuild == null) return;
-        allProducts = await ProductRepo.GetAllAsync();
         var parts = ParseParts(selectedBuild.SelectedPartsJson);
         editPartIds = parts.Where(p => p.Id > 0).Select(p => p.Id).Distinct().ToList();
         editedPrices = parts.Where(p => p.Id > 0).ToDictionary(p => p.Id, p => p.Price);
-        editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, allProducts?.FirstOrDefault(p => p.Id == id)?.Price ?? 0));
+        editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0));
         isEditingParts = true;
+        StateHasChanged();
     }
 
-    private void ToggleEditPart(int productId)
+    private void ToggleEditPart(Product product)
     {
-        if (editPartIds.Contains(productId))
+        if (editPartIds.Contains(product.Id))
         {
-            var price = GetPartPrice(productId, allProducts?.FirstOrDefault(p => p.Id == productId)?.Price ?? 0);
-            editPartIds.Remove(productId);
-            editedPrices.Remove(productId);
+            var price = GetPartPrice(product.Id, product.Price);
+            editPartIds.Remove(product.Id);
+            editedPrices.Remove(product.Id);
             editPartsTotal -= price;
         }
         else
         {
-            var price = allProducts?.FirstOrDefault(p => p.Id == productId)?.Price ?? 0;
-            editPartIds.Add(productId);
-            editedPrices[productId] = price;
-            editPartsTotal += price;
+            editPartIds.Add(product.Id);
+            editedPrices[product.Id] = product.Price;
+            editPartsTotal += product.Price;
         }
     }
 
@@ -502,6 +499,8 @@
             .SingleOrDefault(v => string.Equals(v, newStatus?.Trim(), StringComparison.OrdinalIgnoreCase));
         if (canonical is null) return;
 
+        var wasConfirmed = entity.Status == "Confirmed";
+
         if (canonical == "Pending" && entity.TransactionId.HasValue)
         {
             var txn = await DbContext.Transactions.Include(t => t.Items)
@@ -510,6 +509,15 @@
                 await RestoreStockFromTransaction(txn);
             entity.TransactionId = null;
             entity.CompletedAt = null;
+        }
+
+        if (wasConfirmed && canonical != "Confirmed")
+        {
+            await ReleaseProductReservations(entity.SelectedPartsJson);
+        }
+        else if (canonical == "Confirmed" && !wasConfirmed)
+        {
+            await ReserveProducts(entity.SelectedPartsJson);
         }
 
         entity.Status = canonical;
@@ -573,6 +581,8 @@
         isCheckingOut = true;
         try
         {
+            await ReleaseProductReservations(build.SelectedPartsJson);
+
             var receipt = await CheckoutService.CompleteBuildAsync(
                 build.Id,
                 new CompleteWorkOrderDto { PaymentMethod = checkoutPaymentMethod, ReferenceNumber = checkoutReference },
@@ -590,6 +600,34 @@
         finally
         {
             isCheckingOut = false;
+        }
+    }
+
+    private async Task ReserveProducts(string? selectedPartsJson)
+    {
+        var parts = ParseParts(selectedPartsJson ?? "");
+        var ids = parts.Where(p => p.Id > 0).Select(p => p.Id).Distinct().ToList();
+        if (ids.Count == 0) return;
+        var products = await DbContext.Products.Where(p => ids.Contains(p.Id)).ToListAsync();
+        var lookup = products.ToDictionary(p => p.Id);
+        foreach (var part in parts.Where(p => p.Id > 0))
+        {
+            if (lookup.TryGetValue(part.Id, out var product))
+                product.ReserveStock(1);
+        }
+    }
+
+    private async Task ReleaseProductReservations(string? selectedPartsJson)
+    {
+        var parts = ParseParts(selectedPartsJson ?? "");
+        var ids = parts.Where(p => p.Id > 0).Select(p => p.Id).Distinct().ToList();
+        if (ids.Count == 0) return;
+        var products = await DbContext.Products.Where(p => ids.Contains(p.Id)).ToListAsync();
+        var lookup = products.ToDictionary(p => p.Id);
+        foreach (var part in parts.Where(p => p.Id > 0))
+        {
+            if (lookup.TryGetValue(part.Id, out var product) && product.ReservedStock > 0)
+                product.ReleaseStock(1);
         }
     }
 

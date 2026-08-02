@@ -1,12 +1,17 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StockSense.Application.DTOs;
 
 namespace StockSense.Web.Services;
 
 public interface IAssistanceClient
 {
-    Task<string> AskAsync(string message, string userRole, CancellationToken cancellationToken);
+    Task<string> AskAsync(
+        string message,
+        string userRole,
+        IReadOnlyList<AssistanceHistoryMessage> history,
+        CancellationToken cancellationToken);
 }
 
 public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceClient> logger) : IAssistanceClient
@@ -14,12 +19,13 @@ public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceCl
     public async Task<string> AskAsync(
         string message,
         string userRole,
+        IReadOnlyList<AssistanceHistoryMessage> history,
         CancellationToken cancellationToken)
     {
         var endpoint = GetChatEndpoint(httpClient.BaseAddress);
         using var response = await httpClient.PostAsJsonAsync(
             endpoint,
-            new ChatbotRequest(message, userRole),
+            new ChatbotRequest(message, userRole, history),
             cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -61,7 +67,8 @@ public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceCl
 
     private sealed record ChatbotRequest(
         string Message,
-        [property: JsonPropertyName("user_role")] string UserRole);
+        [property: JsonPropertyName("user_role")] string UserRole,
+        IReadOnlyList<AssistanceHistoryMessage> History);
     private sealed record ChatbotResponse(string Reply);
 }
 

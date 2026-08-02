@@ -10,20 +10,21 @@ namespace StockSense.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "Motorcycles",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Brand = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Model = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    BaseCC = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Motorcycles", x => x.Id);
-                });
+            if (migrationBuilder.ActiveProvider?.Contains("SqlServer") == true)
+            {
+                migrationBuilder.Sql(@"
+                    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE Name = N'Motorcycles')
+                    BEGIN
+                        CREATE TABLE [Motorcycles] (
+                            [Id] int NOT NULL IDENTITY,
+                            [Brand] nvarchar(max) NOT NULL,
+                            [Model] nvarchar(max) NOT NULL,
+                            [BaseCC] nvarchar(max) NOT NULL,
+                            CONSTRAINT [PK_Motorcycles] PRIMARY KEY ([Id])
+                        );
+                    END
+                ");
+            }
         }
 
         /// <inheritdoc />

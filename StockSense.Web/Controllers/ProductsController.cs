@@ -91,7 +91,8 @@ public class ProductsController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, ApiResponse.Error(ex.Message));
+            _logger.LogError(ex, "Sending a product quotation failed.");
+            return StatusCode(500, ApiResponse.Error("The quotation could not be sent. Please try again later."));
         }
     }
 

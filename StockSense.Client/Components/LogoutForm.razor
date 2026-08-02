@@ -1,0 +1,15 @@
+<span style="@FormStyle">
+    <button type="submit" form="stocksense-logout-form" name="ReturnUrl" value="@ReturnUrl"
+            class="@ButtonClass" style="@ButtonStyle" title="@Title">
+        @ChildContent
+    </button>
+</span>
+
+@code {
+    [Parameter] public string ReturnUrl { get; set; } = "/";
+    [Parameter] public string? FormStyle { get; set; } = "display: block; margin: 0;";
+    [Parameter] public string? ButtonClass { get; set; }
+    [Parameter] public string? ButtonStyle { get; set; }
+    [Parameter] public string Title { get; set; } = "Sign out";
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+}

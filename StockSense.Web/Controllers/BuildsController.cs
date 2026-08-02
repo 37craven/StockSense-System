@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StockSense.Application.DTOs;
+using StockSense.Application.Exceptions;
 using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
@@ -21,17 +22,23 @@ public class BuildsController : ControllerBase
     private readonly IWorkOrderCheckoutService _checkoutService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<BuildsController> _logger;
+    private readonly MotorcycleRepository _motorcycleRepository;
 
     public BuildsController(
         BuildRequestRepository buildRepo,
         IWorkOrderCheckoutService checkoutService,
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        MotorcycleRepository motorcycleRepository,
+        ILogger<BuildsController> logger)
     {
         _buildRepo = buildRepo;
         _checkoutService = checkoutService;
         _userManager = userManager;
         _context = context;
+        _motorcycleRepository = motorcycleRepository;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -40,6 +47,11 @@ public class BuildsController : ControllerBase
         if (dto == null) return BadRequest(ApiResponse.Error("Request is empty."));
         var customer = await _userManager.GetUserAsync(User);
         if (customer is null) return Unauthorized();
+        if (!dto.MotorcycleId.HasValue)
+            return BadRequest(ApiResponse.Error("Select a motorcycle from the list."));
+        var motorcycle = await _motorcycleRepository.GetSelectableByIdAsync(dto.MotorcycleId.Value);
+        if (motorcycle is null)
+            return BadRequest(ApiResponse.Error("The selected motorcycle does not exist."));
 
         var request = new BuildRequest
         {
@@ -50,7 +62,8 @@ public class BuildsController : ControllerBase
             SelectedPartsJson = dto.SelectedPartsJson,
             TotalPrice = dto.TotalPrice,
             CreatedAt = DateTime.Now,
-            Status = WorkOrderStatuses.Pending
+            Status = WorkOrderStatuses.Pending,
+            MotorcycleId = motorcycle.Id
         };
 
         await _buildRepo.AddAsync(request);
@@ -109,7 +122,8 @@ public class BuildsController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, ApiResponse.Error($"Reopen failed: {ex.Message}"));
+            _logger.LogError(ex, "Reopening build {BuildId} failed.", id);
+            return StatusCode(500, ApiResponse.Error("The build could not be reopened. Please try again."));
         }
     }
 
@@ -218,7 +232,7 @@ public class BuildsController : ControllerBase
         {
             return BadRequest(ApiResponse.Error("The build's selected-parts data is invalid."));
         }
-        catch (InvalidOperationException exception)
+        catch (WorkOrderConflictException exception)
         {
             return Conflict(ApiResponse.Error(exception.Message));
         }
@@ -249,8 +263,20 @@ public class BuildsController : ControllerBase
         Status = build.Status,
         CompletedAt = build.CompletedAt,
         TransactionId = build.TransactionId,
-        InvoiceNumber = build.Transaction?.InvoiceNumber
+        InvoiceNumber = build.Transaction?.InvoiceNumber,
+        MotorcycleId = build.MotorcycleId,
+        Motorcycle = MapMotorcycle(build.Motorcycle)
     };
+
+    private static MotorcycleOptionDto? MapMotorcycle(Motorcycle? motorcycle) => motorcycle is null
+        ? null
+        : new MotorcycleOptionDto
+        {
+            Id = motorcycle.Id,
+            Brand = motorcycle.Brand,
+            Model = motorcycle.Model,
+            BaseCC = motorcycle.BaseCC
+        };
 
     private static string GetFullName(ApplicationUser user)
     {

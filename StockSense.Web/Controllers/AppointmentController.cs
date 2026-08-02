@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StockSense.Application.DTOs;
+using StockSense.Application.Exceptions;
 using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
@@ -22,6 +23,8 @@ public class AppointmentsController : ControllerBase
     private readonly IWorkOrderCheckoutService _checkoutService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
+    private readonly MotorcycleRepository _motorcycleRepository;
+    private readonly ILogger<AppointmentsController> _logger;
     private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
@@ -30,13 +33,17 @@ public class AppointmentsController : ControllerBase
         StoreServiceRepository serviceRepo,
         IWorkOrderCheckoutService checkoutService,
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        MotorcycleRepository motorcycleRepository,
+        ILogger<AppointmentsController> logger)
     {
         _repo = repo;
         _serviceRepo = serviceRepo;
         _checkoutService = checkoutService;
         _userManager = userManager;
         _context = context;
+        _motorcycleRepository = motorcycleRepository;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -48,6 +55,11 @@ public class AppointmentsController : ControllerBase
             if (customer is null) return Unauthorized();
             var customerEmail = customer.Email ?? string.Empty;
             var customerFullName = GetFullName(customer);
+            if (!dto.MotorcycleId.HasValue)
+                return BadRequest(ApiResponse.Error("Select a motorcycle from the list."));
+            var motorcycle = await _motorcycleRepository.GetSelectableByIdAsync(dto.MotorcycleId.Value);
+            if (motorcycle is null)
+                return BadRequest(ApiResponse.Error("The selected motorcycle does not exist."));
             string flatServices = string.Join(", ", dto.SelectedServices);
             var matchedServices = await _serviceRepo.GetByNamesAsync(dto.SelectedServices);
             decimal serviceTotal = matchedServices.Sum(s => s.Price);
@@ -90,7 +102,8 @@ public class AppointmentsController : ControllerBase
                 CreatedAt = phNow,
                 TotalAmount = serviceTotal + productTotal,
                 DurationMinutes = totalDuration,
-                MechanicName = "Any Available"
+                MechanicName = "Any Available",
+                MotorcycleId = motorcycle.Id
             };
 
             var saved = await _repo.AddAsync(appointment);
@@ -98,7 +111,8 @@ public class AppointmentsController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, ApiResponse.Error(ex.Message));
+            _logger.LogError(ex, "Creating an appointment failed.");
+            return StatusCode(500, ApiResponse.Error("The appointment could not be booked. Please try again."));
         }
     }
 
@@ -165,6 +179,8 @@ public class AppointmentsController : ControllerBase
 
         try
         {
+            var wasConfirmed = appointment.Status == WorkOrderStatuses.Confirmed;
+
             if (canonicalStatus == WorkOrderStatuses.Pending && appointment.Transaction is not null)
             {
                 await RestoreStockFromTransaction(appointment.Transaction);
@@ -175,13 +191,23 @@ public class AppointmentsController : ControllerBase
                 appointment.CompletedAt = null;
             }
 
+            if (wasConfirmed && canonicalStatus != WorkOrderStatuses.Confirmed)
+            {
+                await ReleaseAppointmentReservations(appointment);
+            }
+            else if (canonicalStatus == WorkOrderStatuses.Confirmed && !wasConfirmed)
+            {
+                await ReserveAppointmentProducts(appointment);
+            }
+
             appointment.Status = canonicalStatus;
             await _context.SaveChangesAsync();
             return Ok(new { message = "Status updated" });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, ApiResponse.Error($"Reopen failed: {ex.Message}"));
+            _logger.LogError(ex, "Reopening appointment {AppointmentId} failed.", id);
+            return StatusCode(500, ApiResponse.Error("The appointment could not be reopened. Please try again."));
         }
     }
 
@@ -227,6 +253,59 @@ public class AppointmentsController : ControllerBase
         _context.Transactions.Add(reversal);
     }
 
+    private async Task ReserveAppointmentProducts(Appointment appointment)
+    {
+        var productIds = ExtractProductIds(appointment.SelectedProductsJson);
+        if (productIds.Count == 0) return;
+        var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+        var lookup = products.ToDictionary(p => p.Id);
+        foreach (var id in productIds)
+        {
+            if (lookup.TryGetValue(id, out var product))
+                product.ReserveStock(1);
+        }
+    }
+
+    private async Task ReleaseAppointmentReservations(Appointment appointment)
+    {
+        var productIds = ExtractProductIds(appointment.SelectedProductsJson);
+        if (productIds.Count == 0) return;
+        var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+        var lookup = products.ToDictionary(p => p.Id);
+        foreach (var id in productIds)
+        {
+            if (lookup.TryGetValue(id, out var product) && product.ReservedStock > 0)
+                product.ReleaseStock(1);
+        }
+    }
+
+    private static List<int> ExtractProductIds(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            var breakdown = JsonSerializer.Deserialize<List<ServiceProductBreakdown>>(json, JsonOpts);
+            return breakdown?.SelectMany(s => s.Products.Where(p => p.Selected && p.Id > 0)).Select(p => p.Id).Distinct().ToList() ?? [];
+        }
+        catch { return []; }
+    }
+
+    [HttpPut("{id}/products")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<IActionResult> UpdateProducts(int id, [FromBody] UpdateAppointmentProductsDto dto)
+    {
+        var appointment = await _context.Appointments.FindAsync(id);
+        if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
+        if (appointment.Status is "Completed" or "Cancelled")
+            return Conflict(ApiResponse.Error("Cannot edit parts for completed or cancelled appointments."));
+
+        appointment.SelectedProductsJson = dto.SelectedProductsJson;
+        appointment.TotalAmount = dto.TotalAmount;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Products updated" });
+    }
+
     [HttpPost("{id}/complete")]
     [Authorize(Roles = "Employee,Admin")]
     public async Task<ActionResult<ReceiptDto>> Complete(
@@ -236,6 +315,11 @@ public class AppointmentsController : ControllerBase
     {
         try
         {
+            var appointment = await _context.Appointments.FindAsync(id, cancellationToken);
+            if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
+            if (appointment.Status == WorkOrderStatuses.Confirmed)
+                await ReleaseAppointmentReservations(appointment);
+
             var receipt = await _checkoutService.CompleteAppointmentAsync(
                 id,
                 request,
@@ -252,7 +336,7 @@ public class AppointmentsController : ControllerBase
         {
             return BadRequest(ApiResponse.Error("The appointment's selected-product data is invalid."));
         }
-        catch (InvalidOperationException exception)
+        catch (WorkOrderConflictException exception)
         {
             return Conflict(ApiResponse.Error(exception.Message));
         }
@@ -282,8 +366,20 @@ public class AppointmentsController : ControllerBase
         TotalAmount = a.TotalAmount, Status = a.Status, Category = a.Category,
         MechanicName = a.MechanicName, DurationMinutes = a.DurationMinutes,
         CompletedAt = a.CompletedAt, TransactionId = a.TransactionId,
-        InvoiceNumber = a.Transaction?.InvoiceNumber
+        InvoiceNumber = a.Transaction?.InvoiceNumber,
+        MotorcycleId = a.MotorcycleId,
+        Motorcycle = MapMotorcycle(a.Motorcycle)
     };
+
+    private static MotorcycleOptionDto? MapMotorcycle(Motorcycle? motorcycle) => motorcycle is null
+        ? null
+        : new MotorcycleOptionDto
+        {
+            Id = motorcycle.Id,
+            Brand = motorcycle.Brand,
+            Model = motorcycle.Model,
+            BaseCC = motorcycle.BaseCC
+        };
 
     private static string GetFullName(ApplicationUser user)
     {
@@ -323,5 +419,11 @@ public class AppointmentsController : ControllerBase
         public string Name { get; set; } = "";
         public decimal Price { get; set; }
         public bool Selected { get; set; } = true;
+    }
+
+    public class UpdateAppointmentProductsDto
+    {
+        public string SelectedProductsJson { get; set; } = "";
+        public decimal TotalAmount { get; set; }
     }
 }

@@ -31,7 +31,6 @@ public sealed class OrderSlipPreviewItemDto
     public int CurrentStock { get; set; }
     public int IncomingStock { get; set; }
     public int ReservedStock { get; set; }
-    public int BackorderStock { get; set; }
     public int InventoryPosition { get; set; }
     public decimal AverageDailyDemand { get; set; }
     public decimal LeadTimeDays { get; set; }

@@ -506,7 +506,7 @@ else
         }
         catch (Exception ex)
         {
-            motorErrorMessage = "Failed to add motorcycle: " + ex.Message;
+            motorErrorMessage = ApiErrorMessage.FromException(ex, "The motorcycle could not be added. Please try again.");
         }
         finally
         {
@@ -636,7 +636,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"Failed to save package: {ex.Message}";
+            errorMessage = ApiErrorMessage.FromException(ex, "The package could not be saved. Please try again.");
         }
         finally
         {

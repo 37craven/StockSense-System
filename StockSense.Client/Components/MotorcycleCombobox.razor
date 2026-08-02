@@ -1,0 +1,162 @@
+<div class="motorcycle-picker">
+    <label class="motorcycle-picker__label" for="@InputId">@Label</label>
+    <div class="motorcycle-picker__control">
+        <LucideIcon Name="bike" Size="16" class="motorcycle-picker__icon" aria-hidden="true" />
+        <input id="@InputId"
+               class="motorcycle-picker__input"
+               type="text"
+               role="combobox"
+               autocomplete="off"
+               placeholder="@Placeholder"
+               value="@query"
+               aria-autocomplete="list"
+               aria-expanded="@isOpen.ToString().ToLowerInvariant()"
+               aria-controls="@ListboxId"
+               aria-activedescendant="@ActiveDescendant"
+               aria-busy="@IsLoading.ToString().ToLowerInvariant()"
+               aria-required="true"
+               disabled="@IsLoading"
+               @onfocus="Open"
+               @onblur="Close"
+               @oninput="Filter"
+               @onkeydown="HandleKeyDown" />
+        <LucideIcon Name="chevron-down" Size="16" class="motorcycle-picker__chevron" aria-hidden="true" />
+    </div>
+
+    @if (isOpen)
+    {
+        <div id="@ListboxId" class="motorcycle-picker__list" role="listbox" aria-label="Available motorcycles">
+            @if (IsLoading)
+            {
+                <div class="motorcycle-picker__empty" role="status">Loading motorcycles...</div>
+            }
+            else if (!string.IsNullOrWhiteSpace(LoadError))
+            {
+                <div class="motorcycle-picker__empty motorcycle-picker__empty--error" role="alert">@LoadError</div>
+            }
+            else if (Options.Count == 0)
+            {
+                <div class="motorcycle-picker__empty" role="status">No motorcycles are available in the catalog.</div>
+            }
+            else if (FilteredOptions.Count == 0)
+            {
+                <div class="motorcycle-picker__empty" role="status">No motorcycles match your search.</div>
+            }
+            else
+            {
+                @for (var index = 0; index < FilteredOptions.Count; index++)
+                {
+                    var option = FilteredOptions[index];
+                    var optionIndex = index;
+                    <button id="@OptionId(option)"
+                            type="button"
+                            role="option"
+                            aria-selected="@(Value == option.Id ? "true" : "false")"
+                            class="motorcycle-picker__option @(optionIndex == activeIndex ? "is-active" : null) @(Value == option.Id ? "is-selected" : null)"
+                            @onmousedown="() => SelectAsync(option)">
+                        <span>@option.Brand @option.Model</span>
+                        <small>@option.BaseCC</small>
+                    </button>
+                }
+            }
+        </div>
+    }
+
+    @if (Value.HasValue && SelectedOption is not null)
+    {
+        <p class="motorcycle-picker__selection">
+            <LucideIcon Name="circle-check" Size="13" aria-hidden="true" />
+            Selected: @SelectedOption.DisplayName
+        </p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<MotorcycleOptionDto> Options { get; set; } = [];
+    [Parameter] public int? Value { get; set; }
+    [Parameter] public EventCallback<int?> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Motorcycle";
+    [Parameter] public string Placeholder { get; set; } = "Type to search motorcycles";
+    [Parameter] public string Id { get; set; } = $"motorcycle-{Guid.NewGuid():N}";
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string? LoadError { get; set; }
+
+    private string query = string.Empty;
+    private bool isOpen;
+    private int activeIndex;
+
+    private string InputId => $"{Id}-input";
+    private string ListboxId => $"{Id}-listbox";
+    private MotorcycleOptionDto? SelectedOption => Options.FirstOrDefault(option => option.Id == Value);
+    private List<MotorcycleOptionDto> FilteredOptions => Options
+        .Where(option => string.IsNullOrWhiteSpace(query)
+            || option.Brand.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || option.Model.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || option.BaseCC.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || option.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase))
+        .Take(30)
+        .ToList();
+    private string? ActiveDescendant => isOpen && FilteredOptions.Count > 0
+        ? OptionId(FilteredOptions[Math.Clamp(activeIndex, 0, FilteredOptions.Count - 1)])
+        : null;
+
+    protected override void OnParametersSet()
+    {
+        if (Value.HasValue && SelectedOption is not null && !isOpen)
+            query = SelectedOption.DisplayName;
+    }
+
+    private void Open()
+    {
+        isOpen = true;
+        activeIndex = Math.Max(0, FilteredOptions.FindIndex(option => option.Id == Value));
+    }
+
+    private void Close()
+    {
+        isOpen = false;
+        query = SelectedOption?.DisplayName ?? query;
+    }
+
+    private async Task Filter(ChangeEventArgs args)
+    {
+        query = args.Value?.ToString() ?? string.Empty;
+        activeIndex = 0;
+        isOpen = true;
+        if (Value.HasValue)
+            await ValueChanged.InvokeAsync(null);
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+    {
+        var options = FilteredOptions;
+        switch (args.Key)
+        {
+            case "ArrowDown":
+                isOpen = true;
+                if (options.Count > 0) activeIndex = (activeIndex + 1) % options.Count;
+                break;
+            case "ArrowUp":
+                isOpen = true;
+                if (options.Count > 0) activeIndex = (activeIndex - 1 + options.Count) % options.Count;
+                break;
+            case "Enter" when isOpen && options.Count > 0:
+                await SelectAsync(options[Math.Clamp(activeIndex, 0, options.Count - 1)]);
+                break;
+            case "Escape":
+                isOpen = false;
+                query = SelectedOption?.DisplayName ?? string.Empty;
+                break;
+        }
+    }
+
+    private async Task SelectAsync(MotorcycleOptionDto option)
+    {
+        query = option.DisplayName;
+        isOpen = false;
+        activeIndex = 0;
+        await ValueChanged.InvokeAsync(option.Id);
+    }
+
+    private string OptionId(MotorcycleOptionDto option) => $"{Id}-option-{option.Id}";
+}

@@ -338,7 +338,7 @@
             if (user.IsCurrentUser) { managementError = "You cannot delete your own admin account."; pendingDeleteTarget = null; return; }
             var res = await Http.DeleteAsync($"api/admin/users/{user.Id}");
             if (res.IsSuccessStatusCode) { await LoadUsers(); managementMessage = $"Deleted {user.FullName}."; managementError = ""; }
-            else { var apiError = await res.Content.ReadFromJsonAsync<ManagementApiError>(); managementError = apiError?.Error ?? $"Delete failed ({(int)res.StatusCode})."; }
+            else { managementError = await ApiErrorMessage.FromResponseAsync(res, "The user could not be deleted. Please try again."); }
         }
         else if (pendingDeleteTarget is Mechanic mech)
         {
@@ -355,19 +355,15 @@
         try
         {
             using var response = await Http.PostAsJsonAsync("api/admin/change-role", new { UserId = user.Id, NewRole = newRole });
-            if (!response.IsSuccessStatusCode)
-            {
-                var apiError = await response.Content.ReadFromJsonAsync<ManagementApiError>();
-                throw new InvalidOperationException(apiError?.Error ?? $"Role update failed ({(int)response.StatusCode}).");
-            }
+            await ApiErrorMessage.EnsureSuccessAsync(response, "The role could not be updated. Please try again.");
             user.Role = newRole;
             managementMessage = $"Role updated for {user.FullName}.";
         }
         catch (Exception ex)
         {
-            managementError = ex.Message;
+            managementError = ApiErrorMessage.FromException(ex, "The role could not be updated. Please try again.");
             try { await LoadUsers(); }
-            catch (Exception refreshException) { managementError += $" Could not refresh users: {refreshException.Message}"; }
+            catch { managementError += " Reload the page to refresh the user list."; }
         }
         finally
         {
@@ -380,7 +376,7 @@
         if (user.IsCurrentUser) { managementError = "You cannot change your own account status."; return; }
         var response = await Http.PostAsync($"api/admin/toggle-block/{user.Id}", null);
         if (response.IsSuccessStatusCode) { user.IsBlocked = !user.IsBlocked; managementMessage = $"Account status updated for {user.FullName}."; managementError = ""; }
-        else { var apiError = await response.Content.ReadFromJsonAsync<ManagementApiError>(); managementError = apiError?.Error ?? $"Status update failed ({(int)response.StatusCode})."; }
+        else { managementError = await ApiErrorMessage.FromResponseAsync(response, "The account status could not be updated."); }
     }
 
     private void OpenEmployeeModal() { newEmp = new() { Role = "Employee" }; modalError = ""; showEmployeeModal = true; }
@@ -390,7 +386,7 @@
         modalError = "";
         var response = await Http.PostAsJsonAsync("api/admin/create-employee", newEmp);
         if (response.IsSuccessStatusCode) { showEmployeeModal = false; await LoadUsers(); }
-        else { modalError = await response.Content.ReadAsStringAsync(); }
+        else { modalError = await ApiErrorMessage.FromResponseAsync(response, "The employee account could not be created."); }
     }
 
     private void OpenMechanicModal() { newMechanicName = ""; showMechanicModal = true; }
@@ -409,5 +405,4 @@
         await Http.PutAsJsonAsync($"api/mechanics/{mech.Id}", mech);
     }
 
-    private sealed class ManagementApiError { public string? Error { get; set; } }
 }

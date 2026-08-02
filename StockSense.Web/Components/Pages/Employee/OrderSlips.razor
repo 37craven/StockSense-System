@@ -5,106 +5,274 @@
 @using System.Security.Claims
 @using StockSense.Application.DTOs
 @using StockSense.Application.Interfaces
+@using StockSense.Client.Layout
 @inject IOrderSlipWorkflowService Workflow
 @inject AuthenticationStateProvider AuthenticationState
 @inject NavigationManager Navigation
 @attribute [Authorize(Roles = "Admin, Employee")]
 
-<PageTitle>Order Slip Generator</PageTitle>
+<PageTitle>Generate Orders</PageTitle>
 
-<div class="order-page">
-    <PageHeader Title="Order-Slip Generator"
-                Subtitle="Create an inventory recommendation or prepare a manual supplier draft. Nothing is automatically approved or sent.">
+<div>
+    <PageHeader Title="Generate Orders"
+                Subtitle="Create inventory-based recommendations or prepare manual supplier drafts."
+                Badge="@(preview?.SupplierGroups.Sum(g => g.Items.Count(i => i.IsSelected)).ToString() + " Selected")">
         <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/order-history")'>
-            <LucideIcon Name="clipboard-list" Size="16" /> View order slips
+            View Order History
         </BbButton>
     </PageHeader>
 
-    <div class="mode-selector" role="group" aria-label="Order creation method">
-        <button type="button" class="mode-button @(mode == CreationMode.Automatic ? "active" : null)"
-                aria-pressed="@(mode == CreationMode.Automatic)" @onclick="ShowAutomatic">
-            <LucideIcon Name="sparkles" Size="18" />
-            <span><strong>Automatic</strong><small>Use inventory recommendations</small></span>
+    @* MODE SELECTOR *@
+    <div style="display: flex; gap: var(--space-3); margin-bottom: var(--space-5);">
+        <button type="button" @onclick="ShowAutomatic"
+                style="flex: 1; padding: var(--space-4); border-radius: var(--radius); border: 2px solid @(mode == CreationMode.Automatic ? "var(--primary)" : "var(--border)"); background: @(mode == CreationMode.Automatic ? "var(--accent)" : "var(--card)"); cursor: pointer; text-align: left; transition: border-color 0.2s, background 0.2s;">
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius); background: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); flex-shrink: 0;">
+                    <LucideIcon Name="sparkles" Size="20" />
+                </div>
+                <div>
+                    <div style="font-weight: var(--font-semibold); font-size: var(--text-sm); color: var(--foreground);">Automatic</div>
+                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">Use inventory calculations to generate recommended orders</div>
+                </div>
+            </div>
         </button>
-        <button type="button" class="mode-button @(mode == CreationMode.Manual ? "active" : null)"
-                aria-pressed="@(mode == CreationMode.Manual)" @onclick="ShowManual">
-            <LucideIcon Name="square-pen" Size="18" />
-            <span><strong>Manual</strong><small>Choose supplier, products and quantities</small></span>
+        <button type="button" @onclick="ShowManual"
+                style="flex: 1; padding: var(--space-4); border-radius: var(--radius); border: 2px solid @(mode == CreationMode.Manual ? "var(--primary)" : "var(--border)"); background: @(mode == CreationMode.Manual ? "var(--accent)" : "var(--card)"); cursor: pointer; text-align: left; transition: border-color 0.2s, background 0.2s;">
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius); background: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); flex-shrink: 0;">
+                    <LucideIcon Name="square-pen" Size="20" />
+                </div>
+                <div>
+                    <div style="font-weight: var(--font-semibold); font-size: var(--text-sm); color: var(--foreground);">Manual</div>
+                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">Choose supplier, products, and quantities directly</div>
+                </div>
+            </div>
         </button>
     </div>
 
+    @* NOTICES *@
     @if (!string.IsNullOrWhiteSpace(message))
     {
-        <div role="status" class="notice">@message</div>
+        <div role="status" style="padding: var(--space-3); margin-bottom: var(--space-3); border-radius: var(--radius); border: 1px solid var(--border); background: var(--muted); color: var(--foreground); font-size: var(--text-sm);">@message</div>
     }
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div role="alert" class="notice error">@error</div>
+        <div role="alert" style="padding: var(--space-3); margin-bottom: var(--space-3); border-radius: var(--radius); border: 1px solid var(--destructive); background: color-mix(in oklch, var(--destructive) 10%, transparent); color: var(--destructive); font-size: var(--text-sm);">@error</div>
     }
 
+    @* AUTOMATIC MODE *@
     @if (mode == CreationMode.Automatic)
     {
-        <div class="section-heading">
-            <div><h2>Recommended orders</h2><p>Review the latest stock calculations before creating supplier drafts.</p></div>
-            <BbButton OnClick="LoadPreview" Disabled="busy">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+            <div>
+                <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Recommended Orders</h2>
+                <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Review the latest stock calculations before creating supplier drafts.</p>
+            </div>
+            <BbButton OnClick="LoadPreview" Disabled="busy" Size="ButtonSize.Default">
                 @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                <LucideIcon Name="scan" Size="16" /> Generate preview
+                <LucideIcon Name="scan" Size="16" /> Generate Preview
             </BbButton>
         </div>
+
         @if (preview == null)
         {
-            <EmptyState Icon="package-search" Title="No preview loaded" Description="Generate a preview to calculate inventory position and supplier quantities." />
+            <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
+                <EmptyState Icon="package-search" Title="No preview loaded" Description="Generate a preview to calculate inventory position and supplier quantities." />
+            </div>
         }
         else
         {
             @if (preview.Warnings.Count > 0)
             {
-                <section class="panel warnings"><h2>Skipped products and warnings</h2><ul>@foreach (var warning in preview.Warnings) { <li>@warning.ProductName: @warning.Message</li> }</ul></section>
+                <div style="padding: var(--space-3); margin-bottom: var(--space-4); border-radius: var(--radius); border: 1px solid #f59e0b; background: color-mix(in oklch, #f59e0b 10%, transparent);">
+                    <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: #f59e0b; margin-bottom: var(--space-2);">Warnings</div>
+                    <ul style="margin: 0; padding-left: var(--space-5); font-size: var(--text-sm); color: var(--foreground); display: flex; flex-direction: column; gap: var(--space-1);">
+                        @foreach (var warning in preview.Warnings)
+                        {
+                            <li>@warning.ProductName: @warning.Message</li>
+                        }
+                    </ul>
+                </div>
             }
+
             @foreach (var group in preview.SupplierGroups)
             {
-                <section class="panel" aria-labelledby="supplier-@group.SupplierId">
-                    <header class="panel-header"><h2 id="supplier-@group.SupplierId">@group.SupplierName</h2><span>Selected total: @Money(SelectedTotal(group))</span></header>
-                    <div class="table-scroll"><table><thead><tr><th>Include</th><th>Product</th><th class="number">Current</th><th class="number">Incoming</th><th class="number">Position</th><th class="number">Target</th><th class="number">Suggested</th><th>Final quantity</th><th class="number">Unit cost</th><th class="number">Total</th></tr></thead>
-                        <tbody>@foreach (var item in group.Items) { <tr><td><input type="checkbox" @bind="item.IsSelected" aria-label="Include @item.ProductName" /></td><td><strong>@item.ProductName</strong><small title="@item.RecommendationReason">@item.Brand · @item.RecommendationReason</small></td><td class="number">@item.CurrentStock</td><td class="number">@item.IncomingStock</td><td class="number">@item.InventoryPosition</td><td class="number">@item.TargetStock</td><td class="number">@item.SuggestedQuantity</td><td><label class="sr-only" for="qty-@item.ProductId">Final quantity for @item.ProductName</label><input id="qty-@item.ProductId" type="number" min="1" step="@item.PackageSize" @bind="item.FinalQuantity" />@if (item.IsSelected && errors.TryGetValue(item.ProductId, out var itemError)) { <small class="field-error" role="alert">@itemError</small> }</td><td class="number">@Money(item.UnitCost)</td><td class="number">@Money(item.FinalQuantity * item.UnitCost)</td></tr> }</tbody></table></div>
-                </section>
+                <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: var(--space-4); overflow: hidden;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); background: var(--muted);">
+                        <div>
+                            <h3 style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">@group.SupplierName</h3>
+                        </div>
+                        <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--primary);">Selected: ₱@SelectedTotal(group).ToString("N2")</span>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs); min-width: 900px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
+                                    <th style="text-align: center; padding: 8px 12px; color: var(--muted-foreground); width: 40px;">Include</th>
+                                    <th style="text-align: left; padding: 8px 12px; color: var(--muted-foreground);">Product</th>
+                                    <th style="text-align: center; padding: 8px 12px; color: var(--muted-foreground);">Current</th>
+                                    <th style="text-align: center; padding: 8px 12px; color: var(--muted-foreground);">Incoming</th>
+                                    <th style="text-align: center; padding: 8px 12px; color: var(--muted-foreground);">Position</th>
+                                    <th style="text-align: center; padding: 8px 12px; color: var(--muted-foreground);">Target</th>
+                                    <th style="text-align: center; padding: 8px 12px; color: var(--muted-foreground);">Suggested</th>
+                                    <th style="text-align: center; padding: 8px 12px; color: var(--muted-foreground);">Qty</th>
+                                    <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Unit Cost</th>
+                                    <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in group.Items)
+                                {
+                                    <tr style="border-bottom: 1px solid var(--border);">
+                                        <td style="padding: 8px 12px; text-align: center;">
+                                            <input type="checkbox" @bind="item.IsSelected" aria-label="Include @item.ProductName" style="cursor: pointer;" />
+                                        </td>
+                                        <td style="padding: 8px 12px; color: var(--foreground);">
+                                            <div style="font-weight: var(--font-semibold);">@item.ProductName</div>
+                                            <div style="font-size: 10px; color: var(--muted-foreground); margin-top: 2px;" title="@item.RecommendationReason">@item.Brand · @item.RecommendationReason</div>
+                                        </td>
+                                        <td style="padding: 8px 12px; text-align: center; color: var(--foreground);">@item.CurrentStock</td>
+                                        <td style="padding: 8px 12px; text-align: center; color: var(--foreground);">@item.IncomingStock</td>
+                                        <td style="padding: 8px 12px; text-align: center; color: var(--foreground);">@item.InventoryPosition</td>
+                                        <td style="padding: 8px 12px; text-align: center; color: var(--foreground);">@item.TargetStock</td>
+                                        <td style="padding: 8px 12px; text-align: center; color: var(--primary); font-weight: var(--font-semibold);">@item.SuggestedQuantity</td>
+                                        <td style="padding: 8px 12px; text-align: center;">
+                                            <input id="qty-@item.ProductId" type="number" min="1" step="@item.PackageSize" @bind="item.FinalQuantity"
+                                                   style="width: 60px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); text-align: center;" />
+                                            @if (item.IsSelected && errors.TryGetValue(item.ProductId, out var itemError))
+                                            {
+                                                <div style="font-size: 10px; color: var(--destructive); margin-top: 2px;">@itemError</div>
+                                            }
+                                        </td>
+                                        <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">₱@item.UnitCost.ToString("N2")</td>
+                                        <td style="padding: 8px 12px; text-align: right; color: var(--foreground); font-weight: var(--font-semibold);">₱@((item.FinalQuantity * item.UnitCost).ToString("N2"))</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             }
-            <div class="actions"><BbButton OnClick="CreateDrafts" Disabled="@(busy || !CanCreateAutomatic)"><LucideIcon Name="file-plus" Size="16" /> Create selected drafts</BbButton></div>
+            <div style="display: flex; justify-content: flex-end; padding-top: var(--space-2);">
+                <BbButton OnClick="CreateDrafts" Disabled="@(busy || !CanCreateAutomatic)">
+                    <LucideIcon Name="file-plus" Size="16" /> Create Selected Drafts
+                </BbButton>
+            </div>
         }
     }
+    @* MANUAL MODE *@
     else if (manualLoading)
     {
-        <div class="loading" role="status"><BbSpinner /> Loading suppliers and products…</div>
+        <div style="display: flex; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-10); color: var(--muted-foreground);">
+            <BbSpinner /> Loading suppliers and products...
+        </div>
     }
     else if (manualCatalog != null)
     {
-        <section class="panel manual-form" aria-labelledby="manual-title">
-            <header class="panel-header"><div><h2 id="manual-title">Manual order slip</h2><p>Costs are read from the product database when the draft is saved.</p></div><strong>@Money(ManualTotal)</strong></header>
-            <div class="form-grid">
-                <label>Supplier<span aria-hidden="true"> *</span><select @bind="manualSupplierId" @bind:after="SupplierChanged"><option value="0">Select supplier</option>@foreach (var supplier in manualCatalog.Suppliers) { <option value="@supplier.Id">@supplier.Name</option> }</select></label>
-                <label>Expected delivery date<input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="manualExpectedDate" /></label>
-            </div>
-            <div class="manual-lines">
-                <div class="lines-heading"><h3>Products</h3><BbButton Variant="ButtonVariant.Outline" OnClick="AddManualLine" Disabled="@(manualSupplierId == 0)"><LucideIcon Name="plus" Size="16" /> Add product</BbButton></div>
-                @if (manualLines.Count == 0)
-                {
-                    <p class="empty-copy">Select a supplier, then add at least one product.</p>
-                }
-                @foreach (var line in manualLines)
-                {
-                    var lineProduct = ProductFor(line.ProductId);
-                    <div class="manual-line">
-                        <label>Product<select @bind="line.ProductId"><option value="0">Select product</option>@foreach (var product in AvailableProducts(line)) { <option value="@product.Id">@product.Name (@product.Brand)</option> }</select></label>
-                        <label>Quantity<input type="number" min="1" @bind="line.Quantity" /></label>
-                        <div class="line-meta"><span>Unit cost</span><strong>@(lineProduct == null ? "—" : Money(lineProduct.UnitCost))</strong>@if (lineProduct?.HasInventorySettings == true) { <small>MOQ @lineProduct.MinimumOrderQuantity · pack @lineProduct.PackageSize@if (lineProduct.MaximumStockLevel.HasValue) { <text> · max @lineProduct.MaximumStockLevel</text> }</small> }</div>
-                        <div class="line-meta number"><span>Line total</span><strong>@(lineProduct == null ? "—" : Money(lineProduct.UnitCost * line.Quantity))</strong></div>
-                        <button type="button" class="remove-button" title="Remove product" aria-label="Remove product line" @onclick="() => RemoveManualLine(line)"><LucideIcon Name="trash-2" Size="17" /></button>
+        <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
+            <div style="padding: var(--space-4); border-bottom: 1px solid var(--border); background: var(--muted);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Manual Order Slip</h2>
+                        <p style="font-size: var(--text-xs); color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Costs are read from the product database when the draft is saved.</p>
                     </div>
-                }
+                    <strong style="font-size: var(--text-lg); color: var(--primary);">₱@ManualTotal.ToString("N2")</strong>
+                </div>
             </div>
-            <label class="reason">Reason<span aria-hidden="true"> *</span><textarea maxlength="500" rows="3" placeholder="Why is this manual order needed?" @bind="manualReason"></textarea><small>@manualReason.Length/500 characters</small></label>
-            <div class="actions"><BbButton OnClick="CreateManualDraft" Disabled="@(busy || !CanCreateManual)">@if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }<LucideIcon Name="file-plus" Size="16" /> Create manual draft</BbButton></div>
-        </section>
+            <div style="padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
+                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">
+                        Supplier <span style="color: var(--destructive);">*</span>
+                        <select @bind="manualSupplierId" @bind:after="SupplierChanged"
+                                style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);">
+                            <option value="0">Select supplier</option>
+                            @foreach (var supplier in manualCatalog.Suppliers)
+                            {
+                                <option value="@supplier.Id">@supplier.Name</option>
+                            }
+                        </select>
+                    </label>
+                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">
+                        Expected Delivery
+                        <input type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="manualExpectedDate"
+                               style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);" />
+                    </label>
+                </div>
+
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                        <h3 style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Products</h3>
+                        <BbButton Variant="ButtonVariant.Outline" OnClick="AddManualLine" Disabled="@(manualSupplierId == 0)" Size="ButtonSize.Small">
+                            <LucideIcon Name="plus" Size="14" /> Add Product
+                        </BbButton>
+                    </div>
+
+                    @if (manualLines.Count == 0)
+                    {
+                        <div style="padding: var(--space-6); text-align: center; color: var(--muted-foreground); font-size: var(--text-sm); border: 1px dashed var(--border); border-radius: var(--radius);">
+                            Select a supplier, then add at least one product.
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                            @foreach (var line in manualLines)
+                            {
+                                var lineProduct = ProductFor(line.ProductId);
+                                <div style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); flex-wrap: wrap;">
+                                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-xs); flex: 2; min-width: 160px;">
+                                        Product
+                                        <select @bind="line.ProductId"
+                                                style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);">
+                                            <option value="0">Select product</option>
+                                            @foreach (var product in AvailableProducts(line))
+                                            {
+                                                <option value="@product.Id">@product.Name (@product.Brand)</option>
+                                            }
+                                        </select>
+                                    </label>
+                                    <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-xs); flex: 1; min-width: 100px;">
+                                        Quantity
+                                        <input type="number" min="1" @bind="line.Quantity"
+                                               style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm);" />
+                                    </label>
+                                    <div style="display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--muted-foreground); flex: 1; min-width: 120px;">
+                                        <span>Unit Cost</span>
+                                        <strong style="color: var(--foreground);">@(lineProduct == null ? "—" : $"₱{lineProduct.UnitCost:N2}")</strong>
+                                        @if (lineProduct?.HasInventorySettings == true)
+                                        {
+                                            <small>MOQ @lineProduct.MinimumOrderQuantity · pack @lineProduct.PackageSize@if (lineProduct.MaximumStockLevel.HasValue) { <text> · max @lineProduct.MaximumStockLevel</text> }</small>
+                                        }
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--muted-foreground); flex: 1; min-width: 100px; text-align: right;">
+                                        <span>Line Total</span>
+                                        <strong style="color: var(--foreground);">@(lineProduct == null ? "—" : $"₱{(lineProduct.UnitCost * line.Quantity):N2}")</strong>
+                                    </div>
+                                    <button type="button" title="Remove product" aria-label="Remove product line" @onclick="() => RemoveManualLine(line)"
+                                            style="padding: var(--space-2); border-radius: var(--radius); border: none; background: transparent; color: var(--muted-foreground); cursor: pointer; flex-shrink: 0;">
+                                        <LucideIcon Name="trash-2" Size="17" />
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <label style="display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">
+                    Reason <span style="color: var(--destructive);">*</span>
+                    <textarea maxlength="500" rows="3" placeholder="Why is this manual order needed?" @bind="manualReason"
+                              style="padding: var(--space-2); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); resize: vertical; min-height: 60px;"></textarea>
+                    <small style="color: var(--muted-foreground);">@manualReason.Length/500 characters</small>
+                </label>
+
+                <div style="display: flex; justify-content: flex-end; padding-top: var(--space-2);">
+                    <BbButton OnClick="CreateManualDraft" Disabled="@(busy || !CanCreateManual)">
+                        @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
+                        <LucideIcon Name="file-plus" Size="16" /> Create Manual Draft
+                    </BbButton>
+                </div>
+            </div>
+        </div>
     }
 </div>
 
@@ -130,15 +298,15 @@
     private async Task LoadManualCatalog()
     {
         manualLoading = true;
-        try { var result = await Workflow.GetManualCatalogAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage); manualCatalog = result.Value; }
-        catch (Exception ex) { error = ex.Message; }
+        try { var result = await Workflow.GetManualCatalogAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The product catalog could not be loaded."); manualCatalog = result.Value; }
+        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The product catalog could not be loaded."); }
         finally { manualLoading = false; }
     }
     private async Task LoadPreview()
     {
         busy = true; error = message = ""; errors.Clear();
-        try { var result = await Workflow.PreviewAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage); preview = result.Value; message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations."; }
-        catch (Exception ex) { error = ex.Message; }
+        try { var result = await Workflow.PreviewAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The order preview could not be prepared."); preview = result.Value; message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations."; }
+        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The order preview could not be prepared."); }
         finally { busy = false; }
     }
     private void Validate(OrderSlipPreviewItemDto item)
@@ -158,9 +326,9 @@
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
             var command = new CreateOrderSlipDraftsCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierGroups = preview.SupplierGroups.Select(group => new CreateDraftOrderSlipGroupCommand { SupplierId = group.SupplierId, Items = group.Items.Where(item => item.IsSelected).Select(item => new CreateDraftOrderSlipItemCommand { ProductId = item.ProductId, OrderedQuantity = item.FinalQuantity }).ToList() }).Where(group => group.Items.Count > 0).ToList() };
-            var result = await Workflow.CreateDraftsAsync(command); if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage); message = $"Created {result.Value.OrderSlips.Count} draft order slips."; preview = null;
+            var result = await Workflow.CreateDraftsAsync(command); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slips could not be created."); message = $"Created {result.Value.OrderSlips.Count} draft order slips."; preview = null;
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slips could not be created."); }
         finally { busy = false; }
     }
     private Task SupplierChanged() { manualLines.Clear(); return Task.CompletedTask; }
@@ -176,11 +344,10 @@
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
             var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, ExpectedDeliveryDate = manualExpectedDate, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
-            if (!result.IsSuccess || result.Value == null) throw new InvalidOperationException(result.ErrorMessage);
+            if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slip could not be created.");
             message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = ""; manualExpectedDate = null;
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slip could not be created."); }
         finally { busy = false; }
     }
-    private static string Money(decimal value) => $"₱{value:N2}";
 }

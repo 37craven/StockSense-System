@@ -11,6 +11,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
+@inject ILogger<POS> Logger
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -439,7 +440,8 @@
     [JSInvokable]
     public async Task OnScannerError(string message)
     {
-        scanErrorMessage = $"Camera error: {message}";
+        Logger.LogWarning("Barcode scanner could not start: {ScannerMessage}", message);
+        scanErrorMessage = "The camera could not start. Check camera permission and try again.";
         await InvokeAsync(StateHasChanged);
     }
 
@@ -567,7 +569,8 @@
         }
         catch (Exception ex)
         {
-            statusMessage = "Error: " + ex.Message;
+            Logger.LogError(ex, "Point-of-sale checkout failed.");
+            statusMessage = ApiErrorMessage.FromException(ex, "The sale could not be completed. Review the cart and try again.");
         }
         finally
         {

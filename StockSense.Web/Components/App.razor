@@ -61,6 +61,11 @@
         <Routes />
     </CascadingAuthenticationState>
 
+    <form id="stocksense-logout-form" action="Account/Logout" method="post"
+          data-enhance="false" style="display: none;">
+        <AntiforgeryToken />
+    </form>
+
     <script src="_framework/blazor.web.js"></script>
     <script src="js/barcodeScanner.js"></script>
     <script>

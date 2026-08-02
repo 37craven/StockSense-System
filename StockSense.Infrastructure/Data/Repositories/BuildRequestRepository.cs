@@ -16,6 +16,7 @@ public class BuildRequestRepository
     {
         return await _context.BuildRequests
             .Include(b => b.Transaction)
+            .Include(b => b.Motorcycle)
             .OrderByDescending(b => b.CreatedAt)
             .ToListAsync();
     }
@@ -29,6 +30,7 @@ public class BuildRequestRepository
     {
         return await _context.BuildRequests
             .Include(b => b.Transaction)
+            .Include(b => b.Motorcycle)
             .Where(b => b.CustomerName == customerName)
             .OrderByDescending(b => b.CreatedAt)
             .ToListAsync();
@@ -41,6 +43,7 @@ public class BuildRequestRepository
     {
         return await _context.BuildRequests
             .Include(b => b.Transaction)
+            .Include(b => b.Motorcycle)
             .Where(b => b.CustomerUserId == userId
                 || (b.CustomerUserId == null && b.CustomerEmail == email)
                 || (b.CustomerUserId == null && b.CustomerEmail == null

@@ -383,7 +383,7 @@
         catch (Exception ex)
         {
             rows = null;
-            error = ex.Message;
+            error = ApiErrorMessage.FromException(ex, "Inventory data could not be loaded. Please try again.");
             loadFailed = true;
         }
     }
@@ -483,7 +483,7 @@
         }
         catch (Exception ex)
         {
-            productEditorError = ex.Message;
+            productEditorError = ApiErrorMessage.FromException(ex, "The inventory values could not be saved. Please try again.");
         }
         finally
         {
@@ -514,7 +514,7 @@
             imagePreviewUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer.ToArray())}";
             selectedImageFile = file;
         }
-        catch (Exception ex) { imageUploadError = $"The preview could not be loaded. {ex.Message}"; }
+        catch (Exception ex) { imageUploadError = ApiErrorMessage.FromException(ex, "The image preview could not be loaded."); }
     }
     private void ClearImageSelection()
     {
@@ -552,7 +552,7 @@
             imageInputKey++;
             Toast.Success("The product image is now up to date.", "Image uploaded");
         }
-        catch (Exception ex) { imageUploadError = ex.Message; }
+        catch (Exception ex) { imageUploadError = ApiErrorMessage.FromException(ex, "The image could not be uploaded. Please try again."); }
         finally { imageUploading = false; }
     }
     private async Task RecalculateOne(int id) => await RecalculateIds([id]);
@@ -575,7 +575,7 @@
                 else
                     Toast.Success($"{name} recalculated — safety {result.SafetyStock}, reorder {result.ReorderPoint}, target {result.TargetStock}.", "Inventory recalculated");
             }
-            catch (Exception ex) { errors++; Toast.Error($"{name}: {ex.Message}", "Recalculation failed"); }
+            catch (Exception ex) { errors++; Toast.Error(ApiErrorMessage.FromException(ex, $"{name} could not be recalculated."), "Recalculation failed"); }
         }
         busy = false;
         await LoadAsync();
@@ -600,10 +600,10 @@
             if (loadFailed) return;
             Toast.Success(remaining == 0 ? $"Completed {completed} of {requested} products." : $"Completed {completed} of {requested}; {remaining} not completed.", "Inventory recalculated");
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "Inventory could not be recalculated. Please try again."); }
         finally { busy = false; }
     }
-    private async Task Run(Func<Task> action) { busy = true; error = ""; message = ""; try { await action(); await LoadAsync(); } catch (Exception ex) { error = ex.Message; } finally { busy = false; } }
+    private async Task Run(Func<Task> action) { busy = true; error = ""; message = ""; try { await action(); await LoadAsync(); } catch (Exception ex) { error = ApiErrorMessage.FromException(ex); } finally { busy = false; } }
     private async Task LoadSettingsAsync(int productId, long generation, CancellationToken cancellationToken)
     {
         if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
@@ -640,7 +640,7 @@
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            if (IsCurrentDetail(productId, generation, cancellationToken)) settingsError = ex.Message;
+            if (IsCurrentDetail(productId, generation, cancellationToken)) settingsError = ApiErrorMessage.FromException(ex, "Inventory settings could not be loaded.");
         }
     }
     private async Task SaveSettings()
@@ -649,7 +649,7 @@
         var productId = selectedRow.ProductId;
         busy = true; settingsError = "";
         try { await EnsureSuccess(await Http.PutAsJsonAsync($"api/inventory/products/{productId}/settings", settings)); await LoadAsync(); if (!RefreshSelectedRow()) return; await LoadSettingsAsync(productId, detailGeneration, detailSettingsCts?.Token ?? CancellationToken.None); message = "Inventory settings saved and recalculated."; }
-        catch (Exception ex) { settingsError = ex.Message; }
+        catch (Exception ex) { settingsError = ApiErrorMessage.FromException(ex, "Inventory settings could not be saved. Please try again."); }
         finally { busy = false; }
     }
     private async Task RecalculateDetail()
@@ -682,7 +682,7 @@
         catch (Exception ex)
         {
             if (IsCurrentDetail(productId, generation, cancellationToken))
-                Toast.Error($"{productName}: {ex.Message}", "Recalculation failed");
+                Toast.Error(ApiErrorMessage.FromException(ex, $"{productName} could not be recalculated."), "Recalculation failed");
         }
         finally { busy = false; }
     }
@@ -712,10 +712,8 @@
     private static async Task EnsureSuccess(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode) return;
-        var payload = await response.Content.ReadFromJsonAsync<ApiError>();
-        throw new InvalidOperationException(payload?.Error ?? $"Request failed ({(int)response.StatusCode}).");
+        await ApiErrorMessage.EnsureSuccessAsync(response);
     }
-    private sealed class ApiError { public string? Error { get; set; } }
     public void Dispose() => InvalidateSettingsLoad();
 
     private bool showNewProductModal;
@@ -754,12 +752,12 @@
             }
             else
             {
-                error = $"Create product failed ({(int)response.StatusCode}).";
+                error = await ApiErrorMessage.FromResponseAsync(response, "The product could not be created. Please try again.");
             }
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ApiErrorMessage.FromException(ex, "The product could not be created. Please try again.");
         }
         isSavingNewProduct = false;
     }

@@ -16,6 +16,7 @@ public class AppointmentRepository
     {
         return await _context.Appointments
             .Include(a => a.Transaction)
+            .Include(a => a.Motorcycle)
             .OrderByDescending(a => a.AppointmentDate)
             .ToListAsync();
     }
@@ -66,6 +67,7 @@ public class AppointmentRepository
     {
         return await _context.Appointments
             .Include(a => a.Transaction)
+            .Include(a => a.Motorcycle)
             .Where(a => a.CustomerName == customerName)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
@@ -78,6 +80,7 @@ public class AppointmentRepository
     {
         return await _context.Appointments
             .Include(a => a.Transaction)
+            .Include(a => a.Motorcycle)
             .Where(a => a.CustomerUserId == userId
                 || (a.CustomerUserId == null && a.CustomerEmail == email)
                 || (a.CustomerUserId == null && a.CustomerEmail == null

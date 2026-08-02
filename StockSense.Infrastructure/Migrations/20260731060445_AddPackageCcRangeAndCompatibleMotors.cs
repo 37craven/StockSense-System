@@ -10,70 +10,74 @@ namespace StockSense.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "MaxAddedCC",
-                table: "PreBuiltPackages",
-                type: "int",
-                nullable: false,
-                defaultValue: 0);
+            if (migrationBuilder.ActiveProvider?.Contains("SqlServer") == true)
+            {
+                migrationBuilder.Sql(@"
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'MaxAddedCC' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                    BEGIN
+                        ALTER TABLE [PreBuiltPackages] ADD [MaxAddedCC] int NOT NULL DEFAULT 0;
+                    END
+                ");
 
-            migrationBuilder.CreateTable(
-                name: "PreBuiltPackageMotor",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    PreBuiltPackageId = table.Column<int>(type: "int", nullable: false),
-                    Brand = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Model = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    StockCC = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PreBuiltPackageMotor", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_PreBuiltPackageMotor_PreBuiltPackages_PreBuiltPackageId",
-                        column: x => x.PreBuiltPackageId,
-                        principalTable: "PreBuiltPackages",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+                migrationBuilder.Sql(@"
+                    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE Name = N'PreBuiltPackageMotor')
+                    BEGIN
+                        CREATE TABLE [PreBuiltPackageMotor] (
+                            [Id] int NOT NULL IDENTITY,
+                            [PreBuiltPackageId] int NOT NULL,
+                            [Brand] nvarchar(max) NOT NULL,
+                            [Model] nvarchar(max) NOT NULL,
+                            [StockCC] nvarchar(max) NOT NULL,
+                            CONSTRAINT [PK_PreBuiltPackageMotor] PRIMARY KEY ([Id]),
+                            CONSTRAINT [FK_PreBuiltPackageMotor_PreBuiltPackages_PreBuiltPackageId] FOREIGN KEY ([PreBuiltPackageId]) REFERENCES [PreBuiltPackages]([Id]) ON DELETE CASCADE
+                        );
+                    END
+                ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_PreBuiltPackageMotor_PreBuiltPackageId",
-                table: "PreBuiltPackageMotor",
-                column: "PreBuiltPackageId");
+                migrationBuilder.Sql(@"
+                    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE Name = N'IX_PreBuiltPackageMotor_PreBuiltPackageId')
+                    BEGIN
+                        CREATE INDEX [IX_PreBuiltPackageMotor_PreBuiltPackageId] ON [PreBuiltPackageMotor]([PreBuiltPackageId]);
+                    END
+                ");
 
-            // Preserve legacy single brand/model/cc + added-cc values into the new shape before dropping the old columns
-            migrationBuilder.Sql("""
-                INSERT INTO [PreBuiltPackageMotor] ([PreBuiltPackageId], [Brand], [Model], [StockCC])
-                SELECT [Id], [CompatibleBrand], [CompatibleModel], [TargetCC]
-                FROM [PreBuiltPackages]
-                WHERE [CompatibleBrand] <> N'' AND [CompatibleModel] <> N'' AND [TargetCC] <> N'';
-                """);
+                migrationBuilder.Sql(@"
+                    IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'CompatibleBrand' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                    BEGIN
+                        INSERT INTO [PreBuiltPackageMotor] ([PreBuiltPackageId], [Brand], [Model], [StockCC])
+                        SELECT [Id], [CompatibleBrand], [CompatibleModel], [TargetCC]
+                        FROM [PreBuiltPackages]
+                        WHERE [CompatibleBrand] <> N'' AND [CompatibleModel] <> N'' AND [TargetCC] <> N'';
+                    END
+                ");
 
-            migrationBuilder.Sql("""
-                UPDATE [PreBuiltPackages]
-                SET [MinAddedCC] = [EstimatedAddedCC], [MaxAddedCC] = [EstimatedAddedCC]
-                WHERE [EstimatedAddedCC] > 0;
-                """);
+                migrationBuilder.Sql(@"
+                    IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'EstimatedAddedCC' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'MinAddedCC' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                        BEGIN
+                            ALTER TABLE [PreBuiltPackages] ADD [MinAddedCC] int NOT NULL DEFAULT 0;
+                        END
+                        EXEC sp_executesql N'UPDATE [PreBuiltPackages] SET [MinAddedCC] = [EstimatedAddedCC], [MaxAddedCC] = [EstimatedAddedCC] WHERE [EstimatedAddedCC] > 0';
+                    END
+                ");
 
-            migrationBuilder.DropColumn(
-                name: "CompatibleBrand",
-                table: "PreBuiltPackages");
-
-            migrationBuilder.DropColumn(
-                name: "CompatibleModel",
-                table: "PreBuiltPackages");
-
-            migrationBuilder.DropColumn(
-                name: "TargetCC",
-                table: "PreBuiltPackages");
-
-            migrationBuilder.RenameColumn(
-                name: "EstimatedAddedCC",
-                table: "PreBuiltPackages",
-                newName: "MinAddedCC");
+                migrationBuilder.Sql(@"
+                    IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'CompatibleBrand' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                        ALTER TABLE [PreBuiltPackages] DROP COLUMN [CompatibleBrand];
+                    IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'CompatibleModel' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                        ALTER TABLE [PreBuiltPackages] DROP COLUMN [CompatibleModel];
+                    IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'TargetCC' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                        ALTER TABLE [PreBuiltPackages] DROP COLUMN [TargetCC];
+                    IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'EstimatedAddedCC' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                    BEGIN
+                        IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'MinAddedCC' AND Object_ID = Object_ID(N'PreBuiltPackages'))
+                            ALTER TABLE [PreBuiltPackages] DROP COLUMN [EstimatedAddedCC];
+                        ELSE
+                            EXEC sp_rename N'PreBuiltPackages.EstimatedAddedCC', N'MinAddedCC', N'COLUMN';
+                    END
+                ");
+            }
         }
 
         /// <inheritdoc />

@@ -31,11 +31,7 @@
                     <Authorized>
                         <a href="@GetProfileLink(authCtx.User)" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive(GetProfileLink(authCtx.User)) ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">@GetProfileLabel(authCtx.User)</a>
 
-                        <form action="Account/Logout" method="post" style="margin: 0; display: inline-flex;">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                            <button type="submit" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: transparent; border: none; white-space: nowrap;">Logout</button>
-                        </form>
+                        <LogoutForm ReturnUrl="@currentUrl" FormStyle="margin: 0; display: inline-flex;" ButtonClass="navbar-btn" ButtonStyle="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: transparent; border: none; white-space: nowrap;">Logout</LogoutForm>
                     </Authorized>
                     <NotAuthorized>
                         <a href="/Account/Login" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: transparent; text-decoration: none; white-space: nowrap;">Login</a>
@@ -71,11 +67,7 @@
             <AuthorizeView Context="authCtx">
                 <Authorized>
                     <a href="@GetProfileLink(authCtx.User)" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none;">@GetProfileLabel(authCtx.User)</a>
-                    <form action="Account/Logout" method="post" style="margin: 0;">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" style="width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans); text-align: left;">Logout</button>
-                    </form>
+                    <LogoutForm ReturnUrl="@currentUrl" ButtonStyle="width: 100%; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); background: none; border: none; cursor: pointer; font-family: var(--font-sans); text-align: left;">Logout</LogoutForm>
                 </Authorized>
                 <NotAuthorized>
                     <a href="/Account/Login" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none;">Login</a>

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StockSense.Application.DTOs;
 using StockSense.Web.Services;
 
 namespace StockSense.Web.Controllers;
@@ -21,17 +22,46 @@ public sealed class AssistanceController(
         CancellationToken cancellationToken)
     {
         if (request.AdditionalProperties is { Count: > 0 })
-            return BadRequest(new { error = "Only the message field is accepted." });
+            return BadRequest(new { error = "Only the message and history fields are accepted." });
 
         var message = request.Message?.Trim();
         if (string.IsNullOrWhiteSpace(message))
             return BadRequest(new { error = "Message is required." });
+
+        if (message.Length > AssistanceConversationLimits.MaxMessageLength)
+            return BadRequest(new { error = "Message is too long." });
+
+        var history = request.History ?? [];
+        if (history.Count > AssistanceConversationLimits.MaxHistoryMessages)
+            return BadRequest(new { error = $"History cannot contain more than {AssistanceConversationLimits.MaxHistoryMessages} messages." });
+
+        var normalizedHistory = new List<AssistanceHistoryMessage>(history.Count);
+        var historyCharacters = 0;
+        foreach (var item in history)
+        {
+            if (item is null)
+                return BadRequest(new { error = "History messages cannot be null." });
+            var role = item.Role?.Trim().ToLowerInvariant();
+            var content = item.Content?.Trim();
+            if (role is not ("user" or "assistant"))
+                return BadRequest(new { error = "History roles must be user or assistant." });
+            if (string.IsNullOrWhiteSpace(content))
+                return BadRequest(new { error = "History messages cannot be blank." });
+            if (content.Length > AssistanceConversationLimits.MaxMessageLength)
+                return BadRequest(new { error = "A history message is too long." });
+
+            historyCharacters += content.Length;
+            if (historyCharacters > AssistanceConversationLimits.MaxHistoryCharacters)
+                return BadRequest(new { error = "Conversation history is too large." });
+            normalizedHistory.Add(new AssistanceHistoryMessage(role, content));
+        }
 
         try
         {
             var reply = await assistanceClient.AskAsync(
                 message,
                 GetHighestRole(User),
+                normalizedHistory,
                 cancellationToken);
             return Ok(new AssistanceResponse(reply));
         }
@@ -63,6 +93,8 @@ public sealed class AssistanceRequest
 {
     [Required, StringLength(8000, MinimumLength = 1)]
     public string? Message { get; init; }
+
+    public IReadOnlyList<AssistanceHistoryMessage?>? History { get; init; }
 
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? AdditionalProperties { get; init; }

@@ -42,6 +42,7 @@ namespace StockSense.Client
         {
             var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
             var authState = Task.FromResult(new AuthenticationState(anonymous));
+            _authStateTask = authState;
             NotifyAuthenticationStateChanged(authState);
         }
     }

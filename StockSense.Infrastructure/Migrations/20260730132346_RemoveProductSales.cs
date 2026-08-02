@@ -11,23 +11,17 @@ namespace StockSense.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "HistoricalMonthlyProductSales");
-
-            migrationBuilder.DropTable(
-                name: "HistoricalProductMappings");
-
-            migrationBuilder.DropTable(
-                name: "LiveProductMappings");
-
-            migrationBuilder.DropTable(
-                name: "SalesHistory");
-
-            migrationBuilder.DropTable(
-                name: "SalesImportBatches");
-
-            migrationBuilder.DropTable(
-                name: "ReportingProducts");
+            if (migrationBuilder.ActiveProvider?.Contains("SqlServer") == true)
+            {
+                migrationBuilder.Sql(@"
+                    IF OBJECT_ID(N'HistoricalMonthlyProductSales', N'U') IS NOT NULL DROP TABLE [HistoricalMonthlyProductSales];
+                    IF OBJECT_ID(N'HistoricalProductMappings', N'U') IS NOT NULL DROP TABLE [HistoricalProductMappings];
+                    IF OBJECT_ID(N'LiveProductMappings', N'U') IS NOT NULL DROP TABLE [LiveProductMappings];
+                    IF OBJECT_ID(N'SalesHistory', N'U') IS NOT NULL DROP TABLE [SalesHistory];
+                    IF OBJECT_ID(N'SalesImportBatches', N'U') IS NOT NULL DROP TABLE [SalesImportBatches];
+                    IF OBJECT_ID(N'ReportingProducts', N'U') IS NOT NULL DROP TABLE [ReportingProducts];
+                ");
+            }
         }
 
         /// <inheritdoc />

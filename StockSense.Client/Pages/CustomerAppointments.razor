@@ -65,6 +65,11 @@
                         </p>
 
                         <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">
+                            <span style="font-weight: bold; color: var(--foreground);">Motorcycle:</span>
+                            @(appt.Motorcycle?.DisplayName ?? "Not recorded")
+                        </p>
+
+                        <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">
                             <span style="font-weight: bold; color: var(--foreground);">Services:</span> @appt.ServicesRequested
                         </p>
 

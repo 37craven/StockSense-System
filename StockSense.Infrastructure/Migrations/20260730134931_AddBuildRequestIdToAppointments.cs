@@ -10,25 +10,27 @@ namespace StockSense.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "BuildRequestId",
-                table: "Appointments",
-                type: "int",
-                nullable: true);
+            if (migrationBuilder.ActiveProvider?.Contains("SqlServer") == true)
+            {
+                migrationBuilder.Sql(@"
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'BuildRequestId' AND Object_ID = Object_ID(N'Appointments'))
+                    BEGIN
+                        ALTER TABLE [Appointments] ADD [BuildRequestId] int NULL;
+                    END
+                ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Appointments_BuildRequestId",
-                table: "Appointments",
-                column: "BuildRequestId",
-                unique: true,
-                filter: "[BuildRequestId] IS NOT NULL");
+                migrationBuilder.Sql(@"
+                    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE Name = N'IX_Appointments_BuildRequestId')
+                    BEGIN
+                        CREATE UNIQUE NONCLUSTERED INDEX [IX_Appointments_BuildRequestId] ON [Appointments]([BuildRequestId]) WHERE [BuildRequestId] IS NOT NULL;
+                    END
 
-            migrationBuilder.AddForeignKey(
-                name: "FK_Appointments_BuildRequests_BuildRequestId",
-                table: "Appointments",
-                column: "BuildRequestId",
-                principalTable: "BuildRequests",
-                principalColumn: "Id");
+                    IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE Name = N'FK_Appointments_BuildRequests_BuildRequestId')
+                    BEGIN
+                        ALTER TABLE [Appointments] ADD CONSTRAINT [FK_Appointments_BuildRequests_BuildRequestId] FOREIGN KEY ([BuildRequestId]) REFERENCES [BuildRequests]([Id]);
+                    END
+                ");
+            }
         }
 
         /// <inheritdoc />

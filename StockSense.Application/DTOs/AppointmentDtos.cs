@@ -21,6 +21,8 @@ public class AppointmentDto
     public DateTime? CompletedAt { get; set; }
     public int? TransactionId { get; set; }
     public string? InvoiceNumber { get; set; }
+    public int? MotorcycleId { get; set; }
+    public MotorcycleOptionDto? Motorcycle { get; set; }
 }
 
 public partial class CreateAppointmentDto
@@ -47,6 +49,10 @@ public partial class CreateAppointmentDto
     public string Category { get; set; } = "General";
 
     public string? SelectedProductsJson { get; set; }
+
+    [Required(ErrorMessage = "Select a motorcycle from the list.")]
+    [Range(1, int.MaxValue, ErrorMessage = "Select a motorcycle from the list.")]
+    public int? MotorcycleId { get; set; }
 }
 
 public class BookedSlotDto

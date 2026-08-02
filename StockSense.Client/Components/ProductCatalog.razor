@@ -1,6 +1,6 @@
 @using StockSense.Domain.Entities
 @using StockSense.Infrastructure.Data.Repositories
-@inject ProductRepository ProductRepo
+@inject IServiceScopeFactory ScopeFactory
 
 <div class="pc-catalog">
     <div style="flex-shrink: 0; padding: var(--space-4); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-3);">
@@ -103,6 +103,7 @@
 
     private List<Product> allProducts = new();
     private bool isLoaded;
+    private bool isLoading;
     private List<string> categories = new();
     private string? selectedCategory;
     private string searchTerm = "";
@@ -131,14 +132,32 @@
 
     private async Task LoadAsync()
     {
-        allProducts = Products ?? await ProductRepo.GetAllAsync();
-        isLoaded = true;
-        categories = allProducts
-            .Select(p => p.Category)
-            .Where(c => !string.IsNullOrEmpty(c))
-            .Distinct()
-            .OrderBy(c => c)
-            .ToList();
+        if (isLoading) return;
+        isLoading = true;
+        try
+        {
+            if (Products is not null)
+            {
+                allProducts = Products;
+            }
+            else
+            {
+                using var scope = ScopeFactory.CreateScope();
+                var repo = scope.ServiceProvider.GetRequiredService<ProductRepository>();
+                allProducts = await repo.GetAllAsync();
+            }
+            isLoaded = true;
+            categories = allProducts
+                .Select(p => p.Category)
+                .Where(c => !string.IsNullOrEmpty(c))
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private IEnumerable<Product> FilteredProducts => allProducts

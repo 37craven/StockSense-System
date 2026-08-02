@@ -13,4 +13,6 @@ public class BuildRequestDto
     public DateTime? CompletedAt { get; set; }
     public int? TransactionId { get; set; }
     public string? InvoiceNumber { get; set; }
+    public int? MotorcycleId { get; set; }
+    public MotorcycleOptionDto? Motorcycle { get; set; }
 }

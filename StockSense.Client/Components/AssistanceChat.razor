@@ -1,73 +1,90 @@
 @using System.Text.Json
 @inject HttpClient Http
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IAsyncDisposable
 
-<div class="flex flex-col h-full w-full max-w-3xl mx-auto">
+<section class="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground"
+         aria-labelledby="assistance-title">
+    <h1 id="assistance-title" class="sr-only">StockSense assistant</h1>
+    @if (messages.Count > 0)
+    {
+        <header class="shrink-0 border-b border-border/70 bg-background/95">
+            <div class="mx-auto flex w-full max-w-4xl items-center justify-between px-4 py-2 sm:px-6 lg:px-8">
+                <div class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <span class="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                    StockSense assistant
+                </div>
+                <button type="button"
+                        class="inline-flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled="@isSending"
+                        @onclick="ResetConversationAsync" aria-label="Start a new conversation">
+                    <LucideIcon Name="refresh-cw" Size="14" />
+                    New conversation
+                </button>
+            </div>
+        </header>
+    }
     @if (messages.Count == 0)
     {
-        <div class="flex-1 flex items-center justify-center px-4">
-            <div class="text-center max-w-md">
-                <div class="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground mx-auto mb-5 shadow-sm">
-                    <LucideIcon Name="bot" Size="24" />
+        <div class="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8 sm:px-6">
+            <div class="w-full max-w-lg text-center">
+                <div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm" aria-hidden="true">
+                    <LucideIcon Name="bot" Size="26" />
                 </div>
-                <h2 class="text-xl font-semibold text-foreground mb-2">How can I help you?</h2>
-                <p class="text-sm text-muted-foreground mb-6 leading-relaxed">Ask me about products, inventory, orders, or anything about StockSense.</p>
-                <div class="flex flex-wrap justify-center gap-2">
-                    <button @onclick='() => Suggest("What products are low on stock?")'
-                            class="px-3 py-1.5 text-xs rounded-full border border-border bg-background text-muted-foreground cursor-pointer hover:bg-muted transition-colors whitespace-nowrap">
-                        Low stock products
-                    </button>
-                    <button @onclick='() => Suggest("Show me recent orders")'
-                            class="px-3 py-1.5 text-xs rounded-full border border-border bg-background text-muted-foreground cursor-pointer hover:bg-muted transition-colors whitespace-nowrap">
-                        Recent orders
-                    </button>
-                    <button @onclick='() => Suggest("How do I restock inventory?")'
-                            class="px-3 py-1.5 text-xs rounded-full border border-border bg-background text-muted-foreground cursor-pointer hover:bg-muted transition-colors whitespace-nowrap">
-                        Restock inventory
-                    </button>
-                    <button @onclick='() => Suggest("Top selling items this month")'
-                            class="px-3 py-1.5 text-xs rounded-full border border-border bg-background text-muted-foreground cursor-pointer hover:bg-muted transition-colors whitespace-nowrap">
-                        Top sellers
-                    </button>
+                <h2 class="mb-2 text-2xl font-semibold tracking-tight text-foreground">How can I help you?</h2>
+                <p class="mb-7 text-sm leading-relaxed text-muted-foreground">Choose a suggested question or type your own.</p>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Suggested questions">
+                    @foreach (var suggestion in suggestions)
+                    {
+                        <button @onclick="() => Suggest(suggestion.Prompt)"
+                                type="button" class="min-h-10 rounded-xl border border-border bg-card px-4 py-2.5 text-left text-xs text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            @suggestion.Label
+                        </button>
+                    }
                 </div>
             </div>
         </div>
     }
     else
     {
-        <div class="flex-1 overflow-y-auto px-4 sm:px-6 py-6 scroll-smooth"
-             @ref="messagesElement">
-            <div class="space-y-1">
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth" @ref="messagesElement">
+            <div class="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 sm:px-6 lg:px-8"
+                 role="log" aria-live="polite" aria-relevant="additions text" aria-busy="@isSending">
                 @foreach (var msg in messages)
                 {
-                    <div class="flex gap-3 py-1.5 @(msg.Role == "user" ? "flex-row-reverse" : "")">
+                    <article class="flex items-start gap-3 @(msg.Role == "user" ? "flex-row-reverse" : "")">
                         @if (msg.Role != "user")
                         {
-                            <div class="flex items-center justify-center w-7 h-7 rounded-full bg-muted text-muted-foreground shrink-0 mt-1">
+                            <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground" aria-hidden="true">
                                 <LucideIcon Name="bot" Size="16" />
                             </div>
                         }
-                        <div class="max-w-[85%] sm:max-w-[75%]">
+                        <div class="min-w-0 max-w-[88%] sm:max-w-[78%]">
+                            <span class="sr-only">@(msg.Role == "user" ? "You" : "StockSense assistant"):</span>
                             @if (msg.Role == "user")
                             {
-                                <p class="text-sm leading-relaxed whitespace-pre-wrap break-words bg-primary text-primary-foreground rounded-2xl px-4 py-2.5">@msg.Content</p>
+                                <p class="whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm">@msg.Content</p>
                             }
                             else
                             {
-                                <p class="text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground py-1">@msg.Content</p>
+                                <div class="break-words rounded-2xl rounded-bl-md border border-border bg-card px-4 py-3 text-sm leading-relaxed text-foreground shadow-sm">
+                                    <SafeChatMessage Content="@msg.Content" />
+                                </div>
                             }
                         </div>
-                    </div>
+                    </article>
                 }
 
                 @if (isSending)
                 {
-                    <div class="flex gap-3 py-1.5">
-                        <div class="flex items-center justify-center w-7 h-7 rounded-full bg-muted text-muted-foreground shrink-0 mt-1">
+                    <div class="flex items-start gap-3" role="status" aria-label="StockSense assistant is responding">
+                        <div class="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground" aria-hidden="true">
                             <LucideIcon Name="bot" Size="16" />
                         </div>
-                        <div class="max-w-[85%] sm:max-w-[75%] py-2">
-                            <span class="inline-flex gap-1">
+                        <div class="rounded-2xl rounded-bl-md border border-border bg-card px-4 py-3 shadow-sm">
+                            <span class="sr-only">StockSense assistant is responding</span>
+                            <span class="inline-flex gap-1.5" aria-hidden="true">
                                 <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-pulse"></span>
                                 <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-pulse" style="animation-delay: .2s"></span>
                                 <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-pulse" style="animation-delay: .4s"></span>
@@ -78,43 +95,102 @@
 
                 @if (!string.IsNullOrWhiteSpace(errorMessage))
                 {
-                    <div class="mx-2 mb-2 px-3 py-2 text-xs rounded-lg bg-destructive/10 text-destructive border border-destructive/20">@errorMessage</div>
+                    <div class="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">@errorMessage</div>
                 }
             </div>
         </div>
     }
 
-    <div class="px-4 pb-4 pt-2">
-        <div class="flex items-end gap-2 border border-border rounded-2xl px-4 py-2.5 bg-background shadow-xs">
+    <footer class="sticky bottom-0 z-10 shrink-0 border-t border-border/70 bg-background/95 backdrop-blur">
+      <div class="mx-auto w-full max-w-4xl px-4 pb-4 pt-3 sm:px-6 lg:px-8">
+        <div class="flex items-end gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
             <textarea @bind="message" @bind:event="oninput"
-                      @onkeydown="HandleKeyDown"
+                      @ref="textareaElement"
                       rows="1"
                       maxlength="8000"
                       disabled="@isSending"
                       placeholder="Message StockSense..."
                       aria-label="Message"
-                      class="flex-1 resize-none bg-transparent text-foreground text-sm leading-relaxed outline-none min-h-[1.5rem] max-h-48 disabled:opacity-50 disabled:cursor-not-allowed"></textarea>
+                      aria-describedby="assistance-input-help"
+                      class="min-h-6 max-h-48 flex-1 resize-none bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"></textarea>
             <button @onclick="SendAsync"
+                    @ref="sendButtonElement"
+                    type="button"
                     disabled="@(isSending || string.IsNullOrWhiteSpace(message))"
                     title="Send message"
-                    class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground border-none cursor-pointer shrink-0 disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-85 transition-opacity">
+                    aria-label="Send message"
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-0 bg-primary text-primary-foreground shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30">
                 <LucideIcon Name="arrow-up" Size="14" />
             </button>
         </div>
-    </div>
-</div>
+        <div class="mt-1.5 flex items-center justify-between gap-3 px-2 text-[0.65rem] text-muted-foreground">
+            <span>Stock availability may change.</span>
+            <span id="assistance-input-help" class="hidden sm:inline">Enter to send; Shift+Enter for a new line</span>
+        </div>
+      </div>
+    </footer>
+</section>
 
 @code {
     private readonly List<ChatMessage> messages = [];
+    private readonly CancellationTokenSource componentLifetime = new();
     private string message = string.Empty;
     private string? errorMessage;
     private bool isSending;
+    private bool isDisposed;
+    private IJSObjectReference? chatModule;
     private ElementReference messagesElement;
+    private ElementReference textareaElement;
+    private ElementReference sendButtonElement;
+    private IReadOnlyList<AssistanceSuggestion> suggestions = AssistanceSuggestions.ForRole(null);
 
-    private async Task HandleKeyDown(KeyboardEventArgs args)
+    protected override async Task OnInitializedAsync()
     {
-        if (args.Key == "Enter" && !args.ShiftKey)
-            await SendAsync();
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        var role = user.IsInRole("Admin") ? "Admin" : user.IsInRole("Employee") ? "Employee" : "Customer";
+        suggestions = AssistanceSuggestions.ForRole(role);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || isDisposed)
+            return;
+
+        try
+        {
+            var importedModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                componentLifetime.Token,
+                "./js/assistanceChat.module.js");
+
+            if (isDisposed)
+            {
+                await DisposeModuleAsync(importedModule);
+                return;
+            }
+
+            chatModule = importedModule;
+
+            await chatModule.InvokeVoidAsync(
+                "registerChatComposer",
+                componentLifetime.Token,
+                textareaElement,
+                sendButtonElement);
+        }
+        catch (Exception exception) when (IsExpectedNavigationInterruption(exception))
+        {
+            // A hard refresh can tear down the WebAssembly runtime while the first
+            // render callback is still completing. Navigation cancellation is normal.
+        }
+        catch (JSException)
+        {
+            // The send button remains usable if the optional keyboard/scroll module
+            // cannot load. Avoid failing the entire component for an enhancement.
+            var failedModule = chatModule;
+            chatModule = null;
+            if (failedModule is not null)
+                await DisposeModuleAsync(failedModule);
+        }
     }
 
     private async Task Suggest(string text)
@@ -129,18 +205,29 @@
         if (isSending || string.IsNullOrWhiteSpace(outgoing))
             return;
 
+        var history = BuildHistory();
         messages.Add(new ChatMessage("user", outgoing));
         message = string.Empty;
         errorMessage = null;
         isSending = true;
-        await ScrollToBottom();
 
         try
         {
-            using var response = await Http.PostAsJsonAsync("api/assistance", new { message = outgoing });
+            await ScrollToBottomAsync();
+            using var response = await Http.PostAsJsonAsync(
+                "api/assistance",
+                new AssistanceRequest(outgoing, history),
+                componentLifetime.Token);
+
+            if (isDisposed)
+                return;
+
             if (!response.IsSuccessStatusCode)
             {
-                errorMessage = await ReadErrorAsync(response);
+                errorMessage = await ApiErrorMessage.FromResponseAsync(
+                    response,
+                    "The assistant could not answer right now. Please try again.",
+                    componentLifetime.Token);
                 return;
             }
 
@@ -153,42 +240,140 @@
 
             messages.Add(new ChatMessage("assistant", result.Reply));
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
-            errorMessage = "The assistance service could not be reached. Please try again.";
+            errorMessage = ApiErrorMessage.FromException(
+                exception,
+                "The assistant could not answer right now. Please try again.");
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
-            errorMessage = "The assistant returned an unexpected response. Please try again.";
+            errorMessage = ApiErrorMessage.FromException(exception);
+        }
+        catch (Exception exception) when (IsExpectedNavigationInterruption(exception))
+        {
+            // Refreshing or navigating away cancels the request and disconnects JS.
+            // Do not surface that expected teardown as an unhandled Blazor error.
         }
         finally
         {
             isSending = false;
-            await ScrollToBottom();
+            if (!isDisposed)
+            {
+                await ScrollToBottomAsync();
+                await TryFocusComposerAsync();
+            }
         }
     }
 
-    private async Task ScrollToBottom()
+    private IReadOnlyList<ChatMessage> BuildHistory()
     {
-        await Task.Delay(20);
-        await JS.InvokeVoidAsync("stockSenseScrollToBottom", messagesElement);
+        var selected = new List<ChatMessage>();
+        var characterCount = 0;
+        for (var index = messages.Count - 1;
+             index >= 0 && selected.Count < AssistanceConversationLimits.MaxHistoryMessages;
+             index--)
+        {
+            var candidate = messages[index];
+            var content = candidate.Content.Length <= AssistanceConversationLimits.MaxMessageLength
+                ? candidate.Content
+                : candidate.Content[..AssistanceConversationLimits.MaxMessageLength];
+            if (characterCount + content.Length > AssistanceConversationLimits.MaxHistoryCharacters)
+                break;
+            selected.Add(new ChatMessage(candidate.Role, content));
+            characterCount += content.Length;
+        }
+        selected.Reverse();
+        while (selected.Count > 0 && selected[0].Role != "user")
+            selected.RemoveAt(0);
+        return selected;
     }
 
-    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    private async Task ResetConversationAsync()
+    {
+        if (isSending) return;
+        messages.Clear();
+        message = string.Empty;
+        errorMessage = null;
+        await TryFocusComposerAsync();
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        if (isDisposed)
+            return;
+
+        try
+        {
+            await Task.Delay(20, componentLifetime.Token);
+            if (!isDisposed && chatModule is not null)
+            {
+                await chatModule.InvokeVoidAsync(
+                    "scrollToBottom",
+                    componentLifetime.Token,
+                    messagesElement);
+            }
+        }
+        catch (Exception exception) when (IsExpectedNavigationInterruption(exception))
+        {
+            // The component was removed or the browser refreshed while scrolling.
+        }
+        catch (JSException)
+        {
+            var failedModule = chatModule;
+            chatModule = null;
+            if (failedModule is not null)
+                await DisposeModuleAsync(failedModule);
+        }
+    }
+
+    private async Task TryFocusComposerAsync()
+    {
+        if (isDisposed)
+            return;
+
+        try
+        {
+            await textareaElement.FocusAsync(preventScroll: true);
+        }
+        catch (Exception exception) when (IsExpectedNavigationInterruption(exception))
+        {
+            // ElementReference focus uses JS interop and can race browser teardown.
+        }
+    }
+
+    internal static bool IsExpectedNavigationInterruption(Exception exception) =>
+        exception is OperationCanceledException or JSDisconnectedException or ObjectDisposedException;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (isDisposed)
+            return;
+
+        isDisposed = true;
+        componentLifetime.Cancel();
+        var module = chatModule;
+        chatModule = null;
+
+        if (module is not null)
+            await DisposeModuleAsync(module);
+
+        componentLifetime.Dispose();
+    }
+
+    private static async ValueTask DisposeModuleAsync(IJSObjectReference module)
     {
         try
         {
-            using var payload = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-            if (payload.RootElement.TryGetProperty("error", out var error) &&
-                !string.IsNullOrWhiteSpace(error.GetString()))
-                return error.GetString()!;
+            await module.DisposeAsync();
         }
-        catch (JsonException) { }
-        return response.StatusCode == System.Net.HttpStatusCode.Unauthorized
-            ? "Your session has expired. Please sign in again."
-            : "The assistant could not answer right now. Please try again.";
+        catch (Exception exception) when (IsExpectedNavigationInterruption(exception) || exception is JSException)
+        {
+            // Module disposal is best-effort while the browser runtime is closing.
+        }
     }
 
     private sealed record ChatMessage(string Role, string Content);
+    private sealed record AssistanceRequest(string Message, IReadOnlyList<ChatMessage> History);
     private sealed record AssistanceResponse(string Reply);
 }

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StockSense.Application.DTOs;
+using StockSense.Application.Exceptions;
 using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
@@ -140,7 +141,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
             EnsureReadyForCheckout(build.Status, "build");
             var requested = ParseBuildProducts(build.SelectedPartsJson);
             if (requested.Count == 0)
-                throw new InvalidOperationException("The build has no valid inventory products to check out.");
+                throw new WorkOrderConflictException("The build has no valid inventory products to check out.");
             var products = await LoadProductsAsync(requested.Keys, cancellationToken);
             var sale = CreateSale(
                 invoiceNumber,
@@ -187,7 +188,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
         }
         catch (DbUpdateConcurrencyException exception)
         {
-            throw new InvalidOperationException(
+            throw new WorkOrderConflictException(
                 "Inventory changed during checkout. Reload the work order and try again.",
                 exception);
         }
@@ -213,7 +214,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
                 .Select(product => product.Id)
                 .ToListAsync(cancellationToken);
             if (matches.Count != 1)
-                throw new InvalidOperationException(
+                throw new WorkOrderConflictException(
                     $"Legacy appointment product '{nameGroup.Key}' could not be matched uniquely. Rebook or correct the product selection.");
             requested[matches[0]] = requested.GetValueOrDefault(matches[0]) + nameGroup.Count();
         }
@@ -226,7 +227,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
         var ids = productIds.Distinct().ToArray();
         var products = await _context.Products.Where(value => ids.Contains(value.Id)).ToListAsync(cancellationToken);
         if (products.Count != ids.Length)
-            throw new InvalidOperationException("One or more selected products no longer exist.");
+            throw new WorkOrderConflictException("One or more selected products no longer exist.");
         return products;
     }
 
@@ -240,7 +241,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
             var quantity = requested[product.Id];
             var stockBefore = product.CurrentStock;
             if (stockBefore < quantity)
-                throw new InvalidOperationException(
+                throw new WorkOrderConflictException(
                     $"Insufficient stock for {product.Name}. Available: {stockBefore}, requested: {quantity}.");
             product.DeductStock(quantity);
             sale.Items.Add(new TransactionItem
@@ -316,13 +317,13 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
     private static void EnsureReadyForCheckout(string status, string workOrderType)
     {
         if (!string.Equals(status, WorkOrderStatuses.Confirmed, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Only a confirmed {workOrderType} can be completed.");
+            throw new WorkOrderConflictException($"Only a confirmed {workOrderType} can be completed.");
     }
 
     private static string NormalizePaymentMethod(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || !SupportedPaymentMethods.Contains(value.Trim()))
-            throw new InvalidOperationException("Select a supported payment method.");
+            throw new WorkOrderConflictException("Select a supported payment method.");
         return SupportedPaymentMethods.Single(method =>
             string.Equals(method, value.Trim(), StringComparison.OrdinalIgnoreCase));
     }
@@ -330,7 +331,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
     private static string NormalizeLocation(string? value)
     {
         var normalized = string.IsNullOrWhiteSpace(value) ? InventoryDefaults.LocationId : value.Trim();
-        if (normalized.Length > 50) throw new InvalidOperationException("The location identifier is too long.");
+        if (normalized.Length > 50) throw new WorkOrderConflictException("The location identifier is too long.");
         return normalized;
     }
 
@@ -339,7 +340,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
         if (string.IsNullOrWhiteSpace(value)) return null;
         var normalized = value.Trim();
         if (normalized.Length > maximumLength)
-            throw new InvalidOperationException($"{fieldName} is too long.");
+            throw new WorkOrderConflictException($"{fieldName} is too long.");
         return normalized;
     }
 

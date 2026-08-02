@@ -1,0 +1,64 @@
+@foreach (var block in blocks)
+{
+    @switch (block)
+    {
+        case ChatHeadingBlock heading:
+            <h3 class="mt-3 first:mt-0 mb-1 text-sm font-semibold text-foreground">@heading.Text</h3>
+            break;
+        case ChatParagraphBlock paragraph:
+            <p class="my-2 first:mt-0 last:mb-0 whitespace-pre-wrap break-words">@paragraph.Text</p>
+            break;
+        case ChatListBlock list when list.Ordered:
+            <ol class="my-2 pl-5 list-decimal space-y-1">
+                @foreach (var item in list.Items) { <li>@item</li> }
+            </ol>
+            break;
+        case ChatListBlock list:
+            <ul class="my-2 pl-5 list-disc space-y-1">
+                @foreach (var item in list.Items) { <li>@item</li> }
+            </ul>
+            break;
+        case ChatCodeBlock codeBlock:
+            <div class="my-3 overflow-x-auto rounded-lg border border-border bg-background">
+                @if (!string.IsNullOrWhiteSpace(codeBlock.Language))
+                {
+                    <div class="border-b border-border px-3 py-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">@codeBlock.Language</div>
+                }
+                <pre class="m-0 p-3 text-xs leading-relaxed"><code>@codeBlock.Code</code></pre>
+            </div>
+            break;
+        case ChatTableBlock table:
+            <div class="my-3 max-w-full overflow-x-auto rounded-lg border border-border bg-background">
+                <table class="w-full min-w-max border-collapse text-left text-xs">
+                    <thead class="bg-muted/70">
+                        <tr>
+                            @foreach (var header in table.Headers)
+                            {
+                                <th scope="col" class="border-b border-border px-3 py-2 font-semibold text-foreground">@header</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        @foreach (var row in table.Rows)
+                        {
+                            <tr>
+                                @for (var index = 0; index < table.Headers.Count; index++)
+                                {
+                                    <td class="px-3 py-2 align-top text-foreground">@(index < row.Count ? row[index] : string.Empty)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            break;
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public string Content { get; set; } = string.Empty;
+
+    private IReadOnlyList<ChatContentBlock> blocks = [];
+
+    protected override void OnParametersSet() => blocks = ChatMessageFormatter.Parse(Content);
+}

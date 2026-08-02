@@ -72,6 +72,15 @@
                 <div style="flex: 1; overflow-y: auto; padding: var(--space-4);">
                     <p style="font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 var(--space-3) 0;">Order Summary</p>
 
+                    <div style="margin-bottom: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border);">
+                        <MotorcycleCombobox Id="appointment-motorcycle"
+                                              Label="Motorcycle for this appointment"
+                                              Options="motorcycles"
+                                              IsLoading="isLoadingMotorcycles"
+                                              LoadError="@motorcycleLoadError"
+                                              @bind-Value="newAppt.MotorcycleId" />
+                    </div>
+
                     @if (!SelectedServices.Any())
                     {
                         <div style="display:flex; flex-direction: column; text-align: center; padding: var(--space-6) 0; color: var(--muted-foreground);">
@@ -624,7 +633,7 @@
 
     private bool CanProceed => currentStep switch
     {
-        1 => SelectedServices.Any(),
+        1 => newAppt.MotorcycleId.HasValue && SelectedServices.Any(),
         2 => !string.IsNullOrEmpty(selectedMechanic),
         3 => !string.IsNullOrEmpty(newAppt.TimeSlot),
         _ => true
@@ -668,6 +677,9 @@
     }
 
     private List<ServiceOption> availableServices = new();
+    private List<MotorcycleOptionDto> motorcycles = new();
+    private bool isLoadingMotorcycles;
+    private string? motorcycleLoadError;
     private Dictionary<string, List<ProductDto>> allProductsByCategory = new();
     private List<ProductDto> allProductList = new();
     private Dictionary<int, List<GenericItem>> serviceItemsMap = new();
@@ -697,10 +709,29 @@
         {
             isLoading = true;
             await LoadGenericItemsFromLocalStorage();
-            await Task.WhenAll(LoadUserProfile(), LoadServices(), LoadProducts(), LoadMechanics(), FetchBookedSlots());
+            await Task.WhenAll(LoadUserProfile(), LoadServices(), LoadProducts(), LoadMechanics(), LoadMotorcycles(), FetchBookedSlots());
         }
         catch { errorMessage = "Connection error."; }
         finally { isLoading = false; }
+    }
+
+    private async Task LoadMotorcycles()
+    {
+        isLoadingMotorcycles = true;
+        motorcycleLoadError = null;
+        try
+        {
+            motorcycles = await Http.GetFromJsonAsync<List<MotorcycleOptionDto>>("api/motorcycles") ?? [];
+        }
+        catch
+        {
+            motorcycles = [];
+            motorcycleLoadError = "Motorcycles could not be loaded. Refresh and try again.";
+        }
+        finally
+        {
+            isLoadingMotorcycles = false;
+        }
     }
 
     private async Task LoadUserProfile()
@@ -932,6 +963,7 @@
     {
         if (isProcessing) return;
 
+        if (!newAppt.MotorcycleId.HasValue) { errorMessage = "Select a motorcycle from the list."; return; }
         if (string.IsNullOrEmpty(newAppt.TimeSlot)) { errorMessage = "Select a time slot."; return; }
 
         isProcessing = true;
@@ -964,10 +996,17 @@
             }
             else
             {
-                errorMessage = "Booking failed. " + await response.Content.ReadAsStringAsync();
+                errorMessage = await ApiErrorMessage.FromResponseAsync(
+                    response,
+                    "The appointment could not be booked. Please try again.");
             }
         }
-        catch { errorMessage = "Connection error."; }
+        catch (Exception exception)
+        {
+            errorMessage = ApiErrorMessage.FromException(
+                exception,
+                "The appointment could not be booked. Please try again.");
+        }
         finally { isProcessing = false; }
     }
 

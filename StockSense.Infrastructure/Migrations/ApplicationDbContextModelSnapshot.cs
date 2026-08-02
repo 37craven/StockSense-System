@@ -232,6 +232,9 @@ namespace StockSense.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("MotorcycleId")
+                        .HasColumnType("int");
+
                     b.Property<string>("SelectedProductsJson")
                         .HasColumnType("nvarchar(max)");
 
@@ -262,6 +265,8 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasIndex("CustomerEmail");
 
                     b.HasIndex("CustomerUserId");
+
+                    b.HasIndex("MotorcycleId");
 
                     b.HasIndex("TransactionId")
                         .IsUnique()
@@ -301,6 +306,9 @@ namespace StockSense.Infrastructure.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int?>("MotorcycleId")
+                        .HasColumnType("int");
+
                     b.Property<string>("SelectedPartsJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -320,6 +328,8 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasIndex("CustomerEmail");
 
                     b.HasIndex("CustomerUserId");
+
+                    b.HasIndex("MotorcycleId");
 
                     b.HasIndex("TransactionId")
                         .IsUnique()
@@ -346,6 +356,114 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Mechanics");
+                });
+
+            modelBuilder.Entity("StockSense.Domain.Entities.MotorCompatibility", b =>
+                {
+                    b.Property<int>("CompatibilityId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("CompatibilityID");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CompatibilityId"));
+
+                    b.Property<string>("AirFilterSpec")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("BrakePadFront")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("BrakePadRear")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("BrakeShoeRear")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("CenterSpringSpec")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("CoolantSpec")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("DriveBeltSpec")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("EngineOilSpec")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("FlyBallWeight")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("FuelFilterSpec")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("GearOilSpec")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Manufacturer")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("SparkPlugSpec")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("VersionName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<int?>("YearEnd")
+                        .HasColumnType("int");
+
+                    b.Property<int>("YearStart")
+                        .HasColumnType("int");
+
+                    b.HasKey("CompatibilityId")
+                        .HasName("PK_MotorCompatibility");
+
+                    b.HasIndex("Manufacturer", "ModelName", "VersionName", "YearStart", "YearEnd")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MotorCompatibility_ModelVersionYears");
+
+                    b.ToTable("MotorCompatibility", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MotorCompatibility_Manufacturer", "[Manufacturer] IN ('Honda', 'Yamaha', 'Suzuki', 'Kawasaki', 'Rusi')");
+
+                            t.HasCheckConstraint("CK_MotorCompatibility_YearRange", "[YearStart] >= 1885 AND ([YearEnd] IS NULL OR [YearEnd] >= [YearStart])");
+                        });
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.Motorcycle", b =>
@@ -479,9 +597,6 @@ namespace StockSense.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<int>("BackorderStockSnapshot")
-                        .HasColumnType("int");
-
                     b.Property<string>("Brand")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -586,7 +701,7 @@ namespace StockSense.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_OrderSlipItems_Quantities", "[OrderedQuantity] > 0 AND [SuggestedQuantity] >= 0 AND [ReceivedQuantity] >= 0 AND [ReceivedQuantity] <= [OrderedQuantity]");
 
-                            t.HasCheckConstraint("CK_OrderSlipItems_StockSnapshots", "[CurrentStockSnapshot] >= 0 AND [IncomingStockSnapshot] >= 0 AND [ReservedStockSnapshot] >= 0 AND [BackorderStockSnapshot] >= 0");
+                            t.HasCheckConstraint("CK_OrderSlipItems_StockSnapshots", "[CurrentStockSnapshot] >= 0 AND [IncomingStockSnapshot] >= 0 AND [ReservedStockSnapshot] >= 0");
                         });
                 });
 
@@ -716,6 +831,9 @@ namespace StockSense.Infrastructure.Migrations
                     b.Property<int>("ReorderTarget")
                         .HasColumnType("int");
 
+                    b.Property<int>("ReservedStock")
+                        .HasColumnType("int");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -738,6 +856,54 @@ namespace StockSense.Infrastructure.Migrations
                     b.HasIndex("Category", "Brand");
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("StockSense.Domain.Entities.ProductCompatibilityMapping", b =>
+                {
+                    b.Property<int>("MappingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("MappingID");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MappingId"));
+
+                    b.Property<int>("CompatibilityId")
+                        .HasColumnType("int")
+                        .HasColumnName("CompatibilityID");
+
+                    b.Property<bool>("IsOEM")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("PartFunction")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int")
+                        .HasColumnName("ProductID");
+
+                    b.HasKey("MappingId")
+                        .HasName("PK_ProductCompatibilityMapping");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("IX_ProductCompatibilityMapping_ProductID");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ProductId"), new[] { "CompatibilityId", "PartFunction", "IsOEM" });
+
+                    b.HasIndex("CompatibilityId", "ProductId", "PartFunction")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ProductCompatibilityMapping_CompatibilityProductFunction");
+
+                    b.ToTable("ProductCompatibilityMapping", (string)null);
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.ProductInventoryMetric", b =>
@@ -1363,6 +1529,11 @@ namespace StockSense.Infrastructure.Migrations
                         .WithOne("Appointment")
                         .HasForeignKey("StockSense.Domain.Entities.Appointment", "BuildRequestId");
 
+                    b.HasOne("StockSense.Domain.Entities.Motorcycle", "Motorcycle")
+                        .WithMany()
+                        .HasForeignKey("MotorcycleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("StockSense.Domain.Entities.Transaction", "Transaction")
                         .WithOne()
                         .HasForeignKey("StockSense.Domain.Entities.Appointment", "TransactionId")
@@ -1370,15 +1541,24 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.Navigation("BuildRequest");
 
+                    b.Navigation("Motorcycle");
+
                     b.Navigation("Transaction");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.BuildRequest", b =>
                 {
+                    b.HasOne("StockSense.Domain.Entities.Motorcycle", "Motorcycle")
+                        .WithMany()
+                        .HasForeignKey("MotorcycleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("StockSense.Domain.Entities.Transaction", "Transaction")
                         .WithOne()
                         .HasForeignKey("StockSense.Domain.Entities.BuildRequest", "TransactionId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Motorcycle");
 
                     b.Navigation("Transaction");
                 });
@@ -1437,6 +1617,27 @@ namespace StockSense.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("StockSense.Domain.Entities.ProductCompatibilityMapping", b =>
+                {
+                    b.HasOne("StockSense.Domain.Entities.MotorCompatibility", "MotorCompatibility")
+                        .WithMany("ProductMappings")
+                        .HasForeignKey("CompatibilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_ProductCompatibilityMapping_MotorCompatibility");
+
+                    b.HasOne("StockSense.Domain.Entities.Product", "Product")
+                        .WithMany("CompatibilityMappings")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_ProductCompatibilityMapping_Products");
+
+                    b.Navigation("MotorCompatibility");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("StockSense.Domain.Entities.ProductInventoryMetric", b =>
@@ -1505,6 +1706,11 @@ namespace StockSense.Infrastructure.Migrations
                     b.Navigation("Appointment");
                 });
 
+            modelBuilder.Entity("StockSense.Domain.Entities.MotorCompatibility", b =>
+                {
+                    b.Navigation("ProductMappings");
+                });
+
             modelBuilder.Entity("StockSense.Domain.Entities.OrderSlip", b =>
                 {
                     b.Navigation("Items");
@@ -1524,6 +1730,8 @@ namespace StockSense.Infrastructure.Migrations
 
             modelBuilder.Entity("StockSense.Domain.Entities.Product", b =>
                 {
+                    b.Navigation("CompatibilityMappings");
+
                     b.Navigation("InventoryMetrics");
 
                     b.Navigation("InventorySettings");

@@ -20,6 +20,23 @@ public class MotorcycleRepository
             .ToListAsync();
     }
 
+    public async Task<List<Motorcycle>> GetSelectableAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Motorcycles
+            .AsNoTracking()
+            .OrderBy(m => m.Brand)
+            .ThenBy(m => m.Model)
+            .ThenBy(m => m.BaseCC)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<Motorcycle?> GetSelectableByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return _context.Motorcycles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
+    }
+
     public async Task AddAsync(Motorcycle motorcycle)
     {
         _context.Motorcycles.Add(motorcycle);

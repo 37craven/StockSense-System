@@ -14,6 +14,8 @@ namespace StockSense.Infrastructure.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductInventorySetting> ProductInventorySettings { get; set; }
         public DbSet<ProductInventoryMetric> ProductInventoryMetrics { get; set; }
+        public DbSet<MotorCompatibility> MotorCompatibilities { get; set; }
+        public DbSet<ProductCompatibilityMapping> ProductCompatibilityMappings { get; set; }
         public DbSet<BuildRequest> BuildRequests { get; set; }
         public DbSet<OrderSlip> OrderSlips { get; set; }
         public DbSet<OrderSlipItem> OrderSlipItems { get; set; }
@@ -34,6 +36,18 @@ namespace StockSense.Infrastructure.Data
                 .HasOne(m => m.Motorcycle)
                 .WithMany()
                 .HasForeignKey(m => m.MotorcycleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Appointment>()
+                .HasOne(a => a.Motorcycle)
+                .WithMany()
+                .HasForeignKey(a => a.MotorcycleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<BuildRequest>()
+                .HasOne(b => b.Motorcycle)
+                .WithMany()
+                .HasForeignKey(b => b.MotorcycleId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
 

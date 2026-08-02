@@ -19,7 +19,6 @@ public class OrderSlipItemDto
     public int CurrentStockSnapshot { get; set; }
     public int IncomingStockSnapshot { get; set; }
     public int ReservedStockSnapshot { get; set; }
-    public int BackorderStockSnapshot { get; set; }
     public int InventoryPositionSnapshot { get; set; }
     public decimal AverageDailyDemandSnapshot { get; set; }
     public decimal LeadTimeDaysSnapshot { get; set; }

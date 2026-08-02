@@ -11,23 +11,17 @@ namespace StockSense.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "CustomerBuilds");
-
-            migrationBuilder.DropTable(
-                name: "SynergyRules");
-
-            migrationBuilder.DropTable(
-                name: "UpgradeParts");
-
-            migrationBuilder.DropTable(
-                name: "UpgradeStages");
-
-            migrationBuilder.DropTable(
-                name: "UpgradeCategories");
-
-            migrationBuilder.DropTable(
-                name: "BikeModels");
+            if (migrationBuilder.ActiveProvider?.Contains("SqlServer") == true)
+            {
+                migrationBuilder.Sql(@"
+                    IF OBJECT_ID(N'CustomerBuilds', N'U') IS NOT NULL DROP TABLE [CustomerBuilds];
+                    IF OBJECT_ID(N'SynergyRules', N'U') IS NOT NULL DROP TABLE [SynergyRules];
+                    IF OBJECT_ID(N'UpgradeParts', N'U') IS NOT NULL DROP TABLE [UpgradeParts];
+                    IF OBJECT_ID(N'UpgradeStages', N'U') IS NOT NULL DROP TABLE [UpgradeStages];
+                    IF OBJECT_ID(N'UpgradeCategories', N'U') IS NOT NULL DROP TABLE [UpgradeCategories];
+                    IF OBJECT_ID(N'BikeModels', N'U') IS NOT NULL DROP TABLE [BikeModels];
+                ");
+            }
         }
 
         /// <inheritdoc />

@@ -131,6 +131,7 @@ builder.Services.AddSingleton<PdfDownloadCache>();
 builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
 builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();
 builder.Services.AddScoped<IWorkOrderCheckoutService, WorkOrderCheckoutService>();
+builder.Services.AddScoped<IMotorCompatibilityLookupService, MotorCompatibilityLookupService>();
 
 // --- HELPERS (concrete, no interfaces) ---
 builder.Services.AddScoped<OrderSlipHelper>();
@@ -179,9 +180,22 @@ else
 
 app.Use(async (context, next) =>
 {
-    try { await next(context); }
+    try
+    {
+        await next(context);
+    }
+    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+    {
+        // The browser closed, refreshed, or navigated away. The response transport is
+        // already gone, so attempting to serialize an API error only creates a second
+        // teardown exception in the debugger.
+    }
     catch (Exception ex) when (context.Request.Path.StartsWithSegments("/api"))
     {
+        if (context.Response.HasStarted)
+            throw;
+
+        app.Logger.LogError(ex, "Unhandled API request failure for {RequestPath}.", context.Request.Path);
         context.Response.StatusCode = 500;
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsJsonAsync(new { error = "Internal server error" });

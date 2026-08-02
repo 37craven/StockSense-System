@@ -88,7 +88,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             }
 
             var currentIncoming = incoming.GetValueOrDefault(product.Id);
-            var inventoryPosition = checked(product.CurrentStock + currentIncoming);
+            var inventoryPosition = checked(product.CurrentStock + currentIncoming - product.ReservedStock);
             if (openProducts.Contains(product.Id))
             {
                 preview.Warnings.Add(new(product.Id, product.Name, "OPEN_ORDER_EXISTS",
@@ -128,7 +128,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                 ProductId = product.Id, ProductName = product.Name,
                 Category = product.Category, Brand = product.Brand,
                 CurrentStock = product.CurrentStock, IncomingStock = currentIncoming,
-                ReservedStock = 0, BackorderStock = 0, InventoryPosition = inventoryPosition,
+                ReservedStock = product.ReservedStock, InventoryPosition = inventoryPosition,
                 AverageDailyDemand = metric.AverageDailyDemand,
                 LeadTimeDays = metric.AverageLeadTimeDays,
                 SafetyStock = metric.SafetyStock, ReorderPoint = product.ReorderTarget,
@@ -237,7 +237,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                         continue;
                     }
                     var currentIncoming = incoming.GetValueOrDefault(product.Id);
-                    var inventoryPosition = checked(product.CurrentStock + currentIncoming);
+                    var inventoryPosition = checked(product.CurrentStock + currentIncoming - product.ReservedStock);
                     var validation = OrderSlipMath.ValidateOrderedQuantity(requested.OrderedQuantity,
                         setting.MinimumOrderQuantity, setting.PackageSize, inventoryPosition, setting.MaximumStockLevel);
                     if (validation is not null)
@@ -267,7 +267,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                         ReorderTarget = product.ReorderTarget, Quantity = requested.OrderedQuantity,
                         OrderedQuantity = requested.OrderedQuantity, ReceivedQuantity = 0,
                         CurrentStockSnapshot = product.CurrentStock, IncomingStockSnapshot = currentIncoming,
-                        ReservedStockSnapshot = 0, BackorderStockSnapshot = 0,
+                        ReservedStockSnapshot = product.ReservedStock,
                         InventoryPositionSnapshot = inventoryPosition,
                         AverageDailyDemandSnapshot = metric.AverageDailyDemand,
                         LeadTimeDaysSnapshot = metric.AverageLeadTimeDays,
@@ -422,6 +422,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                     OrderedQuantity = requested.OrderedQuantity,
                     CurrentStockSnapshot = product.CurrentStock,
                     InventoryPositionSnapshot = product.CurrentStock,
+                    ReservedStockSnapshot = product.ReservedStock,
                     AverageDailyDemandSnapshot = metric?.AverageDailyDemand ?? 0,
                     LeadTimeDaysSnapshot = metric?.AverageLeadTimeDays ?? 0,
                     SafetyStockSnapshot = metric?.SafetyStock ?? 0,
@@ -706,7 +707,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             Brand = item.Brand, Category = item.Category ?? string.Empty, CurrentStock = item.CurrentStock,
             ReorderTarget = item.ReorderTarget, Quantity = item.Quantity, ReceivedQuantity = item.ReceivedQuantity,
             CurrentStockSnapshot = item.CurrentStockSnapshot, IncomingStockSnapshot = item.IncomingStockSnapshot,
-            ReservedStockSnapshot = item.ReservedStockSnapshot, BackorderStockSnapshot = item.BackorderStockSnapshot,
+            ReservedStockSnapshot = item.ReservedStockSnapshot,
             InventoryPositionSnapshot = item.InventoryPositionSnapshot,
             AverageDailyDemandSnapshot = item.AverageDailyDemandSnapshot,
             LeadTimeDaysSnapshot = item.LeadTimeDaysSnapshot, SafetyStockSnapshot = item.SafetyStockSnapshot,
