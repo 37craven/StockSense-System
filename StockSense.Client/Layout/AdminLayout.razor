@@ -1,9 +1,41 @@
 @inherits LayoutComponentBase
 @using BlazorBlueprint.Primitives.Services
 
-<AdminShell Body="@Body" />
+<div class="admin-layout">
+    <AdminNav />
+    <main class="admin-main">
+        @Body
+    </main>
+</div>
 
 <BbPortalHost @rendermode="InteractiveServer" />
 <BbDialogProvider @rendermode="InteractiveServer" />
 <BbToastProvider @rendermode="InteractiveServer" Position="ToastPosition.BottomRight" />
 <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" />
+
+<style>
+.admin-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.admin-main {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-6);
+}
+
+@@media (max-width: 767px) {
+    .admin-layout {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+    }
+    .admin-main {
+        padding: var(--space-4);
+        overflow: visible;
+    }
+}
+</style>

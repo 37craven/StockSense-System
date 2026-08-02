@@ -633,7 +633,7 @@
 
     private bool CanProceed => currentStep switch
     {
-        1 => newAppt.MotorcycleId.HasValue && SelectedServices.Any(),
+        1 => SelectedServices.Any(),
         2 => !string.IsNullOrEmpty(selectedMechanic),
         3 => !string.IsNullOrEmpty(newAppt.TimeSlot),
         _ => true
@@ -963,7 +963,6 @@
     {
         if (isProcessing) return;
 
-        if (!newAppt.MotorcycleId.HasValue) { errorMessage = "Select a motorcycle from the list."; return; }
         if (string.IsNullOrEmpty(newAppt.TimeSlot)) { errorMessage = "Select a time slot."; return; }
 
         isProcessing = true;

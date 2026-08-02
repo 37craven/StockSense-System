@@ -33,12 +33,9 @@
 
 <div>
     <PageHeader Title="Dashboard"
-                Subtitle="@(lastUpdated == null ? "Loading..." : $"Updated {lastUpdated.Value.ToLocalTime():MMM d, yyyy · h:mm tt} · MAIN location")">
+                Subtitle="@(lastUpdated == null ? "Loading..." : $"Updated {lastUpdated.Value.ToLocalTime():MMM d, yyyy · h:mm tt}")">
         <BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync" Disabled="@isLoading" Size="ButtonSize.Small">
             <LucideIcon Name="refresh-cw" Size="14" /> Refresh
-        </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" OnClick="() => showCatalog = true" Size="ButtonSize.Small">
-            <LucideIcon Name="package-search" Size="14" /> Catalog
         </BbButton>
         <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/stock")' Size="ButtonSize.Small">
             <LucideIcon Name="sliders-horizontal" Size="14" /> Inventory
@@ -67,6 +64,7 @@
     {
         @* KPI CARDS *@
         <div class="kpi-grid" style="margin-bottom: var(--space-4);">
+            @* Row 1: Health → Risk → Supply (Z top scan) *@
             <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground);">Stocked SKUs</div>
@@ -76,17 +74,6 @@
                 </div>
                 <div style="font-size: var(--text-2xl); font-weight: 900; color: var(--foreground); margin-top: var(--space-2);">@products.Count.ToString("N0")</div>
                 <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">@onHandUnits.ToString("N0") units on hand</div>
-            </div>
-
-            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground);">Confirmed Incoming</div>
-                    <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: color-mix(in oklch, #3b82f6 15%, transparent); color: #3b82f6;">
-                        <LucideIcon Name="truck" Size="18" />
-                    </div>
-                </div>
-                <div style="font-size: var(--text-2xl); font-weight: 900; color: var(--foreground); margin-top: var(--space-2);">@incomingUnits.ToString("N0")</div>
-                <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">Units on ordered slips</div>
             </div>
 
             <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid @(atRiskCount > 0 ? "#f59e0b" : "var(--border)"); background: var(--card);">
@@ -100,6 +87,18 @@
                 <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">SKUs at or below reorder point</div>
             </div>
 
+            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground);">Confirmed Incoming</div>
+                    <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: color-mix(in oklch, #3b82f6 15%, transparent); color: #3b82f6;">
+                        <LucideIcon Name="truck" Size="18" />
+                    </div>
+                </div>
+                <div style="font-size: var(--text-2xl); font-weight: 900; color: var(--foreground); margin-top: var(--space-2);">@incomingUnits.ToString("N0")</div>
+                <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">Units on ordered slips</div>
+            </div>
+
+            @* Row 2: Operations → Service → Workshop (Z bottom scan) *@
             <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground);">Open Purchase Orders</div>
@@ -139,10 +138,49 @@
             <div style="padding: var(--space-6); border-radius: var(--radius); border: 1px dashed var(--border); text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-3);">
                 <LucideIcon Name="package-open" Size="24" style="color: var(--muted-foreground);" />
                 <div>
-                    <div style="font-weight: var(--font-semibold); color: var(--foreground);">No stocked products at MAIN</div>
+                    <div style="font-weight: var(--font-semibold); color: var(--foreground);">No stocked products</div>
                     <div style="font-size: var(--text-sm); color: var(--muted-foreground); margin-top: var(--space-1);">Inventory metrics exclude products with zero on-hand quantity.</div>
                 </div>
                 <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/stock")' Size="ButtonSize.Small">Manage inventory</BbButton>
+            </div>
+        }
+
+        @* RECENT TRANSACTIONS *@
+        @if (recentTransactions.Count > 0)
+        {
+            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); margin-bottom: var(--space-4);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                    <div>
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Latest Activity</div>
+                        <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Recent Sales</h2>
+                    </div>
+                    <a href="/admin/transactions" style="font-size: var(--text-xs); color: var(--primary); text-decoration: none; font-weight: var(--font-medium);">All transactions →</a>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border); background: var(--muted);">
+                                <th style="text-align: left; padding: 6px 10px; color: var(--muted-foreground);">Invoice</th>
+                                <th style="text-align: left; padding: 6px 10px; color: var(--muted-foreground);">Date</th>
+                                <th style="text-align: center; padding: 6px 10px; color: var(--muted-foreground);">Items</th>
+                                <th style="text-align: right; padding: 6px 10px; color: var(--muted-foreground);">Payment</th>
+                                <th style="text-align: right; padding: 6px 10px; color: var(--muted-foreground);">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var txn in recentTransactions)
+                            {
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding: 8px 10px; color: var(--foreground); font-weight: 500; font-family: monospace; font-size: 11px;">@txn.InvoiceNumber</td>
+                                    <td style="padding: 8px 10px; color: var(--muted-foreground); white-space: nowrap;">@txn.TransactionDate.ToLocalTime().ToString("MMM d, h:mm tt")</td>
+                                    <td style="padding: 8px 10px; text-align: center; color: var(--foreground);">@txn.Items.Count</td>
+                                    <td style="padding: 8px 10px; text-align: right; color: var(--muted-foreground);">@txn.PaymentMethod</td>
+                                    <td style="padding: 8px 10px; text-align: right; font-weight: var(--font-semibold); color: var(--primary);">₱@txn.TotalAmount.ToString("F0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         }
 
@@ -249,7 +287,7 @@
                     Last 30 Philippine days
                 </span>
             </div>
-            <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-bottom: var(--space-3);">@salesPeriodStart.ToString("MMM d")–@salesPeriodEnd.AddDays(-1).ToString("MMM d, yyyy") · Completed sales at MAIN</div>
+            <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-bottom: var(--space-3);">@salesPeriodStart.ToString("MMM d")–@salesPeriodEnd.AddDays(-1).ToString("MMM d, yyyy") · Completed sales</div>
             @if (topBrandSales.Count == 0)
             {
                 <div style="font-size: var(--text-sm); color: var(--muted-foreground);">No completed product sales were recorded during this period.</div>
@@ -388,24 +426,8 @@
     }
 </div>
 
-@* PRODUCT CATALOG MODAL *@
-<BbDialog @bind-Open="showCatalog">
-    <BbDialogContent Style="width: min(98vw, 900px); height: min(85vh, 700px); display: flex; flex-direction: column; padding: 0; overflow: hidden;">
-        <div style="padding: var(--space-4) var(--space-4) 0 var(--space-4); flex-shrink: 0;">
-            <BbDialogHeader>
-                <BbDialogTitle>Product Catalog</BbDialogTitle>
-                <BbDialogDescription>Browse all products and their current stock levels.</BbDialogDescription>
-            </BbDialogHeader>
-        </div>
-        <div style="flex: 1; min-height: 0; overflow: hidden; padding: var(--space-4); display: flex;">
-            <ProductCatalog Columns="3" />
-        </div>
-    </BbDialogContent>
-</BbDialog>
-
 @code {
     private bool isLoading = true;
-    private bool showCatalog;
     private string? errorMessage;
     private DateTime? lastUpdated;
     private List<Product> products = [];
@@ -415,6 +437,7 @@
     private Dictionary<int, int> incomingByProduct = [];
     private List<BrandSalesRow> topBrandSales = [];
     private List<ReplenishmentRow> replenishment = [];
+    private List<Transaction> recentTransactions = [];
     private int onHandUnits, incomingUnits, atRiskCount, healthyCount, protectedByIncoming, healthyPercent;
     private int draftCount;
     private int todayConfirmedAppointments, todayPendingAppointments, pendingBuildCount;
@@ -460,6 +483,10 @@
             activeBuilds = await Db.BuildRequests.AsNoTracking()
                 .Where(b => b.Status == WorkOrderStatuses.Pending || b.Status == WorkOrderStatuses.Confirmed)
                 .OrderBy(b => b.CreatedAt).ToListAsync();
+
+            recentTransactions = await Db.Transactions.AsNoTracking().Include(t => t.Items)
+                .Where(t => t.TransactionType == TransactionTypes.Sale && !t.IsVoided)
+                .OrderByDescending(t => t.TransactionDate).Take(5).ToListAsync();
 
             incomingByProduct = openSlips
                 .Where(s => s.Status == OrderSlipStatuses.Ordered || s.Status == OrderSlipStatuses.PartiallyReceived)

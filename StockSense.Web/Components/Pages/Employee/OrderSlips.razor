@@ -5,6 +5,7 @@
 @using System.Security.Claims
 @using StockSense.Application.DTOs
 @using StockSense.Application.Interfaces
+@using StockSense.Domain.Entities
 @using StockSense.Client.Layout
 @inject IOrderSlipWorkflowService Workflow
 @inject AuthenticationStateProvider AuthenticationState
@@ -298,14 +299,14 @@
     private async Task LoadManualCatalog()
     {
         manualLoading = true;
-        try { var result = await Workflow.GetManualCatalogAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The product catalog could not be loaded."); manualCatalog = result.Value; }
+        try { var result = await Workflow.GetManualCatalogAsync(InventoryDefaults.LocationId); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The product catalog could not be loaded."); manualCatalog = result.Value; }
         catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The product catalog could not be loaded."); }
         finally { manualLoading = false; }
     }
     private async Task LoadPreview()
     {
         busy = true; error = message = ""; errors.Clear();
-        try { var result = await Workflow.PreviewAsync("MAIN"); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The order preview could not be prepared."); preview = result.Value; message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations."; }
+        try { var result = await Workflow.PreviewAsync(InventoryDefaults.LocationId); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The order preview could not be prepared."); preview = result.Value; message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations."; }
         catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The order preview could not be prepared."); }
         finally { busy = false; }
     }
@@ -325,7 +326,7 @@
         try
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
-            var command = new CreateOrderSlipDraftsCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierGroups = preview.SupplierGroups.Select(group => new CreateDraftOrderSlipGroupCommand { SupplierId = group.SupplierId, Items = group.Items.Where(item => item.IsSelected).Select(item => new CreateDraftOrderSlipItemCommand { ProductId = item.ProductId, OrderedQuantity = item.FinalQuantity }).ToList() }).Where(group => group.Items.Count > 0).ToList() };
+            var command = new CreateOrderSlipDraftsCommand { LocationId = InventoryDefaults.LocationId, CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierGroups = preview.SupplierGroups.Select(group => new CreateDraftOrderSlipGroupCommand { SupplierId = group.SupplierId, Items = group.Items.Where(item => item.IsSelected).Select(item => new CreateDraftOrderSlipItemCommand { ProductId = item.ProductId, OrderedQuantity = item.FinalQuantity }).ToList() }).Where(group => group.Items.Count > 0).ToList() };
             var result = await Workflow.CreateDraftsAsync(command); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slips could not be created."); message = $"Created {result.Value.OrderSlips.Count} draft order slips."; preview = null;
         }
         catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slips could not be created."); }
@@ -343,7 +344,7 @@
         try
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
-            var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = "MAIN", CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, ExpectedDeliveryDate = manualExpectedDate, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
+            var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = InventoryDefaults.LocationId, CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, ExpectedDeliveryDate = manualExpectedDate, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
             if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slip could not be created.");
             message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = ""; manualExpectedDate = null;
         }

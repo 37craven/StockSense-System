@@ -18,6 +18,7 @@
 @inject IWorkOrderCheckoutService CheckoutService
 @inject ApplicationDbContext DbContext
 @inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 @attribute [Authorize(Roles = "Employee, Admin")]
 
@@ -583,10 +584,14 @@
         {
             await ReleaseProductReservations(build.SelectedPartsJson);
 
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = state.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? throw new InvalidOperationException("User identity is missing.");
+
             var receipt = await CheckoutService.CompleteBuildAsync(
                 build.Id,
                 new CompleteWorkOrderDto { PaymentMethod = checkoutPaymentMethod, ReferenceNumber = checkoutReference },
-                "system",
+                userId,
                 "1",
                 CancellationToken.None);
 

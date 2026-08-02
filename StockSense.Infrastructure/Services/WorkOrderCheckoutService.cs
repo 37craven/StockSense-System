@@ -73,7 +73,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
         CancellationToken cancellationToken)
     {
         var completedAt = DateTime.Now;
-        var invoiceNumber = $"APT-{appointmentId}-{completedAt:yyMMddHHss}-{InvoiceHelper.ShortCode()}";
+        var invoiceNumber = $"APT-{completedAt:yyMMdd}-{completedAt:HHss}-{InvoiceHelper.ShortCode()}-{appointmentId}";
         var result = await ExecuteAsync(async () =>
         {
             var appointment = await _context.Appointments
@@ -126,7 +126,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
         CancellationToken cancellationToken)
     {
         var completedAt = DateTime.Now;
-        var invoiceNumber = $"BLD-{buildId}-{completedAt:yyMMddHHss}-{InvoiceHelper.ShortCode()}";
+        var invoiceNumber = $"BLD-{completedAt:yyMMdd}-{completedAt:HHss}-{InvoiceHelper.ShortCode()}-{buildId}";
         var result = await ExecuteAsync(async () =>
         {
             var build = await _context.BuildRequests

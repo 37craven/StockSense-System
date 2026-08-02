@@ -55,11 +55,14 @@ public class AppointmentsController : ControllerBase
             if (customer is null) return Unauthorized();
             var customerEmail = customer.Email ?? string.Empty;
             var customerFullName = GetFullName(customer);
-            if (!dto.MotorcycleId.HasValue)
-                return BadRequest(ApiResponse.Error("Select a motorcycle from the list."));
-            var motorcycle = await _motorcycleRepository.GetSelectableByIdAsync(dto.MotorcycleId.Value);
-            if (motorcycle is null)
-                return BadRequest(ApiResponse.Error("The selected motorcycle does not exist."));
+
+            Motorcycle? motorcycle = null;
+            if (dto.MotorcycleId.HasValue)
+            {
+                motorcycle = await _motorcycleRepository.GetSelectableByIdAsync(dto.MotorcycleId.Value);
+                if (motorcycle is null)
+                    return BadRequest(ApiResponse.Error("The selected motorcycle does not exist."));
+            }
             string flatServices = string.Join(", ", dto.SelectedServices);
             var matchedServices = await _serviceRepo.GetByNamesAsync(dto.SelectedServices);
             decimal serviceTotal = matchedServices.Sum(s => s.Price);
@@ -103,7 +106,7 @@ public class AppointmentsController : ControllerBase
                 TotalAmount = serviceTotal + productTotal,
                 DurationMinutes = totalDuration,
                 MechanicName = "Any Available",
-                MotorcycleId = motorcycle.Id
+                MotorcycleId = motorcycle?.Id
             };
 
             var saved = await _repo.AddAsync(appointment);

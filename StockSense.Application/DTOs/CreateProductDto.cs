@@ -13,6 +13,7 @@ public class CreateProductDto
     public decimal UnitCost { get; set; } = 0m;
     public int InitialStock { get; set; }
     public int ReorderTarget { get; set; }
-    public string ImageUrl { get; set; } = "https://placehold.co/300x200";
+    public int? SupplierId { get; set; }
+    public string ImageUrl { get; set; } = "";
     public string? Barcode { get; set; }
 }

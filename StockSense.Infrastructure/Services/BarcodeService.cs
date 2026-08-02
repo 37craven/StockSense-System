@@ -80,8 +80,8 @@ public class BarcodeService
         return data.ToArray();
     }
 
-    /// <summary>Builds a printable one-page PDF label for a product with EAN-13 barcode + QR code side-by-side.</summary>
-    public byte[] GenerateBarcodeLabelPdf(Product product, byte[] barcodeImagePng, byte[] qrCodeImagePng)
+    /// <summary>Builds a printable one-page PDF label for a product with barcode and/or QR code.</summary>
+    public byte[] GenerateBarcodeLabelPdf(Product product, byte[] barcodeImagePng, byte[] qrCodeImagePng, string format = "both")
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -103,15 +103,15 @@ public class BarcodeService
                     .PaddingTop(10)
                     .Row(row =>
                     {
-                        row.RelativeItem(3).AlignCenter().AlignMiddle().Image(barcodeImagePng);
-                        row.RelativeItem(2).AlignCenter().AlignMiddle().Image(qrCodeImagePng);
+                        if (format == "barcode" || format == "both")
+                        {
+                            row.RelativeItem(3).AlignCenter().AlignMiddle().Image(barcodeImagePng);
+                        }
+                        if (format == "qr" || format == "both")
+                        {
+                            row.RelativeItem(format == "both" ? 2 : 1).AlignCenter().AlignMiddle().Image(qrCodeImagePng);
+                        }
                     });
-
-                page.Footer().Row(row =>
-                {
-                    row.RelativeItem().Text($"Price: ₱{product.Price:N2}").FontSize(9);
-                    row.RelativeItem().AlignRight().Text($"Stock: {product.CurrentStock}").FontSize(9);
-                });
             });
         }).GeneratePdf();
     }

@@ -43,7 +43,6 @@
     flex-direction: column;
     background-color: var(--card);
     border-right: 1px solid var(--border);
-    overflow: hidden;
 }
 
 .build-main {

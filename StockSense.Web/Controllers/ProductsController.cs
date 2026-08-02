@@ -108,6 +108,7 @@ public class ProductsController : ControllerBase
             Price = dto.Price,
             UnitCost = dto.UnitCost,
             ReorderTarget = dto.ReorderTarget,
+            SupplierId = dto.SupplierId,
             ImageUrl = dto.ImageUrl
         };
         if (dto.InitialStock > 0) product.AddStock(dto.InitialStock);
@@ -125,13 +126,12 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("{id}/barcode-pdf")]
-    public async Task<IActionResult> GetBarcodePdf(int id)
+    public async Task<IActionResult> GetBarcodePdf(int id, [FromQuery] string format = "both")
     {
         var product = await _productRepo.GetByIdAsync(id);
         if (product == null) return NotFound(ApiResponse.NotFound("Product"));
 
-        // Safety net for products that existed before this feature and have no barcode yet.
-        if (string.IsNullOrWhiteSpace(product.Barcode))
+        if (string.IsNullOrWhiteSpace(product.Barcode) || product.Barcode.Length != 13)
         {
             product.Barcode = BarcodeService.GenerateBarcodeValue(product.Id);
             await _productRepo.SaveChangesAsync();
@@ -139,9 +139,10 @@ public class ProductsController : ControllerBase
 
         var barcodePng = _barcodeService.GenerateBarcodeImage(product.Barcode);
         var qrPng = _barcodeService.GenerateQrCodeImage(product);
-        var pdfBytes = _barcodeService.GenerateBarcodeLabelPdf(product, barcodePng, qrPng);
+        var pdfBytes = _barcodeService.GenerateBarcodeLabelPdf(product, barcodePng, qrPng, format);
         var safeName = string.Concat(product.Name.Split(Path.GetInvalidFileNameChars()));
-        return File(pdfBytes, "application/pdf", $"Barcode_{safeName}.pdf");
+        var prefix = format == "qr" ? "QR_" : "Barcode_";
+        return File(pdfBytes, "application/pdf", $"{prefix}{safeName}.pdf");
     }
 
     [HttpPut("{id}")]

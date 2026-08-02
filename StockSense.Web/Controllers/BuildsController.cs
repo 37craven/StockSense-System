@@ -47,11 +47,14 @@ public class BuildsController : ControllerBase
         if (dto == null) return BadRequest(ApiResponse.Error("Request is empty."));
         var customer = await _userManager.GetUserAsync(User);
         if (customer is null) return Unauthorized();
-        if (!dto.MotorcycleId.HasValue)
-            return BadRequest(ApiResponse.Error("Select a motorcycle from the list."));
-        var motorcycle = await _motorcycleRepository.GetSelectableByIdAsync(dto.MotorcycleId.Value);
-        if (motorcycle is null)
-            return BadRequest(ApiResponse.Error("The selected motorcycle does not exist."));
+
+        Motorcycle? motorcycle = null;
+        if (dto.MotorcycleId.HasValue)
+        {
+            motorcycle = await _motorcycleRepository.GetSelectableByIdAsync(dto.MotorcycleId.Value);
+            if (motorcycle is null)
+                return BadRequest(ApiResponse.Error("The selected motorcycle does not exist."));
+        }
 
         var request = new BuildRequest
         {
@@ -63,7 +66,7 @@ public class BuildsController : ControllerBase
             TotalPrice = dto.TotalPrice,
             CreatedAt = DateTime.Now,
             Status = WorkOrderStatuses.Pending,
-            MotorcycleId = motorcycle.Id
+            MotorcycleId = motorcycle?.Id
         };
 
         await _buildRepo.AddAsync(request);

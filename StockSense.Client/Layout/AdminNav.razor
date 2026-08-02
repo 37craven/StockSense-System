@@ -59,23 +59,30 @@
 
 </aside>
 
-@* Mobile Floating Trigger *@
-<div class="admin-sidebar-mobile-trigger">
-    <button @onclick="ToggleMobile" style="position: fixed; top: var(--space-3); right: var(--space-3); z-index: 60; display: flex; align-items: center; justify-content: center; background-color: var(--background); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; width: 2.25rem; height: 2.25rem; color: var(--foreground);">
-        <LucideIcon Name="@(mobileOpen ? "x" : "menu")" Size="18" />
+@* Mobile Sticky Header *@
+<div class="admin-mobile-header">
+    <button @onclick="ToggleMobile" style="display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--foreground); padding: var(--space-2); border-radius: var(--radius);">
+        <LucideIcon Name="@(mobileOpen ? "x" : "menu")" Size="20" />
     </button>
+    <a href="/" style="text-decoration: none; display: flex; align-items: center;">
+        <Logo Size="28" />
+    </a>
+    <span></span>
 </div>
 
 @* Mobile Overlay *@
 @if (mobileOpen)
 {
     <div @onclick="ToggleMobile" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); z-index: 40;"></div>
-    <aside style="position: fixed; top: 0; right: 0; height: 100%; width: 16rem; z-index: 50; display: flex; flex-direction: column; background-color: var(--sidebar); border-left: 1px solid var(--sidebar-border); overflow: hidden;">
+    <aside style="position: fixed; top: 0; left: 0; height: 100%; width: 16rem; z-index: 50; display: flex; flex-direction: column; background-color: var(--sidebar); border-right: 1px solid var(--sidebar-border); overflow: hidden; animation: slideInLeft 0.2s ease;">
 
         <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-3); border-bottom: 1px solid var(--sidebar-border); flex-shrink: 0;">
             <a href="/" style="text-decoration: none;">
                 <Logo Size="32" />
             </a>
+            <button @onclick="ToggleMobile" style="display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--sidebar-foreground); padding: var(--space-1); border-radius: var(--radius);">
+                <LucideIcon Name="x" Size="18" />
+            </button>
         </div>
 
         <nav style="flex: 1; overflow-y: auto; padding: var(--space-3) var(--space-2);">
@@ -363,3 +370,28 @@
 
     public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
 }
+
+<style>
+.admin-mobile-header {
+    display: none;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: 3.5rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--space-3);
+    background-color: var(--background);
+    border-bottom: 1px solid var(--border);
+}
+
+@@keyframes slideInLeft {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+@@media (max-width: 767px) {
+    .admin-sidebar-desktop { display: none !important; }
+    .admin-mobile-header { display: flex !important; }
+}
+</style>
