@@ -69,6 +69,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
+
+// -- Chatbot --
+
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri("https://stocksense-chatbot-eteze2dwh4hzfqg8.eastasia-01.azurewebsites.net/")
+});
+
 // --- 4. IDENTITY ---
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddRoles<IdentityRole>()

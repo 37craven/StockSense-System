@@ -36,9 +36,7 @@ public sealed class InventoryController : ControllerBase
                 from item in _context.OrderSlipItems.AsNoTracking()
                 join slip in _context.OrderSlips.AsNoTracking() on item.OrderSlipId equals slip.Id
                 where slip.LocationId == LocationId
-                      && (slip.Status == OrderSlipStatuses.Approved
-                          || slip.Status == OrderSlipStatuses.Ordered
-                          || slip.Status == OrderSlipStatuses.PartiallyReceived)
+                       && (slip.Status == OrderSlipStatuses.Ordered || slip.Status == OrderSlipStatuses.PartiallyReceived)
                 group item by item.ProductId into productItems
                 select new
                 {

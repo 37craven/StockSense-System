@@ -164,3 +164,12 @@ public sealed record OrderSlipReceiptResult(
     string TransactionNumber,
     string OrderSlipStatus,
     IReadOnlyList<int> AffectedProductIds);
+
+public sealed class PlaceOrderCommand
+{
+    public int OrderSlipId { get; set; }
+    public string? ActingUserId { get; set; }
+    public DateTime? ExpectedDeliveryDate { get; set; }
+    public string? Remarks { get; set; }
+    public byte[] RowVersion { get; set; } = [];
+}
