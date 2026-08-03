@@ -27,23 +27,23 @@
 
         <div style="position: relative; height: 100%;">
 
-            <div class="build-layout" style="display: @(isLoading ? "none" : "flex");">
+            <div class="build-layout @(isLoading ? "hidden" : "flex")">
 
             @* ── Desktop Sidebar ── *@
             <div class="build-sidebar">
 
-                <div style="padding: var(--space-4); border-bottom: 1px solid var(--border); flex-shrink: 0;">
-                    <h2 style="font-size: var(--text-lg); font-weight: var(--font-bold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">@(filterMode == FilterMode.Prebuilt ? "Package Parts" : "Browse All Parts")</h2>
-                    <p style="font-size: var(--text-xs); color: var(--muted-foreground); margin: 0;">@selectedParts.Count part(s) selected</p>
+                <div class="p-4 border-b border-border shrink-0">
+                    <h2 class="text-lg font-bold text-foreground m-0 mb-1">@(filterMode == FilterMode.Prebuilt ? "Package Parts" : "Browse All Parts")</h2>
+                    <p class="text-xs text-muted-foreground m-0">@(filterMode == FilterMode.Prebuilt ? $"{selectedPackageIds.Count} package(s) · " : "")@selectedParts.Count part(s) selected</p>
                 </div>
 
                 @* Filter mode toggle *@
-                <div style="padding: var(--space-2) var(--space-2); border-bottom: 1px solid var(--border); flex-shrink: 0;">
-                    <div style="display: flex; background: var(--muted); border-radius: 9999px; padding: 3px;">
-                        <button @onclick="() => filterMode = FilterMode.Custom" style="flex: 1; padding: 5px 8px; border-radius: 9999px; border: none; font-size: var(--text-xs); font-weight: var(--font-semibold); cursor: pointer; transition: all 0.15s; background: @(filterMode == FilterMode.Custom ? "var(--primary)" : "transparent"); color: @(filterMode == FilterMode.Custom ? "var(--primary-foreground)" : "var(--foreground)");">
+                <div class="p-2 border-b border-border shrink-0">
+                    <div class="flex bg-muted rounded-lg p-[3px]">
+                        <button @onclick="() => filterMode = FilterMode.Custom" class="flex-1 py-1.5 px-2 rounded-lg border-none text-xs font-semibold cursor-pointer transition-all duration-150" style="background: @(filterMode == FilterMode.Custom ? "var(--primary)" : "transparent"); color: @(filterMode == FilterMode.Custom ? "var(--primary-foreground)" : "var(--foreground)");">
                             Custom Build
                         </button>
-                        <button @onclick="() => filterMode = FilterMode.Prebuilt" style="flex: 1; padding: 5px 8px; border-radius: 9999px; border: none; font-size: var(--text-xs); font-weight: var(--font-semibold); cursor: pointer; transition: all 0.15s; background: @(filterMode == FilterMode.Prebuilt ? "var(--primary)" : "transparent"); color: @(filterMode == FilterMode.Prebuilt ? "var(--primary-foreground)" : "var(--foreground)");">
+                        <button @onclick="() => filterMode = FilterMode.Prebuilt" class="flex-1 py-1.5 px-2 rounded-lg border-none text-xs font-semibold cursor-pointer transition-all duration-150" style="background: @(filterMode == FilterMode.Prebuilt ? "var(--primary)" : "transparent"); color: @(filterMode == FilterMode.Prebuilt ? "var(--primary-foreground)" : "var(--foreground)");">
                             Prebuilt Packages
                         </button>
                     </div>
@@ -61,23 +61,23 @@
                     </div>
                     @if (filterMode == FilterMode.Prebuilt)
                     {
-                        @if (!selectedPackageId.HasValue)
+                        @if (!selectedParts.Any())
                         {
-                            <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-xs);">Select a package from the catalog.</div>
+                            <div class="p-4 text-center text-muted-foreground text-xs">Select a package from the catalog.</div>
                         }
                         else
                         {
-                            <div style="margin-bottom: var(--space-1);">
-                                <button @onclick="() => { selectedPackageId = null; selectedParts.Clear(); }" style="display: flex; width: 100%; align-items: center; justify-content: space-between; background: none; border: none; font-size: var(--text-sm); font-weight: var(--font-semibold); cursor: pointer; padding: var(--space-2) var(--space-3); border-radius: var(--radius); color: var(--destructive); font-family: var(--font-sans);">
+                            <div class="mb-1">
+                                <button @onclick="() => { selectedPackageIds.Clear(); selectedParts.Clear(); }" class="flex w-full items-center justify-between bg-none border-none text-sm font-semibold cursor-pointer p-2 px-3 rounded-lg text-destructive">
                                     Clear build
                                     <LucideIcon Name="trash-2" Size="14" />
                                 </button>
                             </div>
                             @foreach (var part in selectedParts)
                             {
-                                <div style="margin-bottom: var(--space-1); padding: var(--space-1) var(--space-3);">
-                                    <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">@part.Name</div>
-                                    <div style="font-size: 10px; color: var(--muted-foreground);">@part.Brand · ₱@part.Price.ToString("N0")</div>
+                                <div class="mb-1 py-1 px-3">
+                                    <div class="text-sm font-medium text-foreground">@part.Name</div>
+                                    <div class="text-[10px] text-muted-foreground">@part.Brand · ₱@part.Price.ToString("N0")</div>
                                 </div>
                             }
                         }
@@ -86,7 +86,7 @@
                     {
                         @if (!selectedParts.Any())
                         {
-                            <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-xs);">No parts selected yet. Browse the catalog to add parts.</div>
+                            <div class="p-4 text-center text-muted-foreground text-xs">No parts selected yet. Browse the catalog to add parts.</div>
                         }
                         else
                         {
@@ -138,16 +138,16 @@
                 </div>
             </div>
 
-            @* ── Mobile Top Bar ── *@
+             @* ── Mobile Top Bar ── *@
             <div class="build-mobile-bar">
-                <div>
-                    <p style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Browse All Parts</p>
-                    <p style="font-size: var(--text-xs); color: var(--muted-foreground); margin: 0;">@selectedParts.Count part(s) selected</p>
+                <div class="flex bg-muted rounded-full p-[3px] flex-1 mr-2">
+                    <button @onclick="() => filterMode = FilterMode.Custom" class="flex-1 py-1 px-3 rounded-lg border-none text-xs font-semibold cursor-pointer transition-all duration-150" style="background: @(filterMode == FilterMode.Custom ? "var(--primary)" : "transparent"); color: @(filterMode == FilterMode.Custom ? "var(--primary-foreground)" : "var(--foreground)");">Custom</button>
+                    <button @onclick="() => filterMode = FilterMode.Prebuilt" class="flex-1 py-1 px-3 rounded-lg border-none text-xs font-semibold cursor-pointer transition-all duration-150" style="background: @(filterMode == FilterMode.Prebuilt ? "var(--primary)" : "transparent"); color: @(filterMode == FilterMode.Prebuilt ? "var(--primary-foreground)" : "var(--foreground)");">Prebuilt</button>
                 </div>
-                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                <div class="flex items-center gap-2">
                     @if (selectedParts.Any())
                     {
-                        <span style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--primary);">₱@TotalPrice.ToString("N0")</span>
+                        <span class="text-sm font-bold text-primary">₱@TotalPrice.ToString("N0")</span>
                     }
                     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="() => mobileDrawerOpen = !mobileDrawerOpen">
                         <LucideIcon Name="@(mobileDrawerOpen ? "x" : "layout-list")" Size="18" />
@@ -183,7 +183,7 @@
                         </div>
                     </div>
 
-                    <div style="padding: var(--space-3) var(--space-4); max-height: 200px; overflow-y: auto;">
+                    <div class="px-4 py-3 max-h-[70px] overflow-y-auto">
                         @if (!selectedParts.Any())
                         {
                             <p style="font-size: var(--text-xs); color: var(--muted-foreground); text-align: center; font-style: italic; margin: 0;">No parts selected yet.</p>
@@ -220,8 +220,8 @@
             }
 
             @* ── Main Content ── *@
-            <div class="build-main" style="flex: 1; display: flex; flex-direction: column; background-color: var(--background); overflow: hidden;">
-                <div class="build-scroll-area @(mobileDrawerOpen ? "drawer-open" : "")" style="flex: 1; overflow-y: auto; padding: var(--space-6);">
+            <div class="build-main flex-1 flex flex-col bg-background overflow-hidden">
+                <div class="build-scroll-area @(mobileDrawerOpen ? "drawer-open" : "") flex-1 overflow-y-auto p-4 md:p-6">
                     @if (filterMode == FilterMode.Prebuilt)
                     {
                         <h2 style="font-size: var(--text-xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">Prebuilt Packages</h2>
@@ -229,7 +229,7 @@
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4);">
                             @foreach (var pkg in packages)
                             {
-                                var isActive = selectedPackageId == pkg.Id;
+                                var isActive = selectedPackageIds.Contains(pkg.Id);
                                 <div @onclick="() => SelectPackage(pkg)" style="position: relative; cursor: pointer; background-color: var(--card); border: 2px solid @(isActive ? "var(--primary)" : "var(--border)"); padding: var(--space-4); border-radius: var(--radius); transition: all 0.15s; display: flex; flex-direction: column; gap: var(--space-2);">
                                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
                                         <div style="min-width: 0;">
@@ -309,7 +309,7 @@
 
                                     <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding-top: var(--space-3); display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
                                         <div style="font-size: 22px; font-weight: 900; color: var(--primary); line-height: 1;">₱@packageInfoTarget.TotalPrice.ToString("N0")</div>
-                                        @if (selectedPackageId == packageInfoTarget.Id)
+                                        @if (selectedPackageIds.Contains(packageInfoTarget.Id))
                                         {
                                             <span style="font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--success); display: flex; align-items: center; gap: 4px;"><LucideIcon Name="check" Size="14" />Added to your build</span>
                                         }
@@ -353,31 +353,31 @@
                                 </button>
                             </form>
                         </div>
-                        <div style="display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-4);">
-                            <button @onclick="() => { expandedCategory = null; }" style="padding: var(--space-1) var(--space-3); border-radius: 9999px; font-size: var(--text-xs); font-weight: var(--font-semibold); border: 1px solid @(expandedCategory == null ? "var(--primary)" : "var(--border)"); background-color: @(expandedCategory == null ? "var(--primary)" : "transparent"); color: @(expandedCategory == null ? "var(--primary-foreground)" : "var(--foreground)"); cursor: pointer; font-family: var(--font-sans);">All Parts</button>
+                        <div class="flex gap-2 flex-wrap mb-4">
+                            <button @onclick="() => { expandedCategory = null; }" class="px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150" style="border-color: @(expandedCategory == null ? "var(--primary)" : "var(--border)"); background-color: @(expandedCategory == null ? "var(--primary)" : "transparent"); color: @(expandedCategory == null ? "var(--primary-foreground)" : "var(--foreground)");">All Parts</button>
                             @foreach (var category in UniqueCategories)
                             {
-                                <button @onclick="() => ToggleCategory(category)" style="padding: var(--space-1) var(--space-3); border-radius: 9999px; font-size: var(--text-xs); font-weight: var(--font-medium); border: 1px solid @(expandedCategory == category ? "var(--primary)" : "var(--border)"); background-color: @(expandedCategory == category ? "var(--primary)" : "transparent"); color: @(expandedCategory == category ? "var(--primary-foreground)" : "var(--foreground)"); cursor: pointer; font-family: var(--font-sans);">@category</button>
+                                <button @onclick="() => ToggleCategory(category)" class="px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150" style="border-color: @(expandedCategory == category ? "var(--primary)" : "var(--border)"); background-color: @(expandedCategory == category ? "var(--primary)" : "transparent"); color: @(expandedCategory == category ? "var(--primary-foreground)" : "var(--foreground)");">@category</button>
                             }
                         </div>
-                        <h3 style="font-size: var(--text-sm); font-weight: bold; margin-bottom: var(--space-3); padding-bottom: var(--space-1); border-bottom: 1px solid var(--border);">Showing: @(expandedCategory ?? "All Parts")</h3>
+                        <h3 class="text-sm font-bold mb-3 pb-1 border-b border-border">Showing: @(expandedCategory ?? "All Parts")</h3>
                     }
                     @if (products != null && filterMode == FilterMode.Custom)
                     {
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-4);">
+                        <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));">
                             @foreach (var product in FilteredProducts)
                             {
                                 bool isSelected = selectedParts.Any(p => p.Id == product.Id);
                                 bool isOutOfStock = product.CurrentStock <= 0;
-                                <div @onclick="@(() => { if (!isOutOfStock) TogglePart(product); })" style="position: relative; cursor: @(isOutOfStock ? "not-allowed" : "pointer"); background-color: var(--card); border: 2px solid @(isSelected ? "var(--primary)" : "var(--border)"); padding: var(--space-3); border-radius: var(--radius); transition: all 0.15s; opacity: @(isOutOfStock ? "0.6" : "1");">
+                                <div @onclick="@(() => { if (!isOutOfStock) TogglePart(product); })" class="relative bg-card border-2 p-3 rounded-lg transition-all duration-150" style="cursor: @(isOutOfStock ? "not-allowed" : "pointer"); border-color: @(isSelected ? "var(--primary)" : "var(--border)"); opacity: @(isOutOfStock ? "0.6" : "1");">
                                     @if (isOutOfStock)
                                     {
-                                        <div style="position: absolute; top: 12px; right: 12px; background: var(--destructive); color: var(--destructive-foreground); padding: 4px 8px; font-size: 10px; font-weight: 800; border-radius: 4px; z-index: 10;">OUT OF STOCK</div>
+                                        <div class="absolute top-3 right-3 bg-destructive text-destructive-foreground px-2 py-1 text-[10px] font-extrabold rounded z-10">OUT OF STOCK</div>
                                     }
-                                    <img src="@product.ImageUrl" style="width: 100%; height: 100px; object-fit: cover; border-radius: calc(var(--radius) - 2px); background-color: var(--muted); margin-bottom: var(--space-2);" />
-                                    <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">@product.Name</div>
-                                    <div style="font-size: var(--text-xs); color: var(--muted-foreground);">@product.Brand</div>
-                                    <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--primary); margin-top: var(--space-1);">₱@product.Price.ToString("N0")</div>
+                                    <img src="@product.ImageUrl" class="w-full h-[100px] object-cover rounded bg-muted mb-2" />
+                                    <div class="text-sm font-medium text-foreground">@product.Name</div>
+                                    <div class="text-xs text-muted-foreground">@product.Brand</div>
+                                    <div class="text-sm font-semibold text-primary mt-1">₱@product.Price.ToString("N0")</div>
                                 </div>
                             }
                         </div>
@@ -392,10 +392,10 @@
     </Authorized>
 
     <NotAuthorized>
-        <div style="height: 100vh; background-color: var(--background); display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--foreground); gap: var(--space-4);">
+        <div class="h-screen bg-background flex flex-col justify-center items-center text-foreground gap-4">
             <BbSpinner Size="SpinnerSize.Large" />
-            <h2 style="color: var(--destructive); font-weight: var(--font-bold); letter-spacing: 0.1em;">SESSION EXPIRED</h2>
-            <p style="color: var(--muted-foreground); font-size: var(--text-sm);">Redirecting to Home.</p>
+            <h2 class="text-destructive font-bold tracking-[0.1em]">SESSION EXPIRED</h2>
+            <p class="text-muted-foreground text-sm">Redirecting to Home.</p>
         </div>
     </NotAuthorized>
 </AuthorizeView>
@@ -507,9 +507,9 @@
 
     @@media (max-width: 767px) {
         .build-mobile-bar { display: flex !important; }
-        .build-scroll-area { padding-bottom: 80px !important; }
-        .build-scroll-area.drawer-open { padding-bottom: calc(70vh + 80px) !important; }
-        .build-bottom-drawer { z-index: 50 !important; }
+        .build-scroll-area { padding-bottom: 60px !important; }
+        .build-scroll-area.drawer-open { padding-bottom: calc(70vh + 60px) !important; }
+        .build-bottom-drawer { z-index: 10 !important; height: 50vh !important; overflow-y: auto !important; }
     }
 </style>
 
@@ -523,12 +523,23 @@
     private int? selectedMotorcycleId;
     private bool isLoadingMotorcycles;
     private string? motorcycleLoadError;
-    private int? selectedPackageId;
+    private List<int> selectedPackageIds = new();
     private bool isLoading = true;
     private bool isProcessing = false;
     private string statusMessage = "";
     private bool isSuccess = false;
-    private bool mobileDrawerOpen = false;
+    private bool mobileDrawerOpen = true;
+
+    private bool showBookingModal = false;
+    private DateTime bookingDate = DateTime.Today.AddDays(3);
+    private TimeOnly? bookingTime;
+    private string selectedMechanic = "Any Available";
+    private List<string> mechanics = new() { "Any Available" };
+    private List<(TimeSpan Start, TimeSpan End)> bookedIntervals = [];
+    private bool isLoadingSlots;
+    private string? bookingError;
+    private int? bookingMotorcycleId;
+    private bool isScheduling;
 
 
     private string? expandedCategory = null;
@@ -585,11 +596,19 @@
 
     private void SelectPackage(PreBuiltPackageDto pkg)
     {
-        selectedPackageId = pkg.Id;
-        foreach (var p in pkg.IncludedProducts)
+        if (selectedPackageIds.Contains(pkg.Id))
         {
-            if (!selectedParts.Any(x => x.Id == p.Id))
-                selectedParts.Add(new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price));
+            selectedPackageIds.Remove(pkg.Id);
+            selectedParts.RemoveAll(sp => pkg.IncludedProducts.Any(ip => ip.Id == sp.Id));
+        }
+        else
+        {
+            selectedPackageIds.Add(pkg.Id);
+            foreach (var p in pkg.IncludedProducts)
+            {
+                if (!selectedParts.Any(x => x.Id == p.Id))
+                    selectedParts.Add(new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price));
+            }
         }
     }
 
@@ -665,8 +684,8 @@
             }
             catch { }
 
-            var isPrebuilt = filterMode == FilterMode.Prebuilt && selectedPackageId.HasValue;
-            var pkgName = isPrebuilt ? packages.FirstOrDefault(p => p.Id == selectedPackageId)?.Name ?? "Package" : "Custom Build";
+            var isPrebuilt = filterMode == FilterMode.Prebuilt && selectedPackageIds.Any();
+            var pkgName = isPrebuilt ? string.Join(", ", packages.Where(p => selectedPackageIds.Contains(p.Id)).Select(p => p.Name)) : "Custom Build";
             var typeTag = isPrebuilt ? "TYPE_PREBUILT" : "TYPE_CUSTOM";
 
             var partsToSave = new List<ProductDto>(selectedParts);
@@ -688,14 +707,120 @@
                 statusMessage = "Build submitted successfully!";
                 isSuccess = true;
                 selectedParts.Clear();
+                selectedPackageIds.Clear();
                 selectedMotorcycleId = null;
-
-
             }
             else { statusMessage = "Failed to submit build."; isSuccess = false; }
         }
         catch { statusMessage = "Connection Error."; isSuccess = false; }
         finally { isProcessing = false; }
+    }
+
+    private async Task OpenDetailedBooking()
+    {
+        showBuildSuccessModal = false;
+        bookingDate = DateTime.Today.AddDays(3);
+        bookingTime = null;
+        selectedMechanic = "Any Available";
+        bookingError = null;
+        showBookingModal = true;
+        await LoadMechanicsAsync();
+        await FetchBookedSlots();
+    }
+
+    private async Task LoadMechanicsAsync()
+    {
+        try
+        {
+            var mechs = await Http.GetFromJsonAsync<List<MechanicDto>>("api/mechanics");
+            mechanics = new List<string> { "Any Available" };
+            if (mechs != null)
+                mechanics.AddRange(mechs.Select(m => m.Name));
+        }
+        catch { }
+    }
+
+    private async Task FetchBookedSlots()
+    {
+        isLoadingSlots = true;
+        try
+        {
+            var dateStr = bookingDate.ToString("yyyy-MM-dd");
+            var mechanicQuery = Uri.EscapeDataString(selectedMechanic);
+            var slots = await Http.GetFromJsonAsync<List<BookedSlotDto>>($"api/appointments/booked-slots?date={dateStr}&mechanic={mechanicQuery}") ?? [];
+            bookedIntervals = slots
+                .Where(s => TimeSpan.TryParse(s.TimeSlot, out _))
+                .Select(s =>
+                {
+                    TimeSpan.TryParse(s.TimeSlot, out var start);
+                    return (Start: start, End: start.Add(TimeSpan.FromMinutes(s.EstimatedMinutes)));
+                })
+                .ToList();
+        }
+        catch { bookedIntervals = []; }
+        finally { isLoadingSlots = false; }
+    }
+
+    private async Task OnMechanicChanged(ChangeEventArgs e)
+    {
+        selectedMechanic = e.Value?.ToString() ?? "Any Available";
+        await FetchBookedSlots();
+    }
+
+    private static List<string> GenerateAllTimeSlots()
+    {
+        var slots = new List<string>();
+        for (var h = 8; h < 17; h++)
+        {
+            slots.Add($"{h:D2}:00");
+            slots.Add($"{h:D2}:30");
+        }
+        return slots;
+    }
+
+    private bool IsTimeSlotAvailable(string time)
+    {
+        if (!TimeSpan.TryParse(time, out var start)) return false;
+        var end = start.Add(TimeSpan.FromMinutes(120));
+        return !bookedIntervals.Any(b => start < b.End && end > b.Start);
+    }
+
+    private static string FormatSlot(string time) =>
+        TimeSpan.TryParse(time, out var ts)
+            ? $"{(ts.Hours > 12 ? ts.Hours - 12 : ts.Hours == 0 ? 12 : ts.Hours):D2}:{ts.Minutes:D2} {(ts.Hours >= 12 ? "PM" : "AM")}"
+            : time;
+
+    private async Task ConfirmBooking()
+    {
+        if (!bookingTime.HasValue) return;
+        isScheduling = true;
+        bookingError = null;
+        try
+        {
+            var appointment = new CreateAppointmentDto
+            {
+                CustomerName = "Customer",
+                AppointmentDate = DateTime.SpecifyKind(bookingDate.Date, DateTimeKind.Unspecified),
+                TimeSlot = bookingTime.Value.ToString("HH:mm"),
+                MotorcycleId = bookingMotorcycleId,
+                SelectedServices = new List<string> { "Build Installation" },
+                Category = "Build"
+            };
+            var response = await Http.PostAsJsonAsync("api/appointments", appointment);
+            if (response.IsSuccessStatusCode)
+            {
+                showBookingModal = false;
+            }
+            else
+            {
+                bookingError = await ApiErrorMessage.FromResponseAsync(response, "Could not schedule the appointment.");
+            }
+        }
+        catch
+        {
+            bookingError = "Connection error. You can book an appointment later from My Appointments.";
+        }
+        finally { isScheduling = false; }
     }
 
     public class UserProfile

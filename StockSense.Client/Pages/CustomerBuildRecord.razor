@@ -13,141 +13,151 @@
 @attribute [Authorize]
 
 
-<div style="width: 100%; max-width: 900px; margin: 0 auto; padding: var(--space-8) var(--space-4);">
-
-    <div style="margin-bottom: var(--space-6);">
-        <h1 style="font-size: var(--text-2xl); font-weight: var(--font-bold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">My Builds</h1>
-        <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">Track the status of your submitted custom builds.</p>
-    </div>
+<div class="w-full max-w-[900px] lg:max-w-[640px] mx-auto px-4 pt-8 pb-[200px] lg:pb-8">
+    <PageHeader Title="My Builds" Subtitle="Track the status of your submitted custom builds." />
 
     @if (isLoading)
     {
-        <div style="display: flex; align-items: center; gap: var(--space-3); color: var(--muted-foreground); padding: var(--space-8); justify-content: center;">
-            <span style="font-size: var(--text-sm);">Loading your builds...</span>
+        <div class="flex items-center gap-3 text-muted-foreground py-8 justify-center">
+            <span class="text-sm">Loading your builds...</span>
         </div>
     }
     else if (myBuilds == null || !myBuilds.Any())
     {
-        <div style="text-align: center; padding: var(--space-8); background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; gap: var(--space-4);">
+        <div class="text-center p-8 bg-card border border-border rounded-lg flex flex-col items-center gap-4">
             <div>
-                <p style="font-size: var(--text-base); font-weight: var(--font-medium); color: var(--foreground); margin: 0 0 var(--space-1) 0;">No builds yet</p>
-                <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: 0;">You haven't submitted any builds yet.</p>
+                <p class="text-base font-medium text-foreground m-0 mb-1">No builds yet</p>
+                <p class="text-sm text-muted-foreground m-0">You haven't submitted any builds yet.</p>
             </div>
-            <button @onclick='() => Nav.NavigateTo("/build")' style="padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: var(--radius); cursor: pointer;">Start a New Build</button>
+            <button @onclick='() => Nav.NavigateTo("/build")' class="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg border-none cursor-pointer font-bold text-sm">Start a New Build</button>
         </div>
     }
     else
     {
-        <div style="display: flex; justify-content: flex-end; margin-bottom: var(--space-3); align-items: center; gap: 8px;">
-            <input type="checkbox" @bind="showAllHistory" id="userBuildArchive" />
-            <label for="userBuildArchive" style="font-size: var(--text-xs); color: var(--muted-foreground); cursor: pointer;">Show full history</label>
-        </div>
-
-        <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: var(--text-sm); min-width: 600px;">
+        @* Desktop: table *@
+        <div class="hidden md:block bg-card border border-border rounded-lg overflow-x-auto">
+            <table class="w-full border-collapse text-sm" style="min-width:600px">
                 <thead>
-                    <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
-                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Date Submitted</th>
-                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Type</th>
-                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Items</th>
-                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Total Value</th>
-                        <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Status</th>
-                        <th style="text-align: center; padding: 12px 16px; color: var(--muted-foreground); font-weight: var(--font-medium);">Action</th>
+                    <tr class="border-b border-border" style="background:rgba(0,0,0,0.02)">
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Date</th>
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Type</th>
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Items</th>
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Total</th>
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Status</th>
+                        <th class="text-center p-3 px-4 text-muted-foreground font-medium">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var build in FilteredBuilds)
                     {
                         var rawParts = ParseParts(build.SelectedPartsJson);
-
-                        // Extract the hidden metadata tag
                         var metaTag = rawParts.FirstOrDefault(p => p.Category == "SYSTEM_METADATA");
                         bool isPreBuilt = metaTag?.Name == "TYPE_PREBUILT";
-
-                        // Get the package name from the Brand field, fallback to generic name if old build
                         string buildName = metaTag?.Brand ?? (isPreBuilt ? "Pre-Built Package" : "Custom Parts Selection");
-
-                        // Filter out the metadata tag so it doesn't mess up your UI counts
                         var actualParts = rawParts.Where(p => p.Category != "SYSTEM_METADATA").ToList();
 
-                        <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;">
-                            <td style="padding: 12px 16px; color: var(--muted-foreground); font-size: var(--text-xs);">@build.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</td>
-
-                            <td style="padding: 12px 16px;">
-                                @if (isPreBuilt)
-                                {
-                                    <span style="display: inline-flex; align-items: center; background: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
-                                        <LucideIcon Name="zap" Size="10" style="margin-right: 4px;" /> Pre-Built
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span style="display: inline-flex; align-items: center; background: var(--muted); color: var(--foreground); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
-                                        <LucideIcon Name="wrench" Size="10" style="margin-right: 4px;" /> Custom
-                                    </span>
-                                }
+                        <tr class="border-b border-border transition-colors duration-200">
+                            <td class="p-3 px-4 text-muted-foreground text-xs">@build.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</td>
+                            <td class="p-3 px-4">
+                                <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase"
+                                      style="background: @(isPreBuilt ? "color-mix(in oklch, var(--primary) 15%, transparent)" : "var(--muted)"); color: @(isPreBuilt ? "var(--primary)" : "var(--foreground)");">
+                                    <LucideIcon Name="@(isPreBuilt ? "zap" : "wrench")" Size="10" class="mr-1" /> @(isPreBuilt ? "Pre-Built" : "Custom")
+                                </span>
                             </td>
-
-                            <td style="padding: 12px 16px;">
-                                <span style="background: var(--muted); padding: 2px 8px; border-radius: 4px; font-size: var(--text-xs);">@actualParts.Count items</span>
-                            </td>
-                            <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);">₱@actualParts.Sum(p => p.Price).ToString("N2")</td>
-                            <td style="padding: 12px 16px;">
-                                <span style="padding: 4px 10px; border-radius: 9999px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; background: rgba(255,255,255,0.05); color: @GetStatusColor(build.Status);">
+                            <td class="p-3 px-4"><span class="bg-muted px-2 py-0.5 rounded text-xs">@actualParts.Count items</span></td>
+                            <td class="p-3 px-4 font-bold text-foreground">₱@actualParts.Sum(p => p.Price).ToString("N2")</td>
+                            <td class="p-3 px-4">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white"
+                                      style="background-color: @GetStatusColor(build.Status);">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white/70"></span>
                                     @build.Status
                                 </span>
                             </td>
-                            <td style="padding: 12px 16px; text-align: center;">
-                                <button @onclick="() => OpenModal(build, actualParts, buildName)" style="background: transparent; border: 1px solid var(--border); color: var(--foreground); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: var(--text-xs);">
-                                    VIEW
-                                </button>
+                            <td class="p-3 px-4 text-center">
+                                <button @onclick="() => OpenModal(build, actualParts, buildName)" class="bg-transparent border border-border text-foreground px-3 py-1.5 rounded cursor-pointer text-xs">VIEW</button>
                             </td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
+
+        @* Mobile: card stack *@
+        <div class="flex flex-col gap-3 md:hidden">
+            @foreach (var build in FilteredBuilds)
+            {
+                var rawParts = ParseParts(build.SelectedPartsJson);
+                var metaTag = rawParts.FirstOrDefault(p => p.Category == "SYSTEM_METADATA");
+                bool isPreBuilt = metaTag?.Name == "TYPE_PREBUILT";
+                string buildName = metaTag?.Brand ?? (isPreBuilt ? "Pre-Built Package" : "Custom Parts Selection");
+                var actualParts = rawParts.Where(p => p.Category != "SYSTEM_METADATA").ToList();
+
+                <div class="bg-card border border-border rounded-lg p-3 border-l-4" style="border-left-color: @GetStatusColor(build.Status)">
+                    <div class="flex justify-between items-start mb-2 gap-2">
+                        <div class="min-w-0">
+                            <span class="text-sm font-semibold text-foreground">@build.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</span>
+                            <div class="text-xs text-muted-foreground mt-0.5">
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+                                      style="background: @(isPreBuilt ? "color-mix(in oklch, var(--primary) 15%, transparent)" : "var(--muted)"); color: @(isPreBuilt ? "var(--primary)" : "var(--foreground)");">
+                                    @(isPreBuilt ? "Pre-Built" : "Custom")
+                                </span>
+                            </div>
+                        </div>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white shrink-0"
+                              style="background-color: @GetStatusColor(build.Status);">
+                            <span class="w-1.5 h-1.5 rounded-full bg-white/70"></span>
+                            @build.Status
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-muted-foreground">
+                        <span>@actualParts.Count items</span>
+                        <div class="flex items-center gap-2">
+                            <button @onclick="() => OpenModal(build, actualParts, buildName)" class="text-[10px] font-semibold text-primary border border-primary/40 rounded-md px-2 py-0.5">View</button>
+                            <span class="text-sm font-bold text-primary">₱@actualParts.Sum(p => p.Price).ToString("N0")</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
     }
 </div>
 
 @if (ShowModal && CurrentParts != null)
 {
-    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 20px;">
-        <div style="background: var(--card); width: 600px; max-height: 85vh; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;">
-            <div style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start;">
+    <div class="fixed inset-0 bg-black/80 flex justify-center items-center z-[1000] p-5">
+        <div class="bg-card w-[600px] max-h-[85vh] rounded-xl border border-border flex flex-col overflow-hidden">
+            <div class="p-5 border-b border-border flex justify-between items-start">
                 <div>
-                    <h3 style="margin: 0 0 6px 0; color: var(--foreground); font-size: 1.25rem;">Build Summary</h3>
+                    <h3 class="m-0 mb-1.5 text-foreground text-xl">Build Summary</h3>
                     @if (!string.IsNullOrEmpty(modalBuildName))
                     {
-                        <span style="display: inline-block; font-size: 11px; color: #3b82f6; text-transform: uppercase; font-weight: 800; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); padding: 4px 10px; border-radius: 6px;">
-                            @modalBuildName
-                        </span>
+                        <span class="inline-block text-[11px] text-blue-500 uppercase font-extrabold bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-md">@modalBuildName</span>
                     }
-                    <p style="margin: 8px 0 0; color: var(--muted-foreground); font-size: var(--text-sm);">
-                        <strong style="color: var(--foreground);">Motorcycle:</strong>
+                    <p class="mt-2 mb-0 text-muted-foreground text-sm">
+                        <strong class="text-foreground">Motorcycle:</strong>
                         @(CurrentBuild?.Motorcycle?.DisplayName ?? "Not recorded")
                     </p>
                 </div>
-                <button @onclick="CloseModal" style="background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 1.5rem;">&times;</button>
+                <button @onclick="CloseModal" class="bg-none border-none text-muted-foreground cursor-pointer text-2xl">&times;</button>
             </div>
-            <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <div class="p-5 overflow-y-auto flex-1">
                 @foreach (var group in CurrentParts.GroupBy(p => p.Category))
                 {
-                    <div style="margin-bottom: 15px;">
-                        <h4 style="font-size: 0.7rem; color: var(--primary); text-transform: uppercase; margin-bottom: 8px;">@group.Key</h4>
+                    <div class="mb-4">
+                        <h4 class="text-[0.7rem] text-primary uppercase mb-2">@group.Key</h4>
                         @foreach (var part in group)
                         {
-                            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                                <span style="font-size: 0.85rem; color: var(--foreground);">@part.Brand @part.Name</span>
-                                <span style="font-weight: bold;">₱@part.Price.ToString("N2")</span>
+                            <div class="flex justify-between py-1.5 border-b border-white/5">
+                                <span class="text-sm text-foreground">@part.Brand @part.Name</span>
+                                <span class="font-bold">₱@part.Price.ToString("N2")</span>
                             </div>
                         }
                     </div>
                 }
             </div>
-            <div style="padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: bold; font-size: 1.1rem;">Total: ₱@CurrentParts.Sum(p => p.Price).ToString("N2")</span>
-                <button @onclick="CloseModal" style="padding: 8px 20px; background: var(--secondary); color: var(--foreground); border: none; border-radius: 6px; cursor: pointer;">Close</button>
+            <div class="p-5 border-t border-border flex justify-between items-center">
+                <span class="font-bold text-lg">Total: ₱@CurrentParts.Sum(p => p.Price).ToString("N2")</span>
+                <button @onclick="CloseModal" class="px-5 py-2 bg-secondary text-foreground border-none rounded-md cursor-pointer">Close</button>
             </div>
         </div>
     </div>

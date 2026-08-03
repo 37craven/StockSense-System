@@ -1,5 +1,4 @@
 
-
 /* =============================================================================
    GLOBAL — Minimal scrollbars
    ============================================================================= */
@@ -28,7 +27,7 @@
 
 
 /* =============================================================================
-   LAYOUT — Build & Appointment
+   LAYOUT — Build
    ============================================================================= */
 .build-layout {
     display: flex;
@@ -56,17 +55,6 @@
 
 .build-bottom-drawer {
     display: none;
-}
-
-.appt-layout {
-    display: flex;
-    height: calc(100vh - 3.5rem);
-    overflow: hidden;
-}
-
-.appt-sidebar {
-    width: 300px;
-    flex-shrink: 0;
 }
 
 .appt-mobile-bar {
@@ -142,14 +130,14 @@
    MEDIA QUERIES (outside @layer to avoid suppression)
    ============================================================================= */
 
-/* ── ≥641px: show settings nav labels ── */
+/* ≥641px: show settings nav labels */
 @media (min-width: 641px) {
     .settings-nav-label {
         display: inline !important;
     }
 }
 
-/* ── ≤640px: mobile navbar & settings ── */
+/* ≤640px: mobile navbar & settings */
 @media (max-width: 640px) {
     .navbar-desktop-nav {
         display: none !important;
@@ -193,26 +181,10 @@
     .settings-main {
         padding: var(--space-4) !important;
     }
-
-    .step3-container {
-        flex-direction: column !important;
-        max-height: none !important;
-    }
-
-    .step3-calendar {
-        border-right: none !important;
-        border-bottom: 1px solid var(--border) !important;
-        overflow-y: visible !important;
-    }
-
-    .step3-slots {
-        max-height: 40vh !important;
-    }
 }
 
-/* ── ≤767px: mobile build, appointment & admin sidebar ── */
+/* ≤767px: mobile build, appointment & admin sidebar */
 @media (max-width: 767px) {
-    /* Build layout */
     .build-layout {
         flex-direction: column;
     }
@@ -250,19 +222,6 @@
         overflow-y: auto;
     }
 
-    /* Appointment layout */
-    .appt-layout {
-        flex-direction: column !important;
-        height: auto !important;
-        overflow: visible !important;
-    }
-
-    .appt-sidebar {
-        width: 100% !important;
-        border-right: none !important;
-        border-bottom: 1px solid var(--border) !important;
-    }
-
     .appt-mobile-bar {
         display: flex;
         align-items: center;
@@ -288,7 +247,6 @@
         overflow-y: auto;
     }
 
-    /* Admin sidebar */
     .admin-sidebar-desktop {
         display: none !important;
     }

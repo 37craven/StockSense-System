@@ -3977,3 +3977,45 @@
     }
   }
 }
+
+/* ── StockSense appointment responsive supplements ── */
+@media (width >= 40rem) {
+    .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sm\:p-5 { padding: var(--space-5); }
+}
+@media (width >= 48rem) {
+    .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (width >= 64rem) {
+    .lg\:static { position: static; }
+    .lg\:z-auto { z-index: auto; }
+    .lg\:col-span-2 { grid-column: span 2 / span 2; }
+    .lg\:h-\[calc\(100vh-3\.5rem\)\] { height: calc(100vh - 3.5rem); }
+    .lg\:max-h-\[50vh\] { max-height: 50vh; }
+    .lg\:max-w-\[640px\] { max-width: 640px; }
+    .lg\:w-\[40\%\] { width: 40%; }
+    .lg\:w-\[300px\] { width: 300px; }
+    .lg\:w-\[40\%\] { width: 40%; }
+    .lg\:shrink-0 { flex-shrink: 0; }
+    .lg\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .lg\:flex-row { flex-direction: row; }
+    .lg\:items-stretch { align-items: stretch; }
+    .lg\:overflow-hidden { overflow: hidden; }
+    .lg\:border-r { border-right-width: 1px; }
+    .lg\:bg-card { background-color: var(--card); }
+    .lg\:p-4 { padding: var(--space-4); }
+    .lg\:p-6 { padding: var(--space-6); }
+    .lg\:py-3 { padding-block: var(--space-3); }
+    .lg\:pb-0 { padding-bottom: 0; }
+    .lg\:pb-8 { padding-bottom: var(--space-8); }
+}
+@media (width >= 80rem) {
+    .xl\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .xl\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .xl\:grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.max-h-\[70px\] { max-height: 70px; }

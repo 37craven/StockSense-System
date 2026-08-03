@@ -24,6 +24,15 @@ This repository uses **BlazorBlueprint** (a shadcn/ui-inspired component library
 
 ---
 
+## 📱 Mobile & UI Conversion Rules
+
+- **Full playbook:** `docs/mobile-conversion.md` (auto-loaded via `opencode.json` instructions).
+- **No inline styles:** All `style="..."` attributes must use Tailwind utilities. Dynamic C# values are the only exception.
+- **Tables → cards on mobile:** Every `<table>` needs a `md:hidden` card stack fallback. Horizontal scroll at `< 768px` is banned.
+- **Delete companion `.razor.css` files** once all rules are migrated to Tailwind.
+
+---
+
 ## 🤖 Critical Execution Rules
 
 ### RESPONSES
@@ -54,10 +63,3 @@ This repository uses **BlazorBlueprint** (a shadcn/ui-inspired component library
 
 ---
 
-## 🧠 Model Selection
-- When using the Gemini API, always use the following models:
-| Task | Model |
-|---|---|
-| Scaffolding, boilerplate, file moves | `gemini-3.1-flash-lite` |
-| Feature implementation, refactoring | `gemini-3-flash` |
-| Architecture decisions, complex debugging | `gemini-3.1-pro` |

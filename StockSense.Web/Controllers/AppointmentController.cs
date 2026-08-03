@@ -361,6 +361,29 @@ public class AppointmentsController : ControllerBase
         return Ok(dtos);
     }
 
+    [HttpPut("{id}/cancel")]
+    public async Task<IActionResult> CancelMyAppointment(int id)
+    {
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+
+        var appointment = await _context.Appointments.FindAsync(id);
+        if (appointment is null) return NotFound(ApiResponse.NotFound("Appointment"));
+        if (appointment.CustomerEmail != customer.Email)
+            return Forbid();
+
+        if (appointment.Status != WorkOrderStatuses.Pending)
+            return Conflict(ApiResponse.Error("Only pending appointments can be cancelled."));
+
+        if (appointment.CreatedAt < DateTime.UtcNow.AddMinutes(-30))
+            return Conflict(ApiResponse.Error("Appointments can only be cancelled within 30 minutes of booking."));
+
+        appointment.Status = WorkOrderStatuses.Cancelled;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Appointment cancelled." });
+    }
+
     private static AppointmentDto MapToDto(Appointment a) => new()
     {
         Id = a.Id, CustomerName = a.CustomerName, CustomerEmail = a.CustomerEmail,
