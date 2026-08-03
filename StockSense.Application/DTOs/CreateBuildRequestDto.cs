@@ -17,7 +17,5 @@ public class CreateBuildRequestDto
     [Range(0, 1_000_000)]
     public decimal TotalPrice { get; set; }
 
-    [Required(ErrorMessage = "Select a motorcycle from the list.")]
-    [Range(1, int.MaxValue, ErrorMessage = "Select a motorcycle from the list.")]
     public int? MotorcycleId { get; set; }
 }

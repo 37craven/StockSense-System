@@ -388,6 +388,74 @@
 
         </div>
 
+        @* ── Build Success ── *@
+        <BbDialog @bind-Open="showBuildSuccessModal">
+            <BbDialogContent Style="width: min(94vw, 400px); padding: var(--space-5); display: flex; flex-direction: column;">
+                <BbDialogHeader>
+                    <BbDialogTitle>Build Submitted!</BbDialogTitle>
+                    <BbDialogDescription>Your build has been sent to the shop. Would you like to schedule an installation appointment?</BbDialogDescription>
+                </BbDialogHeader>
+                <div style="padding-top: var(--space-4); display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick='@(() => { showBuildSuccessModal = false; Nav.NavigateTo("/my-builds", forceLoad: true); })'>View My Builds</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="OpenBookingModal">Schedule Appointment</BbButton>
+                </div>
+            </BbDialogContent>
+        </BbDialog>
+
+        @* ── Build Installation Booking ── *@
+        <BbDialog @bind-Open="showBookingModal">
+            <BbDialogContent Style="width: min(96vw, 560px); max-height: 90dvh; padding: var(--space-5); display: flex; flex-direction: column;">
+                <BbDialogHeader>
+                    <BbDialogTitle>Build Installation</BbDialogTitle>
+                    <BbDialogDescription>Select your preferred date, time, and mechanic. The shop will confirm this appointment.</BbDialogDescription>
+                </BbDialogHeader>
+                <div style="flex: 1; overflow-y: auto; padding: var(--space-2) 0; display: flex; flex-direction: column; gap: var(--space-4);">
+                    <div>
+                        <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Date</label>
+                        <div style="display: flex; gap: var(--space-2);">
+                            <input type="date" @bind-value="bookingDate" @bind-value:format="yyyy-MM-dd" min="@DateTime.Today.ToString("yyyy-MM-dd")" style="flex: 1; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;" />
+                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="FetchBookedSlots" Disabled="@isLoadingSlots"><LucideIcon Name="refresh-cw" Size="14" /></BbButton>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Mechanic</label>
+                        <select value="@selectedMechanic" @onchange="OnMechanicChanged" style="width: 100%; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;">
+                            @foreach (var mech in mechanics)
+                            {
+                                <option value="@mech">@mech</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Time Slot</label>
+                        @if (isLoadingSlots)
+                        {
+                            <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-xs);">Loading slots...</div>
+                        }
+                        else
+                        {
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);">
+                                @foreach (var time in GenerateAllTimeSlots())
+                                {
+                                    bool isAvailable = IsTimeSlotAvailable(time);
+                                    bool isSelected = bookingTime?.ToString("HH:mm") == time;
+                                    <button @onclick="@(() => { if (isAvailable) { bookingTime = TimeOnly.Parse(time); bookingError = null; } })" style="height: 36px; padding: 0 var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); cursor: @(isAvailable ? "pointer" : "not-allowed"); font-family: var(--font-sans); display: flex; align-items: center; justify-content: center; border: 1px solid @(isSelected ? "var(--primary)" : "var(--border)"); background-color: @(isSelected ? "var(--primary)" : "var(--muted)"); color: @(isSelected ? "var(--primary-foreground)" : isAvailable ? "var(--foreground)" : "var(--muted-foreground)"); opacity: @(isAvailable ? "1" : "0.4");">@FormatSlot(time)</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(bookingError))
+                    {
+                        <div role="alert" style="padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive-muted-foreground); font-size: var(--text-xs);">@bookingError</div>
+                    }
+                </div>
+                <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding-top: var(--space-3); display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => showBookingModal = false)">Skip</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmBooking" Disabled="@(bookingTime == null || isScheduling)">@(isScheduling ? "Booking..." : "Book Appointment")</BbButton>
+                </div>
+            </BbDialogContent>
+        </BbDialog>
+
         @* ── End of layout ── *@
     </Authorized>
 
@@ -528,6 +596,7 @@
     private bool isProcessing = false;
     private string statusMessage = "";
     private bool isSuccess = false;
+    private bool showBuildSuccessModal = false;
     private bool mobileDrawerOpen = true;
 
     private bool showBookingModal = false;
@@ -708,7 +777,9 @@
                 isSuccess = true;
                 selectedParts.Clear();
                 selectedPackageIds.Clear();
+                bookingMotorcycleId = selectedMotorcycleId;
                 selectedMotorcycleId = null;
+                showBuildSuccessModal = true;
             }
             else { statusMessage = "Failed to submit build."; isSuccess = false; }
         }
@@ -716,7 +787,7 @@
         finally { isProcessing = false; }
     }
 
-    private async Task OpenDetailedBooking()
+    private async Task OpenBookingModal()
     {
         showBuildSuccessModal = false;
         bookingDate = DateTime.Today.AddDays(3);
