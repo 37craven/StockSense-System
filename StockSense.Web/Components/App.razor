@@ -1,44 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <script>
-        (function () {
-            var intendedDark = localStorage.getItem('theme') === 'dark';
+            (function() {
+                var intendedDark = localStorage.getItem('theme') === 'dark';
 
-            function applyTheme() {
-                intendedDark = localStorage.getItem('theme') === 'dark';
-                if (intendedDark) {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
+                function applyTheme() {
+                    intendedDark = localStorage.getItem('theme') === 'dark';
+                    if (intendedDark) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
                 }
-            }
 
-            applyTheme();
-            document.addEventListener('blazor:navigated', applyTheme);
+                applyTheme();
+                // .NET 8 Enhanced Navigation theme hook
+                document.addEventListener('blazor:enhancedload', applyTheme);
 
-            const observer = new MutationObserver(function () {
-                if (intendedDark && !document.documentElement.classList.contains('dark')) {
-                    document.documentElement.classList.add('dark');
-                }
-            });
+                const observer = new MutationObserver(function() {
+                    if (intendedDark && !document.documentElement.classList.contains('dark')) {
+                        document.documentElement.classList.add('dark');
+                    }
+                });
 
-            observer.observe(document.documentElement, {
-                attributes: true,
-                attributeFilter: ['class']
-            });
+                observer.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
 
-            window.setTheme = function (dark) {
-                intendedDark = dark;
-                localStorage.setItem('theme', dark ? 'dark' : 'light');
-                if (dark) {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-            };
-        })();
+                window.setTheme = function(dark) {
+                    intendedDark = dark;
+                    localStorage.setItem('theme', dark ? 'dark' : 'light');
+                    if (dark) {
+                        document.documentElement.classList.add('dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                    }
+                };
+            })();
     </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -46,16 +46,15 @@
     <link rel="stylesheet" href="styles/tailwind.css" />
     <link rel="stylesheet" href="styles/app.css" />
 
-
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
     <link rel="stylesheet" href="styles/theme.css" />
     <link rel="stylesheet" href="StockSense.Web.styles.css" />
 
     <link rel="icon" type="image/png" href="favicon.png" />
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
     <HeadOutlet />
 </head>
-
 <body>
     <CascadingAuthenticationState>
         <Routes />
@@ -68,42 +67,109 @@
 
     <script src="_framework/blazor.web.js"></script>
     <script src="js/barcodeScanner.js"></script>
-    <script>
-        window.triggerDownload = async (url, fileName) => {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    console.error('Download failed:', response.status, response.statusText);
-                    return;
-                }
-                const blob = await response.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = fileName;
-                document.body.appendChild(link);
-                link.click();
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(blobUrl);
-                }, 5000);
-            } catch (e) {
-                console.error('Download error:', e);
-            }
-        };
 
-        window.pinnedSlipsStorage = {
-            get: function (key) {
-                return localStorage.getItem(key) || '';
-            },
-            set: function (key, value) {
-                localStorage.setItem(key, value);
-            },
-            remove: function (key) {
-                localStorage.removeItem(key);
-            }
-        };
+    <!-- Aggressive .NET 8 Title Enforcer -->
+    <script>
+            (function() {
+                var titleMap = {
+                    '/': 'Home',
+                    '/Dashboard': 'Dashboard',
+                    '/assistance': 'Assistance',
+                    '/auth': 'Auth',
+                    '/my-bookings': 'My Appointments',
+                    '/appointment': 'Book Appointment',
+                    '/my-builds': 'My Builds',
+                    '/build': 'Browse All Parts',
+                    '/admin/management': 'System Management',
+                    '/admin/prebuilts': 'Manage Pre-Built Packages',
+                    '/admin/services': 'Manage Services',
+                    '/admin/transactions': 'Transaction History',
+                    '/admin/stock': 'Safety Stock',
+                    '/admin/assistance': 'Assistance',
+                    '/admin/pos': 'Point of Sale',
+                    '/admin/orderslips': 'Generate Orders',
+                    '/admin/order-history': 'Order History',
+                    '/admin/appointments': 'Manage Appointments',
+                    '/admin/builds': 'Manage Builds',
+                    '/Error': 'Error'
+                };
+
+                var paramPatterns = [
+                    [/^\/admin\/order-slips\/\d+\/receive$/, 'Receive Order Slip'],
+                    [/^\/admin\/order-slips\/\d+$/, 'Order Slip Details']
+                ];
+
+                function getTitle(path) {
+                    var t = titleMap[path];
+                    if (t) return t;
+                    for (var i = 0; i < paramPatterns.length; i++) {
+                        if (paramPatterns[i][0].test(path)) return paramPatterns[i][1];
+                    }
+                    return null;
+                }
+
+                function enforceTitle() {
+                    var expectedTitle = getTitle(window.location.pathname);
+                    if (expectedTitle && document.title !== expectedTitle) {
+                        document.title = expectedTitle;
+                    }
+                }
+
+                // 1. Hook into standard browser navigation
+                window.addEventListener('popstate', enforceTitle);
+
+                // 2. Hook into .NET 8 Blazor Enhanced Navigation
+                document.addEventListener('blazor:enhancedload', enforceTitle);
+
+                // 3. Force override if Blazor quietly injects the raw URL into the DOM
+                new MutationObserver(function() {
+                    enforceTitle();
+                }).observe(document.head, {
+                    childList: true,
+                    characterData: true,
+                    subtree: true
+                });
+
+                // Initial load
+                enforceTitle();
+            })();
+    </script>
+
+    <script>
+            window.triggerDownload = async (url, fileName) => {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        console.error('Download failed:', response.status, response.statusText);
+                        return;
+                    }
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(blobUrl);
+                    }, 5000);
+                } catch (e) {
+                    console.error('Download error:', e);
+                }
+            };
+
+            window.pinnedSlipsStorage = {
+                get: function(key) {
+                    return localStorage.getItem(key) || '';
+                },
+                set: function(key, value) {
+                    localStorage.setItem(key, value);
+                },
+                remove: function(key) {
+                    localStorage.removeItem(key);
+                }
+            };
     </script>
 </body>
-
 </html>

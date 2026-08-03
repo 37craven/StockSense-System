@@ -5,7 +5,7 @@
 @implements IAsyncDisposable
 
 <section style="display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; background: var(--background); color: var(--foreground); position: relative;" aria-labelledby="assistance-title">
-    <h1 id="assistance-title" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;">StockSense assistant</h1>
+    <h1 id="assistance-title" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;">Sap Shop assistant</h1>
 
     @if (messages.Count > 0)
     {
@@ -52,7 +52,7 @@
                 {
                     var isUser = msg.Role == "user";
                     <div style="display: flex; flex-direction: column; @(isUser ? "align-items: flex-end;" : "align-items: flex-start;")">
-                        <span class="sr-only">@(isUser ? "You" : "StockSense assistant"):</span>
+                        <span class="sr-only">@(isUser ? "You" : "Sap Shop assistant"):</span>
                         @if (isUser)
                         {
                             <div style="max-width: 80%; padding: 10px 18px; border-radius: 20px; border-bottom-right-radius: 6px; background: var(--primary); color: var(--primary-foreground); font-size: 14px; line-height: 1.55;">
@@ -93,7 +93,7 @@
                           rows="1"
                           maxlength="8000"
                           disabled="@isSending"
-                          placeholder="Message StockSense..."
+                          placeholder="Message Sap Shop..."
                           aria-label="Message"
                           style="flex: 1; min-height: 22px; max-height: 160px; resize: none; border: none; background: transparent; font-size: 14px; line-height: 1.5; color: var(--foreground); outline: none;"></textarea>
                 <button @onclick="SendAsync"

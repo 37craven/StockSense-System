@@ -45,7 +45,7 @@ public sealed class ApiErrorMessageTests
 
     [Theory]
     [InlineData("{\"error\":\"Request failed (409).\"}")]
-    [InlineData("{\"error\":\"System.InvalidOperationException: failed at StockSense.Service\"}")]
+    [InlineData("{\"error\":\"System.InvalidOperationException: failed at Sap Shop.Service\"}")]
     [InlineData("{\"title\":\"Internal Server Error\",\"traceId\":\"abc\"}")]
     [InlineData("<html><body>500 Server Error</body></html>")]
     public async Task Technical_or_raw_payloads_use_a_safe_fallback(string body)

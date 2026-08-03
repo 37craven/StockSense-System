@@ -74,7 +74,7 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddScoped(sp => new HttpClient
 {
-    BaseAddress = new Uri("https://stocksense-chatbot-eteze2dwh4hzfqg8.eastasia-01.azurewebsites.net/")
+    BaseAddress = new Uri("https://stocksense-chatbot-eteze2dwh4hzfqg8.malaysiawest-01.azurewebsites.net/")
 });
 
 // --- 4. IDENTITY ---

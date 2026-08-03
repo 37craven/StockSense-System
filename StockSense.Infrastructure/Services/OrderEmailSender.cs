@@ -20,7 +20,7 @@ public class OrderEmailSender
             throw new InvalidOperationException("SMTP user is not configured.");
 
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress("StockSense Orders", smtpUser));
+        message.From.Add(new MailboxAddress("SapShop Orders", smtpUser));
         message.To.Add(new MailboxAddress("", toEmail));
         message.Subject = subject;
 

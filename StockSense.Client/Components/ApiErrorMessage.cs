@@ -160,7 +160,7 @@ public static partial class ApiErrorMessage
         string[] technicalMarkers =
         [
             "exception", "stack trace", "traceid", "status code", "reasonphrase",
-            "system.", "microsoft.", "sqlserver", "inner exception", " at stockSense.",
+            "system.", "microsoft.", "sqlserver", "inner exception", " at Sap Shop.",
             "internal server error"
         ];
         return !technicalMarkers.Any(marker => text.Contains(marker, StringComparison.OrdinalIgnoreCase));

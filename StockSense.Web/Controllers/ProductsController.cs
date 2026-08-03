@@ -173,7 +173,8 @@ public class ProductsController : ControllerBase
         var stockBefore = product.CurrentStock;
         product.Barcode = newBarcode;
         product.Price = dto.Price;
-        product.UnitCost = dto.UnitCost;
+        if (dto.UnitCost.HasValue) product.UnitCost = dto.UnitCost.Value;
+        product.SupplierId = dto.SupplierId;
         if (dto.ReorderTarget.HasValue) product.ReorderTarget = dto.ReorderTarget.Value;
         if (dto.CurrentStock.HasValue) product.CurrentStock = dto.CurrentStock.Value;
 

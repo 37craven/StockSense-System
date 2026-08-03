@@ -22,7 +22,7 @@ public class EmailSender : IEmailSender<ApplicationUser>
             <div style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px;'>
                 <div style='max-width: 450px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
                     <h1 style='text-align: center; font-size: 24px; font-weight: 600; color: #09090b; margin: 0;'>Confirm your email</h1>
-                    <h2 style='text-align: center; font-size: 16px; font-weight: 500; color: #71717a; margin-top: 8px; margin-bottom: 24px;'>Welcome to StockSense!</h2>
+                    <h2 style='text-align: center; font-size: 16px; font-weight: 500; color: #71717a; margin-top: 8px; margin-bottom: 24px;'>Welcome to Sap Shop!</h2>
                     <div style='border-top: 1px solid #e4e4e7; margin: 24px 0;'></div>
                     <p style='text-align: center; font-size: 14px; color: #71717a; margin-bottom: 24px;'>
                         Please confirm your account registration by clicking the button below.
@@ -34,7 +34,7 @@ public class EmailSender : IEmailSender<ApplicationUser>
                     </div>
                 </div>
             </div>";
-        await SendEmailAsync(email, "StockSense - Confirm your email", htmlMessage);
+        await SendEmailAsync(email, "Sap Shop - Confirm your email", htmlMessage);
     }
 
     public async Task SendPasswordResetLinkAsync(ApplicationUser user, string email, string resetLink)
@@ -43,7 +43,7 @@ public class EmailSender : IEmailSender<ApplicationUser>
             <div style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px;'>
                 <div style='max-width: 450px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
                     <h1 style='text-align: center; font-size: 24px; font-weight: 600; color: #09090b; margin: 0;'>Reset your password</h1>
-                    <h2 style='text-align: center; font-size: 16px; font-weight: 500; color: #71717a; margin-top: 8px; margin-bottom: 24px;'>StockSense Account Recovery</h2>
+                    <h2 style='text-align: center; font-size: 16px; font-weight: 500; color: #71717a; margin-top: 8px; margin-bottom: 24px;'>Sap Shop Account Recovery</h2>
                     <div style='border-top: 1px solid #e4e4e7; margin: 24px 0;'></div>
                     <p style='text-align: center; font-size: 14px; color: #71717a; margin-bottom: 24px;'>
                         We received a request to reset the password for your account. Click the button below to choose a new password.
@@ -58,7 +58,7 @@ public class EmailSender : IEmailSender<ApplicationUser>
                     </p>
                 </div>
             </div>";
-        await SendEmailAsync(email, "StockSense - Reset your password", htmlMessage);
+        await SendEmailAsync(email, "Sap Shop - Reset your password", htmlMessage);
     }
 
     public async Task SendPasswordResetCodeAsync(ApplicationUser user, string email, string resetCode)
@@ -67,7 +67,7 @@ public class EmailSender : IEmailSender<ApplicationUser>
             <div style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px;'>
                 <div style='max-width: 450px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
                     <h1 style='text-align: center; font-size: 24px; font-weight: 600; color: #09090b; margin: 0;'>Your Reset Code</h1>
-                    <h2 style='text-align: center; font-size: 16px; font-weight: 500; color: #71717a; margin-top: 8px; margin-bottom: 24px;'>StockSense Account Recovery</h2>
+                    <h2 style='text-align: center; font-size: 16px; font-weight: 500; color: #71717a; margin-top: 8px; margin-bottom: 24px;'>Sap Shop Account Recovery</h2>
                     <div style='border-top: 1px solid #e4e4e7; margin: 24px 0;'></div>
                     <p style='text-align: center; font-size: 14px; color: #71717a; margin-bottom: 16px;'>
                         Please use the following code to reset your password:
@@ -77,13 +77,13 @@ public class EmailSender : IEmailSender<ApplicationUser>
                     </div>
                 </div>
             </div>";
-        await SendEmailAsync(email, "StockSense - Your password reset code", htmlMessage);
+        await SendEmailAsync(email, "Sap Shop - Your password reset code", htmlMessage);
     }
 
     public async Task SendEmailAsync(string toEmail, string subject, string body)
     {
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress("StockSense Support", _config["Smtp:User"] ?? "noreply@yourdomain.com"));
+        message.From.Add(new MailboxAddress("Sap Shop Support", _config["Smtp:User"] ?? "noreply@yourdomain.com"));
         message.To.Add(new MailboxAddress("", toEmail));
         message.Subject = subject;
         message.Body = new TextPart("html") { Text = body };

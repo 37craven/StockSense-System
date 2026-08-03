@@ -11,7 +11,7 @@ public class UpdateProductDto
     public decimal Price { get; set; }
 
     [Range(typeof(decimal), "0", "9999999")]
-    public decimal UnitCost { get; set; } = 0m;
+    public decimal? UnitCost { get; set; }
 
     [Range(0, 99_999)]
     public int? ReorderTarget { get; set; }
@@ -22,6 +22,8 @@ public class UpdateProductDto
     public byte[] RowVersion { get; set; } = [];
 
     public string? Barcode { get; set; }
+
+    public int? SupplierId { get; set; }
 }
 
 public sealed class UpdateProductInventoryDto

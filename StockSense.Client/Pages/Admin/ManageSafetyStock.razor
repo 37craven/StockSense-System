@@ -10,7 +10,6 @@
 @attribute [Authorize(Roles = "Admin, Employee")]
 @implements IDisposable
 
-<PageTitle>Safety Stock</PageTitle>
 
 <BbPortalHost />
 <BbDialogProvider />
@@ -186,6 +185,35 @@
                 </section>
                 <AuthorizeView Roles="Admin">
                   <Authorized>
+                    <section aria-labelledby="supplier-mapping-heading">
+                        <div class="section-heading"><div><h3 id="supplier-mapping-heading">Supplier mapping</h3><p>Assign or change the supplier for this product.</p></div></div>
+                        <div class="editor-grid two-fields">
+                            <label for="detail-supplier">Supplier
+                                <select id="detail-supplier" @bind="detailSupplierId" class="field">
+                                    <option value="">None</option>
+                                    @foreach (var s in supplierList)
+                                    {
+                                        <option value="@s.Id">@s.Name</option>
+                                    }
+                                </select>
+                            </label>
+                        </div>
+                        @if (!showAddSupplierForm)
+                        {
+                            <div class="section-actions"><BbButton OnClick="SaveProductSupplier" Disabled="@(ModalOperationLocked || supplierSaving)">@if (supplierSaving) { <BbSpinner Size="SpinnerSize.Small" /> } Save supplier</BbButton><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="OpenAddSupplierForm">+ Add new supplier</BbButton></div>
+                        }
+                        else
+                        {
+                            <div class="editor-grid" style="grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-2);">
+                                <label>Supplier name<input @bind="newSupplierName" class="field" placeholder="e.g. Motostar" maxlength="200" /></label>
+                                <label>Email<input @bind="newSupplierEmail" class="field" type="email" placeholder="supplier@example.com" maxlength="200" /></label>
+                                <label>Mobile number<input @bind="newSupplierMobile" class="field" type="tel" placeholder="09123456789" maxlength="50" /></label>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(newSupplierError)) { <p role="alert" class="form-error">@newSupplierError</p> }
+                            <div class="section-actions" style="margin-top: var(--space-2);"><BbButton OnClick="AddNewSupplier" Disabled="@(string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier)">@if (addingSupplier) { <BbSpinner Size="SpinnerSize.Small" /> } Add supplier</BbButton><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="CancelAddSupplierForm" Disabled="addingSupplier">Cancel</BbButton></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(supplierUpdateError)) { <p role="alert" class="form-error">@supplierUpdateError</p> }
+                    </section>
                     <section aria-labelledby="inventory-values-heading">
                         <div class="section-heading"><div><h3 id="inventory-values-heading">Price and stock</h3><p>Changes are audited and require a reason.</p></div></div>
                         <div class="editor-grid two-fields"><label for="edit-price">Selling price<input id="edit-price" class="field" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock">Current stock<input id="edit-stock" class="field" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
@@ -380,13 +408,13 @@
     private CancellationTokenSource? detailSettingsCts;
     private long detailGeneration;
     private ProductInventorySettingDto? settings;
-    private bool productSaving, imageUploading;
+    private bool productSaving, imageUploading, supplierSaving, addingSupplier, showAddSupplierForm;
     private IBrowserFile? selectedImageFile;
     private const long MaxImageBytes = 5 * 1024 * 1024;
     private int editingProductId, originalStock, imageInputKey;
     private decimal originalPrice;
     private byte[] editingProductRowVersion = [];
-    private string editingProductName = "", editPriceText = "", editStockText = "", stockCorrectionReason = "", productEditorError = "", imagePreviewUrl = "", imageUploadError = "";
+    private string editingProductName = "", editPriceText = "", editStockText = "", stockCorrectionReason = "", productEditorError = "", imagePreviewUrl = "", imageUploadError = "", supplierUpdateError = "", newSupplierName = "", newSupplierEmail = "", newSupplierMobile = "", newSupplierError = "";
     private bool TryPrice(out decimal value) => decimal.TryParse(editPriceText, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, out value);
     private bool TryStock(out int value) => int.TryParse(editStockText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.CurrentCulture, out value);
     private bool editPriceInvalid => !TryPrice(out var value) || value <= 0 || decimal.Round(value, 2) != value;
@@ -396,7 +424,9 @@
     private bool ProductWillChange => (TryPrice(out var price) && price != originalPrice)
                                       || StockWillChange;
     private bool ProductEditorValid => !editPriceInvalid && !editStockInvalid && !reasonInvalid;
-    private bool ModalOperationLocked => busy || productSaving || imageUploading;
+    private bool ModalOperationLocked => busy || productSaving || imageUploading || supplierSaving || addingSupplier;
+    private List<SupplierDto> supplierList = [];
+    private int? detailSupplierId;
     private string CurrentImagePreview => string.IsNullOrWhiteSpace(imagePreviewUrl) ? selectedRow?.ImageUrl ?? string.Empty : imagePreviewUrl;
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -428,6 +458,15 @@
             rows = null;
             error = ApiErrorMessage.FromException(ex, "Inventory data could not be loaded. Please try again.");
             loadFailed = true;
+        }
+
+        try
+        {
+            supplierList = await Http.GetFromJsonAsync<List<SupplierDto>>("api/suppliers") ?? [];
+        }
+        catch
+        {
+            supplierList = [];
         }
     }
     private void Toggle(int id, ChangeEventArgs e) { if (e.Value is true) selectedIds.Add(id); else selectedIds.Remove(id); }
@@ -466,6 +505,8 @@
         editStockText = row.CurrentStock.ToString(System.Globalization.CultureInfo.CurrentCulture);
         stockCorrectionReason = "";
         productEditorError = "";
+        supplierUpdateError = "";
+        detailSupplierId = row.SupplierId;
         selectedImageFile = null;
         imagePreviewUrl = "";
         imageUploadError = "";
@@ -482,6 +523,8 @@
         selectedRow = null;
         settings = null;
         settingsError = "";
+        showAddSupplierForm = false;
+        newSupplierError = "";
         selectedImageFile = null;
         imagePreviewUrl = "";
         imageUploadError = "";
@@ -536,6 +579,82 @@
         finally
         {
             productSaving = false;
+        }
+    }
+    private async Task SaveProductSupplier()
+    {
+        if (ModalOperationLocked || selectedRow is null || selectedRow.ProductId != editingProductId) return;
+        var targetProductId = selectedRow.ProductId;
+        supplierSaving = true;
+        supplierUpdateError = "";
+        try
+        {
+            var dto = new UpdateProductDto
+            {
+                Id = targetProductId,
+                Price = selectedRow.Price,
+                SupplierId = detailSupplierId,
+                RowVersion = editingProductRowVersion
+            };
+            using var response = await Http.PutAsJsonAsync($"api/products/{targetProductId}", dto);
+            await EnsureSuccess(response);
+            await LoadAsync();
+            if (!RefreshSelectedRow()) return;
+            Toast.Success($"Supplier updated for {editingProductName}.", "Product updated");
+        }
+        catch (Exception ex)
+        {
+            supplierUpdateError = ApiErrorMessage.FromException(ex, "The supplier could not be updated. Please try again.");
+        }
+        finally
+        {
+            supplierSaving = false;
+        }
+    }
+    private void OpenAddSupplierForm()
+    {
+        if (ModalOperationLocked) return;
+        newSupplierName = "";
+        newSupplierEmail = "";
+        newSupplierMobile = "";
+        newSupplierError = "";
+        showAddSupplierForm = true;
+    }
+    private void CancelAddSupplierForm()
+    {
+        if (addingSupplier) return;
+        showAddSupplierForm = false;
+    }
+    private async Task AddNewSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier) return;
+        addingSupplier = true;
+        newSupplierError = "";
+        try
+        {
+            var dto = new CreateSupplierDto
+            {
+                Name = newSupplierName.Trim(),
+                Email = (newSupplierEmail ?? string.Empty).Trim(),
+                MobileNumber = (newSupplierMobile ?? string.Empty).Trim()
+            };
+            var response = await Http.PostAsJsonAsync("api/suppliers", dto);
+            await EnsureSuccess(response);
+            var created = await response.Content.ReadFromJsonAsync<SupplierDto>()
+                ?? throw new InvalidOperationException("The server returned an empty supplier result.");
+            supplierList.Add(created);
+            supplierList = supplierList.OrderBy(s => s.Name).ToList();
+            detailSupplierId = created.Id;
+            showAddSupplierForm = false;
+            Toast.Success($"Supplier \"{created.Name}\" added.", "Supplier created");
+        }
+        catch (Exception ex)
+        {
+            newSupplierError = ApiErrorMessage.FromException(ex, "The supplier could not be created. Please try again.");
+        }
+        finally
+        {
+            addingSupplier = false;
         }
     }
     private async Task HandleImageSelected(InputFileChangeEventArgs args)

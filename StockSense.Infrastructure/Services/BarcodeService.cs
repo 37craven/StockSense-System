@@ -74,7 +74,7 @@ public class BarcodeService
             }
         };
 
-        using SKBitmap bitmap = writer.Write(product.Barcode ?? $"STOCKSENSE-{product.Id}");
+        using SKBitmap bitmap = writer.Write(product.Barcode ?? $"Sap Shop-{product.Id}");
         using SKImage image = SKImage.FromBitmap(bitmap);
         using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
         return data.ToArray();
@@ -94,7 +94,7 @@ public class BarcodeService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text("StockSense").FontSize(10).FontColor(Colors.Grey.Medium);
+                    col.Item().Text("Sap Shop").FontSize(10).FontColor(Colors.Grey.Medium);
                     col.Item().Text(product.Name).FontSize(16).SemiBold();
                     col.Item().Text($"{product.Category} · {product.Brand}").FontSize(9).FontColor(Colors.Grey.Darken1);
                 });
