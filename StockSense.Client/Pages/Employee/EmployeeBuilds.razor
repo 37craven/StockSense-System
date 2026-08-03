@@ -41,13 +41,13 @@
 .col-stat { width: 12%; }
 .col-act { width: 18%; }
 @@media (max-width: 1024px) {
-    .col-cust { width: 22%; }
-    .col-date { width: 20%; }
+    .col-cust { width: 28%; }
+    .col-date { display: none; }
     .col-type { display: none; }
-    .col-items { width: 15%; }
-    .col-total { width: 15%; }
-    .col-stat { width: 15%; }
-    .col-act { width: 28%; }
+    .col-items { width: 16%; }
+    .col-total { width: 16%; }
+    .col-stat { width: 16%; }
+    .col-act { width: 24%; }
 }
 @@media (max-width: 768px) {
     .col-cust { width: 35%; }
@@ -157,7 +157,7 @@
                                     }
                                 </td>
                                 <td style="padding: 12px 16px;" class="col-items">
-                                    <span style="background: var(--muted); padding: 2px 8px; border-radius: 4px; font-size: var(--text-xs);">@actualParts.Count items</span>
+                                    <span style="background: var(--muted); padding: 2px 8px; border-radius: 4px; font-size: var(--text-xs);">@actualParts.Count</span>
                                 </td>
                                 <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);" class="col-total">
                                     ₱@actualParts.Sum(p => p.Price).ToString("F0")

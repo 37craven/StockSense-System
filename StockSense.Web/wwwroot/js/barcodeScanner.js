@@ -40,7 +40,7 @@ window.barcodeScanner = (function () {
         currentIndex = 0;
     }
 
-    async function cycleCamera() {
+    async function cycleCamera(elementId) {
         if (allCameras.length === 0) {
             await refreshCameraList();
         }
@@ -48,10 +48,10 @@ window.barcodeScanner = (function () {
 
         // Cycle to next camera
         currentIndex = (currentIndex + 1) % allCameras.length;
-        await switchToCamera(allCameras[currentIndex].deviceId);
+        await switchToCamera(allCameras[currentIndex].deviceId, elementId);
     }
 
-    async function switchToCamera(deviceId) {
+    async function switchToCamera(deviceId, elementId) {
         if (!html5QrCode || !dotNetRef) return;
 
         // Save ref and stop current
@@ -61,10 +61,11 @@ window.barcodeScanner = (function () {
         dotNetRef = null;
 
         // Find the container element and restart
-        const container = document.querySelector("#barcode-camera-container");
+        const containerId = elementId || "barcode-camera-container";
+        const container = document.querySelector("#" + containerId);
         if (!container) return;
 
-        html5QrCode = new Html5Qrcode(container.id);
+        html5QrCode = new Html5Qrcode(containerId);
         dotNetRef = ref;
 
         const config = { fps: 10, aspectRatio: 1.777 };

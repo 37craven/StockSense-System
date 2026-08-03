@@ -7,6 +7,18 @@
     scrollbar-color: var(--border) transparent;
 }
 
+/* Hide number input spinners globally */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -253,5 +265,195 @@
 
     .admin-sidebar-mobile-trigger {
         display: block !important;
+    }
+}
+
+
+/* =============================================================================
+   POS — Toggle switch (pseudo-elements needed beyond Tailwind)
+   ============================================================================= */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: var(--muted);
+    border-radius: 24px;
+    transition: background-color 0.2s;
+}
+
+.slider::before {
+    content: "";
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #fff;
+    border-radius: 9999px;
+    transition: transform 0.2s;
+}
+
+.switch input:checked + .slider {
+    background-color: var(--primary);
+}
+
+.switch input:checked + .slider::before {
+    transform: translateX(20px);
+}
+
+
+/* =============================================================================
+   POS — Order summary (receipt) modal
+   ============================================================================= */
+.order-summary-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0,0,0,0.6);
+    z-index: 100;
+}
+
+.order-summary-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    z-index: 101;
+    width: 400px;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.order-summary-content {
+    overflow-y: auto;
+    color: #000;
+    font-family: 'Courier New', Courier, monospace;
+    padding-bottom: 20px;
+}
+
+.order-summary-header {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+    .order-summary-header h2 {
+        font-size: 16px;
+        margin: 0 0 5px 0;
+        font-weight: bold;
+    }
+
+    .order-summary-header p {
+        margin: 2px 0;
+        font-size: 12px;
+    }
+
+.order-summary-meta {
+    font-size: 12px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.order-summary-payment-meta {
+    padding-top: 8px;
+    border-top: 1px dashed #000;
+}
+
+.order-summary-table {
+    width: 100%;
+    font-size: 12px;
+    border-top: 1px dashed #000;
+    border-bottom: 1px dashed #000;
+    margin-bottom: 15px;
+}
+
+    .order-summary-table th, .order-summary-table td {
+        padding: 5px 2px;
+    }
+
+.order-summary-totals {
+    font-size: 12px;
+    margin-bottom: 20px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.order-summary-footer {
+    text-align: center;
+    font-size: 10px;
+    border-top: 1px dashed #000;
+    padding-top: 10px;
+}
+
+.order-summary-remarks {
+    margin-bottom: 15px;
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+.order-summary-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+    border-top: 1px solid #ccc;
+    padding-top: 15px;
+}
+
+
+/* =============================================================================
+   AdminPreBuilt — Package modal responsive layout
+   ============================================================================= */
+.apb-modal-body {
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.apb-left-panel {
+    width: 100%;
+    flex-shrink: 0;
+    max-height: 40vh;
+}
+
+.apb-right-panel {
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .apb-modal-body {
+        flex-direction: row;
+        overflow-y: hidden;
+    }
+
+    .apb-left-panel {
+        width: 320px;
+        max-height: none;
+    }
+
+    .apb-right-panel {
+        width: auto;
     }
 }

@@ -11,6 +11,7 @@
 @using BlazorBlueprint.Primitives.Services
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject ToastService Toast
 
 @attribute [Authorize]
 
@@ -19,6 +20,7 @@
     <Authorized>
         <BbPortalHost />
         <BbDialogProvider />
+        <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" />
 
         @if (isLoading)
         {
@@ -121,10 +123,6 @@
                         </div>
                         <div style="font-size: 28px; font-weight: 900; color: var(--primary); margin-top: var(--space-1); line-height: 1;">₱@TotalPrice.ToString("N0")</div>
                     </div>
-                    @if (!string.IsNullOrEmpty(statusMessage))
-                    {
-                        <div style="margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: @(isSuccess ? "var(--success-muted)" : "var(--destructive-muted)"); border: 1px solid @(isSuccess ? "var(--success-border)" : "var(--destructive-border)"); color: @(isSuccess ? "var(--success-muted-foreground)" : "var(--destructive-muted-foreground)"); font-size: var(--text-xs);">@statusMessage</div>
-                    }
                     <div style="display: flex; flex-direction: column; gap: var(--space-2);">
                         <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="SendEmailQuote" Disabled="@(isProcessing || !selectedParts.Any())">Send Quote to Email</BbButton>
                         <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="SubmitBuildToAdmin" Disabled="@(isProcessing || !selectedParts.Any())">Submit Build to Shop</BbButton>
@@ -199,11 +197,6 @@
                             }
                         }
                     </div>
-
-                    @if (!string.IsNullOrEmpty(statusMessage))
-                    {
-                        <div style="margin: 0 var(--space-4) var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: @(isSuccess ? "var(--success-muted)" : "var(--destructive-muted)"); border: 1px solid @(isSuccess ? "var(--success-border)" : "var(--destructive-border)"); color: @(isSuccess ? "var(--success-muted-foreground)" : "var(--destructive-muted-foreground)"); font-size: var(--text-xs);">@statusMessage</div>
-                    }
 
                     <div style="padding: var(--space-4); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-2);">
                         <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="SendEmailQuote" Disabled="@(isProcessing || !selectedParts.Any())">Send Quote to Email</BbButton>
@@ -439,15 +432,12 @@
                                 {
                                     bool isAvailable = IsTimeSlotAvailable(time);
                                     bool isSelected = bookingTime?.ToString("HH:mm") == time;
-                                    <button @onclick="@(() => { if (isAvailable) { bookingTime = TimeOnly.Parse(time); bookingError = null; } })" style="height: 36px; padding: 0 var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); cursor: @(isAvailable ? "pointer" : "not-allowed"); font-family: var(--font-sans); display: flex; align-items: center; justify-content: center; border: 1px solid @(isSelected ? "var(--primary)" : "var(--border)"); background-color: @(isSelected ? "var(--primary)" : "var(--muted)"); color: @(isSelected ? "var(--primary-foreground)" : isAvailable ? "var(--foreground)" : "var(--muted-foreground)"); opacity: @(isAvailable ? "1" : "0.4");">@FormatSlot(time)</button>
+                                    <button @onclick="@(() => { if (isAvailable) { bookingTime = TimeOnly.Parse(time); } })" style="height: 36px; padding: 0 var(--space-2); border-radius: var(--radius); font-size: var(--text-sm); cursor: @(isAvailable ? "pointer" : "not-allowed"); font-family: var(--font-sans); display: flex; align-items: center; justify-content: center; border: 1px solid @(isSelected ? "var(--primary)" : "var(--border)"); background-color: @(isSelected ? "var(--primary)" : "var(--muted)"); color: @(isSelected ? "var(--primary-foreground)" : isAvailable ? "var(--foreground)" : "var(--muted-foreground)"); opacity: @(isAvailable ? "1" : "0.4");">@FormatSlot(time)</button>
                                 }
                             </div>
                         }
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(bookingError))
-                    {
-                        <div role="alert" style="padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive-muted-foreground); font-size: var(--text-xs);">@bookingError</div>
-                    }
+
                 </div>
                 <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding-top: var(--space-3); display: flex; justify-content: flex-end; gap: var(--space-2);">
                     <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => showBookingModal = false)">Skip</BbButton>
@@ -594,8 +584,6 @@
     private List<int> selectedPackageIds = new();
     private bool isLoading = true;
     private bool isProcessing = false;
-    private string statusMessage = "";
-    private bool isSuccess = false;
     private bool showBuildSuccessModal = false;
     private bool mobileDrawerOpen = true;
 
@@ -606,7 +594,7 @@
     private List<string> mechanics = new() { "Any Available" };
     private List<(TimeSpan Start, TimeSpan End)> bookedIntervals = [];
     private bool isLoadingSlots;
-    private string? bookingError;
+
     private int? bookingMotorcycleId;
     private bool isScheduling;
 
@@ -635,7 +623,7 @@
         catch (Exception ex)
         {
             Console.WriteLine(ex.Message);
-            statusMessage = "Could not load inventory.";
+            Toast.Error("Could not load inventory.");
         }
         finally
         {
@@ -717,26 +705,24 @@
 
     private async Task SendEmailQuote()
     {
-        if (!selectedParts.Any()) { statusMessage = "Please select parts first."; isSuccess = false; return; }
+        if (!selectedParts.Any()) { Toast.Warning("Please select parts first."); return; }
         isProcessing = true;
-        statusMessage = "Sending email quote...";
         try
         {
             var authState = await AuthStateTask!;
             var userEmail = authState.User.Identity?.Name ?? "User";
             var response = await Http.PostAsJsonAsync("api/products/send-quote", new { UserEmail = userEmail, ProductIds = selectedParts.Select(p => p.Id).ToList() });
-            if (response.IsSuccessStatusCode) { statusMessage = "Quote sent to your email!"; isSuccess = true; }
-            else { statusMessage = "Failed to send email."; isSuccess = false; }
+            if (response.IsSuccessStatusCode) { Toast.Success("Quote sent to your email!"); }
+            else { Toast.Error("Failed to send email."); }
         }
-        catch { statusMessage = "Connection Error."; isSuccess = false; }
+        catch { Toast.Error("Connection error."); }
         finally { isProcessing = false; }
     }
 
     private async Task SubmitBuildToAdmin()
     {
-        if (!selectedParts.Any()) { statusMessage = "Please select parts first."; return; }
+        if (!selectedParts.Any()) { Toast.Warning("Please select parts first."); return; }
         isProcessing = true;
-        statusMessage = "Submitting to admin...";
         try
         {
             var authState = await AuthStateTask!;
@@ -773,17 +759,15 @@
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<BuildRequestDto>();
-                statusMessage = "Build submitted successfully!";
-                isSuccess = true;
                 selectedParts.Clear();
                 selectedPackageIds.Clear();
                 bookingMotorcycleId = selectedMotorcycleId;
                 selectedMotorcycleId = null;
                 showBuildSuccessModal = true;
             }
-            else { statusMessage = "Failed to submit build."; isSuccess = false; }
+            else { Toast.Error("Failed to submit build."); }
         }
-        catch { statusMessage = "Connection Error."; isSuccess = false; }
+        catch { Toast.Error("Connection error."); }
         finally { isProcessing = false; }
     }
 
@@ -793,7 +777,6 @@
         bookingDate = DateTime.Today.AddDays(3);
         bookingTime = null;
         selectedMechanic = "Any Available";
-        bookingError = null;
         showBookingModal = true;
         await LoadMechanicsAsync();
         await FetchBookedSlots();
@@ -865,7 +848,6 @@
     {
         if (!bookingTime.HasValue) return;
         isScheduling = true;
-        bookingError = null;
         try
         {
             var appointment = new CreateAppointmentDto
@@ -880,16 +862,17 @@
             var response = await Http.PostAsJsonAsync("api/appointments", appointment);
             if (response.IsSuccessStatusCode)
             {
+                Toast.Success("Appointment scheduled!");
                 showBookingModal = false;
             }
             else
             {
-                bookingError = await ApiErrorMessage.FromResponseAsync(response, "Could not schedule the appointment.");
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not schedule the appointment."));
             }
         }
         catch
         {
-            bookingError = "Connection error. You can book an appointment later from My Appointments.";
+            Toast.Error("Connection error. You can book an appointment later from My Appointments.");
         }
         finally { isScheduling = false; }
     }

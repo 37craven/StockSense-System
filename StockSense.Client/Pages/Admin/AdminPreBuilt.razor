@@ -197,9 +197,9 @@ else
 
 @* ── Create / Edit Package Modal ── *@
 <BbDialog @bind-Open="showCreateModal">
-    <BbDialogContent Style="display: flex; flex-direction: column; max-height: 90dvh; width: 98vw; max-width: 900px; padding: 0; overflow: hidden;">
+    <BbDialogContent class="flex flex-col overflow-hidden p-0" Style="max-height: 90dvh; width: 98vw; max-width: 900px;">
 
-        <div style="padding: var(--space-5) var(--space-5) 0 var(--space-5); flex-shrink: 0;">
+        <div class="shrink-0 px-5 pt-5">
             <BbDialogHeader>
                 <BbDialogTitle>@(isEditMode ? "Edit Package" : "Create Pre-Built Package")</BbDialogTitle>
                 <BbDialogDescription>Combine existing inventory products into a single guided package.</BbDialogDescription>
@@ -208,51 +208,51 @@ else
 
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <div style="margin: var(--space-3) var(--space-5) 0 var(--space-5); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive-muted-foreground); font-size: var(--text-xs); flex-shrink: 0;">
+            <div class="shrink-0 mx-5 mt-3 p-2 px-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-xs dark:bg-red-950 dark:border-red-800 dark:text-red-200">
                 @errorMessage
             </div>
         }
 
-        <div style="overflow: hidden; display: flex; padding: var(--space-5); gap: var(--space-5); min-width: 0;">
+        <div class="apb-modal-body flex p-5 gap-5 min-w-0">
 
             @* ── Left Panel: Package Details ── *@
-            <div style="width: 320px; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4); min-height: 0;">
+            <div class="apb-left-panel overflow-y-auto flex flex-col gap-4 min-h-0">
 
                 <div>
-                    <label style="font-size: var(--text-xs); font-weight: 600; margin-bottom: var(--space-1); display: block; color: var(--foreground);">Package Name</label>
+                    <label class="text-xs font-semibold mb-1 block text-foreground">Package Name</label>
                     <input type="text" @bind="newPackage.Name" placeholder="e.g., Touring Spec Setup"
-                           style="width: 100%; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box; outline: none;"/>
+                           class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm box-border outline-none"/>
                 </div>
 
                 <div>
-                    <label style="font-size: var(--text-xs); font-weight: 600; margin-bottom: var(--space-1); display: block; color: var(--foreground);">Description</label>
+                    <label class="text-xs font-semibold mb-1 block text-foreground">Description</label>
                     <textarea @bind="newPackage.Description" rows="3" placeholder="Describe who this build is for..."
-                              style="width: 100%; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); resize: vertical; box-sizing: border-box; outline: none;"></textarea>
+                              class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm resize-y box-border outline-none"></textarea>
                 </div>
 
                 <div>
-                    <label style="font-size: var(--text-xs); font-weight: 600; margin-bottom: var(--space-1); display: block; color: var(--foreground);">CC Gain Range</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2);">
+                    <label class="text-xs font-semibold mb-1 block text-foreground">CC Gain Range</label>
+                    <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <span style="font-size: 10px; color: var(--muted-foreground);">Min</span>
+                            <span class="text-[10px] text-muted-foreground">Min</span>
                             <input type="number" @bind="newPackage.MinAddedCC" placeholder="20"
-                                   style="width: 100%; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box; outline: none;"/>
+                                   class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm box-border outline-none"/>
                         </div>
                         <div>
-                            <span style="font-size: 10px; color: var(--muted-foreground);">Max</span>
+                            <span class="text-[10px] text-muted-foreground">Max</span>
                             <input type="number" @bind="newPackage.MaxAddedCC" placeholder="30"
-                                   style="width: 100%; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box; outline: none;"/>
+                                   class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm box-border outline-none"/>
                         </div>
                     </div>
-                    <p style="font-size: 10px; color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Estimated displacement gain for the customer's stock engine.</p>
+                    <p class="text-[10px] text-muted-foreground mt-1 mb-0">Estimated displacement gain for the customer&rsquo;s stock engine.</p>
                 </div>
 
-                <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                    <label style="font-size: var(--text-xs); font-weight: 600; margin-bottom: var(--space-1); display: block; color: var(--foreground);">Compatible Motors <span style="font-weight: 400; color: var(--muted-foreground);">(@newPackage.CompatibleMotors.Count selected)</span></label>
-                    <div style="flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); min-height: 0;">
+                <div class="flex-1 flex flex-col min-h-0">
+                    <label class="text-xs font-semibold mb-1 block text-foreground">Compatible Motors <span class="font-normal text-muted-foreground">(@newPackage.CompatibleMotors.Count selected)</span></label>
+                    <div class="flex-1 overflow-y-auto border border-border rounded-md min-h-0">
                         @if (!motorcycles.Any())
                         {
-                            <div style="padding: var(--space-6) var(--space-3); text-align: center; color: var(--muted-foreground); font-size: var(--text-xs);">
+                            <div class="p-6 px-3 text-center text-muted-foreground text-xs">
                                 No motorcycles yet.<br/>Add them under &ldquo;Manage Motorcycles.&rdquo;
                             </div>
                         }
@@ -261,12 +261,12 @@ else
                             @foreach (var motor in motorcycles)
                             {
                                 var isSelected = IsMotorSelected(motor);
-                                <label style="display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; background: @(isSelected ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent");">
+                                <label class="flex items-center gap-2 p-2 px-3 border-b border-border cursor-pointer" style="background: @(isSelected ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent")">
                                     <input type="checkbox" checked="@isSelected" @onchange="() => ToggleMotor(motor)"
-                                           style="accent-color: var(--primary); flex-shrink: 0; width: 16px; height: 16px; cursor: pointer;"/>
-                                    <div style="min-width: 0;">
-                                        <div style="font-size: var(--text-xs); font-weight: 500; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@motor.Brand @motor.Model</div>
-                                        <div style="font-size: 10px; color: var(--muted-foreground);">@motor.BaseCC</div>
+                                           class="accent-primary shrink-0 w-4 h-4 cursor-pointer"/>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-medium text-foreground truncate">@motor.Brand @motor.Model</div>
+                                        <div class="text-[10px] text-muted-foreground">@motor.BaseCC</div>
                                     </div>
                                 </label>
                             }
@@ -276,9 +276,9 @@ else
             </div>
 
             @* ── Right Panel: Product Catalog ── *@
-            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
-                <label style="font-size: var(--text-xs); font-weight: 600; margin-bottom: var(--space-1); display: block; color: var(--foreground); flex-shrink: 0;">Select Products <span style="font-weight: 400; color: var(--muted-foreground);">(@newPackage.SelectedProductIds.Count selected)</span></label>
-                <div style="height: 50vh; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column;">
+            <div class="apb-right-panel flex-1 min-w-0 flex flex-col">
+                <label class="text-xs font-semibold mb-1 block text-foreground shrink-0">Select Products <span class="font-normal text-muted-foreground">(@newPackage.SelectedProductIds.Count selected)</span></label>
+                <div class="overflow-hidden border border-border rounded-md flex flex-col" style="height: 50vh">
                     <ProductCatalog Columns="3"
                                     OnProductClick="p => ToggleProductSelection(p.Id)"
                                     IsSelected="p => newPackage.SelectedProductIds.Contains(p.Id)"
@@ -290,12 +290,12 @@ else
         </div>
 
         @* ── Footer ── *@
-        <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding: var(--space-4) var(--space-5); display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap;">
+        <div class="shrink-0 border-t border-border p-4 px-5 flex justify-between items-center gap-3 flex-wrap">
             <div>
-                <span style="font-size: var(--text-xs); color: var(--muted-foreground);">Total Price</span>
-                <span style="font-size: var(--text-lg); font-weight: 800; color: var(--primary); margin-left: var(--space-2);">₱@CalculateCurrentTotal().ToString("N0")</span>
+                <span class="text-xs text-muted-foreground">Total Price</span>
+                <span class="text-lg font-black text-primary ml-2">₱@CalculateCurrentTotal().ToString("N0")</span>
             </div>
-            <div style="display: flex; gap: var(--space-2);">
+            <div class="flex gap-2">
                 <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showCreateModal = false">Cancel</BbButton>
                 <BbButton Variant="ButtonVariant.Default" OnClick="SubmitPackage" Disabled="isProcessing">
                     @if (isProcessing)

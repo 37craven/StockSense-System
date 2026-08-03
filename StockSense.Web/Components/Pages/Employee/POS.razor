@@ -6,12 +6,14 @@
 @using StockSense.Infrastructure.Data.Repositories
 @using StockSense.Web.Helpers
 @using StockSense.Web.Options
+@using BlazorBlueprint.Primitives.Services
 @inject ProductRepository ProductRepo
 @inject TransactionHelper SaleService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
 @inject ILogger<POS> Logger
+@inject ToastService Toast
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -19,28 +21,38 @@
 
 <PageTitle>Point of Sale</PageTitle>
 
-@* Added the 'no-print' class so this entire section hides when generating the PDF/Print *@
+<BbPortalHost />
+<BbDialogProvider />
+
+@* ═══════════════════════════════════════════════════════════════════════
+   MAIN WRAPPER — mobile-first single-column, md+: two-column
+   ═══════════════════════════════════════════════════════════════════════ *@
 <div class="pos-wrapper no-print">
 
-    @* --- PRODUCT CATALOG --- *@
-    <ProductCatalog @ref="catalog"
-                    OnProductClick="AddToCart"
-                    IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
+    @* ─── PRODUCT CATALOG ─── *@
+    <div class="pos-catalog flex-1 min-w-0 overflow-hidden bg-card border border-border rounded-lg flex flex-col"
+         style="@(scannerEnabled ? "padding-bottom: 360px" : "padding-bottom: 56px")">
+        <ProductCatalog @ref="catalog"
+                        OnProductClick="AddToCart"
+                        IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
+    </div>
 
-    @* --- RIGHT COLUMN (desktop): order summary + scanner card --- *@
-    <div class="pos-right">
-        <div class="pos-cart-desktop">
-            <div style="flex-shrink: 0; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: var(--space-2);">
+    @* ─── DESKTOP RIGHT COLUMN: cart + scanner ─── *@
+    <div class="pos-desktop-right flex flex-col gap-4">
+
+        @* Cart card *@
+        <div class="flex-1 min-h-0 flex flex-col overflow-hidden bg-card border border-border rounded-lg">
+            <div class="shrink-0 px-6 py-4 border-b border-border flex items-center gap-2">
                 <LucideIcon Name="shopping-cart" Size="18" />
-                <span style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--card-foreground);">Current Order</span>
+                <span class="text-base font-semibold text-foreground">Current Order</span>
             </div>
 
-            <div style="flex: 1; overflow-x: hidden; overflow-y: auto; padding: var(--space-4);">
+            <div class="flex-1 overflow-x-hidden overflow-y-auto p-4">
                 @if (!cart.Any())
                 {
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: var(--space-3); color: var(--muted-foreground);">
+                    <div class="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
                         <LucideIcon Name="shopping-cart" Size="40" />
-                        <p style="font-size: var(--text-sm); margin: 0;">Cart is empty</p>
+                        <p class="text-sm m-0">Cart is empty</p>
                     </div>
                 }
                 else
@@ -49,142 +61,149 @@
                 }
             </div>
 
-            @CartFooter()
-        </div>
-
-        @* --- SCANNER CARD --- *@
-        <div class="pos-scanner-card">
-            <div class="pos-scanner-header">
-                <div style="display: flex; align-items: center; gap: var(--space-2);">
-                    <LucideIcon Name="scan-line" Size="16" />
-                    <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--card-foreground);">Barcode Scanner</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: var(--space-2);">
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleCamera" title="Flip camera">
-                        <LucideIcon Name="switch-camera" Size="16" />
-                    </BbButton>
-                    <label class="switch">
-                        <input type="checkbox" @bind="scannerEnabled" />
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            @if (scannerEnabled)
+            @if (cart.Any())
             {
-                <div class="pos-scanner-body">
-                    <div id="barcode-camera-container" class="@CameraClass"></div>
-
-                    @if (!string.IsNullOrEmpty(scanErrorMessage))
+                <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
+                    @if (!string.IsNullOrEmpty(statusMessage))
                     {
-                        <div class="pos-scanner-msg error">@scanErrorMessage</div>
-                    }
-                    else if (scannedProduct != null)
-                    {
-                        <div class="pos-scanner-result">
-                            <div class="pos-scanner-product-info">
-                                <span class="pos-scanner-product-name">@scannedProduct.Name</span>
-                                <span class="pos-scanner-product-price">₱@scannedProduct.Price.ToString("N2")</span>
-                                <span class="pos-scanner-product-stock">Stock: @scannedProduct.CurrentStock</span>
-                            </div>
-                            @if (scannedProduct.CurrentStock <= 0)
-                            {
-                                <div class="pos-scanner-msg error">Out of stock — cannot add.</div>
-                            }
-                            else
-                            {
-                                <div class="pos-scanner-qty-row">
-                                    <label>Qty:</label>
-                                    <input type="number" @bind="scanQuantity" min="1" max="@scannedProduct.CurrentStock" />
-                                </div>
-                            }
-                            <div class="pos-scanner-actions">
-                                <BbButton Variant="ButtonVariant.Outline" Class="flex-1" OnClick="DiscardScannedItem">Discard</BbButton>
-                                <BbButton Variant="ButtonVariant.Default" Class="flex-1" OnClick="ConfirmScannedItem" Disabled="@(scannedProduct.CurrentStock <= 0)">Add to Order</BbButton>
-                            </div>
+                        <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+                            @statusMessage
                         </div>
                     }
-                    else
-                    {
-                        <div class="pos-scanner-waiting"></div>
-                    }
+                    <div class="grid gap-2">
+                        <div class="flex justify-between text-muted-foreground text-sm">
+                            <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
+                        </div>
+                        <div class="flex justify-between text-muted-foreground text-sm">
+                            <span>Discount</span><span>-₱@TotalDiscount.ToString("N2")</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-base font-semibold text-foreground">Total</span>
+                            <span class="text-xl font-bold text-primary">₱@TotalAmount.ToString("N2")</span>
+                        </div>
+                    </div>
+                    @CheckoutFields("desktop")
+                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="Checkout" Disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <BbSpinner Size="SpinnerSize.Small" />
+                            <span>Processing...</span>
+                        }
+                        else
+                        {
+                            <LucideIcon Name="check" Size="16" />
+                            <span>Confirm Sale</span>
+                        }
+                    </BbButton>
                 </div>
+            }
+        </div>
+
+        @* Scanner card (desktop) *@
+        <div class="shrink-0 bg-card border border-border rounded-lg overflow-hidden flex flex-col">
+            @ScannerHeader()
+            @if (scannerEnabled)
+            {
+                @ScannerBody("barcode-camera-container")
             }
         </div>
     </div>
 
-    @* --- MOBILE CART DRAWER --- *@
-    @if (cartOpen && cart.Any())
+    @* ─── MOBILE: Floating cart button ─── *@
+    @if (cart.Any())
     {
-        <div @onclick="() => cartOpen = false"
-             style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); z-index: 40; display: none;"
-             class="pos-mobile-backdrop">
-        </div>
+        <button type="button" @onclick="() => cartModalOpen = true"
+                class="pos-mobile-cart-btn fixed bottom-20 right-4 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg font-bold text-sm min-h-[44px]">
+            <LucideIcon Name="shopping-cart" Size="18" />
+            <span>@cart.Sum(i => i.Quantity)</span>
+            <span>₱@TotalAmount.ToString("N2")</span>
+        </button>
     }
 
-    <div class="pos-cart-mobile @(cartOpen ? "pos-cart-mobile-open" : "")">
-        <div @onclick="() => cartOpen = !cartOpen"
-             style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <div style="display: flex; align-items: center; gap: var(--space-2);">
-                <LucideIcon Name="shopping-cart" Size="18" />
-                <span style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--card-foreground);">
-                    Order (@cart.Count items)
-                </span>
-                @if (cart.Any())
-                {
-                    <span style="background-color: var(--primary); color: var(--primary-foreground); border-radius: 9999px; padding: 0 var(--space-2); font-size: var(--text-xs); font-weight: var(--font-bold);">
-                        @cart.Sum(i => i.Quantity)
-                    </span>
-                }
-            </div>
-            <div style="display: flex; align-items: center; gap: var(--space-3);">
-                <span style="font-size: var(--text-base); font-weight: var(--font-bold); color: var(--primary);">₱@TotalAmount.ToString("N2")</span>
-                <LucideIcon Name="@(cartOpen ? "chevron-down" : "chevron-up")" Size="18" />
-            </div>
-        </div>
-
-        @if (cartOpen)
+    @* ─── MOBILE: Scanner docked at bottom ─── *@
+    <div class="pos-scanner-mobile fixed bottom-0 left-0 right-0 z-30 bg-card border-t border-border @(scannerEnabled ? "shadow-lg" : "")">
+        @ScannerHeader()
+        @if (scannerEnabled)
         {
-            <div style="flex: 1; overflow-y: auto; padding: var(--space-4);">
-                @if (!cart.Any())
-                {
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--space-8); gap: var(--space-3); color: var(--muted-foreground);">
-                        <LucideIcon Name="shopping-cart" Size="32" />
-                        <p style="font-size: var(--text-sm); margin: 0;">Cart is empty</p>
-                    </div>
-                }
-                else
-                {
-                    @CartTable()
-                }
-            </div>
+            @ScannerBody("barcode-camera-container-mobile")
         }
-
-        <div style="padding: var(--space-4); border-top: 1px solid var(--border); flex-shrink: 0;">
-            @if (!string.IsNullOrEmpty(statusMessage))
-            {
-                <div style="margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: var(--success-muted); border: 1px solid var(--success-border); font-size: var(--text-sm); color: var(--success-muted-foreground);">
-                    @statusMessage
-                </div>
-            }
-            @CheckoutFields("mobile")
-            <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="Checkout" Disabled="@(isProcessing || !cart.Any())">
-                @if (isProcessing)
-                {
-                    <BbSpinner Size="SpinnerSize.Small" />
-                    <span>Processing...</span>
-                }
-                else
-                {
-                    <LucideIcon Name="check" Size="16" />
-                    <span>Confirm Sale — ₱@TotalAmount.ToString("N2")</span>
-                }
-            </BbButton>
-        </div>
     </div>
 </div>
 
+@* ═══════════════════════════════════════════════════════════════════════
+   CART MODAL (mobile)
+   ═══════════════════════════════════════════════════════════════════════ *@
+<BbDialog @bind-Open="cartModalOpen">
+     <BbDialogContent Style="width: min(98vw, 500px); max-height: 90dvh" class="flex flex-col p-0 overflow-hidden">
+        <BbDialogHeader class="shrink-0 px-4 py-3 border-b border-border">
+            <BbDialogTitle class="flex items-center gap-2 text-base font-semibold">
+                <LucideIcon Name="shopping-cart" Size="18" />
+                Current Order (@cart.Count items)
+                @if (cart.Any())
+                {
+                    <span class="bg-primary text-primary-foreground rounded-full px-2 text-xs font-bold">
+                        @cart.Sum(i => i.Quantity)
+                    </span>
+                }
+            </BbDialogTitle>
+        </BbDialogHeader>
 
+        <div class="flex-1 overflow-y-auto p-4">
+            @if (!cart.Any())
+            {
+                <div class="flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
+                    <LucideIcon Name="shopping-cart" Size="32" />
+                    <p class="text-sm m-0">Cart is empty</p>
+                </div>
+            }
+            else
+            {
+                @CartTable()
+            }
+        </div>
+
+        @if (cart.Any())
+        {
+            <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+                        @statusMessage
+                    </div>
+                }
+                <div class="grid gap-2">
+                    <div class="flex justify-between text-muted-foreground text-sm">
+                        <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
+                    </div>
+                    <div class="flex justify-between text-muted-foreground text-sm">
+                        <span>Discount</span><span>-₱@TotalDiscount.ToString("N2")</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-base font-semibold text-foreground">Total</span>
+                        <span class="text-xl font-bold text-primary">₱@TotalAmount.ToString("N2")</span>
+                    </div>
+                </div>
+                @CheckoutFields("mobile")
+                <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="CheckoutFromModal" Disabled="@(isProcessing || !cart.Any())">
+                    @if (isProcessing)
+                    {
+                        <BbSpinner Size="SpinnerSize.Small" />
+                        <span>Processing...</span>
+                    }
+                    else
+                    {
+                        <LucideIcon Name="check" Size="16" />
+                        <span>Confirm Sale — ₱@TotalAmount.ToString("N2")</span>
+                    }
+                </BbButton>
+            </div>
+        }
+    </BbDialogContent>
+</BbDialog>
+
+@* ═══════════════════════════════════════════════════════════════════════
+   ORDER SUMMARY MODAL (post-checkout)
+   ═══════════════════════════════════════════════════════════════════════ *@
 @if (showOrderSummaryModal && completedTransaction != null)
 {
     <div class="order-summary-backdrop no-print"></div>
@@ -273,40 +292,47 @@
 
 @code {
     private RenderFragment CartTable() =>
-    @<table style="width: 100%; border-collapse: collapse; font-size: var(--text-sm);">
+    @<table class="w-full border-collapse text-sm">
         <thead>
-            <tr style="border-bottom: 1px solid var(--border);">
-                <th style="text-align: left; padding: var(--space-2) var(--space-2); color: var(--muted-foreground); font-weight: var(--font-medium);">Item</th>
-                <th style="text-align: left; padding: var(--space-2) var(--space-2); color: var(--muted-foreground); font-weight: var(--font-medium);">Qty</th>
-                <th style="text-align: right; padding: var(--space-2) var(--space-2); color: var(--muted-foreground); font-weight: var(--font-medium);">Discount</th>
-                <th style="text-align: right; padding: var(--space-2) var(--space-2); color: var(--muted-foreground); font-weight: var(--font-medium);">Total</th>
-                <th style="padding: var(--space-2) var(--space-2);"></th>
+            <tr class="border-b border-border">
+                <th class="text-left p-1 text-muted-foreground font-medium">Item</th>
+                <th class="text-left p-1 text-muted-foreground font-medium">Qty</th>
+                <th class="text-center p-1 text-muted-foreground font-medium">Price</th>
+                <th class="p-1"></th>
             </tr>
         </thead>
         <tbody>
             @foreach (var item in cart)
             {
-                <tr style="border-bottom: 1px solid var(--border);">
-                    <td style="padding: var(--space-2) var(--space-2); color: var(--foreground);">@item.ProductName</td>
-                    <td style="padding: var(--space-2) var(--space-2);">
-                        <input type="number"
-                               value="@item.Quantity"
-                               @onchange="@((ChangeEventArgs e) => UpdateCartQuantity(item, e))"
-                               min="1"
-                               style="width: 56px; padding: var(--space-1) var(--space-2); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;" />
+                <tr class="border-b border-border">
+                    <td class="p-1 text-foreground">@item.ProductName</td>
+                    <td class="p-1">
+                        <div class="flex items-center gap-0">
+                            <button type="button" @onclick="() => DecrementQty(item)"
+                                    class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
+                                <LucideIcon Name="chevron-left" Size="14" />
+                            </button>
+                            <input type="number"
+                                   @bind="item.Quantity"
+                                   @bind:event="oninput"
+                                   min="1"
+                                   class="w-8 py-1 px-0 text-center rounded border border-input bg-background text-foreground text-sm box-border" />
+                            <button type="button" @onclick="() => IncrementQty(item)"
+                                    class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
+                                <LucideIcon Name="chevron-right" Size="14" />
+                            </button>
+                        </div>
                     </td>
-                    <td style="padding: var(--space-2) var(--space-2); text-align: right;">
+                    <td class="p-1 text-center">
                         <input type="number"
-                               value="@item.DiscountAmount"
-                               @onchange="@((ChangeEventArgs e) => UpdateLineDiscount(item, e))"
-                               min="0"
-                               max="@(item.Price * item.Quantity)"
+                               @bind="item.Price"
+                               @bind:event="oninput"
+                               min="0.01"
                                step="0.01"
-                               aria-label="Discount for @item.ProductName"
-                               style="width: 76px; padding: var(--space-1) var(--space-2); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box; text-align: right;" />
+                               aria-label="Price for @item.ProductName"
+                               class="w-3/4 py-1 px-1 rounded-md border border-input bg-background text-foreground text-sm box-border text-center" />
                     </td>
-                    <td style="padding: var(--space-2) var(--space-2); text-align: right; color: var(--foreground);">₱@GetCartLineTotal(item).ToString("N2")</td>
-                    <td style="padding: var(--space-2) var(--space-2);">
+                    <td class="p-1">
                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="() => cart.Remove(item)">
                             <LucideIcon Name="x" Size="14" />
                         </BbButton>
@@ -316,70 +342,103 @@
         </tbody>
     </table>;
 
-    private RenderFragment CartFooter() =>
-    @<div>
-        @if (cart.Any())
-        {
-            <div style="padding: var(--space-4); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-3); flex-shrink: 0;">
-                @if (!string.IsNullOrEmpty(statusMessage))
-                {
-                    <div style="padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: var(--success-muted); border: 1px solid var(--success-border); font-size: var(--text-sm); color: var(--success-muted-foreground);">
-                        @statusMessage
-                    </div>
-                }
-                <div style="display: grid; gap: var(--space-1);">
-                    <div style="display: flex; justify-content: space-between; color: var(--muted-foreground); font-size: var(--text-sm);">
-                        <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; color: var(--muted-foreground); font-size: var(--text-sm);">
-                        <span>Discount</span><span>-₱@TotalDiscount.ToString("N2")</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--foreground);">Total</span>
-                        <span style="font-size: var(--text-xl); font-weight: var(--font-bold); color: var(--primary);">₱@TotalAmount.ToString("N2")</span>
-                    </div>
-                </div>
-                @CheckoutFields("desktop")
-                <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="Checkout" Disabled="@isProcessing">
-                    @if (isProcessing)
-                    {
-                        <BbSpinner Size="SpinnerSize.Small" />
-                        <span>Processing...</span>
-                    }
-                    else
-                    {
-                        <LucideIcon Name="check" Size="16" />
-                        <span>Confirm Sale</span>
-                    }
-                </BbButton>
-            </div>
-        }
-    </div>;
-
     private RenderFragment CheckoutFields(string idPrefix) =>
-    @<div class="checkout-fields">
-        <div>
-            <label for="@(idPrefix)-payment-method">Payment method</label>
-            <select id="@(idPrefix)-payment-method" @bind="paymentMethod">
+    @<div class="grid gap-2">
+        <div class="flex flex-col gap-2">
+            <label for="@(idPrefix)-payment-method" class="text-xs font-medium text-foreground">Payment method</label>
+            <select id="@(idPrefix)-payment-method" @bind="paymentMethod"
+                    class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm">
                 <option value="Cash">Cash</option>
                 <option value="Online">Online</option>
             </select>
         </div>
-        <div>
-            <label for="@(idPrefix)-reference-number">Reference number <span>(optional)</span></label>
-            <input id="@(idPrefix)-reference-number" @bind="referenceNumber" maxlength="100" placeholder="Payment or external reference" />
+        <div class="flex flex-col gap-2">
+            <label for="@(idPrefix)-reference-number" class="text-xs font-medium text-foreground">
+                Reference number <span class="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <input id="@(idPrefix)-reference-number" @bind="referenceNumber" maxlength="100"
+                   placeholder="Payment or external reference"
+                   class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm" />
         </div>
-        <div>
-            <label for="@(idPrefix)-remarks">Remarks <span>(optional)</span></label>
-            <textarea id="@(idPrefix)-remarks" @bind="remarks" maxlength="500" rows="2" placeholder="Notes about this sale"></textarea>
+        <div class="flex flex-col gap-2">
+            <label for="@(idPrefix)-remarks" class="text-xs font-medium text-foreground">
+                Remarks <span class="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <textarea id="@(idPrefix)-remarks" @bind="remarks" maxlength="500" rows="2"
+                      placeholder="Notes about this sale"
+                      class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm resize-y"></textarea>
         </div>
+    </div>;
+
+    private RenderFragment ScannerHeader() =>
+    @<div class="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <LucideIcon Name="scan-line" Size="16" />
+            <span class="text-sm font-semibold text-foreground">Barcode Scanner</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleCamera" title="Flip camera">
+                <LucideIcon Name="switch-camera" Size="16" />
+            </BbButton>
+            <label class="switch">
+                <input type="checkbox" @bind="scannerEnabled" />
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>;
+
+    private RenderFragment ScannerBody(string elementId) =>
+    @<div class="p-3 flex flex-col gap-3">
+        <div id="@elementId" class="w-full h-40 md:h-[200px] bg-transparent rounded-lg overflow-hidden border-2 box-border @CameraClass">
+        </div>
+
+        @if (!string.IsNullOrEmpty(scanErrorMessage))
+        {
+            <div class="text-center py-2 px-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+                @scanErrorMessage
+            </div>
+        }
+        else if (scannedProduct != null)
+        {
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <span class="text-sm font-semibold text-foreground truncate flex-1 min-w-0">@scannedProduct.Name</span>
+                    <span class="text-base font-bold text-primary shrink-0">₱@scannedProduct.Price.ToString("N2")</span>
+                    <span class="text-xs text-muted-foreground shrink-0">Stock: @scannedProduct.CurrentStock</span>
+                </div>
+                @if (scannedProduct.CurrentStock <= 0)
+                {
+                    <div class="text-center py-2 px-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+                        Out of stock — cannot add.
+                    </div>
+                }
+                else
+                {
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-foreground shrink-0">Qty:</label>
+                        <input type="number" @bind="scanQuantity" min="1" max="@scannedProduct.CurrentStock"
+                               class="w-[72px] py-1 px-2 rounded-md border border-input bg-background text-foreground text-sm box-border" />
+                    </div>
+                }
+                <div class="flex gap-2">
+                    <BbButton Variant="ButtonVariant.Outline" Class="flex-1" OnClick="DiscardScannedItem">Discard</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" Class="flex-1" OnClick="ConfirmScannedItem" Disabled="@(scannedProduct.CurrentStock <= 0)">Add to Order</BbButton>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-2 px-3 rounded-md text-sm text-muted-foreground">
+                Point camera at a barcode
+            </div>
+        }
     </div>;
 
     private ProductCatalog? catalog;
     private List<CartItemDto> cart = new();
     private bool isProcessing = false;
     private string? statusMessage;
-    private bool cartOpen = false;
+    private bool cartModalOpen = false;
     private string paymentMethod = "Cash";
     private string? referenceNumber;
     private string? remarks;
@@ -390,20 +449,28 @@
 
     // --- Barcode scanner inline state ---
     private bool scannerEnabled = false;
-    private bool scanFlash = false;
     private Product? scannedProduct;
     private string? scanErrorMessage;
     private int scanQuantity = 1;
     private DotNetObjectReference<POS>? dotNetRef;
+    private string _scannerElementId = "barcode-camera-container";
 
-    private string CameraClass => scannedProduct != null ? "scanned" : "scanning";
+    private string CameraClass => scannedProduct != null
+        ? "border-green-500 dark:border-green-400"
+        : "border-destructive";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            var width = await JS.InvokeAsync<int>("eval", "window.innerWidth");
+            if (width < 768) _scannerElementId = "barcode-camera-container-mobile";
+        }
+
         if (scannerEnabled && dotNetRef == null)
         {
             dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("barcodeScanner.start", "barcode-camera-container", dotNetRef);
+            await JS.InvokeVoidAsync("barcodeScanner.start", _scannerElementId, dotNetRef);
         }
         else if (!scannerEnabled && dotNetRef != null)
         {
@@ -417,7 +484,7 @@
     {
         if (dotNetRef != null)
         {
-            await JS.InvokeVoidAsync("barcodeScanner.cycleCamera");
+            await JS.InvokeVoidAsync("barcodeScanner.cycleCamera", _scannerElementId);
         }
     }
 
@@ -432,7 +499,6 @@
         scanErrorMessage = product == null ? $"No product found for barcode \"{barcode}\"." : null;
         scannedProduct = product;
         scanQuantity = 1;
-        scanFlash = true;
         await InvokeAsync(StateHasChanged);
     }
 
@@ -472,12 +538,9 @@
         authenticatedUserId = authenticationState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     }
 
-    private decimal SubtotalAmount => cart.Sum(item => item.Price * item.Quantity);
-    private decimal TotalDiscount => cart.Sum(item => item.DiscountAmount);
-    private decimal TotalAmount => cart.Sum(GetCartLineTotal);
-
-    private static decimal GetCartLineTotal(CartItemDto item) =>
-        Math.Max(0, (item.Price * item.Quantity) - item.DiscountAmount);
+    private decimal SubtotalAmount => cart.Sum(item => item.OriginalPrice * item.Quantity);
+    private decimal TotalDiscount => cart.Sum(item => (item.OriginalPrice - item.Price) * item.Quantity);
+    private decimal TotalAmount => cart.Sum(item => item.Price * item.Quantity);
 
     private void AddToCart(Product p)
     {
@@ -493,40 +556,25 @@
         }
         else
         {
-            cart.Add(new CartItemDto { ProductId = p.Id, ProductName = p.Name, Price = p.Price, Quantity = 1 });
-        }
-
-        cartOpen = true;
-    }
-
-    private void UpdateCartQuantity(CartItemDto item, ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int newQty))
-        {
-            if (newQty <= 0) cart.Remove(item);
-            else item.Quantity = newQty;
-
-            var maximumDiscount = item.Price * item.Quantity;
-            if (item.DiscountAmount > maximumDiscount)
-            {
-                item.DiscountAmount = maximumDiscount;
-                statusMessage = $"Discount adjusted to the line amount for {item.ProductName}.";
-            }
+            cart.Add(new CartItemDto { ProductId = p.Id, ProductName = p.Name, Price = p.Price, OriginalPrice = p.Price, Quantity = 1 });
         }
     }
 
-    private void UpdateLineDiscount(CartItemDto item, ChangeEventArgs args)
+    private void DecrementQty(CartItemDto item)
     {
-        if (!decimal.TryParse(args.Value?.ToString(), out var discount))
-        {
-            item.DiscountAmount = 0;
-            return;
-        }
+        if (item.Quantity > 1) item.Quantity--;
+        else cart.Remove(item);
+    }
 
-        var maximumDiscount = item.Price * item.Quantity;
-        item.DiscountAmount = Math.Clamp(discount, 0, maximumDiscount);
-        if (discount != item.DiscountAmount)
-            statusMessage = $"Discount must be between ₱0.00 and ₱{maximumDiscount:N2} for {item.ProductName}.";
+    private void IncrementQty(CartItemDto item)
+    {
+        item.Quantity++;
+    }
+
+    private async Task CheckoutFromModal()
+    {
+        cartModalOpen = false;
+        await Checkout();
     }
 
     private async Task Checkout()
@@ -541,7 +589,7 @@
                 {
                     ProductId = item.ProductId,
                     Quantity = item.Quantity,
-                    DiscountAmount = item.DiscountAmount
+                    DiscountAmount = Math.Max(0, item.OriginalPrice - item.Price) * item.Quantity
                 }).ToList(),
                 PaymentMethod = paymentMethod,
                 ReferenceNumber = referenceNumber,
@@ -558,9 +606,10 @@
             statusMessage = "Sale complete! Transaction summary generated.";
 
             showOrderSummaryModal = true;
+            Toast.Success("Transaction Recorded");
 
             cart.Clear();
-            cartOpen = false;
+            cartModalOpen = false;
             paymentMethod = "Cash";
             referenceNumber = null;
             remarks = null;
@@ -591,228 +640,53 @@
 }
 
 <style>
-    /* UI STYLES */
+    /* ─── POS responsive layout (pre-built Tailwind lacks these breakpoints) ─── */
     .pos-wrapper {
         display: flex;
-        gap: var(--space-6);
+        flex-direction: column;
         height: calc(100dvh - 3.5rem);
         overflow: hidden;
         position: relative;
     }
 
     .pos-catalog {
-        flex: 1;
+        padding-bottom: 0;
+    }
+
+    .pos-desktop-right {
+        display: none;
+    }
+
+    .pos-mobile-cart-btn {
         display: flex;
-        flex-direction: column;
-        min-width: 0;
-        overflow: hidden;
-        background-color: var(--card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
     }
 
-    .pos-cart-mobile {
-        display: none;
+    .pos-scanner-mobile {
+        display: block;
     }
 
-    .pos-mobile-backdrop {
-        display: none;
-    }
-
-    .checkout-fields {
-        display: grid;
-        gap: var(--space-2);
-    }
-
-        .checkout-fields label {
-            display: block;
-            margin-bottom: var(--space-1);
-            color: var(--foreground);
-            font-size: var(--text-xs);
-            font-weight: var(--font-medium);
-        }
-
-            .checkout-fields label span {
-                color: var(--muted-foreground);
-                font-weight: normal;
-            }
-
-        .checkout-fields input,
-        .checkout-fields select,
-        .checkout-fields textarea {
-            width: 100%;
-            box-sizing: border-box;
-            padding: var(--space-2);
-            border: 1px solid var(--input);
-            border-radius: var(--radius);
-            background: var(--background);
-            color: var(--foreground);
-            font: inherit;
-            font-size: var(--text-sm);
-        }
-
-        .checkout-fields textarea {
-            resize: vertical;
-        }
-
-    @@media (max-width: 767px) {
+    @@media (min-width: 768px) {
         .pos-wrapper {
-            flex-direction: column;
-            height: auto;
-            min-height: calc(100dvh - 3.5rem);
-            gap: 0;
+            flex-direction: row;
+            gap: 1.5rem;
         }
-
-        .pos-cart-desktop {
+        .pos-catalog {
+            padding-bottom: 0 !important;
+        }
+        .pos-desktop-right {
+            display: flex;
+            width: 25rem;
+            flex-shrink: 0;
+        }
+        .pos-mobile-cart-btn {
             display: none;
         }
-
-        .pos-cart-mobile {
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background-color: var(--card);
-            border-top: 1px solid var(--border);
-            border-radius: var(--radius) var(--radius) 0 0;
-            z-index: 50;
-            max-height: 30vh;
-            transition: max-height 0.3s ease;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
-        }
-
-        .pos-cart-mobile-open {
-            max-height: 50vh;
-            overflow: auto;
-        }
-
-        .pos-mobile-backdrop {
-            display: block;
-        }
-
-        .pos-right {
-            order: 1;
-            width: 100%;
-        }
-
-        .pos-catalog {
-            order: 0;
-            margin-bottom: 5rem;
-        }
-
-        .pos-scanner-card {
-            margin: 0 var(--space-4) calc(5rem + var(--space-4));
+        .pos-scanner-mobile {
+            display: none;
         }
     }
 
-    /* SALES TRANSACTION SUMMARY MODAL STYLES */
-    .order-summary-backdrop {
-        position: fixed;
-        inset: 0;
-        background-color: rgba(0,0,0,0.6);
-        z-index: 100;
-    }
-
-    .order-summary-modal {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        z-index: 101;
-        width: 400px;
-        max-width: 90vw;
-        max-height: 90vh;
-        display: flex;
-        flex-direction: column;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    }
-
-    .order-summary-content {
-        overflow-y: auto;
-        color: #000;
-        font-family: 'Courier New', Courier, monospace;
-        padding-bottom: 20px;
-    }
-
-    .order-summary-header {
-        text-align: center;
-        margin-bottom: 15px;
-    }
-
-        .order-summary-header h2 {
-            font-size: 16px;
-            margin: 0 0 5px 0;
-            font-weight: bold;
-        }
-
-        .order-summary-header p {
-            margin: 2px 0;
-            font-size: 12px;
-        }
-
-    .order-summary-meta {
-        font-size: 12px;
-        margin-bottom: 15px;
-        display: flex;
-        justify-content: space-between;
-    }
-
-    .order-summary-payment-meta {
-        padding-top: 8px;
-        border-top: 1px dashed #000;
-    }
-
-    .order-summary-table {
-        width: 100%;
-        font-size: 12px;
-        border-top: 1px dashed #000;
-        border-bottom: 1px dashed #000;
-        margin-bottom: 15px;
-    }
-
-        .order-summary-table th, .order-summary-table td {
-            padding: 5px 2px;
-        }
-
-    .order-summary-totals {
-        font-size: 12px;
-        margin-bottom: 20px;
-    }
-
-    .summary-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 3px;
-    }
-
-    .order-summary-footer {
-        text-align: center;
-        font-size: 10px;
-        border-top: 1px dashed #000;
-        padding-top: 10px;
-    }
-
-    .order-summary-remarks {
-        margin-bottom: 15px;
-        font-size: 11px;
-        overflow-wrap: anywhere;
-    }
-
-    .order-summary-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 15px;
-        border-top: 1px solid #ccc;
-        padding-top: 15px;
-    }
-
-    /* PRINT STYLES */
+    /* ─── Print styles for receipt ─── */
     @@media print {
         body * {
             visibility: hidden;
@@ -835,209 +709,4 @@
             padding: 0;
         }
     }
-    /* --- RIGHT COLUMN (desktop) --- */
-    .pos-right {
-        width: 24rem;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-4);
-    }
-
-    /* --- ORDER SUMMARY CARD --- */
-    .pos-cart-desktop {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        background-color: var(--card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-    }
-
-    /* --- SCANNER CARD --- */
-    .pos-scanner-card {
-        flex-shrink: 0;
-        background-color: var(--card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        transition: box-shadow 0.3s;
-    }
-
-    .pos-scanner-body #barcode-camera-container.scanning {
-        border: 2px solid var(--destructive);
-    }
-
-    .pos-scanner-body #barcode-camera-container.scanned {
-        border-color: var(--success);
-    }
-
-    .pos-scanner-header {
-        flex-shrink: 0;
-        padding: var(--space-3) var(--space-4);
-        border-bottom: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    .pos-scanner-body {
-        padding: var(--space-3);
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-3);
-    }
-
-    .pos-scanner-body #barcode-camera-container {
-        width: 100%;
-        height: 200px;
-        background-color: transparent;
-        border-radius: var(--radius);
-        overflow: hidden;
-        border: 2px solid var(--border);
-        box-sizing: border-box;
-    }
-
-    .pos-scanner-body #barcode-camera-container video {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover;
-    }
-
-    .pos-scanner-waiting,
-    .pos-scanner-msg {
-        text-align: center;
-        padding: var(--space-2) var(--space-3);
-        border-radius: var(--radius);
-        font-size: var(--text-sm);
-    }
-
-    .pos-scanner-msg.error {
-        background-color: var(--destructive-muted);
-        border: 1px solid var(--destructive-border);
-        color: var(--destructive-muted-foreground);
-    }
-
-    .pos-scanner-waiting {
-        color: var(--muted-foreground);
-    }
-
-    .pos-scanner-result {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-    }
-
-    .pos-scanner-product-info {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--space-2);
-        flex-wrap: wrap;
-    }
-
-    .pos-scanner-product-name {
-        font-size: var(--text-sm);
-        font-weight: var(--font-semibold);
-        color: var(--foreground);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        flex: 1;
-        min-width: 0;
-    }
-
-    .pos-scanner-product-price {
-        font-size: var(--text-base);
-        font-weight: var(--font-bold);
-        color: var(--primary);
-        flex-shrink: 0;
-    }
-
-    .pos-scanner-product-stock {
-        font-size: var(--text-xs);
-        color: var(--muted-foreground);
-        flex-shrink: 0;
-    }
-
-    .pos-scanner-qty-row {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-    }
-
-    .pos-scanner-qty-row label {
-        font-size: var(--text-sm);
-        color: var(--foreground);
-        flex-shrink: 0;
-    }
-
-    .pos-scanner-qty-row input {
-        width: 72px;
-        padding: var(--space-1) var(--space-2);
-        border-radius: var(--radius);
-        border: 1px solid var(--input);
-        background-color: var(--background);
-        color: var(--foreground);
-        font-size: var(--text-sm);
-        box-sizing: border-box;
-    }
-
-    .pos-scanner-actions {
-        display: flex;
-        gap: var(--space-2);
-    }
-
-    .pos-scanner-actions .flex-1 {
-        flex: 1;
-    }
-
-    /* --- TOGGLE SWITCH --- */
-    .switch {
-        position: relative;
-        display: inline-block;
-        width: 44px;
-        height: 24px;
-        flex-shrink: 0;
-    }
-
-    .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-
-    .slider {
-        position: absolute;
-        cursor: pointer;
-        inset: 0;
-        background-color: var(--muted);
-        border-radius: 24px;
-        transition: background-color 0.2s;
-    }
-
-    .slider::before {
-        content: "";
-        position: absolute;
-        height: 18px;
-        width: 18px;
-        left: 3px;
-        bottom: 3px;
-        background-color: #fff;
-        border-radius: 9999px;
-        transition: transform 0.2s;
-    }
-
-    .switch input:checked + .slider {
-        background-color: var(--primary);
-    }
-
-    .switch input:checked + .slider::before {
-        transform: translateX(20px);
-    }
-
 </style>

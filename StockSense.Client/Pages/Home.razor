@@ -8,8 +8,7 @@
 
 <div class="home" style="display: flex; flex-direction: column; font-family: var(--font-sans); background-color: var(--background);">
 
-    <section class="hero" style="height: calc(100dvh - 3.5rem); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
-        <div class="hero-bg" style="position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 50% 40%, color-mix(in oklch, var(--primary) 12%, transparent) 0%, transparent 60%); pointer-events: none;"></div>
+  <section class="hero" style="min-height: calc(100dvh - 3.5rem); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: var(--background); background-image: url('/hero_bg.svg'); background-size: cover; background-position: center; background-repeat: no-repeat;">
         <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-8); padding: var(--space-8); position: relative; z-index: 1;">
             <h1 style="font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: var(--font-extrabold); color: var(--foreground); line-height: 1.1; letter-spacing: -0.02em; margin: 0; max-width: 14ch;">
                 Turning your<br />
@@ -39,7 +38,7 @@
                         Since 2005, SAPShop Motorcycle Parts and Accessories has been serving riders in Porac, Pampanga with trusted motorcycle maintenance, engine upgrades, custom builds, and genuine parts. Founded by Adrian Cunanan, the shop grew from a passion for motorcycles and drag racing into a respected family-owned business known for quality workmanship, honest service, and lasting customer relationships.
                     </p>
                     <p style="font-size: var(--text-base); line-height: 1.8; color: var(--muted-foreground); margin: 0;">
-                        Today, with the help of StockSense, we continue to improve the customer experience through smarter inventory management, online appointment booking, and personalized build planning—keeping every rider’s journey smooth, reliable, and performance-driven.
+                        Today, with the help of StockSense, we continue to improve the customer experience through smarter inventory management, online appointment booking, and personalized build planning—keeping every rider's journey smooth, reliable, and performance-driven.
                     </p>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: var(--space-4);">
@@ -107,7 +106,7 @@
             padding-top: 2.5rem !important;
             padding-bottom: 2.5rem !important;
         }
-        .hero > div {
+        .hero > div:last-of-type {
             gap: var(--space-5) !important;
             padding: var(--space-4) !important;
         }

@@ -74,7 +74,7 @@
     }
 
     .pc-grid {
-        --pc-cols: 6;
+        --pc-cols: 7;
         display: grid;
         grid-template-columns: repeat(var(--pc-cols), minmax(0, 1fr));
         grid-auto-rows: max-content;
@@ -83,11 +83,27 @@
         overflow: auto;
     }
 
+    @@media (max-width: 1599px) {
+        .pc-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    }
+
+    @@media (max-width: 1399px) {
+        .pc-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    }
+
+    @@media (max-width: 1199px) {
+        .pc-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+
     @@media (max-width: 1023px) {
-        .pc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .pc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 
     @@media (max-width: 767px) {
+        .pc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @@media (max-width: 639px) {
         .pc-grid { grid-template-columns: minmax(0, 1fr); }
     }
 </style>
@@ -96,7 +112,7 @@
     [Parameter] public EventCallback<Product> OnProductClick { get; set; }
     [Parameter] public Func<Product, bool>? IsSelected { get; set; }
     [Parameter] public Func<Product, bool>? IsDisabled { get; set; }
-    [Parameter] public int Columns { get; set; } = 6;
+    [Parameter] public int Columns { get; set; } = 7;
     [Parameter] public bool ShowCheckbox { get; set; }
     [Parameter] public bool AllowDisabledClick { get; set; }
     [Parameter] public List<Product>? Products { get; set; }
