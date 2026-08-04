@@ -17,32 +17,198 @@
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <style>
-/* Base states for layout toggling */
-.mobile-cards { display: none; }
-.desktop-table { display: block; width: 100%; min-width: 0; }
-
-/* Table Column Widths */
-.col-num { width: 18%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-sup { width: 22%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-stat { width: 15%; }
-.col-gen { width: 15%; }
-.col-exp { width: 15%; }
-.col-act { width: 15%; }
-
-/* Tablet (Portrait iPad) Layout Adjustments */
-@@media (max-width: 1024px) {
-    .col-num { width: 22%; }
-    .col-sup { width: 28%; }
-    .col-stat { width: 15%; }
-    .col-gen { width: 20%; }
-    .col-exp { display: none; }
-    .col-act { width: 15%; }
+.order-page { display:flex; flex-direction:column; gap:1.25rem; min-height:100%; }
+.order-toolbar { display:flex; align-items:end; justify-content:space-between; gap:.75rem; padding:1rem; border:1px solid rgba(127,127,127,.30); border-radius:.75rem; background:var(--card, transparent); box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.order-filter { display:flex; flex-direction:column; gap:.3rem; min-width:210px; color:hsl(var(--muted-foreground)); font-size:.75rem; }
+.order-filter select {
+    width:100%;
+    height:2.5rem;
+    border:1px solid rgba(120,120,120,.55);
+    border-radius:.5rem;
+    background:hsl(var(--background));
+    color:hsl(var(--foreground));
+    padding:0 .75rem;
+    font-size:.875rem;
+    box-shadow:0 0 0 1px rgba(120,120,120,.06);
+}
+.order-filter select:focus {
+    outline:none;
+    border-color:hsl(var(--primary));
+    box-shadow:0 0 0 2px hsl(var(--primary) / .15);
+}
+.order-list-shell {
+    overflow:hidden;
+    border:1px solid rgba(120,120,120,.28);
+    border-radius:.85rem;
+    background:hsl(var(--card));
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+}
+.order-list-summary { min-height:2.75rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.65rem 1rem; border-bottom:1px solid hsl(var(--border)); color:hsl(var(--muted-foreground)); font-size:.75rem; }
+.order-table-wrap {
+    width:100%;
+    overflow-x:auto;
+    background:hsl(var(--card));
+    border-top:0;
+}
+.order-table { width:100%; min-width:760px; border-collapse:collapse; table-layout:fixed; font-size:.875rem; }
+.order-table col.col-order { width:32%; }
+.order-table col.col-supplier { width:22%; }
+.order-table col.col-status { width:16%; }
+.order-table col.col-generated { width:15%; }
+.order-table col.col-actions { width:15%; }
+.order-table {
+    border-collapse:separate;
+    border-spacing:0;
+}
+.order-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius:.85rem;
+}
+.order-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius:.85rem;
+}
+.order-table thead {
+    background:hsl(var(--muted) / .20);
+}
+.order-table th {
+    padding:.8rem 1rem;
+    text-align:left;
+    color:hsl(var(--muted-foreground));
+    font-size:.72rem;
+    font-weight:700;
+    white-space:nowrap;
+    text-transform:uppercase;
+    letter-spacing:.035em;
+    border-bottom:1px solid rgba(120,120,120,.20);
+    background:hsl(var(--card));
+}
+.order-table th:last-child { text-align:right; }
+.order-table td {
+    padding:.95rem 1rem;
+    vertical-align:middle;
+    background:hsl(var(--card));
+    border-bottom:1px solid rgba(120,120,120,.20);
+    transition:background-color .15s ease;
 }
 
-/* Phone Layout - Switch entirely to Cards */
+.order-table tbody tr:not(:last-child) td {
+    border-bottom:1px solid rgba(120,120,120,.20) !important;
+}
+
+.order-table tbody tr:last-child td {
+    border-bottom:0;
+}
+
+.dark .order-table td,
+.dark .order-table tbody tr:not(:last-child) td,
+.dark .order-table th,
+.dark .order-list-summary {
+    border-bottom-color:rgba(255,255,255,.12) !important;
+}
+.order-row { cursor:pointer; }
+.order-row:hover td { background:hsl(var(--muted) / .28); }
+.order-primary { display:flex; flex-direction:column; min-width:0; }
+.order-primary strong { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:.85rem; color:hsl(var(--foreground)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.order-primary small { margin-top:.2rem; color:hsl(var(--muted-foreground)); font-size:.72rem; }
+.status-pill { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; min-width:96px; padding:.3rem .65rem; border-radius:999px; color:#fff; font-size:.7rem; font-weight:700; white-space:nowrap; }
+.status-dot { width:.38rem; height:.38rem; border-radius:999px; background:#fff; opacity:.75; }
+.order-actions { display:flex; justify-content:flex-end; gap:.25rem; flex-wrap:wrap; }
+.order-empty { border:1px solid rgba(127,127,127,.30); border-radius:.75rem; background:var(--card, transparent); box-shadow:0 1px 2px rgba(0,0,0,.04); overflow:hidden; }
+.notice { border-radius:.55rem; border:1px solid hsl(var(--border)); padding:.75rem; font-size:.875rem; background:hsl(var(--muted) / .3); color:hsl(var(--foreground)); }
+.notice.error { border-color:hsl(var(--destructive)); color:hsl(var(--destructive)); background:hsl(var(--destructive) / .08); }
+.detail-body {
+    flex:1;
+    min-height:0;
+    max-height:calc(82vh - 130px);
+    overflow-y:auto;
+    padding:.85rem 1rem;
+    display:flex;
+    flex-direction:column;
+    gap:.8rem;
+}
+.detail-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
+.detail-metric {
+    min-width:0;
+    padding:.75rem .85rem;
+    border:1px solid rgba(120,120,120,.45);
+    border-radius:.65rem;
+    background:hsl(var(--card));
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+}
+.detail-metric span { display:block; margin-bottom:.35rem; color:hsl(var(--muted-foreground)); font-size:.65rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+.detail-metric strong { display:block; color:hsl(var(--foreground)); font-size:.875rem; overflow-wrap:anywhere; }
+.items-shell { overflow:hidden; border:1px solid hsl(var(--border)); border-radius:.7rem; }
+.items-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.6rem .85rem; border-bottom:1px solid hsl(var(--border)); background:hsl(var(--muted) / .25); }
+.items-heading strong { font-size:.875rem; }
+.items-heading span { color:hsl(var(--muted-foreground)); font-size:.72rem; }
+.items-table-wrap { overflow-x:auto; }
+.items-table { width:100%; min-width:1120px; border-collapse:collapse; font-size:.75rem; }
+.items-table th,.items-table td { padding:.65rem .7rem; border-bottom:1px solid hsl(var(--border)); white-space:nowrap; }
+.items-table th { color:hsl(var(--muted-foreground)); text-align:right; font-weight:600; background:hsl(var(--muted) / .2); }
+.items-table th:first-child,.items-table td:first-child { text-align:left; }
+.items-table td:not(:first-child) { text-align:right; }
+.items-table tbody tr:last-child td { border-bottom:0; }
+.product-cell strong { display:block; font-size:.78rem; }
+.product-cell small { color:hsl(var(--muted-foreground)); font-size:.66rem; }
+.detail-footer { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.6rem .85rem; border-top:1px solid hsl(var(--border)); flex-shrink:0; }
+.detail-footer-group { display:flex; gap:.5rem; flex-wrap:wrap; }
+.receive-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
+.receive-fields label { display:flex; flex-direction:column; gap:.35rem; color:hsl(var(--foreground)); font-size:.8rem; font-weight:600; }
+.receive-fields input { min-width:0; width:100%; height:2.5rem; border:1px solid hsl(var(--input)); border-radius:.5rem; background:hsl(var(--background)); color:hsl(var(--foreground)); padding:0 .7rem; font-size:.875rem; }
+.receive-table { width:100%; border-collapse:collapse; font-size:.75rem; }
+.receive-table th,.receive-table td { padding:.7rem .75rem; border-bottom:1px solid hsl(var(--border)); }
+.receive-table th { background:hsl(var(--muted) / .3); color:hsl(var(--muted-foreground)); font-weight:600; }
+.receive-table th:not(:first-child),.receive-table td:not(:first-child) { text-align:right; }
+.receive-qty { width:5rem; padding:.4rem .45rem; border:1px solid hsl(var(--input)); border-radius:.45rem; background:hsl(var(--background)); color:hsl(var(--foreground)); text-align:right; }
+
+@@media (max-width: 1024px) {
+    .detail-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .order-table { min-width:560px; }
+    .hide-tablet { display:none; }
+}
+
+@@media (min-width: 768px) and (max-width: 1024px) {
+    .hide-ipad { display:none !important; }
+    .order-table { min-width:0; }
+    .order-table col.col-order { width:52%; }
+    .order-table col.col-status { width:20%; }
+    .order-table col.col-actions { width:28%; }
+    .order-table th, .order-table td { padding-left:.8rem; padding-right:.8rem; }
+}
+
 @@media (max-width: 767px) {
-    .desktop-table { display: none !important; }
-    .mobile-cards { display: flex !important; flex-direction: column; gap: 0.75rem; }
+    .order-page { gap:1rem; }
+    .order-toolbar { align-items:stretch; flex-direction:column; padding:.85rem; }
+    .order-filter { min-width:0; width:100%; }
+    .order-toolbar-action { width:100%; }
+    .order-list-summary { align-items:flex-start; flex-direction:column; gap:.15rem; }
+    .order-table-wrap { overflow:visible; padding:.65rem; background:transparent; }
+    .order-table { min-width:0; display:block; border-spacing:0; }
+    .order-table thead { display:none; }
+    .order-table tbody { display:flex; flex-direction:column; gap:.65rem; }
+    .order-table tr.order-row { display:grid; grid-template-columns:1fr auto; gap:.7rem 1rem; padding:.85rem; border:1px solid rgba(127,127,127,.34); border-radius:.65rem; background:var(--background, transparent); box-shadow:0 1px 3px rgba(0,0,0,.05); }
+    .order-table td { display:block; padding:0; border:0; min-width:0; background:transparent; border-radius:0 !important; box-shadow:none !important; }
+    .order-table td[data-label="Order"] { grid-column:1; grid-row:1; }
+    .order-table td[data-label="Status"] { grid-column:2; grid-row:1; align-self:start; }
+    .order-table td[data-label="Actions"] { grid-column:1 / -1; padding-top:.65rem; border-top:1px solid hsl(var(--border)); }
+    .order-actions { justify-content:flex-start; }
+    .status-pill { min-width:0; max-width:130px; }
+    .detail-summary-grid { grid-template-columns:1fr 1fr; }
+    .detail-footer { align-items:stretch; flex-direction:column-reverse; }
+    .detail-footer-group { width:100%; }
+    .receive-fields { grid-template-columns:1fr; }
+    .receive-table thead { display:none; }
+    .receive-table,.receive-table tbody { display:block; }
+    .receive-table tr { display:grid; grid-template-columns:1fr auto; gap:.45rem .8rem; padding:.8rem; border-bottom:1px solid hsl(var(--border)); }
+    .receive-table td { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:0; border:0; text-align:right !important; }
+    .receive-table td:first-child { grid-column:1 / -1; font-weight:700; text-align:left !important; }
+    .receive-table td:not(:first-child)::before { content:attr(data-label); color:hsl(var(--muted-foreground)); font-size:.7rem; font-weight:600; text-align:left; }
+    .receive-table td[data-label="Receive Now"] { grid-column:1 / -1; padding-top:.35rem; }
+}
+
+@@media (max-width: 480px) {
+    .detail-summary-grid { grid-template-columns:1fr; }
+    .detail-body { padding:.7rem; max-height:calc(88vh - 120px); }
+    .detail-footer { padding:.65rem .7rem; }
 }
 </style>
 
@@ -50,165 +216,127 @@
 <BbPortalHost />
 <BbDialogProvider />
 
-<div>
+<div class="order-page">
     <PageHeader Title="Order Slips"
                 Subtitle="Review purchase orders and track receipt progress."
                 Badge="@(slips?.Count(s => s.Status == OrderSlipStatuses.Draft || s.Status == OrderSlipStatuses.Ordered || s.Status == OrderSlipStatuses.PartiallyReceived).ToString() + " Active")"
-                Badge2="@(slips?.Count(s => s.Status == OrderSlipStatuses.Completed).ToString() + " Completed")" />
+                Badge2="@(slips?.Count(s => s.Status == OrderSlipStatuses.Completed).ToString() + " Completed")">
+        <BbButton Variant="ButtonVariant.Default" OnClick='() => Navigation.NavigateTo("/admin/orderslips")'>
+            <LucideIcon Name="plus" Size="16" /> Generate Order
+        </BbButton>
+    </PageHeader>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div role="status" class="notice">@message</div>
+    }
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div role="alert" class="notice error">@error</div>
+    }
 
     @if (slips == null)
     {
-        <LoadingState Description="Loading Order Slips..." />
+        <LoadingState Description="Loading order slips…" />
     }
     else
     {
-        <div class="flex justify-between items-center mb-4 flex-col sm:flex-row gap-2">
-            <div class="flex gap-2 items-center">
-                <select @bind="statusFilter" @bind:after="ApplyFilter"
-                        class="px-3 py-2 rounded-lg text-sm border border-border bg-background text-foreground max-w-[180px] min-h-[44px]">
+        <div class="order-toolbar">
+            <label class="order-filter">
+                Status
+                <select @bind="statusFilter" @bind:after="ApplyFilter" aria-label="Filter order slips by status">
                     <option value="">All statuses</option>
                     @foreach (var value in Statuses)
                     {
                         <option value="@value">@value</option>
                     }
                 </select>
-            </div>
-            <div class="flex gap-2">
-                <BbButton Variant="ButtonVariant.Default" OnClick='() => Navigation.NavigateTo("/admin/orderslips")'>
-                    Generate Order
-                </BbButton>
+            </label>
+            <div class="text-xs text-muted-foreground">
+                Showing <strong class="text-foreground">@filteredSlips.Count</strong> of <strong class="text-foreground">@slips.Count</strong> order slips
             </div>
         </div>
 
-        @if (!string.IsNullOrEmpty(message))
-        {
-            <div role="status" class="p-3 mb-3 rounded-lg border border-border bg-muted text-foreground text-sm">@message</div>
-        }
-        @if (!string.IsNullOrEmpty(error))
-        {
-            <div role="alert" class="p-3 mb-3 rounded-lg border border-destructive text-destructive text-sm bg-destructive/10">@error</div>
-        }
-
         @if (filteredSlips.Count == 0)
         {
-            <div class="bg-card border border-border rounded-lg">
-                <EmptyState Icon="clipboard-list" Description="No order slips found." Title="" />
+            <div class="order-empty">
+                <EmptyState Icon="clipboard-list" Description="Try changing the status filter or generate a new order." Title="No order slips found" />
             </div>
         }
         else
         {
-            @* MOBILE CARDS (Visible only on phones < 768px) *@
-            <div class="mobile-cards">
-                @foreach (var slip in filteredSlips)
-                {
-                    <div @onclick="() => OpenDetail(slip)" class="p-3 rounded-lg border border-border bg-card cursor-pointer flex flex-col gap-2">
-                        <div class="flex justify-between items-start gap-2">
-                            <div class="flex flex-col gap-0.5 min-w-0">
-                                <span class="font-semibold text-sm font-mono truncate">@DisplayNumber(slip)</span>
-                                <span class="text-xs text-muted-foreground truncate">@slip.Supplier.Name</span>
-                            </div>
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white shrink-0 whitespace-nowrap" style="background-color: @GetStatusColor(slip.Status)">
-                                <span class="w-1.5 h-1.5 rounded-full bg-white opacity-70"></span>
-                                @ShortStatus(slip.Status)
-                            </span>
-                        </div>
-                        <div class="flex gap-2 pt-1" @onclick:stopPropagation>
-                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenDetail(slip)" aria-label="@("View details for " + DisplayNumber(slip))">
-                                Details
-                            </BbButton>
-                            @if (slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
-                            {
-                                <BbButton Size="ButtonSize.Small" OnClick="() => OpenDetailForReceive(slip)" Style="background: #8b5cf6; border-color: #8b5cf6;">
-                                    Receive
-                                </BbButton>
-                            }
-                            <AuthorizeView Roles="Admin">
-                                @if (slip.Status is not (OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled))
-                                {
-                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenCancel(slip)" Style="color: #ef4444;">
-                                        Cancel
-                                    </BbButton>
-                                }
-                            </AuthorizeView>
-                        </div>
-                    </div>
-                }
-            </div>
-
-            @* DESKTOP/TABLET TABLE (Visible only >= 768px) *@
-            <div class="desktop-table bg-card border border-border rounded-lg overflow-x-auto">
-                <table class="w-full border-collapse text-sm" style="table-layout: fixed; min-width: 700px;">
-                    <colgroup>
-                        <col class="col-num" /><col class="col-sup" /><col class="col-stat" /><col class="col-gen" /><col class="col-exp" /><col class="col-act" />
-                    </colgroup>
-                    <thead>
-                        <tr class="border-b border-border bg-black/[0.02] dark:bg-white/[0.02]">
-                            <th @onclick="@(() => ToggleSort("number"))" class="col-num cursor-pointer text-left py-3 px-4 text-muted-foreground select-none">
-                                Order Slip @SortArrow("number")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("supplier"))" class="col-sup cursor-pointer text-left py-3 px-4 text-muted-foreground select-none">
-                                Supplier @SortArrow("supplier")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("status"))" class="col-stat cursor-pointer text-left py-3 px-4 text-muted-foreground select-none">
-                                Status @SortArrow("status")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("generated"))" class="col-gen cursor-pointer text-left py-3 px-4 text-muted-foreground select-none">
-                                Generated @SortArrow("generated")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("expected"))" class="col-exp cursor-pointer text-left py-3 px-4 text-muted-foreground select-none">
-                                Expected @SortArrow("expected")
-                            </th>
-                            <th class="col-act text-right py-3 px-4 text-muted-foreground">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var slip in filteredSlips)
-                        {
-                            <tr @onclick="() => OpenDetail(slip)"
-                                class="cursor-pointer border-b border-border transition-colors hover:bg-primary/5">
-                                <td class="col-num py-3 px-4 text-foreground font-mono">
-                                    @DisplayNumber(slip)
-                                </td>
-                                <td class="col-sup py-3 px-4 text-foreground">
-                                    @slip.Supplier.Name
-                                </td>
-                                <td class="col-stat py-3 px-4">
-                                    <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white w-full max-w-[120px]" style="background-color: @GetStatusColor(slip.Status)">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-white opacity-70"></span>
-                                        @ShortStatus(slip.Status)
-                                    </span>
-                                </td>
-                                <td class="col-gen py-3 px-4 text-muted-foreground text-xs">
-                                    @GeneratedDate(slip).ToString("MMM dd, yyyy")
-                                </td>
-                                <td class="col-exp py-3 px-4 text-muted-foreground text-xs">
-                                    @(slip.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "—")
-                                </td>
-                                <td class="col-act py-3 px-2" @onclick:stopPropagation>
-                                    <div class="flex gap-0.5 flex-wrap justify-end">
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenDetail(slip)">
-                                            Details
-                                        </BbButton>
-                                        @if (slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
-                                        {
-                                            <BbButton Size="ButtonSize.Small" OnClick="() => OpenDetailForReceive(slip)" Style="background: #8b5cf6; border-color: #8b5cf6;">
-                                                Receive
-                                            </BbButton>
-                                        }
-                                        <AuthorizeView Roles="Admin">
-                                            @if (slip.Status is not (OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled))
-                                            {
-                                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenCancel(slip)" Style="color: #ef4444;">
-                                                    Cancel
-                                                </BbButton>
-                                            }
-                                        </AuthorizeView>
-                                    </div>
-                                </td>
+            <div class="order-list-shell">
+                <div class="order-list-summary">
+                    <span>@filteredSlips.Count order slip@(filteredSlips.Count == 1 ? "" : "s")</span>
+                    <span>Select an order to view receipt and inventory details</span>
+                </div>
+                <div class="order-table-wrap">
+                    <table class="order-table">
+                        <colgroup>
+                            <col class="col-order" />
+                            <col class="col-supplier hide-ipad" />
+                            <col class="col-status" />
+                            <col class="col-generated hide-ipad" />
+                            <col class="col-actions" />
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th @onclick='@(() => ToggleSort("number"))' class="cursor-pointer select-none">
+                                    Order Slip @SortArrow("number")
+                                </th>
+                                <th @onclick='@(() => ToggleSort("supplier"))' class="cursor-pointer select-none hide-ipad">
+                                    Supplier @SortArrow("supplier")
+                                </th>
+                                <th @onclick='@(() => ToggleSort("status"))' class="cursor-pointer select-none">
+                                    Status @SortArrow("status")
+                                </th>
+                                <th @onclick='@(() => ToggleSort("generated"))' class="cursor-pointer select-none hide-ipad">
+                                    Generated @SortArrow("generated")
+                                </th>
+                                <th>Actions</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach (var slip in filteredSlips)
+                            {
+                                <tr class="order-row" @onclick="() => OpenDetail(slip)">
+                                    <td data-label="Order">
+                                        <div class="order-primary">
+                                            <strong>@DisplayNumber(slip)</strong>
+                                            <small>@slip.Supplier.Name</small>
+                                        </div>
+                                    </td>
+                                    <td data-label="Supplier" class="hide-ipad text-foreground">
+                                        @slip.Supplier.Name
+                                    </td>
+                                    <td data-label="Status">
+                                        <span class="status-pill" style="background-color:@GetStatusColor(slip.Status)">
+                                            <span class="status-dot"></span>@ShortStatus(slip.Status)
+                                        </span>
+                                    </td>
+                                    <td data-label="Generated" class="hide-ipad text-muted-foreground">
+                                        @GeneratedDate(slip).ToString("MMM dd, yyyy")
+                                    </td>
+                                    <td data-label="Actions" @onclick:stopPropagation>
+                                        <div class="order-actions">
+                                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenDetail(slip)">Details</BbButton>
+                                            @if (slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
+                                            {
+                                                <BbButton Size="ButtonSize.Small" OnClick="() => OpenDetailForReceive(slip)" Style="background:#8b5cf6;border-color:#8b5cf6;">Receive</BbButton>
+                                            }
+                                            <AuthorizeView Roles="Admin">
+                                                @if (slip.Status is not (OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled))
+                                                {
+                                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="() => OpenCancel(slip)" Style="color:#ef4444;">Cancel</BbButton>
+                                                }
+                                            </AuthorizeView>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         }
     }
@@ -216,132 +344,72 @@
 
 @* DETAIL MODAL *@
 <BbDialog @bind-Open="detailOpen">
-    <BbDialogContent class="flex flex-col p-0 overflow-hidden max-h-[90vh]" Style="width: min(96vw, 1200px);">
+    <BbDialogContent class="flex flex-col p-0 overflow-hidden" Style="width:min(94vw,980px);max-height:82vh;">
         <div class="px-4 pt-4 shrink-0">
             <BbDialogHeader>
-                <div class="flex flex-row items-center gap-1.5">
-                    <BbDialogTitle>@(selectedSlip == null ? "" : DisplayNumber(selectedSlip))</BbDialogTitle>
+                <div class="flex flex-wrap items-center gap-2">
+                    <BbDialogTitle>@(selectedSlip == null ? "Order details" : DisplayNumber(selectedSlip))</BbDialogTitle>
                     @if (selectedSlip != null)
                     {
-                        <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white min-w-[90px]" style="background-color: @GetStatusColor(selectedSlip.Status)">
-                            <span class="w-1.5 h-1.5 rounded-full bg-white opacity-70"></span>
-                            @selectedSlip.Status
-                        </span>
+                        <span class="status-pill" style="background-color:@GetStatusColor(selectedSlip.Status)"><span class="status-dot"></span>@selectedSlip.Status</span>
                     }
                 </div>
                 <BbDialogDescription>@(selectedSlip?.Supplier.Name) · @(selectedSlip != null ? GeneratedDate(selectedSlip).ToString("MMM dd, yyyy") : "")</BbDialogDescription>
             </BbDialogHeader>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        <div class="detail-body">
             @if (selectedSlip != null)
             {
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="p-3 rounded-lg bg-muted">
-                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Generated</div>
-                        <div class="text-sm font-semibold text-foreground mt-1">@GeneratedDate(selectedSlip).ToString("MMM dd, yyyy h:mm tt")</div>
-                    </div>
-                    <div class="p-3 rounded-lg bg-muted">
-                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Expected Delivery</div>
-                        <div class="text-sm font-semibold text-foreground mt-1">@(selectedSlip.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "—")</div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="p-3 rounded-lg bg-muted">
-                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Estimated Cost</div>
-                        <div class="text-sm font-semibold text-primary mt-1">₱@selectedSlip.TotalEstimatedCost.ToString("N2")</div>
-                    </div>
-                    <div class="p-3 rounded-lg bg-muted">
-                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Location</div>
-                        <div class="text-sm font-semibold text-foreground mt-1">@selectedSlip.LocationId</div>
-                    </div>
+                <div class="detail-summary-grid">
+                    <div class="detail-metric"><span>Generated</span><strong>@GeneratedDate(selectedSlip).ToString("MMM dd, yyyy h:mm tt")</strong></div>
+                    <div class="detail-metric"><span>Expected delivery</span><strong>@(selectedSlip.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "—")</strong></div>
+                    <div class="detail-metric"><span>Location</span><strong>@selectedSlip.LocationId</strong></div>
                 </div>
 
                 @if (selectedSlip.Items.Count > 0)
                 {
-                    <div class="border border-border rounded-lg overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="border-collapse text-xs min-w-[1200px] w-full">
-                                <thead>
-                                    <tr class="border-b border-border bg-muted">
-                                        <th class="text-left py-2 px-3 text-muted-foreground whitespace-nowrap">Product</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Current</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Incoming</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Reserved</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Backorder</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Position</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Demand/Day</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Lead Days</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Safety</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Reorder</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Target</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Suggested</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Ordered</th>
-                                        <th class="text-right py-2 px-2.5 text-muted-foreground whitespace-nowrap">Received</th>
-                                    </tr>
-                                </thead>
+                    <section class="items-shell">
+                        <div class="items-heading"><strong>Order items</strong><span>@selectedSlip.Items.Count item@(selectedSlip.Items.Count == 1 ? "" : "s")</span></div>
+                        <div class="items-table-wrap">
+                            <table class="items-table">
+                                <thead><tr><th>Product</th><th>Current</th><th>Incoming</th><th>Reserved</th><th>Position</th><th>Demand/Day</th><th>Lead Days</th><th>Safety</th><th>Reorder</th><th>Target</th><th>Suggested</th><th>Ordered</th><th>Received</th></tr></thead>
                                 <tbody>
                                     @foreach (var item in selectedSlip.Items)
                                     {
-                                        <tr class="border-b border-border">
-                                            <td class="py-2 px-3 text-foreground">
-                                                <div class="font-semibold">@item.ProductName</div>
-                                                @if (!string.IsNullOrWhiteSpace(item.Brand))
-                                                {
-                                                    <div class="text-[10px] text-muted-foreground">@item.Brand</div>
-                                                }
-                                            </td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.CurrentStockSnapshot</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.IncomingStockSnapshot</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.ReservedStockSnapshot</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.InventoryPositionSnapshot</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.AverageDailyDemandSnapshot.ToString("0.##")</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.LeadTimeDaysSnapshot.ToString("0.##")</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.SafetyStockSnapshot</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.ReorderPointSnapshot</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground">@item.TargetStockSnapshot</td>
-                                            <td class="py-2 px-2.5 text-right text-primary font-semibold">@item.SuggestedQuantity</td>
-                                            <td class="py-2 px-2.5 text-right text-foreground font-semibold">@(item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity)</td>
-                                            <td class="py-2 px-2.5 text-right @(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
+                                        <tr>
+                                            <td class="product-cell"><strong>@item.ProductName</strong>@if (!string.IsNullOrWhiteSpace(item.Brand)) { <small>@item.Brand</small> }</td>
+                                            <td>@item.CurrentStockSnapshot</td><td>@item.IncomingStockSnapshot</td><td>@item.ReservedStockSnapshot</td><td>@item.InventoryPositionSnapshot</td>
+                                            <td>@item.AverageDailyDemandSnapshot.ToString("0.##")</td><td>@item.LeadTimeDaysSnapshot.ToString("0.##")</td><td>@item.SafetyStockSnapshot</td><td>@item.ReorderPointSnapshot</td><td>@item.TargetStockSnapshot</td>
+                                            <td class="text-primary font-semibold">@item.SuggestedQuantity</td><td class="font-semibold">@(item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity)</td><td class="@(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    </section>
                 }
 
                 @if (!string.IsNullOrWhiteSpace(selectedSlip.Remarks))
                 {
-                    <div class="p-3 rounded-lg bg-muted">
-                        <div class="text-[10px] font-bold text-muted-foreground uppercase mb-2">Remarks</div>
-                        <div class="text-sm text-foreground">@selectedSlip.Remarks</div>
-                    </div>
+                    <div class="detail-metric"><span>Remarks</span><strong class="font-normal">@selectedSlip.Remarks</strong></div>
                 }
             }
         </div>
 
-        <div class="flex justify-between items-center gap-2 p-3 px-4 border-t border-border shrink-0">
-            <div class="flex gap-2">
+        <div class="detail-footer">
+            <div class="detail-footer-group">
                 <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDetail">Close</BbButton>
                 @if (selectedSlip != null)
                 {
-                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="PrintSlip" aria-label="Print order slip">
-                        <LucideIcon Name="printer" Size="14" /> Print
-                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PrintSlip"><LucideIcon Name="printer" Size="14" /> Print</BbButton>
                 }
             </div>
-            <div class="flex gap-2">
-            @if (selectedSlip != null)
-            {
+            <div class="detail-footer-group">
                 @if (selectedSlip?.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
                 {
-                    <BbButton Size="ButtonSize.Small" OnClick="OpenReceiveModal" Style="background: #8b5cf6; border-color: #8b5cf6;">
-                        Record Receipt
-                    </BbButton>
+                    <BbButton Size="ButtonSize.Small" OnClick="OpenReceiveModal" Style="background:#8b5cf6;border-color:#8b5cf6;">Record Receipt</BbButton>
                 }
-            }
             </div>
         </div>
     </BbDialogContent>
@@ -349,65 +417,36 @@
 
 @* RECEIVE MODAL *@
 <BbDialog @bind-Open="receiveOpen">
-    <BbDialogContent class="flex flex-col p-0 overflow-hidden max-h-[85vh]" Style="width: min(96vw, 650px);">
+    <BbDialogContent class="flex flex-col p-0 overflow-hidden" Style="width:min(96vw,720px);height:min(88vh,760px);max-height:88vh;">
         <div class="px-4 pt-4 shrink-0">
-            <BbDialogHeader>
-                <BbDialogTitle>Record Receipt</BbDialogTitle>
-                <BbDialogDescription>Enter quantities received in this delivery. Partial receipts remain open.</BbDialogDescription>
-            </BbDialogHeader>
+            <BbDialogHeader><BbDialogTitle>Record Receipt</BbDialogTitle><BbDialogDescription>Enter quantities received in this delivery. Partial receipts remain open.</BbDialogDescription></BbDialogHeader>
         </div>
-
-        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        <div class="detail-body">
             @if (selectedSlip != null)
             {
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label class="flex flex-col gap-1 text-sm font-medium text-foreground">
-                        Received Date
-                        <input type="date" @bind="receiveDate" @bind:format="yyyy-MM-dd"
-                               class="p-2 rounded-lg border border-border bg-background text-foreground text-sm" />
-                    </label>
-                    <label class="flex flex-col gap-1 text-sm font-medium text-foreground">
-                        Supplier Ref
-                        <input @bind="receiveRef" maxlength="100"
-                               class="p-2 rounded-lg border border-border bg-background text-foreground text-sm" />
-                    </label>
-                    <label class="flex flex-col gap-1 text-sm font-medium text-foreground">
-                        Remarks
-                        <input @bind="receiveRemarks" maxlength="500"
-                               class="p-2 rounded-lg border border-border bg-background text-foreground text-sm" />
-                    </label>
+                <div class="receive-fields">
+                    <label>Received Date<input type="date" @bind="receiveDate" @bind:format="yyyy-MM-dd" /></label>
+                    <label>Supplier Ref<input @bind="receiveRef" maxlength="100" placeholder="Optional reference" /></label>
+                    <label>Remarks<input @bind="receiveRemarks" maxlength="500" placeholder="Optional remarks" /></label>
                 </div>
-
-                @if (!string.IsNullOrWhiteSpace(receiveError))
-                {
-                    <div role="alert" class="p-3 rounded-lg border border-destructive text-destructive text-sm">@receiveError</div>
-                }
-
-                <div class="border border-border rounded-lg overflow-hidden">
-                    <table class="w-full border-collapse text-xs">
-                        <thead>
-                            <tr class="border-b border-border bg-muted">
-                                <th class="text-left py-2 px-3 text-muted-foreground">Product</th>
-                                <th class="text-right py-2 px-3 text-muted-foreground">Ordered</th>
-                                <th class="text-right py-2 px-3 text-muted-foreground">Prev Recv'd</th>
-                                <th class="text-right py-2 px-3 text-muted-foreground">Receive Now</th>
-                            </tr>
-                        </thead>
+                @if (!string.IsNullOrWhiteSpace(receiveError)) { <div role="alert" class="notice error">@receiveError</div> }
+                <div class="items-shell">
+                    <table class="receive-table">
+                        <thead><tr><th>Product</th><th>Ordered</th><th>Previously Received</th><th>Receive Now</th></tr></thead>
                         <tbody>
                             @foreach (var item in selectedSlip.Items)
                             {
                                 var ordered = item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity;
                                 var remaining = ordered - item.ReceivedQuantity;
-                                <tr class="border-b border-border">
-                                    <td class="py-2 px-3 text-foreground font-semibold">@item.ProductName</td>
-                                    <td class="py-2 px-3 text-right text-foreground">@ordered</td>
-                                    <td class="py-2 px-3 text-right @(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
-                                    <td class="py-2 px-3 text-right">
-                                        <input type="number" min="0" max="@remaining" @bind="receiveQtys[item.Id]"
-                                               class="w-20 p-1.5 rounded-lg border border-border bg-background text-foreground text-sm text-right" />
-                                        <span class="text-[10px] text-muted-foreground ml-2">
-                                            @(receiveQtys.GetValueOrDefault(item.Id) >= remaining && remaining > 0 ? "full" : $"{remaining - receiveQtys.GetValueOrDefault(item.Id)} left")
-                                        </span>
+                                <tr>
+                                    <td>@item.ProductName</td>
+                                    <td data-label="Ordered">@ordered</td>
+                                    <td data-label="Prev Received" class="@(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
+                                    <td data-label="Receive Now">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <input class="receive-qty" type="number" min="0" max="@remaining" @bind="receiveQtys[item.Id]" />
+                                            <span class="text-[10px] text-muted-foreground whitespace-nowrap">@(receiveQtys.GetValueOrDefault(item.Id) >= remaining && remaining > 0 ? "full" : $"{remaining - receiveQtys.GetValueOrDefault(item.Id)} left")</span>
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -416,37 +455,23 @@
                 </div>
             }
         </div>
-
-        <div class="flex justify-end gap-2 p-3 px-4 border-t border-border shrink-0">
+        <div class="detail-footer">
             <BbButton Variant="ButtonVariant.Ghost" OnClick="() => receiveOpen = false">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="SaveReceipt" Disabled="receiveBusy" Style="background: #8b5cf6; border-color: #8b5cf6;">
-                @if (receiveBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                Save Receipt
-            </BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="SaveReceipt" Disabled="receiveBusy" Style="background:#8b5cf6;border-color:#8b5cf6;">@if (receiveBusy) { <BbSpinner Size="SpinnerSize.Small" /> } Save Receipt</BbButton>
         </div>
     </BbDialogContent>
 </BbDialog>
 
 @* CANCEL DIALOG *@
 <BbDialog @bind-Open="cancelOpen">
-    <BbDialogContent class="flex flex-col" Style="width: min(96vw, 440px);">
-        <BbDialogHeader>
-            <BbDialogTitle>Cancel Order Slip</BbDialogTitle>
-            <BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription>
-        </BbDialogHeader>
+    <BbDialogContent class="flex flex-col" Style="width:min(96vw,440px);">
+        <BbDialogHeader><BbDialogTitle>Cancel Order Slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription></BbDialogHeader>
         <div class="py-2 flex flex-col gap-3">
-            <label class="flex flex-col gap-1 text-sm font-medium">
-                Reason
-                <textarea @bind="cancelReason" rows="3" maxlength="500"
-                          class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[60px]"
-                          placeholder="Why is this order being cancelled?"></textarea>
-            </label>
+            <label class="flex flex-col gap-1 text-sm font-medium">Reason<textarea @bind="cancelReason" rows="3" maxlength="500" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
         </div>
         <div class="flex justify-end gap-2 pt-3 border-t border-border">
             <BbButton Variant="ButtonVariant.Ghost" OnClick="() => cancelOpen = false">Back</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel" Disabled="@string.IsNullOrWhiteSpace(cancelReason)">
-                Cancel Order
-            </BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel" Disabled="@string.IsNullOrWhiteSpace(cancelReason)">Cancel Order</BbButton>
         </div>
     </BbDialogContent>
 </BbDialog>

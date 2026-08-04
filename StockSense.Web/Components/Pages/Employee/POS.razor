@@ -15,7 +15,7 @@
 @inject ILogger<POS> Logger
 @inject ToastService Toast
 @rendermode InteractiveServer
-@implements IDisposable
+@implements IAsyncDisposable
 
 @attribute [Authorize(Roles = "Admin, Employee")]
 
@@ -27,7 +27,7 @@
 @* ═══════════════════════════════════════════════════════════════════════
    MAIN WRAPPER — mobile-first single-column, md+: two-column
    ═══════════════════════════════════════════════════════════════════════ *@
-<div class="pos-wrapper no-print">
+<div class="pos-wrapper no-print @(scannerEnabled ? "scanner-open" : "")">
 
     @* ─── PRODUCT CATALOG ─── *@
     <div class="pos-catalog flex-1 min-w-0 overflow-hidden bg-card border border-border rounded-lg flex flex-col"
@@ -113,7 +113,7 @@
     @if (cart.Any())
     {
         <button type="button" @onclick="() => cartModalOpen = true"
-                class="pos-mobile-cart-btn fixed bottom-20 right-4 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg font-bold text-sm min-h-[44px]">
+                class="pos-mobile-cart-btn fixed right-4 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg font-bold text-sm min-h-[44px]">
             <LucideIcon Name="shopping-cart" Size="18" />
             <span>@cart.Sum(i => i.Quantity)</span>
             <span>₱@TotalAmount.ToString("N2")</span>
@@ -134,7 +134,7 @@
    CART MODAL (mobile)
    ═══════════════════════════════════════════════════════════════════════ *@
 <BbDialog @bind-Open="cartModalOpen">
-     <BbDialogContent Style="width: min(98vw, 500px); max-height: 90dvh" class="flex flex-col p-0 overflow-hidden">
+    <BbDialogContent Style="width: min(98vw, 500px); max-height: 90dvh" class="flex flex-col p-0 overflow-hidden">
         <BbDialogHeader class="shrink-0 px-4 py-3 border-b border-border">
             <BbDialogTitle class="flex items-center gap-2 text-base font-semibold">
                 <LucideIcon Name="shopping-cart" Size="18" />
@@ -388,8 +388,8 @@
     </div>;
 
     private RenderFragment ScannerBody(string elementId) =>
-    @<div class="p-3 flex flex-col gap-3">
-        <div id="@elementId" class="w-full h-40 md:h-[200px] bg-transparent rounded-lg overflow-hidden border-2 box-border @CameraClass">
+    @<div class="pos-scanner-body p-3 flex flex-col gap-3">
+        <div id="@elementId" class="pos-camera-preview w-full bg-black rounded-lg overflow-hidden border-2 box-border @CameraClass">
         </div>
 
         @if (!string.IsNullOrEmpty(scanErrorMessage))
@@ -453,7 +453,11 @@
     private string? scanErrorMessage;
     private int scanQuantity = 1;
     private DotNetObjectReference<POS>? dotNetRef;
+    private DotNetObjectReference<POS>? viewportDotNetRef;
     private string _scannerElementId = "barcode-camera-container";
+    private int _lastViewportWidth;
+    private int _lastViewportHeight;
+    private bool _scannerRestartPending = false;
 
     private string CameraClass => scannedProduct != null
         ? "border-green-500 dark:border-green-400"
@@ -463,28 +467,149 @@
     {
         if (firstRender)
         {
-            var width = await JS.InvokeAsync<int>("eval", "window.innerWidth");
-            if (width < 768) _scannerElementId = "barcode-camera-container-mobile";
+            _lastViewportWidth = await JS.InvokeAsync<int>("eval", "window.innerWidth");
+            _lastViewportHeight = await JS.InvokeAsync<int>("eval", "window.innerHeight");
+
+            var useDesktopScanner = await JS.InvokeAsync<bool>(
+                "eval",
+                "window.matchMedia('(min-width: 1280px) and (hover: hover) and (pointer: fine)').matches");
+
+            _scannerElementId = useDesktopScanner
+                ? "barcode-camera-container"
+                : "barcode-camera-container-mobile";
+
+            viewportDotNetRef = DotNetObjectReference.Create(this);
+
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "barcodeScanner.watchViewport",
+                    viewportDotNetRef);
+            }
+            catch (JSException ex)
+            {
+                Logger.LogWarning(
+                    ex,
+                    "barcodeScanner.watchViewport is unavailable. Refresh static JS assets.");
+
+                // Keep this as a developer-side warning only.
+                // Do not show a scanner error to the user if the camera itself still works.
+                scanErrorMessage = null;
+            }
+        }
+
+        if (_scannerRestartPending && scannerEnabled)
+        {
+            _scannerRestartPending = false;
+            scanErrorMessage = null;
+
+            dotNetRef?.Dispose();
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            try
+            {
+                // iPad/iPhone browsers need time after rotation for:
+                // 1) the old MediaStream to be released, and
+                // 2) the new scanner container to finish becoming visible.
+                await JS.InvokeVoidAsync(
+                    "barcodeScanner.restartAfterViewportChange",
+                    _scannerElementId,
+                    dotNetRef);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Scanner restart after rotation failed.");
+                scanErrorMessage =
+                    "The camera could not restart after rotation. Toggle the scanner off and on.";
+            }
+
+            return;
         }
 
         if (scannerEnabled && dotNetRef == null)
         {
+            scanErrorMessage = null;
             dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("barcodeScanner.start", _scannerElementId, dotNetRef);
         }
         else if (!scannerEnabled && dotNetRef != null)
         {
             await JS.InvokeVoidAsync("barcodeScanner.stop");
+            dotNetRef.Dispose();
+            dotNetRef = null;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPosViewportChanged(int width, int height, bool useDesktopScanner)
+    {
+        var oldLandscape = _lastViewportWidth > _lastViewportHeight;
+        var newLandscape = width > height;
+
+        var newElementId = useDesktopScanner
+            ? "barcode-camera-container"
+            : "barcode-camera-container-mobile";
+
+        var targetChanged = !string.Equals(
+            newElementId,
+            _scannerElementId,
+            StringComparison.Ordinal);
+
+        var orientationChanged =
+            _lastViewportWidth > 0 &&
+            _lastViewportHeight > 0 &&
+            oldLandscape != newLandscape;
+
+        _lastViewportWidth = width;
+        _lastViewportHeight = height;
+
+        // If rotation keeps us in the same tablet/mobile scanner container,
+        // do nothing. The existing video stream can continue running.
+        if (!targetChanged)
+            return;
+
+        _scannerElementId = newElementId;
+
+        if (!scannerEnabled)
+            return;
+
+        try
+        {
+            // Only restart when we actually cross the tablet/desktop breakpoint
+            // and therefore need to move the camera into a different DOM element.
+            await JS.InvokeVoidAsync("barcodeScanner.stop");
+
             dotNetRef?.Dispose();
             dotNetRef = null;
+
+            _scannerRestartPending = true;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Scanner preparation for layout change failed.");
+            scanErrorMessage =
+                "The camera could not restart after the layout changed. Toggle the scanner off and on.";
+            await InvokeAsync(StateHasChanged);
         }
     }
 
     private async Task ToggleCamera()
     {
-        if (dotNetRef != null)
+        if (dotNetRef == null)
+            return;
+
+        try
         {
-            await JS.InvokeVoidAsync("barcodeScanner.cycleCamera", _scannerElementId);
+            await JS.InvokeVoidAsync(
+                "barcodeScanner.cycleCamera",
+                _scannerElementId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Camera switch failed.");
+            scanErrorMessage =
+                "The camera could not be switched. Try turning the scanner off and on again.";
         }
     }
 
@@ -527,9 +652,23 @@
         scanQuantity = 1;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
+        try
+        {
+            await JS.InvokeVoidAsync("barcodeScanner.unwatchViewport");
+            await JS.InvokeVoidAsync("barcodeScanner.stop");
+        }
+        catch
+        {
+            // The JS runtime may already be disconnected during navigation.
+        }
+
         dotNetRef?.Dispose();
+        viewportDotNetRef?.Dispose();
+
+        dotNetRef = null;
+        viewportDotNetRef = null;
     }
 
     protected override async Task OnInitializedAsync()
@@ -659,28 +798,242 @@
 
     .pos-mobile-cart-btn {
         display: flex;
+        top: 1rem;
+        right: 1rem;
+        bottom: auto;
+        transition: none;
+    }
+
+    .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+        top: 1rem;
+        bottom: auto;
     }
 
     .pos-scanner-mobile {
         display: block;
     }
 
-    @@media (min-width: 768px) {
+    .pos-camera-preview {
+        display: block;
+        width: 100%;
+        height: 180px;
+        min-height: 180px;
+        position: relative;
+        background: #000;
+    }
+
+        .pos-camera-preview video,
+        .pos-camera-preview canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+            object-fit: cover;
+        }
+
+    @@media (max-width: 767px) {
+        .pos-mobile-cart-btn {
+            top: 4.75rem;
+            right: 1rem;
+            bottom: auto;
+        }
+
+        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+            top: 4.75rem;
+            bottom: auto;
+        }
+
+        .pos-scanner-mobile {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        .pos-wrapper.scanner-open .pos-catalog {
+            padding-bottom: 18rem !important;
+        }
+
+        .pos-camera-preview {
+            height: 170px;
+            min-height: 170px;
+        }
+    }
+
+    @@media (min-width: 768px) and (max-width: 1279px) {
+        .pos-wrapper {
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .pos-catalog {
+            width: 100%;
+            padding-bottom: 4.5rem !important;
+        }
+
+        .pos-wrapper.scanner-open .pos-catalog {
+            padding-bottom: 18rem !important;
+        }
+
+        .pos-desktop-right {
+            display: none;
+        }
+
+        .pos-mobile-cart-btn {
+            display: flex;
+            top: 1rem;
+            right: 1.25rem;
+            bottom: auto;
+        }
+
+        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+            top: 1rem;
+            bottom: auto;
+        }
+
+        .pos-scanner-mobile {
+            display: block;
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100%;
+            max-width: 100%;
+        }
+
+            .pos-scanner-mobile > div:first-child {
+                padding-top: .65rem !important;
+                padding-bottom: .65rem !important;
+            }
+
+        .pos-camera-preview {
+            height: 190px;
+            min-height: 190px;
+        }
+    }
+
+    @@media (min-width: 768px) and (max-width: 1279px) {
+        .pos-scanner-body {
+            padding: .65rem !important;
+            gap: .5rem !important;
+            align-items: center;
+        }
+
+        .pos-camera-preview {
+            width: min(100%, 520px);
+            height: 220px;
+            min-height: 220px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+            .pos-camera-preview video,
+            .pos-camera-preview canvas {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover;
+                background: transparent;
+            }
+
+        .pos-scanner-body > div:not(.pos-camera-preview) {
+            width: min(100%, 520px);
+        }
+    }
+
+    /* iPad Pro / large touch tablets: stay in tablet POS mode even above 1280px. */
+    @@media (min-width: 1280px) and (hover: none), (min-width: 1280px) and (pointer: coarse) {
+        .pos-wrapper {
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .pos-catalog {
+            width: 100%;
+            padding-bottom: 4.5rem !important;
+        }
+
+        .pos-wrapper.scanner-open .pos-catalog {
+            padding-bottom: 18rem !important;
+        }
+
+        .pos-desktop-right {
+            display: none !important;
+        }
+
+        .pos-mobile-cart-btn {
+            display: flex !important;
+            top: 1rem;
+            right: 1.25rem;
+            bottom: auto;
+        }
+
+        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+            top: 1rem;
+            bottom: auto;
+        }
+
+        .pos-scanner-mobile {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100%;
+            max-width: 100%;
+        }
+
+            .pos-scanner-mobile > div:first-child {
+                padding-top: .65rem !important;
+                padding-bottom: .65rem !important;
+            }
+
+        .pos-scanner-body {
+            padding: .65rem !important;
+            gap: .5rem !important;
+            align-items: center;
+        }
+
+        .pos-camera-preview {
+            width: min(100%, 520px);
+            height: 220px;
+            min-height: 220px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+            .pos-camera-preview video,
+            .pos-camera-preview canvas {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover;
+                background: transparent;
+            }
+
+        .pos-scanner-body > div:not(.pos-camera-preview) {
+            width: min(100%, 520px);
+        }
+    }
+
+    /* True desktop/laptop mode: wide screen plus mouse/fine pointer. */
+    @@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
         .pos-wrapper {
             flex-direction: row;
             gap: 1.5rem;
         }
+
         .pos-catalog {
             padding-bottom: 0 !important;
         }
+
         .pos-desktop-right {
             display: flex;
             width: 25rem;
             flex-shrink: 0;
         }
+
         .pos-mobile-cart-btn {
             display: none;
         }
+
         .pos-scanner-mobile {
             display: none;
         }

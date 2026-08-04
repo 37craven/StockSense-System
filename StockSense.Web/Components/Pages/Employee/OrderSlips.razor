@@ -64,7 +64,10 @@
                 <p class="text-sm mt-1 m-0" style="color:var(--muted-foreground)">Review the latest stock calculations before creating supplier drafts.</p>
             </div>
             <BbButton OnClick="LoadPreview" Disabled="busy" Size="ButtonSize.Default">
-                @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @if (busy)
+                {
+                    <BbSpinner Size="SpinnerSize.Small" />
+                }
                 <LucideIcon Name="scan" Size="16" /> Generate Preview
             </BbButton>
         </div>
@@ -252,37 +255,43 @@
                                     @if (lineProduct?.HasInventorySettings == true)
                                     {
                                         <div class="line-meta">
-                                            <small>MOQ @lineProduct.MinimumOrderQuantity · pack @lineProduct.PackageSize@if (lineProduct.MaximumStockLevel.HasValue) { <text> · max @lineProduct.MaximumStockLevel</text> }</small>
-                                        </div>
-                                    }
+                                            <small>MOQ @lineProduct.MinimumOrderQuantity · pack @lineProduct.PackageSize@if (lineProduct.MaximumStockLevel.HasValue) {
+                                                <text> · max @lineProduct.MaximumStockLevel</text>
+                                            }
+                                        </small>
+                                    </div>
+                                }
                                     else
-                                    {
-                                        <div class="line-meta"></div>
-                                    }
-                                    <button type="button" title="Remove product" aria-label="Remove product line" @onclick="() => RemoveManualLine(line)" class="remove-button">
-                                        <LucideIcon Name="trash-2" Size="17" />
-                                    </button>
-                                </div>
-                            }
-                        </div>
+                                {
+                                    <div class="line-meta"></div>
+                                }
+                                <button type="button" title="Remove product" aria-label="Remove product line" @onclick="() => RemoveManualLine(line)" class="remove-button">
+                                    <LucideIcon Name="trash-2" Size="17" />
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <label class="reason">
+                <span>Reason<span style="color:var(--destructive)"> *</span></span>
+                <textarea maxlength="500" rows="2" placeholder="Why is this manual order needed?" @bind="manualReason" style="min-height:50px"></textarea>
+                <small>@manualReason.Length/500 characters</small>
+            </label>
+
+            <div class="actions">
+                <BbButton OnClick="CreateManualDraft" Disabled="@(busy || !CanCreateManual)">
+                    @if (busy)
+                    {
+                        <BbSpinner Size="SpinnerSize.Small" />
                     }
-                </div>
-
-                <label class="reason">
-                    <span>Reason<span style="color:var(--destructive)"> *</span></span>
-                    <textarea maxlength="500" rows="2" placeholder="Why is this manual order needed?" @bind="manualReason" style="min-height:50px"></textarea>
-                    <small>@manualReason.Length/500 characters</small>
-                </label>
-
-                <div class="actions">
-                    <BbButton OnClick="CreateManualDraft" Disabled="@(busy || !CanCreateManual)">
-                        @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                        <LucideIcon Name="file-plus" Size="16" /> Create Draft
-                    </BbButton>
-                </div>
+                    <LucideIcon Name="file-plus" Size="16" /> Create Draft
+                </BbButton>
             </div>
         </div>
-    }
+    </div>
+}
 </div>
 
 @code {
@@ -311,50 +320,36 @@
     }
     private async Task LoadPreview()
     {
-        busy = true; error = message = ""; errors.Clear();
+        busy = true;
+        error = "";
+        message = "";
+        errors.Clear();
+
         try
         {
-            /* TEMP MOCK DATA - REMOVE THIS BLOCK AFTER TESTING */
-            preview = new OrderSlipPreviewDto
+            var result = await Workflow.PreviewAsync(InventoryDefaults.LocationId);
+
+            if (!result.IsSuccess || result.Value == null)
             {
-                LocationId = InventoryDefaults.LocationId,
-                GeneratedAt = DateTime.UtcNow,
-                SupplierGroups = new List<OrderSlipPreviewGroupDto>
-                {
-                    new()
-                    {
-                        SupplierId = 1,
-                        SupplierName = "Motul Philippines",
-                        Items = new List<OrderSlipPreviewItemDto>
-                        {
-                            new() { ProductId = 101, ProductName = "Chain Lube Spray 400ml", Brand = "Motul", Category = "Lubricants", CurrentStock = 2, IncomingStock = 0, InventoryPosition = 2, TargetStock = 20, SuggestedQuantity = 18, FinalQuantity = 18, PackageSize = 6, MinimumOrderQuantity = 6, MaximumStockLevel = 30, UnitCost = 245.00m, EstimatedLineTotal = 4410.00m, RecommendationReason = "Below Reorder Point" },
-                            new() { ProductId = 102, ProductName = "Fork Oil 15W 1L", Brand = "Motul", Category = "Lubricants", CurrentStock = 5, IncomingStock = 3, InventoryPosition = 8, TargetStock = 15, SuggestedQuantity = 7, FinalQuantity = 7, PackageSize = 1, MinimumOrderQuantity = 3, MaximumStockLevel = 20, UnitCost = 380.00m, EstimatedLineTotal = 2660.00m, RecommendationReason = "Low Stock" },
-                            new() { ProductId = 103, ProductName = "Brake Fluid DOT 4 500ml", Brand = "Motul", Category = "Brakes", CurrentStock = 0, IncomingStock = 0, InventoryPosition = 0, TargetStock = 12, SuggestedQuantity = 12, FinalQuantity = 12, PackageSize = 6, MinimumOrderQuantity = 6, MaximumStockLevel = 24, UnitCost = 195.00m, EstimatedLineTotal = 2340.00m, RecommendationReason = "Out of Stock" },
-                            new() { ProductId = 104, ProductName = "Air Filter Oil Spray", Brand = "Motul", Category = "Filters", CurrentStock = 3, IncomingStock = 0, InventoryPosition = 3, TargetStock = 10, SuggestedQuantity = 7, FinalQuantity = 7, PackageSize = 1, MinimumOrderQuantity = 1, MaximumStockLevel = null, UnitCost = 520.00m, EstimatedLineTotal = 3640.00m, RecommendationReason = "Below Reorder Point" },
-                        }
-                    },
-                    new()
-                    {
-                        SupplierId = 2,
-                        SupplierName = "RK Takasago Chain",
-                        Items = new List<OrderSlipPreviewItemDto>
-                        {
-                            new() { ProductId = 201, ProductName = "428H Chain 132L", Brand = "RK", Category = "Chains", CurrentStock = 1, IncomingStock = 0, InventoryPosition = 1, TargetStock = 8, SuggestedQuantity = 7, FinalQuantity = 7, PackageSize = 1, MinimumOrderQuantity = 2, MaximumStockLevel = 15, UnitCost = 850.00m, EstimatedLineTotal = 5950.00m, RecommendationReason = "Below Reorder Point" },
-                            new() { ProductId = 202, ProductName = "520 Chain 120L Gold", Brand = "RK", Category = "Chains", CurrentStock = 0, IncomingStock = 0, InventoryPosition = 0, TargetStock = 5, SuggestedQuantity = 5, FinalQuantity = 5, PackageSize = 1, MinimumOrderQuantity = 1, MaximumStockLevel = 10, UnitCost = 1250.00m, EstimatedLineTotal = 6250.00m, RecommendationReason = "Out of Stock" },
-                        }
-                    }
-                },
-                Warnings = new List<OrderSlipGenerationWarningDto>
-                {
-                    new(101, "Chain Lube Spray 400ml", "OPEN_ORDER_EXISTS", "Product already has an open order. Remaining incoming quantity: 3."),
-                    new(202, "520 Chain 120L Gold", "NO_SUPPLIER", "No supplier has been assigned to this product."),
-                }
-            };
+                throw new UserFacingApiException(
+                    result.ErrorMessage ?? "The order preview could not be prepared.");
+            }
+
+            preview = result.Value;
+
             message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations.";
-            /* END TEMP MOCK DATA */
         }
-        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The order preview could not be prepared."); }
-        finally { busy = false; }
+        catch (Exception ex)
+        {
+            preview = null;
+            error = ApiErrorMessage.FromException(
+                ex,
+                "The order preview could not be prepared.");
+        }
+        finally
+        {
+            busy = false;
+        }
     }
     private void Validate(OrderSlipPreviewItemDto item)
     {
@@ -391,7 +386,7 @@
             var state = await AuthenticationState.GetAuthenticationStateAsync();
             var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = InventoryDefaults.LocationId, CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
             if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slip could not be created.");
-            message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = ""; 
+            message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = "";
         }
         catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slip could not be created."); }
         finally { busy = false; }
