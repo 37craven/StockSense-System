@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using BlazorBlueprint.Components;
 using BlazorBlueprint.Primitives;
@@ -97,11 +98,19 @@ builder.Services.AddRateLimiter(options =>
     {
         opt.PermitLimit = 5; opt.Window = TimeSpan.FromSeconds(30); opt.QueueLimit = 0;
     });
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    options.AddPolicy("api-policy", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? httpContext.Request.Headers.Host.ToString(),
-            factory: partition => new FixedWindowRateLimiterOptions
-            { AutoReplenishment = true, PermitLimit = 100, Window = TimeSpan.FromMinutes(1) }));
+            partitionKey: httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) is { Length: > 0 } userId
+                ? $"user:{userId}"
+                : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 300,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 10,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
 });
 
 // --- 7. ADDITIONAL SERVICES ---
@@ -247,9 +256,9 @@ using (var scope = app.Services.CreateScope())
 if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
@@ -258,7 +267,7 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(StockSense.Client._Imports).Assembly);
 
 app.MapAdditionalIdentityEndpoints();
-app.MapControllers();
+app.MapControllers().RequireRateLimiting("api-policy");
 
 app.MapGet("/api/download/{token}", (string token, PdfDownloadCache cache) =>
 {
