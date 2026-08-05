@@ -4,39 +4,37 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
-<section style="display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; background: var(--background); color: var(--foreground); position: relative;" aria-labelledby="assistance-title">
-    <h1 id="assistance-title" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;">Sap Shop assistant</h1>
-
-    @if (messages.Count > 0)
-    {
-        <div style="position: absolute; top: 12px; right: 12px; z-index: 10;">
-            <button type="button"
-                    disabled="@isSending"
-                    @onclick="ResetConversationAsync"
-                    aria-label="Start a new conversation"
-                    style="display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--background); color: var(--muted-foreground); font-size: 11px; font-weight: 500; cursor: pointer; transition: background 0.15s;">
-                <LucideIcon Name="plus" Size="12" />
-                New chat
-            </button>
-        </div>
-    }
+<section class="chat-shell" aria-labelledby="assistance-title">
+    <h1 id="assistance-title" class="sr-only">Sap Shop assistant</h1>
 
     @if (messages.Count == 0)
     {
-        <div style="flex: 1; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 32px 16px;">
-            <div style="width: 100%; max-width: 440px; text-align: center;">
-                <div style="margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 14px; background: var(--primary); color: white;" aria-hidden="true">
-                    <LucideIcon Name="bot" Size="24" />
+        <div class="chat-empty-scroll">
+            <div class="chat-empty-state">
+                <div class="chat-empty-logo">
+                    <div class="chat-empty-logo-inner">
+                        <LucideIcon Name="bot" Size="28" />
+                    </div>
                 </div>
-                <h2 style="margin-bottom: 8px; font-size: 22px; font-weight: 600; color: var(--foreground);">How can I help you?</h2>
-                <p style="margin-bottom: 24px; font-size: 14px; color: var(--muted-foreground);">Choose a suggested question or type your own.</p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" aria-label="Suggested questions">
+
+                <h2 class="chat-empty-title">How can I help?</h2>
+                <p class="chat-empty-description">
+                    Ask about products, inventory, stock availability, transactions, or other Sap Shop information.
+                </p>
+
+                <div class="chat-suggestions" aria-label="Suggested questions">
                     @foreach (var suggestion in suggestions)
                     {
                         <button @onclick="() => Suggest(suggestion.Prompt)"
                                 type="button"
-                                style="padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); font-size: 12px; text-align: left; cursor: pointer; transition: background 0.15s;">
-                            @suggestion.Label
+                                class="chat-suggestion-card">
+                            <div class="chat-suggestion-left">
+                                <div class="chat-suggestion-icon">
+                                    <LucideIcon Name="message-circle" Size="15" />
+                                </div>
+                                <span class="chat-suggestion-label">@suggestion.Label</span>
+                            </div>
+                            <LucideIcon Name="arrow-up-right" Size="14" />
                         </button>
                     }
                 </div>
@@ -45,24 +43,39 @@
     }
     else
     {
-        <div style="flex: 1; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth; padding: 16px 0 0 0;" @ref="messagesElement">
-            <div style="width: 100%; max-width: 720px; margin: 0 auto; padding: 0 20px; display: flex; flex-direction: column; gap: 8px;"
-                 role="log" aria-live="polite" aria-relevant="additions text" aria-busy="@isSending">
+        <div class="chat-messages-scroll" @ref="messagesElement">
+            <div class="chat-thread"
+                 role="log"
+                 aria-live="polite"
+                 aria-relevant="additions text"
+                 aria-busy="@isSending">
+
                 @foreach (var msg in messages)
                 {
                     var isUser = msg.Role == "user";
-                    <div style="display: flex; flex-direction: column; @(isUser ? "align-items: flex-end;" : "align-items: flex-start;")">
+
+                    <div class="chat-message-row @(isUser ? "chat-message-user" : "chat-message-assistant")">
                         <span class="sr-only">@(isUser ? "You" : "Sap Shop assistant"):</span>
+
                         @if (isUser)
                         {
-                            <div style="max-width: 80%; padding: 10px 18px; border-radius: 20px; border-bottom-right-radius: 6px; background: var(--primary); color: var(--primary-foreground); font-size: 14px; line-height: 1.55;">
-                                <p style="white-space: pre-wrap; word-break: break-word; margin: 0;">@msg.Content</p>
+                            <div class="chat-user-bubble">
+                                <p>@msg.Content</p>
                             </div>
                         }
                         else
                         {
-                            <div style="max-width: 95%; font-size: 14px; line-height: 1.65; color: var(--foreground);">
-                                <SafeChatMessage Content="@msg.Content" />
+                            <div class="chat-assistant-wrap">
+                                <div class="chat-assistant-avatar" aria-hidden="true">
+                                    <LucideIcon Name="sparkles" Size="15" />
+                                </div>
+
+                                <div class="chat-assistant-content">
+                                    <div class="chat-assistant-label">Sap Shop Assistant</div>
+                                    <div class="chat-assistant-message">
+                                        <SafeChatMessage Content="@msg.Content" />
+                                    </div>
+                                </div>
                             </div>
                         }
                     </div>
@@ -70,46 +83,493 @@
 
                 @if (isSending)
                 {
-                    <div role="status" aria-label="Responding" style="display: flex; align-items: center; gap: 6px;">
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted-foreground); opacity: 0.35; animation: pulse 1.4s infinite;"></span>
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted-foreground); opacity: 0.35; animation: pulse 1.4s infinite; animation-delay: 0.2s;"></span>
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted-foreground); opacity: 0.35; animation: pulse 1.4s infinite; animation-delay: 0.4s;"></span>
+                    <div class="chat-message-row chat-message-assistant">
+                        <div class="chat-assistant-wrap">
+                            <div class="chat-assistant-avatar" aria-hidden="true">
+                                <LucideIcon Name="sparkles" Size="15" />
+                            </div>
+
+                            <div class="chat-typing" role="status" aria-label="Responding">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
                     </div>
                 }
 
                 @if (!string.IsNullOrWhiteSpace(errorMessage))
                 {
-                    <div style="padding: 10px 14px; border-radius: 12px; border: 1px solid var(--destructive-border, #fca5a5); background: var(--destructive-muted, #fef2f2); color: var(--destructive); font-size: 13px;" role="alert">@errorMessage</div>
+                    <div class="chat-error" role="alert">
+                        <LucideIcon Name="circle-alert" Size="15" />
+                        <span>@errorMessage</span>
+                    </div>
                 }
             </div>
         </div>
     }
 
-    <div style="flex-shrink: 0; padding: 12px 20px 0; background: var(--background);">
-        <div style="width: 100%; max-width: 720px; margin: 0 auto;">
-            <div style="display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-                <textarea @bind="message" @bind:event="oninput"
+    <div class="chat-composer-shell">
+        <div class="chat-composer-wrap">
+            <div class="chat-composer">
+                <textarea @bind="message"
+                          @bind:event="oninput"
                           @ref="textareaElement"
                           rows="1"
                           maxlength="8000"
                           disabled="@isSending"
-                          placeholder="Message Sap Shop..."
+                          placeholder="Ask Sap Shop Assistant..."
                           aria-label="Message"
-                          style="flex: 1; min-height: 22px; max-height: 160px; resize: none; border: none; background: transparent; font-size: 14px; line-height: 1.5; color: var(--foreground); outline: none;"></textarea>
+                          class="chat-textarea"></textarea>
+
                 <button @onclick="SendAsync"
                         @ref="sendButtonElement"
                         type="button"
                         disabled="@(isSending || string.IsNullOrWhiteSpace(message))"
                         title="Send message"
                         aria-label="Send message"
-                        style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; background: var(--primary); color: var(--primary-foreground); cursor: pointer; opacity: @(string.IsNullOrWhiteSpace(message) ? "0.3" : "1"); flex-shrink: 0;">
-                    <LucideIcon Name="arrow-up" Size="14" />
+                        class="chat-send-button">
+                    <LucideIcon Name="arrow-up" Size="16" />
                 </button>
             </div>
-            <p style="text-align: center; margin-top: 6px; font-size: 11px; color: var(--muted-foreground);">Stock availability may change.</p>
+
+            <p class="chat-helper-text">Stock availability may change.</p>
         </div>
     </div>
 </section>
+
+<style>
+    .chat-shell {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+        color: var(--foreground);
+        background: var(--background);
+    }
+
+
+
+
+
+
+
+
+
+
+
+    .chat-empty-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 42px 20px 30px;
+    }
+
+    .chat-empty-state {
+        width: 100%;
+        max-width: 620px;
+        text-align: center;
+    }
+
+    .chat-empty-logo {
+        width: 68px;
+        height: 68px;
+        margin: 0 auto 18px;
+        position: relative;
+    }
+
+    .chat-empty-logo-inner {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        border-radius: 20px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 16%, transparent), inset 0 1px 0 rgba(255,255,255,.12);
+    }
+
+
+    .chat-empty-title {
+        margin: 0;
+        font-size: clamp(23px, 4vw, 30px);
+        line-height: 1.15;
+        letter-spacing: -.03em;
+        font-weight: 700;
+        color: var(--foreground);
+    }
+
+    .chat-empty-description {
+        max-width: 510px;
+        margin: 10px auto 24px;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--muted-foreground);
+    }
+
+    .chat-suggestions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .chat-suggestion-card {
+        min-height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 13px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: color-mix(in srgb, var(--card) 92%, transparent);
+        color: var(--foreground);
+        text-align: left;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0,0,0,.025);
+        transition: border-color .12s ease, background .12s ease, box-shadow .12s ease;
+    }
+
+        .chat-suggestion-card:hover {
+            background: var(--card);
+            border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+            box-shadow: 0 8px 22px rgba(0,0,0,.055);
+        }
+
+    .chat-suggestion-left {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .chat-suggestion-icon {
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        color: var(--muted-foreground);
+    }
+
+    .chat-suggestion-label {
+        font-size: 12px;
+        line-height: 1.35;
+        font-weight: 530;
+    }
+
+    .chat-messages-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scroll-behavior: smooth;
+        padding: 22px 0 16px;
+    }
+
+    .chat-thread {
+        width: 100%;
+        max-width: 790px;
+        margin: 0 auto;
+        padding: 0 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        box-sizing: border-box;
+    }
+
+    .chat-message-row {
+        width: 100%;
+        display: flex;
+    }
+
+    .chat-message-user {
+        justify-content: flex-end;
+    }
+
+    .chat-message-assistant {
+        justify-content: flex-start;
+    }
+
+    .chat-user-bubble {
+        max-width: min(78%, 560px);
+        padding: 10px 15px;
+        border-radius: 18px 18px 5px 18px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 12%, transparent);
+    }
+
+        .chat-user-bubble p {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 13.5px;
+            line-height: 1.55;
+        }
+
+    .chat-assistant-wrap {
+        width: min(100%, 690px);
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .chat-assistant-avatar {
+        width: 30px;
+        height: 30px;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        margin-top: 1px;
+        border-radius: 9px;
+        background: color-mix(in srgb, var(--primary) 11%, var(--muted));
+        color: var(--primary);
+        border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+    }
+
+    .chat-assistant-content {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .chat-assistant-label {
+        margin: 0 0 5px;
+        font-size: 10.5px;
+        font-weight: 650;
+        color: var(--muted-foreground);
+    }
+
+    .chat-assistant-message {
+        font-size: 13.5px;
+        line-height: 1.68;
+        color: var(--foreground);
+    }
+
+    .chat-typing {
+        min-width: 54px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: 13px;
+        background: var(--card);
+    }
+
+        .chat-typing span {
+            width: 5px;
+            height: 5px;
+            border-radius: 999px;
+            background: var(--muted-foreground);
+            opacity: .35;
+            animation: chatPulse 1.6s infinite ease-in-out;
+        }
+
+            .chat-typing span:nth-child(2) {
+                animation-delay: .15s;
+            }
+
+            .chat-typing span:nth-child(3) {
+                animation-delay: .3s;
+            }
+
+    .chat-error {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid color-mix(in srgb, var(--destructive) 35%, var(--border));
+        background: color-mix(in srgb, var(--destructive) 8%, var(--card));
+        color: var(--destructive);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .chat-composer-shell {
+        flex-shrink: 0;
+        padding: 10px 18px 8px;
+        background: linear-gradient(to top, var(--background) 72%, color-mix(in srgb, var(--background) 88%, transparent));
+    }
+
+    .chat-composer-wrap {
+        width: 100%;
+        max-width: 790px;
+        margin: 0 auto;
+    }
+
+    .chat-composer {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        padding: 9px 10px 9px 14px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--card);
+        box-shadow: 0 8px 28px rgba(0,0,0,.055), 0 1px 2px rgba(0,0,0,.04);
+        transition: border-color .16s ease, box-shadow .16s ease;
+    }
+
+        .chat-composer:focus-within {
+            border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+            box-shadow: 0 8px 28px rgba(0,0,0,.06), 0 0 0 3px color-mix(in srgb, var(--primary) 9%, transparent);
+        }
+
+    .chat-textarea {
+        flex: 1;
+        min-width: 0;
+        min-height: 24px;
+        max-height: 150px;
+        padding: 4px 0;
+        resize: none;
+        overflow-y: auto;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--foreground);
+        font: inherit;
+        font-size: 13.5px;
+        line-height: 1.5;
+    }
+
+        .chat-textarea::placeholder {
+            color: color-mix(in srgb, var(--muted-foreground) 85%, transparent);
+        }
+
+    .chat-send-button {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 11px;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        cursor: pointer;
+        box-shadow: 0 5px 14px color-mix(in srgb, var(--primary) 18%, transparent);
+        transition: opacity .12s ease, filter .12s ease;
+    }
+
+        .chat-send-button:hover:not(:disabled) {
+            filter: brightness(1.04);
+        }
+
+        .chat-send-button:active:not(:disabled) {
+        }
+
+        .chat-send-button:disabled {
+            opacity: .34;
+            cursor: default;
+            box-shadow: none;
+        }
+
+    .chat-helper-text {
+        margin: 6px 0 0;
+        text-align: center;
+        font-size: 10.5px;
+        color: var(--muted-foreground);
+    }
+
+    @@keyframes chatPulse {
+        0%, 80%, 100% {
+            opacity: .30;
+        }
+
+        40% {
+            opacity: .65;
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .chat-typing span {
+            animation: none;
+            opacity: .45;
+        }
+
+        .chat-suggestion-card,
+        .chat-send-button,
+        .chat-composer {
+            transition: none;
+        }
+    }
+
+    @@media (max-width: 640px) {
+
+    
+    
+        .chat-empty-scroll {
+            padding: 30px 14px 22px;
+            align-items: flex-start;
+        }
+
+        .chat-empty-state {
+            margin-top: 7vh;
+        }
+
+        .chat-empty-logo {
+            width: 60px;
+            height: 60px;
+        }
+
+        .chat-empty-logo-inner {
+            border-radius: 17px;
+        }
+
+        .chat-empty-description {
+            margin-bottom: 20px;
+        }
+
+        .chat-suggestions {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .chat-suggestion-card {
+            min-height: 52px;
+        }
+
+        .chat-messages-scroll {
+            padding-top: 16px;
+        }
+
+        .chat-thread {
+            padding: 0 13px;
+            gap: 18px;
+        }
+
+        .chat-user-bubble {
+            max-width: 86%;
+        }
+
+        .chat-assistant-wrap {
+            gap: 8px;
+        }
+
+        .chat-assistant-avatar {
+            width: 27px;
+            height: 27px;
+            border-radius: 8px;
+        }
+
+        .chat-composer-shell {
+            padding: 8px 10px 7px;
+        }
+
+        .chat-composer {
+            border-radius: 16px;
+        }
+    }
+</style>
 
 @code {
     private readonly List<ChatMessage> messages = [];

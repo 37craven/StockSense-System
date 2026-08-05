@@ -154,6 +154,9 @@
             }
 
             await UserManager.AddToRoleAsync(user, defaultRole);
+
+            user.Role = defaultRole;
+            await UserManager.UpdateAsync(user);
             // --- END OF DEFAULT ROLE LOGIC ---
 
             Logger.LogInformation("User created a new account with Customer role.");

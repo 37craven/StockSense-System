@@ -394,8 +394,9 @@
 
         @if (!string.IsNullOrEmpty(scanErrorMessage))
         {
-            <div class="text-center py-2 px-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
-                @scanErrorMessage
+            <div class="flex items-center gap-2 py-2 px-3 rounded-md text-xs bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+                <LucideIcon Name="camera-off" Size="14" />
+                <span>@scanErrorMessage</span>
             </div>
         }
         else if (scannedProduct != null)
@@ -627,12 +628,51 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    // Called from barcodeScanner.js when the camera/scanner starts successfully.
+    [JSInvokable]
+    public async Task OnScannerStarted()
+    {
+        scanErrorMessage = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
     // Called from barcodeScanner.js if the camera fails to start.
     [JSInvokable]
     public async Task OnScannerError(string message)
     {
         Logger.LogWarning("Barcode scanner could not start: {ScannerMessage}", message);
-        scanErrorMessage = "The camera could not start. Check camera permission and try again.";
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
+        }
+        else if (message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
+                 message.Contains("NotAllowed", StringComparison.OrdinalIgnoreCase) ||
+                 message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
+                 message.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            scanErrorMessage = "Camera permission is blocked. Allow camera access in your browser settings and try again.";
+        }
+        else if (message.Contains("NotFound", StringComparison.OrdinalIgnoreCase) ||
+                 message.Contains("No camera", StringComparison.OrdinalIgnoreCase))
+        {
+            scanErrorMessage = "No camera was found on this device.";
+        }
+        else if (message.Contains("NotReadable", StringComparison.OrdinalIgnoreCase) ||
+                 message.Contains("being used", StringComparison.OrdinalIgnoreCase))
+        {
+            scanErrorMessage = "The camera is unavailable or is being used by another application.";
+        }
+        else if (message.Contains("HTTPS", StringComparison.OrdinalIgnoreCase) ||
+                 message.Contains("secure", StringComparison.OrdinalIgnoreCase))
+        {
+            scanErrorMessage = "Camera access requires a secure HTTPS connection.";
+        }
+        else
+        {
+            scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
+        }
+
         await InvokeAsync(StateHasChanged);
     }
 

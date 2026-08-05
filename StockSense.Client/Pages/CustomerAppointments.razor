@@ -11,134 +11,238 @@
 
 
 <div class="w-full max-w-[900px] lg:max-w-[640px] mx-auto px-4 pt-8 pb-[200px] lg:pb-8">
-    <PageHeader Title="My Appointments" Subtitle="Your booking history and appointment status." />
+
+    <div style="margin-top: 28px; margin-bottom: 20px;">
+        <PageHeader Title="My Appointments"
+                    Subtitle="Your booking history and appointment status." />
+    </div>
 
     @if (isLoading)
     {
         <div class="flex items-center gap-3 text-muted-foreground py-8 justify-center">
-            <span class="text-sm">Loading your records...</span>
+            <span class="text-sm">
+                Loading your records...
+            </span>
         </div>
     }
     else if (myAppointments == null || !myAppointments.Any())
     {
         <div class="text-center p-8 bg-card border border-border rounded-lg flex flex-col items-center gap-4">
+
             <div>
-                <p class="text-base font-medium text-foreground m-0 mb-1">No appointments yet</p>
-                <p class="text-sm text-muted-foreground m-0">You have no booking history yet.</p>
+                <p class="text-base font-medium text-foreground m-0 mb-1">
+                    No appointments yet
+                </p>
+
+                <p class="text-sm text-muted-foreground m-0">
+                    You have no booking history yet.
+                </p>
             </div>
-            <a href="/appointment" class="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg no-underline font-bold text-sm">Book your first appointment</a>
+
+            <a href="/appointment"
+               class="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg no-underline font-bold text-sm">
+                Book your first appointment
+            </a>
+
         </div>
     }
     else
     {
         <div class="flex flex-col gap-3">
+
             @foreach (var appt in FilteredAppointments)
             {
                 <div class="bg-card border border-border rounded-lg p-3 sm:p-4 border-l-4"
                      style="border-left-color: @GetStatusColor(appt.Status)">
 
                     <div class="flex justify-between items-start mb-2 gap-2">
+
                         <div class="min-w-0">
+
                             <span class="text-sm font-semibold text-foreground">
                                 @appt.AppointmentDate.ToString("MMM dd, yyyy") · @appt.TimeSlot
                             </span>
-                            <div class="text-xs text-muted-foreground mt-0.5 truncate">@appt.ServicesRequested</div>
+
+                            <div class="text-xs text-muted-foreground mt-0.5 truncate">
+                                @appt.ServicesRequested
+                            </div>
+
                         </div>
+
+                        @* Status badge with original solid background + small circle *@
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white shrink-0"
                               style="background-color: @GetStatusColor(appt.Status);">
-                            <span class="w-1.5 h-1.5 rounded-full bg-white/70"></span>
+
+                            <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
+
                             @appt.Status
+
                         </span>
+
                     </div>
 
                     <div class="flex justify-between items-center text-xs text-muted-foreground">
-                        <span>@(string.IsNullOrEmpty(appt.MechanicName) ? "Any mechanic" : appt.MechanicName.Split(' ').LastOrDefault() ?? appt.MechanicName) · @appt.DurationMinutes min</span>
+
+                        <span>
+                            @(string.IsNullOrEmpty(appt.MechanicName)
+                                ? "Any mechanic"
+                                : appt.MechanicName.Split(' ').LastOrDefault()
+                                  ?? appt.MechanicName)
+                            · @appt.DurationMinutes min
+                        </span>
+
                         <div class="flex items-center gap-2">
-                            @if (appt.Status == "Pending" && appt.CreatedAt > DateTime.UtcNow.AddMinutes(-30))
+
+                            @if (appt.Status == "Pending" &&
+                                 appt.CreatedAt > DateTime.UtcNow.AddMinutes(-30))
                             {
                                 <button @onclick="() => CancelAppointment(appt)"
                                         class="text-[10px] font-semibold text-destructive border border-destructive/40 rounded-md px-2 py-0.5 hover:bg-destructive/10 transition-colors">
                                     Cancel
                                 </button>
                             }
-                            <span class="text-sm font-bold text-primary">₱@appt.TotalAmount.ToString("N0")</span>
+
+                            <span class="text-sm font-bold text-primary">
+                                ₱@appt.TotalAmount.ToString("N0")
+                            </span>
+
                         </div>
+
                     </div>
+
                 </div>
             }
+
         </div>
     }
+
 </div>
 
+
 @code {
-    [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
     private List<AppointmentDto>? myAppointments;
+
     private bool isLoading = true;
+
     private bool showAllHistory = false;
+
 
     private IEnumerable<AppointmentDto> FilteredAppointments
     {
         get
         {
-            if (myAppointments == null) return Enumerable.Empty<AppointmentDto>();
+            if (myAppointments == null)
+            {
+                return Enumerable.Empty<AppointmentDto>();
+            }
 
-            var active = myAppointments.Where(a => a.Status == "Pending" || a.Status == "Confirmed");
+            var active =
+                myAppointments.Where(
+                    a =>
+                        a.Status == "Pending"
+                        || a.Status == "Confirmed"
+                );
 
-            var history = myAppointments.Where(a => a.Status == "Completed" || a.Status == "Cancelled");
+            var history =
+                myAppointments.Where(
+                    a =>
+                        a.Status == "Completed"
+                        || a.Status == "Cancelled"
+                );
 
             if (!showAllHistory)
             {
-                var limitDate = DateTime.Now.AddDays(-30);
-                history = history.Where(a => a.AppointmentDate >= limitDate);
+                var limitDate =
+                    DateTime.Now.AddDays(-30);
+
+                history =
+                    history.Where(
+                        a =>
+                            a.AppointmentDate >= limitDate
+                    );
             }
 
-            return active.Concat(history).OrderByDescending(a => a.AppointmentDate);
+            return active
+                .Concat(history)
+                .OrderByDescending(
+                    a =>
+                        a.AppointmentDate
+                );
         }
     }
+
 
     protected override async Task OnInitializedAsync()
     {
         if (AuthStateTask != null)
         {
-            var authState = await AuthStateTask;
-            var user = authState.User;
+            var authState =
+                await AuthStateTask;
+
+            var user =
+                authState.User;
 
             if (user.Identity?.IsAuthenticated == true)
             {
                 try
                 {
-                    myAppointments = await Http.GetFromJsonAsync<List<AppointmentDto>>("api/appointments/my-bookings");
+                    myAppointments =
+                        await Http.GetFromJsonAsync<List<AppointmentDto>>(
+                            "api/appointments/my-bookings"
+                        );
                 }
                 catch
                 {
-                    myAppointments = new();
+                    myAppointments =
+                        new List<AppointmentDto>();
                 }
             }
         }
+
         isLoading = false;
     }
 
-    private string GetStatusColor(string status) => status switch
-    {
-        "Pending" => "#f59e0b",
-        "Confirmed" => "#3b82f6",
-        "Completed" => "#10b981",
-        "Cancelled" => "#ef4444",
-        _ => "#888888"
-    };
+
+    private string GetStatusColor(string status) =>
+        status switch
+        {
+            "Pending" => "#f59e0b",
+            "Confirmed" => "#3b82f6",
+            "Completed" => "#10b981",
+            "Cancelled" => "#ef4444",
+            _ => "#888888"
+        };
+
 
     private async Task CancelAppointment(AppointmentDto appt)
     {
         try
         {
-            var response = await Http.PutAsync($"api/appointments/{appt.Id}/cancel", null);
+            var response =
+                await Http.PutAsync(
+                    $"api/appointments/{appt.Id}/cancel",
+                    null
+                );
+
             if (response.IsSuccessStatusCode)
             {
-                appt.Status = "Cancelled";
-                myAppointments = new List<AppointmentDto>(myAppointments!);
+                appt.Status =
+                    "Cancelled";
+
+                myAppointments =
+                    new List<AppointmentDto>(
+                        myAppointments!
+                    );
+
                 StateHasChanged();
             }
         }
-        catch { }
+        catch
+        {
+        }
     }
 }

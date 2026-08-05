@@ -220,6 +220,29 @@ using (var scope = app.Services.CreateScope())
         {
             context.Database.Migrate();
         }
+
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+        foreach (var roleName in new[] { "Admin", "Employee", "Customer" })
+        {
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                await roleManager.CreateAsync(new IdentityRole(roleName));
+            }
+        }
+
+        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var usersWithEmptyRole = await userManager.Users
+            .Where(u => string.IsNullOrEmpty(u.Role))
+            .ToListAsync();
+        foreach (var user in usersWithEmptyRole)
+        {
+            var identityRoles = await userManager.GetRolesAsync(user);
+            if (identityRoles.Count == 1)
+            {
+                user.Role = identityRoles[0];
+                await userManager.UpdateAsync(user);
+            }
+        }
     }
     catch (Exception ex)
     {
