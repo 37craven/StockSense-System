@@ -39,6 +39,14 @@ public class BarcodeService
         return (10 - (sum % 10)) % 10;
     }
 
+    public static bool IsValidEan13(string? value)
+    {
+        if (value is not { Length: 13 } || !value.All(char.IsAsciiDigit))
+            return false;
+
+        return value[12] - '0' == ComputeEan13CheckDigit(value[..12]);
+    }
+
     /// <summary>Renders the barcode as a PNG image (bytes) for embedding in a PDF or the UI.</summary>
     public byte[] GenerateBarcodeImage(string barcodeValue)
     {
@@ -81,8 +89,15 @@ public class BarcodeService
     }
 
     /// <summary>Builds a printable one-page PDF label for a product with barcode and/or QR code.</summary>
-    public byte[] GenerateBarcodeLabelPdf(Product product, byte[] barcodeImagePng, byte[] qrCodeImagePng, string format = "both")
+    public byte[] GenerateBarcodeLabelPdf(Product product, byte[]? barcodeImagePng, byte[]? qrCodeImagePng, string format = "both")
     {
+        if (format is not ("barcode" or "qr" or "both"))
+            throw new ArgumentOutOfRangeException(nameof(format), "Format must be barcode, qr, or both.");
+        if (format is "barcode" or "both" && barcodeImagePng is null)
+            throw new ArgumentNullException(nameof(barcodeImagePng));
+        if (format is "qr" or "both" && qrCodeImagePng is null)
+            throw new ArgumentNullException(nameof(qrCodeImagePng));
+
         QuestPDF.Settings.License = LicenseType.Community;
 
         return Document.Create(container =>
@@ -105,11 +120,11 @@ public class BarcodeService
                     {
                         if (format == "barcode" || format == "both")
                         {
-                            row.RelativeItem(3).AlignCenter().AlignMiddle().Image(barcodeImagePng);
+                            row.RelativeItem(3).AlignCenter().AlignMiddle().Image(barcodeImagePng!).FitArea();
                         }
                         if (format == "qr" || format == "both")
                         {
-                            row.RelativeItem(format == "both" ? 2 : 1).AlignCenter().AlignMiddle().Image(qrCodeImagePng);
+                            row.RelativeItem(format == "both" ? 2 : 1).AlignCenter().AlignMiddle().Image(qrCodeImagePng!).FitArea();
                         }
                     });
             });
