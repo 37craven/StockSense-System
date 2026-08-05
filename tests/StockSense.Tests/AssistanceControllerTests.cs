@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using StockSense.Application.DTOs;
 using StockSense.Web.Controllers;
@@ -45,9 +46,58 @@ public sealed class AssistanceControllerTests
         Assert.Equal("answer", Assert.IsType<AssistanceResponse>(ok.Value).Reply);
         Assert.Equal("question", client.Message);
         Assert.Equal(expectedRole, client.Role);
+        Assert.False(string.IsNullOrWhiteSpace(client.CorrelationId));
         Assert.Equal(
             [new AssistanceHistoryMessage("user", "earlier question"), new AssistanceHistoryMessage("assistant", "earlier answer")],
             client.History);
+    }
+
+    [Fact]
+    public async Task Employee_cannot_use_legacy_direct_database_queries()
+    {
+        var client = new CapturingAssistanceClient();
+        var controller = CreateController(client, "Employee");
+
+        var result = await controller.Ask(
+            new AssistanceRequest { Message = "SELECT Name FROM dbo.Products" }, default);
+
+        Assert.IsType<ForbidResult>(result.Result);
+        Assert.False(client.WasCalled);
+    }
+
+    [Fact]
+    public async Task Admin_legacy_database_request_is_forwarded_with_trusted_role()
+    {
+        var client = new CapturingAssistanceClient { Reply = "answer" };
+        var controller = CreateController(client, "Admin");
+
+        var result = await controller.Ask(
+            new AssistanceRequest { Message = "SELECT Name FROM dbo.Products" }, default);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal("Admin", client.Role);
+        Assert.True(client.WasCalled);
+    }
+
+    [Fact]
+    public async Task Staff_audit_is_structured_and_excludes_prompt_history_and_reply()
+    {
+        var logger = new ListLogger<AssistanceController>();
+        var client = new CapturingAssistanceClient { Reply = "PRIVATE-REPLY" };
+        var controller = CreateController(client, logger, "Employee");
+
+        await controller.Ask(new AssistanceRequest
+        {
+            Message = "PRIVATE-PROMPT",
+            History = [new AssistanceHistoryMessage("user", "PRIVATE-HISTORY")]
+        }, default);
+
+        var audit = Assert.Single(logger.Entries.Where(entry => entry.EventId.Id == 4100));
+        Assert.Contains("Role=Employee", audit.Message);
+        Assert.Contains("Outcome=succeeded", audit.Message);
+        Assert.DoesNotContain("PRIVATE-PROMPT", audit.Message);
+        Assert.DoesNotContain("PRIVATE-HISTORY", audit.Message);
+        Assert.DoesNotContain("PRIVATE-REPLY", audit.Message);
     }
 
     [Fact]
@@ -155,9 +205,15 @@ public sealed class AssistanceControllerTests
     private static AssistanceController CreateController(
         IAssistanceClient client,
         params string[] roles)
+        => CreateController(client, NullLogger<AssistanceController>.Instance, roles);
+
+    private static AssistanceController CreateController(
+        IAssistanceClient client,
+        ILogger<AssistanceController> logger,
+        params string[] roles)
     {
         var claims = roles.Select(role => new Claim(ClaimTypes.Role, role));
-        var controller = new AssistanceController(client, NullLogger<AssistanceController>.Instance)
+        var controller = new AssistanceController(client, logger)
         {
             ControllerContext = new ControllerContext
             {
@@ -170,6 +226,16 @@ public sealed class AssistanceControllerTests
         return controller;
     }
 
+    private sealed class ListLogger<T> : ILogger<T>
+    {
+        public List<(EventId EventId, string Message)> Entries { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add((eventId, formatter(state, exception)));
+    }
+
     private sealed class CapturingAssistanceClient : IAssistanceClient
     {
         public string Reply { get; init; } = string.Empty;
@@ -178,17 +244,20 @@ public sealed class AssistanceControllerTests
         public string? Message { get; private set; }
         public string? Role { get; private set; }
         public IReadOnlyList<AssistanceHistoryMessage>? History { get; private set; }
+        public string? CorrelationId { get; private set; }
 
         public Task<string> AskAsync(
             string message,
             string userRole,
             IReadOnlyList<AssistanceHistoryMessage> history,
+            string correlationId,
             CancellationToken cancellationToken)
         {
             WasCalled = true;
             Message = message;
             Role = userRole;
             History = history;
+            CorrelationId = correlationId;
             return Exception is null
                 ? Task.FromResult(Reply)
                 : Task.FromException<string>(Exception);

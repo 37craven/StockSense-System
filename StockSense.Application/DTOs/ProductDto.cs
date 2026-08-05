@@ -13,6 +13,7 @@ public record ProductDto(
     string ImageUrl = "",
     string? Barcode = null,
     decimal UnitCost = 0m,
-    byte[]? RowVersion = null
+    byte[]? RowVersion = null,
+    bool IsActive = true
 
 );

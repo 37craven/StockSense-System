@@ -12,6 +12,7 @@ public sealed class InventoryDashboardRowDto
     public decimal Price { get; set; }
     public string ImageUrl { get; set; } = string.Empty;
     public byte[] ProductRowVersion { get; set; } = [];
+    public bool IsActive { get; set; } = true;
     public int IncomingStock { get; set; }
     public int InventoryPosition { get; set; }
     public decimal AverageDailyDemand { get; set; }

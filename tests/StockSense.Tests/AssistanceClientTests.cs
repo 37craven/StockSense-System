@@ -24,10 +24,11 @@ public sealed class AssistanceClientTests
             new AssistanceHistoryMessage("user", "2022 V2"),
             new AssistanceHistoryMessage("assistant", "first answer")
         };
-        var reply = await client.AskAsync("question", "Employee", history, default);
+        var reply = await client.AskAsync("question", "Employee", history, "corr-123", default);
 
         Assert.Equal("answer", reply);
         Assert.Equal(new Uri("https://internal.example/chatbot/api/chat"), handler.RequestUri);
+        Assert.Equal("corr-123", handler.CorrelationId);
         using var payload = JsonDocument.Parse(handler.RequestBody!);
         Assert.Equal("Employee", payload.RootElement.GetProperty("user_role").GetString());
         Assert.Equal("question", payload.RootElement.GetProperty("message").GetString());
@@ -42,12 +43,14 @@ public sealed class AssistanceClientTests
     {
         public Uri? RequestUri { get; private set; }
         public string? RequestBody { get; private set; }
+        public string? CorrelationId { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
+            CorrelationId = request.Headers.GetValues("X-Correlation-ID").Single();
             RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {

@@ -1,0 +1,23 @@
+@if (Tone == ChatStatusTone.None)
+{
+    @Value
+}
+else
+{
+    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold @ToneClass">
+        @Value
+    </span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public ChatStatusTone Tone { get; set; }
+
+    private string ToneClass => Tone switch
+    {
+        ChatStatusTone.Positive => "border-success-border bg-success-muted text-success-muted-foreground",
+        ChatStatusTone.Attention => "border-warning-border bg-warning-muted text-warning-muted-foreground",
+        ChatStatusTone.Critical => "border-destructive-border bg-destructive-muted text-destructive-muted-foreground",
+        _ => "border-border bg-muted text-muted-foreground"
+    };
+}

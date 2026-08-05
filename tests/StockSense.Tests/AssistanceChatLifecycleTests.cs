@@ -29,4 +29,13 @@ public sealed class AssistanceChatLifecycleTests
         Assert.NotNull(method);
         Assert.Equal(expected, method.Invoke(null, [exception]));
     }
+
+    [Fact]
+    public void Assistance_chat_exposes_retry_and_reset_handlers()
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        Assert.NotNull(typeof(AssistanceChat).GetMethod("RetryFailedRequestAsync", flags));
+        Assert.NotNull(typeof(AssistanceChat).GetMethod("ResetConversationAsync", flags));
+    }
 }

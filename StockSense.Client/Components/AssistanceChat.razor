@@ -5,7 +5,7 @@
 @implements IAsyncDisposable
 
 <section class="chat-shell" aria-labelledby="assistance-title">
-    <h1 id="assistance-title" class="sr-only">Sap Shop assistant</h1>
+    <h1 id="assistance-title" class="sr-only">@roleCopy.AssistantName</h1>
 
     @if (messages.Count == 0)
     {
@@ -17,9 +17,9 @@
                     </div>
                 </div>
 
-                <h2 class="chat-empty-title">How can I help?</h2>
+                <h2 class="chat-empty-title">@roleCopy.Heading</h2>
                 <p class="chat-empty-description">
-                    Ask about products, inventory, stock availability, transactions, or other Sap Shop information.
+                    @roleCopy.Description
                 </p>
 
                 <div class="chat-suggestions" aria-label="Suggested questions">
@@ -43,6 +43,15 @@
     }
     else
     {
+        <div class="chat-thread-actions">
+            <button @onclick="ResetConversationAsync"
+                    type="button"
+                    disabled="@isSending"
+                    class="chat-new-button">
+                <LucideIcon Name="plus" Size="15" />
+                <span>New chat</span>
+            </button>
+        </div>
         <div class="chat-messages-scroll" @ref="messagesElement">
             <div class="chat-thread"
                  role="log"
@@ -55,7 +64,7 @@
                     var isUser = msg.Role == "user";
 
                     <div class="chat-message-row @(isUser ? "chat-message-user" : "chat-message-assistant")">
-                        <span class="sr-only">@(isUser ? "You" : "Sap Shop assistant"):</span>
+                        <span class="sr-only">@(isUser ? "You" : roleCopy.AssistantName):</span>
 
                         @if (isUser)
                         {
@@ -71,7 +80,7 @@
                                 </div>
 
                                 <div class="chat-assistant-content">
-                                    <div class="chat-assistant-label">Sap Shop Assistant</div>
+                                    <div class="chat-assistant-label">@roleCopy.AssistantName</div>
                                     <div class="chat-assistant-message">
                                         <SafeChatMessage Content="@msg.Content" />
                                     </div>
@@ -102,7 +111,18 @@
                 {
                     <div class="chat-error" role="alert">
                         <LucideIcon Name="circle-alert" Size="15" />
-                        <span>@errorMessage</span>
+                        <div>
+                            <span>@errorMessage</span>
+                            @if (failedRequest is not null)
+                            {
+                                <button @onclick="RetryFailedRequestAsync"
+                                        type="button"
+                                        disabled="@isSending"
+                                        class="chat-retry-button">
+                                    Try again
+                                </button>
+                            }
+                        </div>
                     </div>
                 }
             </div>
@@ -118,7 +138,7 @@
                           rows="1"
                           maxlength="8000"
                           disabled="@isSending"
-                          placeholder="Ask Sap Shop Assistant..."
+                          placeholder="@roleCopy.Placeholder"
                           aria-label="Message"
                           class="chat-textarea"></textarea>
 
@@ -133,7 +153,7 @@
                 </button>
             </div>
 
-            <p class="chat-helper-text">Stock availability may change.</p>
+            <p class="chat-helper-text">@roleCopy.HelperText</p>
         </div>
     </div>
 </section>
@@ -271,6 +291,64 @@
         overscroll-behavior: contain;
         scroll-behavior: smooth;
         padding: 22px 0 16px;
+    }
+
+    .chat-thread-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-shrink: 0;
+        width: 100%;
+        max-width: 790px;
+        margin: 0 auto;
+        padding: 10px 22px 0;
+        box-sizing: border-box;
+    }
+
+    .chat-new-button,
+    .chat-retry-button {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .chat-new-button {
+        padding: 0 13px;
+    }
+
+    .chat-retry-button {
+        min-width: 88px;
+        margin-top: 8px;
+        padding: 0 12px;
+    }
+
+    .chat-new-button:hover:not(:disabled),
+    .chat-retry-button:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+        background: var(--muted);
+    }
+
+    .chat-new-button:focus-visible,
+    .chat-retry-button:focus-visible,
+    .chat-suggestion-card:focus-visible,
+    .chat-send-button:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+    }
+
+    .chat-new-button:disabled,
+    .chat-retry-button:disabled {
+        cursor: default;
+        opacity: .5;
     }
 
     .chat-thread {
@@ -446,8 +524,8 @@
         }
 
     .chat-send-button {
-        width: 36px;
-        height: 36px;
+        width: 44px;
+        height: 44px;
         flex-shrink: 0;
         display: grid;
         place-items: center;
@@ -547,6 +625,10 @@
             gap: 18px;
         }
 
+        .chat-thread-actions {
+            padding: 8px 13px 0;
+        }
+
         .chat-user-bubble {
             max-width: 86%;
         }
@@ -576,6 +658,7 @@
     private readonly CancellationTokenSource componentLifetime = new();
     private string message = string.Empty;
     private string? errorMessage;
+    private FailedAssistanceRequest? failedRequest;
     private bool isSending;
     private bool isDisposed;
     private IJSObjectReference? chatModule;
@@ -583,12 +666,14 @@
     private ElementReference textareaElement;
     private ElementReference sendButtonElement;
     private IReadOnlyList<AssistanceSuggestion> suggestions = AssistanceSuggestions.ForRole(null);
+    private AssistanceRoleCopy roleCopy = AssistanceRolePresentation.ForRole(null);
 
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
         var role = user.IsInRole("Admin") ? "Admin" : user.IsInRole("Employee") ? "Employee" : "Customer";
         suggestions = AssistanceSuggestions.ForRole(role);
+        roleCopy = AssistanceRolePresentation.ForRole(role);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -648,7 +733,21 @@
         var history = BuildHistory();
         messages.Add(new ChatMessage("user", outgoing));
         message = string.Empty;
+        await SendRequestAsync(new FailedAssistanceRequest(outgoing, history));
+    }
+
+    private Task RetryFailedRequestAsync()
+    {
+        if (isSending || failedRequest is null)
+            return Task.CompletedTask;
+
+        return SendRequestAsync(failedRequest);
+    }
+
+    private async Task SendRequestAsync(FailedAssistanceRequest request)
+    {
         errorMessage = null;
+        failedRequest = null;
         isSending = true;
 
         try
@@ -656,7 +755,7 @@
             await ScrollToBottomAsync();
             using var response = await Http.PostAsJsonAsync(
                 "api/assistance",
-                new AssistanceRequest(outgoing, history),
+                new AssistanceRequest(request.Message, request.History),
                 componentLifetime.Token);
 
             if (isDisposed)
@@ -668,6 +767,7 @@
                     response,
                     "The assistant could not answer right now. Please try again.",
                     componentLifetime.Token);
+                failedRequest = request;
                 return;
             }
 
@@ -675,6 +775,7 @@
             if (string.IsNullOrWhiteSpace(result?.Reply))
             {
                 errorMessage = "The assistant returned an empty response. Please try again.";
+                failedRequest = request;
                 return;
             }
 
@@ -685,10 +786,12 @@
             errorMessage = ApiErrorMessage.FromException(
                 exception,
                 "The assistant could not answer right now. Please try again.");
+            failedRequest = request;
         }
         catch (JsonException exception)
         {
             errorMessage = ApiErrorMessage.FromException(exception);
+            failedRequest = request;
         }
         catch (Exception exception) when (IsExpectedNavigationInterruption(exception))
         {
@@ -735,8 +838,13 @@
         messages.Clear();
         message = string.Empty;
         errorMessage = null;
+        failedRequest = null;
         await TryFocusComposerAsync();
     }
+
+    private sealed record FailedAssistanceRequest(
+        string Message,
+        IReadOnlyList<ChatMessage> History);
 
     private async Task ScrollToBottomAsync()
     {

@@ -21,6 +21,7 @@ public class Product
     public int CurrentStock { get; set; }
     public int ReorderTarget { get; set; }
     public int ReservedStock { get; set; }
+    public bool IsActive { get; set; } = true;
 
     public int AvailableStock => Math.Max(0, CurrentStock - ReservedStock);
 

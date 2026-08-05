@@ -32,6 +32,10 @@ namespace StockSense.Infrastructure.Data
             base.OnModelCreating(builder);
             builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
+            builder.Entity<Product>()
+                .Property(product => product.IsActive)
+                .HasDefaultValue(true);
+
             builder.Entity<PreBuiltPackageMotor>()
                 .HasOne(m => m.Motorcycle)
                 .WithMany()

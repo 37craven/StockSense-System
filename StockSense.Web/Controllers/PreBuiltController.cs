@@ -25,7 +25,8 @@ public class PreBuiltController : ControllerBase
     {
         var allPackages = await _repo.GetAllAsync();
         var matching = allPackages
-            .Where(p => p.IsActive && p.TotalPrice >= minBudget && p.TotalPrice <= maxBudget)
+            .Where(p => p.IsActive && p.IncludedProducts.All(product => product.IsActive)
+                && p.TotalPrice >= minBudget && p.TotalPrice <= maxBudget)
             .Where(p => p.CompatibleMotors.Any(m =>
                 m.Brand.Equals(brand, StringComparison.OrdinalIgnoreCase) &&
                 m.Model.Equals(model, StringComparison.OrdinalIgnoreCase) &&
@@ -112,7 +113,8 @@ public class PreBuiltController : ControllerBase
         }).ToList(),
         IncludedProducts = p.IncludedProducts.Select(prod => new PreBuiltProductDto
         {
-            Id = prod.Id, Name = prod.Name, Brand = prod.Brand, Price = prod.Price
+            Id = prod.Id, Name = prod.Name, Brand = prod.Brand, Price = prod.Price,
+            Category = prod.Category, IsActive = prod.IsActive
         }).ToList()
     };
 }

@@ -11,6 +11,7 @@ public interface IAssistanceClient
         string message,
         string userRole,
         IReadOnlyList<AssistanceHistoryMessage> history,
+        string correlationId,
         CancellationToken cancellationToken);
 }
 
@@ -20,13 +21,16 @@ public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceCl
         string message,
         string userRole,
         IReadOnlyList<AssistanceHistoryMessage> history,
+        string correlationId,
         CancellationToken cancellationToken)
     {
         var endpoint = GetChatEndpoint(httpClient.BaseAddress);
-        using var response = await httpClient.PostAsJsonAsync(
-            endpoint,
-            new ChatbotRequest(message, userRole, history),
-            cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = JsonContent.Create(new ChatbotRequest(message, userRole, history))
+        };
+        request.Headers.TryAddWithoutValidation("X-Correlation-ID", correlationId);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {

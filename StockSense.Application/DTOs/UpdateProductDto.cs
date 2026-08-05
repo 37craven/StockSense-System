@@ -24,6 +24,8 @@ public class UpdateProductDto
     public string? Barcode { get; set; }
 
     public int? SupplierId { get; set; }
+
+    public bool? IsActive { get; set; }
 }
 
 public sealed class UpdateProductInventoryDto
@@ -53,4 +55,15 @@ public sealed record UpdateProductInventoryResultDto(
 public sealed record ProductImageUploadResultDto(
     int Id,
     string ImageUrl,
+    byte[] ProductRowVersion);
+
+public sealed class UpdateProductStatusDto
+{
+    public bool IsActive { get; set; }
+    public byte[] ProductRowVersion { get; set; } = [];
+}
+
+public sealed record UpdateProductStatusResultDto(
+    int Id,
+    bool IsActive,
     byte[] ProductRowVersion);

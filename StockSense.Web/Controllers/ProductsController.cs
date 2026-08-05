@@ -46,7 +46,7 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<List<ProductDto>>> GetProducts()
     {
         var products = await _productRepo.GetAllAsync();
-        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode, p.UnitCost, p.RowVersion)).ToList();
+        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode, p.UnitCost, p.RowVersion, p.IsActive)).ToList();
         return Ok(dtos);
     }
 
@@ -58,7 +58,7 @@ public class ProductsController : ControllerBase
 
         var dto = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion);
+            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive);
         return Ok(dto);
     }
 
@@ -109,7 +109,8 @@ public class ProductsController : ControllerBase
             UnitCost = dto.UnitCost,
             ReorderTarget = dto.ReorderTarget,
             SupplierId = dto.SupplierId,
-            ImageUrl = dto.ImageUrl
+            ImageUrl = dto.ImageUrl,
+            IsActive = dto.IsActive
         };
         if (dto.InitialStock > 0) product.AddStock(dto.InitialStock);
         await _productRepo.AddAsync(product);
@@ -121,8 +122,37 @@ public class ProductsController : ControllerBase
 
         var dtoResult = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion);
+            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive);
         return Ok(dtoResult);
+    }
+
+    [HttpPut("{id:int}/status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateProductStatus(
+        int id,
+        [FromBody] UpdateProductStatusDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (dto.ProductRowVersion.Length == 0)
+            return BadRequest(ApiResponse.Error("A row version is required when changing product status. Reload the product and try again."));
+
+        var product = await _context.Products.SingleOrDefaultAsync(value => value.Id == id, cancellationToken);
+        if (product is null) return NotFound(ApiResponse.NotFound("Product"));
+
+        _context.Entry(product).Property(value => value.RowVersion).OriginalValue = dto.ProductRowVersion;
+        product.IsActive = dto.IsActive;
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            _logger.LogWarning(exception, "Product {ProductId} status update conflicted with another change.", id);
+            return Conflict(ApiResponse.Error("The product was changed by another user. Reload the latest data and try again."));
+        }
+
+        return Ok(new UpdateProductStatusResultDto(product.Id, product.IsActive, product.RowVersion));
     }
 
     [HttpGet("{id}/barcode-pdf")]
@@ -168,11 +198,12 @@ public class ProductsController : ControllerBase
 
         var changesStock = dto.CurrentStock.HasValue && dto.CurrentStock.Value != product.CurrentStock;
         var changesReorderTarget = dto.ReorderTarget.HasValue && dto.ReorderTarget.Value != product.ReorderTarget;
-        var changesInventory = changesStock || changesReorderTarget;
-        if (changesInventory && dto.RowVersion.Length == 0)
-            return BadRequest(ApiResponse.Error("A row version is required when changing stock or the reorder target. Reload the product and try again."));
+        var changesStatus = dto.IsActive.HasValue && dto.IsActive.Value != product.IsActive;
+        var changesConcurrencyProtectedFields = changesStock || changesReorderTarget || changesStatus;
+        if (changesConcurrencyProtectedFields && dto.RowVersion.Length == 0)
+            return BadRequest(ApiResponse.Error("A row version is required when changing stock, the reorder target, or product status. Reload the product and try again."));
 
-        if (changesInventory)
+        if (changesConcurrencyProtectedFields)
             _context.Entry(product).Property(value => value.RowVersion).OriginalValue = dto.RowVersion;
 
         var stockBefore = product.CurrentStock;
@@ -182,6 +213,7 @@ public class ProductsController : ControllerBase
         product.SupplierId = dto.SupplierId;
         if (dto.ReorderTarget.HasValue) product.ReorderTarget = dto.ReorderTarget.Value;
         if (dto.CurrentStock.HasValue) product.CurrentStock = dto.CurrentStock.Value;
+        if (dto.IsActive.HasValue) product.IsActive = dto.IsActive.Value;
 
         if (changesStock)
         {

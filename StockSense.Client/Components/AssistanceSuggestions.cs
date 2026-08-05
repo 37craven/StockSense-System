@@ -8,16 +8,17 @@ public static class AssistanceSuggestions
     {
         "Admin" =>
         [
-            new("Sales overview", "Show me today's sales summary."),
-            new("Inventory counts", "Which products are low or out of stock?"),
-            new("Supplier status", "Show supplier and pending order status."),
-            new("Operations overview", "Summarize current appointments and active builds.")
+            new("Sales performance", "Show the sales summary for the last 30 days."),
+            new("Replenishment settings", "Show safety-stock confidence and automatic-order settings."),
+            new("Pending supplier orders", "Show pending and partially received supplier orders."),
+            new("User overview", "Show user counts by role.")
         ],
         "Employee" =>
         [
-            new("Product availability", "Check current product availability."),
-            new("Today's appointments", "Show today's appointment schedule."),
-            new("Active builds", "Show active motorcycle build requests."),
+            new("Inventory attention", "Which products are low or out of stock?"),
+            new("Appointment status", "Summarize current appointment status."),
+            new("Build status", "Summarize current motorcycle build status."),
+            new("Incoming orders", "Show pending and partially received supplier orders."),
             new("Compatibility lookup", "Help me identify compatible parts for a motorcycle.")
         ],
         _ =>

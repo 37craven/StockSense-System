@@ -65,6 +65,11 @@
         <label class="flex flex-col gap-1 text-xs text-muted-foreground">Supplier
             <select @bind="supplier" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All suppliers</option><option value="__missing">Missing supplier</option>@foreach (var value in Suppliers) { <option>@value</option> }</select>
         </label>
+        <label class="flex flex-col gap-1 text-xs text-muted-foreground">Product status
+            <select @bind="productStatus" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                <option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>
+            </select>
+        </label>
         <label class="flex items-center gap-2 self-end h-9 text-sm text-foreground"><input type="checkbox" @bind="belowReorder" /> Below reorder point</label>
         <label class="flex items-center gap-2 self-end h-9 text-sm text-foreground"><input type="checkbox" @bind="missingSupplier" /> Missing supplier</label>
         <label class="flex items-center gap-2 self-end h-9 text-sm text-foreground"><input type="checkbox" @bind="automaticOnly" /> Automatic only</label>
@@ -88,13 +93,14 @@
             <div class="inventory-list-summary"><span>@FilteredRows.Count() of @rows.Count products</span><span>Select a product to view metrics and settings</span></div>
             <div class="inventory-table-wrap">
                 <table class="inventory-table">
-                    <thead><tr><th><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th><th>Product</th><th>Stock</th><th>Position</th><th>Reorder</th><th>Calculation</th><th><span class="sr-only">Open</span></th></tr></thead>
+                    <thead><tr><th><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th><th>Product</th><th>Status</th><th>Stock</th><th>Position</th><th>Reorder</th><th>Calculation</th><th><span class="sr-only">Open</span></th></tr></thead>
                     <tbody>
                         @foreach (var row in FilteredRows)
                         {
                             <tr class="inventory-row" @onclick="() => OpenDetails(row)">
                                 <td @onclick:stopPropagation><input type="checkbox" aria-label="Select @row.ProductName for recalculation" checked="@selectedIds.Contains(row.ProductId)" @onchange="e => Toggle(row.ProductId, e)" /></td>
                                 <td data-label="Product"><strong>@row.ProductName</strong><small>@row.Brand · @row.Category</small></td>
+                                <td data-label="Status"><span class="product-status-badge @(row.IsActive ? "is-active" : "is-inactive")">@(row.IsActive ? "Active" : "Inactive")</span></td>
                                 <td data-label="Stock">@row.CurrentStock <small>+@row.IncomingStock incoming</small></td>
                                 <td data-label="Position" class="metric-emphasis @(row.InventoryPosition <= row.ReorderPoint ? "metric-risk" : "")">@row.InventoryPosition</td>
                                 <td data-label="Reorder">@row.ReorderPoint</td>
@@ -155,6 +161,24 @@
                     {
                         <AuthorizeView Roles="Admin">
                           <Authorized>
+                            <section aria-labelledby="product-status-heading">
+                                <div class="flex items-center justify-between gap-3">
+                                    <h3 id="product-status-heading" class="m-0 text-sm font-semibold text-foreground">Product status</h3>
+                                    <button type="button"
+                                            role="switch"
+                                            aria-checked="@editingProductIsActive"
+                                            aria-label="Product status: @(editingProductIsActive ? "Active" : "Inactive"). Select to make @(editingProductIsActive ? "inactive" : "active")."
+                                            title="Set product @(editingProductIsActive ? "inactive" : "active")"
+                                            disabled="@ModalOperationLocked"
+                                            @onclick="ToggleProductStatus"
+                                            class="product-status-toggle @(editingProductIsActive ? "is-active" : "is-inactive")">
+                                        @if (statusSaving) { <BbSpinner Size="SpinnerSize.Small" /> }
+                                        else { <LucideIcon Name="@(editingProductIsActive ? "eye" : "eye-off")" Size="15" /> }
+                                        @(editingProductIsActive ? "Active" : "Inactive")
+                                    </button>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(productStatusError)) { <p role="alert" class="form-error">@productStatusError</p> }
+                            </section>
                             <section aria-labelledby="product-image-edit-heading">
                                 <div class="section-heading"><div><h3 id="product-image-edit-heading">Product image</h3><p>Upload or replace the product image.</p></div></div>
                                 @if (ModalOperationLocked)
@@ -221,7 +245,15 @@
                                 </div>
                                 @if (!showAddSupplierForm)
                                 {
-                                    <div class="section-actions"><BbButton OnClick="SaveProductSupplier" Disabled="@(ModalOperationLocked || supplierSaving)">@if (supplierSaving) { <BbSpinner Size="SpinnerSize.Small" /> } Save supplier</BbButton><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="OpenAddSupplierForm">+ Add new supplier</BbButton></div>
+                                    <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
+                                        <BbButton Class="min-h-11 max-sm:w-full" OnClick="SaveProductSupplier" Disabled="@(ModalOperationLocked || supplierSaving)">
+                                            @if (supplierSaving) { <BbSpinner Size="SpinnerSize.Small" /> }
+                                            Save supplier
+                                        </BbButton>
+                                        <BbButton Class="min-h-11 max-sm:w-full" Variant="ButtonVariant.Outline" OnClick="OpenAddSupplierForm" Disabled="@ModalOperationLocked">
+                                            <LucideIcon Name="plus" Size="15" /> Add new supplier
+                                        </BbButton>
+                                    </div>
                                 }
                                 else
                                 {
@@ -231,7 +263,10 @@
                                         <label>Mobile number<input @bind="newSupplierMobile" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" type="tel" placeholder="09123456789" maxlength="50" /></label>
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(newSupplierError)) { <p role="alert" class="form-error">@newSupplierError</p> }
-                                    <div class="section-actions mt-2"><BbButton OnClick="AddNewSupplier" Disabled="@(string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier)">@if (addingSupplier) { <BbSpinner Size="SpinnerSize.Small" /> } Add supplier</BbButton><BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="CancelAddSupplierForm" Disabled="addingSupplier">Cancel</BbButton></div>
+                                    <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
+                                        <BbButton Class="min-h-11 max-sm:w-full" OnClick="AddNewSupplier" Disabled="@(string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier)">@if (addingSupplier) { <BbSpinner Size="SpinnerSize.Small" /> } Add supplier</BbButton>
+                                        <BbButton Class="min-h-11 max-sm:w-full" Variant="ButtonVariant.Outline" OnClick="CancelAddSupplierForm" Disabled="addingSupplier">Cancel</BbButton>
+                                    </div>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(supplierUpdateError)) { <p role="alert" class="form-error">@supplierUpdateError</p> }
                             </section>
@@ -413,7 +448,7 @@
 @code {
     private List<InventoryDashboardRowDto>? rows;
     private readonly HashSet<int> selectedIds = [];
-    private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", message = "", error = "", settingsError = "";
+    private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", productStatus = "", message = "", error = "", settingsError = "";
     private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed;
     private bool detailOpen
     {
@@ -429,13 +464,14 @@
     private CancellationTokenSource? detailSettingsCts;
     private long detailGeneration;
     private ProductInventorySettingDto? settings;
-    private bool productSaving, imageUploading, supplierSaving, addingSupplier, showAddSupplierForm;
+    private bool productSaving, imageUploading, supplierSaving, statusSaving, addingSupplier, showAddSupplierForm;
     private IBrowserFile? selectedImageFile;
     private const long MaxImageBytes = 5 * 1024 * 1024;
     private int editingProductId, originalStock, imageInputKey;
     private decimal originalPrice;
     private byte[] editingProductRowVersion = [];
-    private string editingProductName = "", editPriceText = "", editStockText = "", stockCorrectionReason = "", productEditorError = "", imagePreviewUrl = "", imageUploadError = "", supplierUpdateError = "", newSupplierName = "", newSupplierEmail = "", newSupplierMobile = "", newSupplierError = "";
+    private string editingProductName = "", editPriceText = "", editStockText = "", stockCorrectionReason = "", productEditorError = "", imagePreviewUrl = "", imageUploadError = "", supplierUpdateError = "", productStatusError = "", newSupplierName = "", newSupplierEmail = "", newSupplierMobile = "", newSupplierError = "";
+    private bool editingProductIsActive;
     private bool TryPrice(out decimal value) => decimal.TryParse(editPriceText, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, out value);
     private bool TryStock(out int value) => int.TryParse(editStockText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.CurrentCulture, out value);
     private bool editPriceInvalid => !TryPrice(out var value) || value <= 0 || decimal.Round(value, 2) != value;
@@ -445,7 +481,7 @@
     private bool ProductWillChange => (TryPrice(out var price) && price != originalPrice)
                                       || StockWillChange;
     private bool ProductEditorValid => !editPriceInvalid && !editStockInvalid && !reasonInvalid;
-    private bool ModalOperationLocked => busy || productSaving || imageUploading || supplierSaving || addingSupplier;
+    private bool ModalOperationLocked => busy || productSaving || imageUploading || supplierSaving || statusSaving || addingSupplier;
     private List<SupplierDto> supplierList = [];
     private int? detailSupplierId;
     private string detailTab = "overview";
@@ -459,6 +495,7 @@
         .Where(x => string.IsNullOrWhiteSpace(category) || x.Category == category)
         .Where(x => string.IsNullOrWhiteSpace(brand) || x.Brand == brand)
         .Where(x => string.IsNullOrWhiteSpace(supplier) || (supplier == "__missing" ? !x.SupplierId.HasValue : x.SupplierName == supplier))
+        .Where(x => string.IsNullOrWhiteSpace(productStatus) || (productStatus == "active" ? x.IsActive : !x.IsActive))
         .Where(x => !belowReorder || x.InventoryPosition <= x.ReorderPoint)
         .Where(x => !missingSupplier || !x.SupplierId.HasValue)
         .Where(x => !automaticOnly || x.IsAutomaticOrderEnabled);
@@ -520,6 +557,7 @@
     {
         editingProductId = row.ProductId;
         editingProductName = row.ProductName;
+        editingProductIsActive = row.IsActive;
         originalPrice = row.Price;
         originalStock = row.CurrentStock;
         editingProductRowVersion = row.ProductRowVersion.ToArray();
@@ -528,6 +566,7 @@
         stockCorrectionReason = "";
         productEditorError = "";
         supplierUpdateError = "";
+        productStatusError = "";
         detailSupplierId = row.SupplierId;
         selectedImageFile = null;
         imagePreviewUrl = "";
@@ -632,6 +671,44 @@
         finally
         {
             supplierSaving = false;
+        }
+    }
+    private async Task ToggleProductStatus()
+    {
+        if (ModalOperationLocked || selectedRow is null || selectedRow.ProductId != editingProductId) return;
+
+        var targetProductId = selectedRow.ProductId;
+        var requestedStatus = !editingProductIsActive;
+        statusSaving = true;
+        productStatusError = "";
+        try
+        {
+            var dto = new UpdateProductStatusDto
+            {
+                IsActive = requestedStatus,
+                ProductRowVersion = editingProductRowVersion
+            };
+            using var response = await Http.PutAsJsonAsync($"api/products/{targetProductId}/status", dto);
+            await EnsureSuccess(response);
+            var result = await response.Content.ReadFromJsonAsync<UpdateProductStatusResultDto>()
+                ?? throw new InvalidOperationException("The server returned an empty product status result.");
+            editingProductIsActive = result.IsActive;
+            editingProductRowVersion = result.ProductRowVersion;
+            await LoadAsync();
+            if (!RefreshSelectedRow()) return;
+            Toast.Success(
+                result.IsActive
+                    ? $"{editingProductName} is now available on the build page."
+                    : $"{editingProductName} is now hidden from the build page.",
+                "Product status updated");
+        }
+        catch (Exception ex)
+        {
+            productStatusError = ApiErrorMessage.FromException(ex, "The product status could not be saved. Please try again.");
+        }
+        finally
+        {
+            statusSaving = false;
         }
     }
     private void OpenAddSupplierForm()

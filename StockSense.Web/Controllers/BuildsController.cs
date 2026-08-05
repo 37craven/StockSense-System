@@ -48,6 +48,51 @@ public class BuildsController : ControllerBase
         var customer = await _userManager.GetUserAsync(User);
         if (customer is null) return Unauthorized();
 
+        List<ProductDto> submittedParts;
+        try
+        {
+            submittedParts = JsonSerializer.Deserialize<List<ProductDto>>(dto.SelectedPartsJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            return BadRequest(ApiResponse.Error("The selected parts are invalid. Refresh the build page and try again."));
+        }
+
+        var selectedProductIds = submittedParts
+            .Where(part => part.Id > 0)
+            .Select(part => part.Id)
+            .ToList();
+        if (selectedProductIds.Count == 0)
+            return BadRequest(ApiResponse.Error("Select at least one active product before submitting the build."));
+
+        var distinctProductIds = selectedProductIds.Distinct().ToList();
+        var activeProducts = await _context.Products
+            .AsNoTracking()
+            .Where(product => distinctProductIds.Contains(product.Id) && product.IsActive)
+            .ToListAsync();
+        if (activeProducts.Count != distinctProductIds.Count)
+            return BadRequest(ApiResponse.Error("One or more selected products are no longer available. Refresh the build page and choose active products."));
+
+        var productsById = activeProducts.ToDictionary(product => product.Id);
+        var canonicalParts = selectedProductIds.Select(id => productsById[id]).Select(product => new ProductDto(
+            product.Id,
+            product.Name,
+            product.Category,
+            product.Brand,
+            product.Price,
+            product.CurrentStock,
+            product.ReorderTarget,
+            product.SupplierId ?? 0,
+            string.Empty,
+            product.ImageUrl ?? string.Empty,
+            product.Barcode,
+            product.UnitCost,
+            product.RowVersion,
+            product.IsActive)).ToList();
+
+        // Preserve the UI's non-product build metadata, but never trust submitted product details or prices.
+        canonicalParts.AddRange(submittedParts.Where(part => part.Id <= 0));
+
         Motorcycle? motorcycle = null;
         if (dto.MotorcycleId.HasValue)
         {
@@ -62,8 +107,8 @@ public class BuildsController : ControllerBase
             CustomerEmail = customer.Email,
             CustomerUserId = customer.Id,
             BuildName = dto.BuildName,
-            SelectedPartsJson = dto.SelectedPartsJson,
-            TotalPrice = dto.TotalPrice,
+            SelectedPartsJson = JsonSerializer.Serialize(canonicalParts),
+            TotalPrice = selectedProductIds.Sum(id => productsById[id].Price),
             CreatedAt = DateTime.Now,
             Status = WorkOrderStatuses.Pending,
             MotorcycleId = motorcycle?.Id

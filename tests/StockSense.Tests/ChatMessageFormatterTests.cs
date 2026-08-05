@@ -16,6 +16,57 @@ public sealed class ChatMessageFormatterTests
         Assert.Equal(["Brake Pad", "0"], table.Rows[1]);
     }
 
+    [Theory]
+    [InlineData("Here are the products currently available:\n\n| Product | Brand | Price | Availability |\n| --- | --- | ---: | :---: |\n| Honda Oil 800 mL | Honda | ₱334.29 | Available |", "Product", "Honda Oil 800 mL")]
+    [InlineData("Inventory summary: 2 items need attention.\n\n| Product | On hand | Reorder point | Status |\n| --- | ---: | ---: | --- |\n| Brake Pad | 0 | 5 | Critical |", "Product", "Brake Pad")]
+    [InlineData("Sales summary for August 6, 2026.\n\n| Product | Units | Sales | Transactions |\n|---|---:|---:|---:|\n| Engine Oil | 4 | ₱1,400.00 | 3 |", "Product", "Engine Oil")]
+    public void Parse_recognizes_customer_employee_and_admin_report_tables(
+        string content,
+        string expectedHeader,
+        string expectedFirstCell)
+    {
+        var table = Assert.IsType<ChatTableBlock>(ChatMessageFormatter.Parse(content)[1]);
+
+        Assert.Equal(expectedHeader, table.Headers[0]);
+        Assert.Equal(expectedFirstCell, table.Rows[0][0]);
+    }
+
+    [Fact]
+    public void Table_cells_use_an_accessible_placeholder_for_missing_mobile_card_values()
+    {
+        var table = new ChatTableBlock(
+            ["Product", "Availability"],
+            [["Engine Oil"]]);
+
+        Assert.Equal("Engine Oil", table.CellAt(table.Rows[0], 0));
+        Assert.Equal("—", table.CellAt(table.Rows[0], 1));
+        Assert.Equal(string.Empty, table.CellAt(table.Rows[0], 1, string.Empty));
+    }
+
+    [Theory]
+    [InlineData("Completed", ChatStatusTone.Positive)]
+    [InlineData("Pending", ChatStatusTone.Attention)]
+    [InlineData("Partially received", ChatStatusTone.Attention)]
+    [InlineData("Overdue", ChatStatusTone.Critical)]
+    [InlineData("Custom state", ChatStatusTone.Neutral)]
+    public void Status_semantics_are_bounded_to_status_columns(string value, ChatStatusTone expected)
+    {
+        var table = new ChatTableBlock(["Order", "Status"], [["OS-1", value]]);
+
+        Assert.Equal(expected, table.StatusToneAt(table.Rows[0], 1));
+        Assert.Equal(ChatStatusTone.None, table.StatusToneAt(table.Rows[0], 0));
+    }
+
+    [Fact]
+    public void Arbitrary_status_text_remains_plain_data()
+    {
+        const string untrusted = "<img src=x onerror=alert(1)>";
+        var table = new ChatTableBlock(["Status"], [[untrusted]]);
+
+        Assert.Equal(untrusted, table.CellAt(table.Rows[0], 0));
+        Assert.Equal(ChatStatusTone.Neutral, table.StatusToneAt(table.Rows[0], 0));
+    }
+
     [Fact]
     public void Parse_recognizes_headings_lists_code_and_paragraphs_in_order()
     {

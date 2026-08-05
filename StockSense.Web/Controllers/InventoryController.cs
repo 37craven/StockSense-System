@@ -68,6 +68,7 @@ public sealed class InventoryController : ControllerBase
                     Price = product.Price,
                     ImageUrl = product.ImageUrl,
                     ProductRowVersion = product.RowVersion,
+                    IsActive = product.IsActive,
                     AverageDailyDemand = metric == null ? 0 : metric.AverageDailyDemand,
                     DemandStandardDeviation = metric == null ? 0 : metric.DemandStandardDeviation,
                     SafetyStock = metric == null ? 0 : metric.SafetyStock,

@@ -606,8 +606,9 @@
     private FilterMode filterMode = FilterMode.Custom;
 
     private decimal TotalPrice => selectedParts.Sum(s => s.Price);
-    private IEnumerable<string> UniqueCategories => products?.Select(p => p.Category).Distinct() ?? Array.Empty<string>();
+    private IEnumerable<string> UniqueCategories => products?.Where(p => p.IsActive).Select(p => p.Category).Distinct() ?? Array.Empty<string>();
     private IEnumerable<ProductDto> FilteredProducts => products?.Where(p =>
+        p.IsActive &&
         (filterMode != FilterMode.Custom || string.IsNullOrEmpty(expandedCategory) || p.Category == expandedCategory) &&
         (filterMode != FilterMode.Custom || string.IsNullOrEmpty(searchTerm) || p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || p.Brand.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))) ?? Array.Empty<ProductDto>();
 
@@ -616,8 +617,11 @@
         try
         {
             isLoading = true;
-            products = await Http.GetFromJsonAsync<List<ProductDto>>("api/products");
-            packages = await Http.GetFromJsonAsync<List<PreBuiltPackageDto>>("api/prebuilts/all") ?? [];
+            var loadedProducts = await Http.GetFromJsonAsync<List<ProductDto>>("api/products") ?? [];
+            products = CustomerBuildCatalogPolicy.SelectProducts(loadedProducts);
+
+            var loadedPackages = await Http.GetFromJsonAsync<List<PreBuiltPackageDto>>("api/prebuilts/all") ?? [];
+            packages = CustomerBuildCatalogPolicy.SelectPackages(loadedPackages);
             await LoadMotorcycles();
         }
         catch (Exception ex)
@@ -653,6 +657,9 @@
 
     private void SelectPackage(PreBuiltPackageDto pkg)
     {
+        if (!CustomerBuildCatalogPolicy.CanSelect(pkg))
+            return;
+
         if (selectedPackageIds.Contains(pkg.Id))
         {
             selectedPackageIds.Remove(pkg.Id);
@@ -697,6 +704,9 @@
 
     private void TogglePart(ProductDto product)
     {
+        if (!CustomerBuildCatalogPolicy.CanSelect(product))
+            return;
+
         if (selectedParts.Any(p => p.Id == product.Id))
             selectedParts.RemoveAll(p => p.Id == product.Id);
         else

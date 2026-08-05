@@ -154,4 +154,37 @@ public sealed record ChatListBlock(bool Ordered, IReadOnlyList<string> Items) : 
 public sealed record ChatCodeBlock(string Language, string Code) : ChatContentBlock;
 public sealed record ChatTableBlock(
     IReadOnlyList<string> Headers,
-    IReadOnlyList<IReadOnlyList<string>> Rows) : ChatContentBlock;
+    IReadOnlyList<IReadOnlyList<string>> Rows) : ChatContentBlock
+{
+    public string CellAt(IReadOnlyList<string> row, int index, string fallback = "—") =>
+        index >= 0 && index < row.Count && !string.IsNullOrWhiteSpace(row[index])
+            ? row[index]
+            : fallback;
+
+    public bool IsStatusColumn(int index) =>
+        index >= 0 && index < Headers.Count &&
+        Headers[index].Contains("status", StringComparison.OrdinalIgnoreCase);
+
+    public ChatStatusTone StatusToneAt(IReadOnlyList<string> row, int index)
+    {
+        if (!IsStatusColumn(index))
+            return ChatStatusTone.None;
+
+        return CellAt(row, index, string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "completed" or "confirmed" or "available" => ChatStatusTone.Positive,
+            "pending" or "draft" or "approved" or "ordered" or "partially received" => ChatStatusTone.Attention,
+            "overdue" or "out of stock" or "cancelled" => ChatStatusTone.Critical,
+            _ => ChatStatusTone.Neutral
+        };
+    }
+}
+
+public enum ChatStatusTone
+{
+    None,
+    Neutral,
+    Positive,
+    Attention,
+    Critical
+}

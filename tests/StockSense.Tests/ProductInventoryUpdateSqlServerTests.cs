@@ -17,6 +17,65 @@ public sealed class ProductInventoryUpdateSqlServerTests
 {
     private const string ConnectionVariable = "STOCKSENSE_TEST_SQL_CONNECTION";
 
+    [Fact]
+    public void NewProducts_are_active_by_default()
+    {
+        var product = new Product();
+        var createCommand = new CreateProductDto();
+
+        Assert.True(product.IsActive);
+        Assert.True(createCommand.IsActive);
+    }
+
+    [SqlServerFact]
+    public async Task ProductStatusUpdate_persists_and_returns_new_row_version()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var oldVersion = fixture.Context.Products.AsNoTracking()
+            .Where(value => value.Id == fixture.ProductId)
+            .Select(value => value.RowVersion)
+            .Single();
+
+        var action = await fixture.Controller.UpdateProductStatus(
+            fixture.ProductId,
+            new UpdateProductStatusDto { IsActive = false, ProductRowVersion = oldVersion },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(action);
+        var result = Assert.IsType<UpdateProductStatusResultDto>(ok.Value);
+        Assert.False(result.IsActive);
+        Assert.NotEqual(oldVersion, result.ProductRowVersion);
+        fixture.Context.ChangeTracker.Clear();
+        Assert.False((await fixture.Context.Products.AsNoTracking()
+            .SingleAsync(value => value.Id == fixture.ProductId)).IsActive);
+    }
+
+    [SqlServerFact]
+    public async Task ProductStatusUpdate_with_stale_version_returns_conflict()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var staleVersion = fixture.Context.Products.AsNoTracking()
+            .Where(value => value.Id == fixture.ProductId)
+            .Select(value => value.RowVersion)
+            .Single();
+        await using (var competing = fixture.CreateContext())
+        {
+            var product = await competing.Products.SingleAsync(value => value.Id == fixture.ProductId);
+            product.Price += 1m;
+            await competing.SaveChangesAsync();
+        }
+
+        var action = await fixture.Controller.UpdateProductStatus(
+            fixture.ProductId,
+            new UpdateProductStatusDto { IsActive = false, ProductRowVersion = staleVersion },
+            CancellationToken.None);
+
+        Assert.IsType<ConflictObjectResult>(action);
+        fixture.Context.ChangeTracker.Clear();
+        Assert.True((await fixture.Context.Products.AsNoTracking()
+            .SingleAsync(value => value.Id == fixture.ProductId)).IsActive);
+    }
+
     [SqlServerFact]
     public async Task StockCorrection_UsesSignedDeltaAndCreatesAuditTransaction()
     {
