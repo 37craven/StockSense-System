@@ -100,7 +100,7 @@
                             <tr class="inventory-row" @onclick="() => OpenDetails(row)">
                                 <td @onclick:stopPropagation><input type="checkbox" aria-label="Select @row.ProductName for recalculation" checked="@selectedIds.Contains(row.ProductId)" @onchange="e => Toggle(row.ProductId, e)" /></td>
                                 <td data-label="Product"><strong>@row.ProductName</strong><small>@row.Brand · @row.Category</small></td>
-                                <td data-label="Status"><span class="product-status-badge @(row.IsActive ? "is-active" : "is-inactive")">@(row.IsActive ? "Active" : "Inactive")</span></td>
+                                <td data-label="Status"><span class="product-status-badge ss-product-status @(row.IsActive ? "ss-status-active" : "ss-status-inactive")">@(row.IsActive ? "Active" : "Inactive")</span></td>
                                 <td data-label="Stock">@row.CurrentStock <small>+@row.IncomingStock incoming</small></td>
                                 <td data-label="Position" class="metric-emphasis @(row.InventoryPosition <= row.ReorderPoint ? "metric-risk" : "")">@row.InventoryPosition</td>
                                 <td data-label="Reorder">@row.ReorderPoint</td>
@@ -171,7 +171,7 @@
                                             title="Set product @(editingProductIsActive ? "inactive" : "active")"
                                             disabled="@ModalOperationLocked"
                                             @onclick="ToggleProductStatus"
-                                            class="product-status-toggle @(editingProductIsActive ? "is-active" : "is-inactive")">
+                                            class="product-status-toggle ss-product-status @(editingProductIsActive ? "ss-status-active" : "ss-status-inactive")">
                                         @if (statusSaving) { <BbSpinner Size="SpinnerSize.Small" /> }
                                         else { <LucideIcon Name="@(editingProductIsActive ? "eye" : "eye-off")" Size="15" /> }
                                         @(editingProductIsActive ? "Active" : "Inactive")
