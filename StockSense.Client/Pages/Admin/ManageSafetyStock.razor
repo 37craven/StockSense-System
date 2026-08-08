@@ -154,7 +154,15 @@
                                 <div><dt>Average demand / day</dt><dd>@selectedRow.AverageDailyDemand.ToString("0.####")</dd></div><div><dt>Demand variability</dt><dd>@selectedRow.DemandStandardDeviation.ToString("0.####")</dd></div><div><dt>Supplier</dt><dd>@(string.IsNullOrWhiteSpace(selectedRow.SupplierName) ? "Missing" : selectedRow.SupplierName)</dd></div>
                                 <div><dt>Selling price</dt><dd>₱@selectedRow.Price.ToString("N2")</dd></div><div><dt>Order policy</dt><dd>@(selectedRow.IsAutomaticOrderEnabled ? "Automatic" : "Manual review")</dd></div>
                             </dl>
-                            <div class="calculation-note"><strong>Calculation details</strong><p>@(string.IsNullOrWhiteSpace(selectedRow.CalculationExplanation) ? "No calculation explanation is available." : selectedRow.CalculationExplanation)</p><small>Last calculated: @(selectedRow.LastCalculatedAt?.ToString("MMM d, yyyy h:mm tt") ?? "Never")</small></div>
+                            <div class="calculation-note" aria-labelledby="calculation-summary-heading">
+                                <strong id="calculation-summary-heading">@CalculationStatusLabel(selectedRow)</strong>
+                                <p>@CalculationStatusSummary(selectedRow)</p>
+                                @if (CalculationActionSummary(selectedRow) is { } action)
+                                {
+                                    <p>@action</p>
+                                }
+                                <small>Last calculated: @(selectedRow.LastCalculatedAt?.ToString("MMM d, yyyy h:mm tt") ?? "Never")</small>
+                            </div>
                         </section>
                     }
                     else
@@ -341,30 +349,34 @@
                 </button>
             </div>
             <div class="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
+                @if (!string.IsNullOrWhiteSpace(newProductFormError))
+                {
+                    <p role="alert" class="form-error m-0">@newProductFormError</p>
+                }
                 <div class="grid gap-4" style="grid-template-columns:1fr">
                     <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Name</label>
-                        <input @bind="newProduct.Name" placeholder="Product name"
+                        <label for="new-product-name" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Name</label>
+                        <input id="new-product-name" @bind="newProduct.Name" placeholder="Product name" required
                                class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                     </div>
                 </div>
                 <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
                     <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Brand</label>
-                        <input @bind="newProduct.Brand" placeholder="Brand name"
+                        <label for="new-product-brand" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Brand</label>
+                        <input id="new-product-brand" @bind="newProduct.Brand" placeholder="Brand name" required
                                class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                     </div>
                     <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Category</label>
-                        <input @bind="newProduct.Category" placeholder="e.g. Engine, Brakes"
+                        <label for="new-product-category" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Category</label>
+                        <input id="new-product-category" @bind="newProduct.Category" placeholder="e.g. Engine, Brakes" required
                                class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                     </div>
                 </div>
                 <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
                     <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Supplier</label>
-                        <select @bind="newProduct.SupplierId" class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none">
-                            <option value="">None</option>
+                        <label for="new-product-supplier" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Supplier</label>
+                        <select id="new-product-supplier" @bind="newProduct.SupplierId" required class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none">
+                            <option value="">Select a supplier</option>
                             @foreach (var supplier in NewProductSuppliers)
                             {
                                 <option value="@supplier.Id">@supplier.Name</option>
@@ -372,32 +384,27 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Unit Price (₱)</label>
-                        <input type="number" step="0.01" @bind="newProduct.Price" placeholder="0.00"
+                        <label for="new-product-price" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Selling Price (₱)</label>
+                        <input id="new-product-price" type="number" step="0.01" min="0.01" @bind="newProduct.Price" placeholder="0.00" required
                                class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                     </div>
                 </div>
                 <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
                     <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Unit Cost (₱)</label>
-                        <input type="number" step="0.01" @bind="newProduct.UnitCost" placeholder="0.00"
+                        <label for="new-product-initial-stock" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Initial Stock</label>
+                        <input id="new-product-initial-stock" type="number" min="0" @bind="newProduct.InitialStock" placeholder="0" required
                                class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                     </div>
                     <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Initial Stock</label>
-                        <input type="number" @bind="newProduct.InitialStock" placeholder="0"
-                               class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Reorder Point</label>
-                        <input type="number" @bind="newProduct.ReorderTarget" placeholder="0"
+                        <label for="new-product-reorder-point" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Reorder Point</label>
+                        <input id="new-product-reorder-point" type="number" min="0" @bind="newProduct.ReorderTarget" placeholder="0" required
                                class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                     </div>
                 </div>
                 <div class="grid gap-4" style="grid-template-columns:1fr">
                     <div>
                         <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Image</label>
-                        <InputFile @key="newProductImageInputKey" id="new-product-image-input" class="upload-input" OnChange="HandleNewProductImageSelected" accept="image/jpeg,image/png,image/webp" />
+                        <InputFile @key="newProductImageInputKey" id="new-product-image-input" class="upload-input" OnChange="HandleNewProductImageSelected" accept="image/jpeg,image/png,image/webp" required />
                         <label class="upload-card" for="new-product-image-input">
                             <span class="upload-card-visual" aria-hidden="true">
                                 @if (newProductImageFile is not null && !string.IsNullOrWhiteSpace(newProductImagePreview))
@@ -486,6 +493,36 @@
     private int? detailSupplierId;
     private string detailTab = "overview";
     private string CurrentImagePreview => string.IsNullOrWhiteSpace(imagePreviewUrl) ? selectedRow?.ImageUrl ?? string.Empty : imagePreviewUrl;
+
+    private static string CalculationStatusLabel(InventoryDashboardRowDto row) => row.CalculationStage switch
+    {
+        "ColdStart" => "Getting started",
+        "Learning" => "Building confidence",
+        "DataDriven" => "Up to date",
+        "Manual" => "Manually set",
+        _ => "Not calculated"
+    };
+
+    private static string CalculationStatusSummary(InventoryDashboardRowDto row) => row.CalculationStage switch
+    {
+        "ColdStart" => "Stock targets use the starting estimate while this product builds sales history.",
+        "Learning" => "Stock targets combine recent sales with the starting estimate.",
+        "DataDriven" => "Stock targets use this product's sales history.",
+        "Manual" => "Stock targets use values set by an administrator.",
+        _ => "Stock targets have not been calculated yet."
+    };
+
+    private static string? CalculationActionSummary(InventoryDashboardRowDto row)
+    {
+        if (row.CalculationStage == "Not calculated" || !row.LastCalculatedAt.HasValue)
+            return "Run the inventory calculation to create stock targets.";
+        if (row.InventoryPosition <= row.ReorderPoint)
+            return row.IncomingStock > 0
+                ? $"Stock is low, with {row.IncomingStock} unit(s) already incoming."
+                : "Stock is low. Review replenishment.";
+
+        return null;
+    }
 
     protected override Task OnInitializedAsync() => LoadAsync();
     private IEnumerable<InventoryDashboardRowDto> FilteredRows => (rows ?? [])
@@ -991,6 +1028,7 @@
     private IBrowserFile? newProductImageFile;
     private string newProductImagePreview = "";
     private string newProductImageError = "";
+    private string newProductFormError = "";
     private int newProductImageInputKey;
 
     private void OpenNewProductModal()
@@ -999,6 +1037,7 @@
         newProductImageFile = null;
         newProductImagePreview = "";
         newProductImageError = "";
+        newProductFormError = "";
         newProductImageInputKey++;
         showNewProductModal = true;
     }
@@ -1010,7 +1049,19 @@
 
     private async Task SaveNewProduct()
     {
-        if (string.IsNullOrWhiteSpace(newProduct.Name)) return;
+        newProductFormError = "";
+        if (string.IsNullOrWhiteSpace(newProduct.Name) ||
+            string.IsNullOrWhiteSpace(newProduct.Brand) ||
+            string.IsNullOrWhiteSpace(newProduct.Category) ||
+            !newProduct.SupplierId.HasValue ||
+            newProduct.Price <= 0 ||
+            newProduct.InitialStock < 0 ||
+            newProduct.ReorderTarget < 0 ||
+            newProductImageFile is null)
+        {
+            newProductFormError = "Complete all required fields and select a product image before adding the product.";
+            return;
+        }
         isSavingNewProduct = true;
         try
         {

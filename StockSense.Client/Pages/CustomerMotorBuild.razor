@@ -171,17 +171,7 @@
                                               @bind-Value="selectedMotorcycleId" />
                     </div>
 
-                    <div style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); overflow-x: auto;">
-                        <div style="display: flex; gap: var(--space-2); flex-wrap: nowrap;">
-                            <button @onclick="() => { expandedCategory = null; mobileDrawerOpen = false; }" style="white-space: nowrap; padding: var(--space-1) var(--space-3); border-radius: 9999px; font-size: var(--text-xs); font-weight: var(--font-semibold); border: 1px solid @(expandedCategory == null ? "var(--primary)" : "var(--border)"); background-color: @(expandedCategory == null ? "var(--primary)" : "transparent"); color: @(expandedCategory == null ? "var(--primary-foreground)" : "var(--foreground)"); cursor: pointer; font-family: var(--font-sans);">All Parts</button>
-                            @foreach (var category in UniqueCategories)
-                            {
-                                <button @onclick="() => { ToggleCategory(category); mobileDrawerOpen = false; }" style="white-space: nowrap; padding: var(--space-1) var(--space-3); border-radius: 9999px; font-size: var(--text-xs); font-weight: var(--font-medium); border: 1px solid @(expandedCategory == category ? "var(--primary)" : "var(--border)"); background-color: @(expandedCategory == category ? "var(--primary)" : "transparent"); color: @(expandedCategory == category ? "var(--primary-foreground)" : "var(--foreground)"); cursor: pointer; font-family: var(--font-sans);">@category</button>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="px-4 py-3 max-h-[70px] overflow-y-auto">
+                    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3" aria-label="Selected build parts">
                         @if (!selectedParts.Any())
                         {
                             <p style="font-size: var(--text-xs); color: var(--muted-foreground); text-align: center; font-style: italic; margin: 0;">No parts selected yet.</p>
@@ -192,20 +182,22 @@
                             {
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                     <span style="font-size: var(--text-xs); color: var(--foreground);">@part.Name</span>
-                                    <button @onclick="() => TogglePart(part)" style="background: none; border: none; cursor: pointer; color: var(--destructive); padding: 0; display: flex;"><LucideIcon Name="x" Size="12" /></button>
+                                    <button type="button"
+                                            @onclick="() => TogglePart(part)"
+                                            aria-label="Remove @part.Name from build"
+                                            class="min-h-[44px] min-w-[44px] shrink-0 flex items-center justify-center border-0 bg-transparent text-destructive cursor-pointer">
+                                        <LucideIcon Name="x" Size="14" />
+                                    </button>
                                 </div>
                             }
                         }
                     </div>
 
-                    <div style="padding: var(--space-4); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-2);">
-                        <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="SendEmailQuote" Disabled="@(isProcessing || !selectedParts.Any())">Send Quote to Email</BbButton>
-                        <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="SubmitBuildToAdmin" Disabled="@(isProcessing || !selectedParts.Any())">Submit Build to Shop</BbButton>
-                    </div>
-
-                    <div style="padding: var(--space-3) var(--space-4); border-top: 1px dashed var(--border);">
-                        <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick='@(() => Nav.NavigateTo("/my-builds", forceLoad: true))'>
-                            <LucideIcon Name="blocks" Size="16" style="margin-right: 6px;" />
+                    <div class="build-mobile-actions">
+                        <BbButton Variant="ButtonVariant.Outline" Class="build-mobile-action" OnClick="SendEmailQuote" Disabled="@(isProcessing || !selectedParts.Any())">Send Quote to Email</BbButton>
+                        <BbButton Variant="ButtonVariant.Default" Class="build-mobile-action" OnClick="SubmitBuildToAdmin" Disabled="@(isProcessing || !selectedParts.Any())">Submit Build to Shop</BbButton>
+                        <BbButton Variant="ButtonVariant.Ghost" Class="build-mobile-action build-mobile-action-secondary" OnClick='@(() => Nav.NavigateTo("/my-builds", forceLoad: true))'>
+                            <LucideIcon Name="blocks" Size="14" style="margin-right: 6px;" />
                             View My Builds
                         </BbButton>
                     </div>
@@ -566,8 +558,33 @@
     @@media (max-width: 767px) {
         .build-mobile-bar { display: flex !important; }
         .build-scroll-area { padding-bottom: 60px !important; }
-        .build-scroll-area.drawer-open { padding-bottom: calc(70vh + 60px) !important; }
-        .build-bottom-drawer { z-index: 10 !important; height: 50vh !important; overflow-y: auto !important; }
+        .build-scroll-area.drawer-open { padding-bottom: calc(55dvh + 60px) !important; }
+        .build-bottom-drawer {
+            z-index: 10 !important;
+            height: clamp(20rem, 55dvh, 28rem) !important;
+            max-height: 55dvh !important;
+            overflow: hidden !important;
+        }
+        .build-mobile-actions {
+            display: flex;
+            flex: none;
+            flex-direction: column;
+            gap: 6px;
+            padding: 12px 16px calc(24px + env(safe-area-inset-bottom));
+            border-top: 1px solid var(--border);
+        }
+        .build-mobile-action {
+            width: 100% !important;
+            min-height: 34px !important;
+            height: 34px !important;
+            padding: 0 12px !important;
+            font-size: 12px !important;
+        }
+        .build-mobile-action-secondary {
+            align-self: center;
+            width: auto !important;
+            min-width: 140px;
+        }
     }
 </style>
 

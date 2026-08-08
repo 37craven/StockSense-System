@@ -74,6 +74,9 @@ public class TransactionHelper
                     var product = productsById[line.ProductId];
                     var grossAmount = product.Price * line.Quantity;
 
+                    if (!product.IsActive)
+                        throw new InvalidOperationException(
+                            $"{product.Name} is inactive and cannot be sold.");
                     if (product.CurrentStock < line.Quantity)
                         throw new InvalidOperationException(
                             $"Insufficient stock for {product.Name}. Available: {product.CurrentStock}, requested: {line.Quantity}.");

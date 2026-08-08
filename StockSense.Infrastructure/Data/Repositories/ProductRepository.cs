@@ -21,6 +21,17 @@ public class ProductRepository
             .ToListAsync();
     }
 
+    public async Task<List<Product>> GetActiveAsync()
+    {
+        return await _context.Products
+            .AsNoTracking()
+            .Include(p => p.Supplier)
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.Category)
+            .ThenBy(p => p.Name)
+            .ToListAsync();
+    }
+
     public async Task<Product?> GetByIdAsync(int id)
     {
         return await _context.Products.FindAsync(id);
@@ -60,5 +71,13 @@ public class ProductRepository
         return await _context.Products
             .Include(p => p.Supplier)
             .FirstOrDefaultAsync(p => p.Barcode == barcode);
+    }
+
+    public async Task<Product?> GetActiveByBarcodeAsync(string barcode)
+    {
+        return await _context.Products
+            .AsNoTracking()
+            .Include(p => p.Supplier)
+            .FirstOrDefaultAsync(p => p.IsActive && p.Barcode == barcode);
     }
 }

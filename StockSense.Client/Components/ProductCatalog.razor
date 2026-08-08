@@ -36,7 +36,7 @@
         }
         else
         {
-            <div class="pc-grid" style="--pc-cols: @Columns;">
+            <div class="pc-grid" style="--pc-cols: @Columns; --pc-column-basis: @GridColumnBasis;">
                 @foreach (var p in FilteredProducts)
                 {
                     var isSelected = IsSelected?.Invoke(p) == true;
@@ -75,36 +75,13 @@
 
     .pc-grid {
         --pc-cols: 7;
+        --pc-column-basis: calc(14.2857% - var(--space-3));
         display: grid;
-        grid-template-columns: repeat(var(--pc-cols), minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, max(8rem, var(--pc-column-basis))), 1fr));
         grid-auto-rows: max-content;
         gap: var(--space-3);
         min-width: 0;
         overflow: auto;
-    }
-
-    @@media (max-width: 1599px) {
-        .pc-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-    }
-
-    @@media (max-width: 1399px) {
-        .pc-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-    }
-
-    @@media (max-width: 1199px) {
-        .pc-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    }
-
-    @@media (max-width: 1023px) {
-        .pc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    }
-
-    @@media (max-width: 767px) {
-        .pc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    @@media (max-width: 639px) {
-        .pc-grid { grid-template-columns: minmax(0, 1fr); }
     }
 </style>
 
@@ -115,6 +92,7 @@
     [Parameter] public int Columns { get; set; } = 7;
     [Parameter] public bool ShowCheckbox { get; set; }
     [Parameter] public bool AllowDisabledClick { get; set; }
+    [Parameter] public bool ActiveOnly { get; set; }
     [Parameter] public List<Product>? Products { get; set; }
 
     private List<Product> allProducts = new();
@@ -160,7 +138,9 @@
             {
                 using var scope = ScopeFactory.CreateScope();
                 var repo = scope.ServiceProvider.GetRequiredService<ProductRepository>();
-                allProducts = await repo.GetAllAsync();
+                allProducts = ActiveOnly
+                    ? await repo.GetActiveAsync()
+                    : await repo.GetAllAsync();
             }
             isLoaded = true;
             categories = allProducts
@@ -177,10 +157,14 @@
     }
 
     private IEnumerable<Product> FilteredProducts => allProducts
-        .Where(p => (string.IsNullOrEmpty(selectedCategory) || p.Category == selectedCategory) &&
+        .Where(p => (!ActiveOnly || p.IsActive) &&
+                    (string.IsNullOrEmpty(selectedCategory) || p.Category == selectedCategory) &&
                     (string.IsNullOrWhiteSpace(searchTerm) ||
                     (p.Name != null && p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
                     (p.Brand != null && p.Brand.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))));
+
+    private string GridColumnBasis =>
+        $"calc({100d / Math.Max(1, Columns):0.####}% - var(--space-3))";
 
     private string GetStockColor(Product p) =>
         p.CurrentStock <= 2 ? "#ef4444" :

@@ -442,6 +442,21 @@ input[type="number"] {
     width: 100%;
 }
 
+@media (max-width: 767px) {
+    .apb-left-panel {
+        max-height: none;
+    }
+
+    .apb-motor-section {
+        flex: none;
+    }
+
+    .apb-motor-list {
+        height: 16rem;
+        flex: none;
+    }
+}
+
 @media (min-width: 768px) {
     .apb-modal-body {
         flex-direction: row;

@@ -11,7 +11,7 @@
 
 
 <PageHeader Title="System Management"
-                Subtitle="Manage users, employee roles, and shop mechanics." />
+                Subtitle="Manage users, employees, and shop mechanics." />
 
 @if (!string.IsNullOrWhiteSpace(managementMessage))
 {
@@ -22,9 +22,9 @@
     <div role="alert" style="margin-bottom:var(--space-4);padding:var(--space-3);border:1px solid var(--destructive);border-radius:var(--radius);color:var(--destructive);">@managementError</div>
 }
 
-    @* --- TABS & FILTERS --- *@
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); gap: var(--space-4);">
-        <div style="display: flex; gap: var(--space-2);">
+    @* --- TABS & PRIMARY ACTION --- *@
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex gap-2 overflow-x-auto">
             <button @onclick='() => currentTab = "Users"'
                     style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "Users" ? "var(--secondary)" : "transparent"); color: @(currentTab == "Users" ? "var(--foreground)" : "var(--muted-foreground)");">
                 Users & Employees
@@ -35,7 +35,21 @@
             </button>
         </div>
 
-
+        @if (currentTab == "Users")
+        {
+            <div class="flex flex-wrap items-center gap-2">
+                <select id="management-role-filter" aria-label="Filter accounts by role" @bind="roleFilter" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="All">All Roles</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Employee">Employee</option>
+                    <option value="Customer">Customer</option>
+                </select>
+                <BbButton Variant="ButtonVariant.Default" @onclick="OpenEmployeeModal" Class="shrink-0">
+                    <LucideIcon Name="id-card-lanyard" Size="16" />
+                    Add Employee
+                </BbButton>
+            </div>
+        }
     </div>
 
 
@@ -43,23 +57,6 @@
 
         @if (currentTab == "Users")
         {
-            <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-4); gap: var(--space-4);">
-                <div style="display: flex; align-items: center; gap: var(--space-3);">
-                    <label style="font-size: var(--text-sm); color: var(--muted-foreground);">Filter:</label>
-                    <select @bind="roleFilter" style="padding: 6px 12px; background: var(--background); color: var(--foreground); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--text-sm);">
-                        <option value="All">All Roles</option>
-                        <option value="Admin">Admins</option>
-                        <option value="Employee">Employees</option>
-                        <option value="Customer">Customers</option>
-                    </select>
-                </div>
-
-                <BbButton Variant="ButtonVariant.Default" @onclick="OpenEmployeeModal">
-                    <LucideIcon Name="id-card-lanyard" Size="16" />
-                    Add Employee
-                </BbButton>
-            </div>
-
             @if (users == null)
             {
                 <LoadingState Description="Loading Personnel..." />
@@ -84,20 +81,7 @@
                                     <div style="color: var(--muted-foreground); font-size: 0.8rem;">@user.Email</div>
                                 </td>
                                 <td style="padding: 12px;">
-                                    @if (user.IsCurrentUser)
-                                    {
-                                        <div><strong>@user.Role</strong><div style="margin-top:3px;color:var(--muted-foreground);font-size:var(--text-xs);">You cannot change your own role.</div></div>
-                                    }
-                                    else
-                                    {
-                                        <select aria-label="Change role for @user.FullName" @onchange="@(e => ChangeUserRole(user, e.Value?.ToString()))"
-                                                disabled="@roleUpdates.Contains(user.Id)"
-                                                style="padding: 6px; background: var(--background); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px;">
-                                            <option value="Customer" selected="@(user.Role == "Customer")">Customer</option>
-                                            <option value="Employee" selected="@(user.Role == "Employee")">Employee</option>
-                                            <option value="Admin" selected="@(user.Role == "Admin")">Admin</option>
-                                        </select>
-                                    }
+                                    <strong>@user.Role</strong>
                                 </td>
                                 <td style="padding: 12px; text-align: center; min-width: 100px;">
                                     @if (user.IsCurrentUser)
@@ -305,13 +289,13 @@
     private string pendingDeleteName = "";
 
     private IEnumerable<UserDto> FilteredUsers => users?
-        .Where(u => roleFilter == "All" || u.Role.Equals(roleFilter, StringComparison.OrdinalIgnoreCase)) ?? Enumerable.Empty<UserDto>();
+        .Where(user => roleFilter == "All" || user.Role.Equals(roleFilter, StringComparison.OrdinalIgnoreCase))
+        ?? Enumerable.Empty<UserDto>();
 
     private bool showEmployeeModal = false;
     private bool showMechanicModal = false;
     private string modalError = "";
     private string managementMessage = "", managementError = "";
-    private readonly HashSet<string> roleUpdates = [];
     private CreateEmployeeDto newEmp = new();
     private string newMechanicName = "";
 
@@ -345,29 +329,6 @@
             if (res.IsSuccessStatusCode) await LoadMechanics();
         }
         pendingDeleteTarget = null;
-    }
-
-    private async Task ChangeUserRole(UserDto user, string? newRole)
-    {
-        if (user.IsCurrentUser || string.IsNullOrEmpty(newRole) || newRole == user.Role || !roleUpdates.Add(user.Id)) return;
-        managementError = managementMessage = "";
-        try
-        {
-            using var response = await Http.PostAsJsonAsync("api/admin/change-role", new { UserId = user.Id, NewRole = newRole });
-            await ApiErrorMessage.EnsureSuccessAsync(response, "The role could not be updated. Please try again.");
-            user.Role = newRole;
-            managementMessage = $"Role updated for {user.FullName}.";
-        }
-        catch (Exception ex)
-        {
-            managementError = ApiErrorMessage.FromException(ex, "The role could not be updated. Please try again.");
-            try { await LoadUsers(); }
-            catch { managementError += " Reload the page to refresh the user list."; }
-        }
-        finally
-        {
-            roleUpdates.Remove(user.Id);
-        }
     }
 
     private async Task ToggleBlockUser(UserDto user)

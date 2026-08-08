@@ -33,6 +33,7 @@
     <div class="pos-catalog flex-1 min-w-0 overflow-hidden bg-card border border-border rounded-lg flex flex-col"
          style="@(scannerEnabled ? "padding-bottom: 360px" : "padding-bottom: 56px")">
         <ProductCatalog @ref="catalog"
+                        ActiveOnly="true"
                         OnProductClick="AddToCart"
                         IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
     </div>
@@ -621,7 +622,7 @@
         if (scannedProduct != null && scannedProduct.Barcode == barcode)
             return;
 
-        var product = await ProductRepo.GetByBarcodeAsync(barcode);
+        var product = await ProductRepo.GetActiveByBarcodeAsync(barcode);
         scanErrorMessage = product == null ? $"No product found for barcode \"{barcode}\"." : null;
         scannedProduct = product;
         scanQuantity = 1;
@@ -678,7 +679,7 @@
 
     private void ConfirmScannedItem()
     {
-        if (scannedProduct == null || scannedProduct.CurrentStock <= 0) return;
+        if (scannedProduct == null || !scannedProduct.IsActive || scannedProduct.CurrentStock <= 0) return;
         for (var i = 0; i < scanQuantity; i++)
             AddToCart(scannedProduct);
         scannedProduct = null;
@@ -723,7 +724,7 @@
 
     private void AddToCart(Product p)
     {
-        if (p.CurrentStock <= 0) return;
+        if (!p.IsActive || p.CurrentStock <= 0) return;
         statusMessage = null;
 
         var existing = cart.FirstOrDefault(i => i.ProductId == p.Id);
