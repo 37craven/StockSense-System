@@ -20,7 +20,9 @@
 
         <BbPortalHost />
         <BbDialogProvider />
-        <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" />
+        <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
+        <UnsavedChangesGuard IsDirty="@HasUnsavedBooking"
+                             Message="Your appointment has not been booked. If you leave now, your selected services and schedule will be lost." />
 
         @if (isLoading)
         {
@@ -231,11 +233,17 @@
                                                 @foreach (var cat in service.ProductCategories)
                                                 {
                                                     var picked = service.PickedProducts.GetValueOrDefault(cat);
+                                                    var hasAvailableProduct = HasAvailableProduct(service, cat);
                                                     <button @onclick="() => OpenProductModal(service, cat)"
                                                             disabled="@(!service.IsSelected)"
+                                                            aria-label="@GetPartSelectorAriaLabel(cat, picked, hasAvailableProduct)"
+                                                            title="@(hasAvailableProduct ? $"Choose {cat}" : $"{cat} is out of stock")"
                                                             class="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] border transition-all duration-150 min-h-[44px]"
                                                             style="border-color: @(service.IsSelected ? "var(--primary)" : "var(--border)"); background-color: @(picked != null && service.IsSelected ? "var(--primary)" : "transparent"); color: @(picked != null && service.IsSelected ? "var(--primary-foreground)" : "var(--muted-foreground)"); opacity: @(service.IsSelected ? "1" : "0.5"); pointer-events: @(service.IsSelected ? "auto" : "none");">
-                                                        @cat: @(picked?.Name ?? "Pick...")
+                                                        <span>@cat: @(picked?.Name ?? "Pick...")</span>
+                                                        <span class="font-semibold @(hasAvailableProduct ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")">
+                                                            @(hasAvailableProduct ? "In stock" : "Out of stock")
+                                                        </span>
                                                     </button>
                                                 }
                                             </div>
@@ -511,14 +519,20 @@
                             @foreach (var prod in filtered)
                             {
                                 var isChosen = productModalPicked?.Id == prod.Id;
-                                <label @onclick="() => productModalPicked = prod"
-                                       class="flex items-center gap-3 p-3 rounded-lg cursor-pointer mb-1 transition-all duration-100"
+                                var isAvailable = IsProductAvailableForSlot(prod, productModalService, productModalCategory);
+                                <label @onclick="() => SelectModalProduct(prod)"
+                                       aria-label="@($"{prod.Name}, {(isAvailable ? "in stock" : "out of stock")}")"
+                                       title="@(isAvailable ? "Available to select" : "This product is out of stock")"
+                                       class="flex items-center gap-3 p-3 rounded-lg mb-1 transition-all duration-100 @(isAvailable ? "cursor-pointer" : "cursor-not-allowed opacity-60 bg-muted/50")"
                                        style="background: @(isChosen ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent"); border: 1px solid @(isChosen ? "var(--primary)" : "transparent");">
-                                    <input type="radio" name="product-select" checked="@isChosen"
+                                    <input type="radio" name="product-select" checked="@isChosen" disabled="@(!isAvailable)"
                                            class="pointer-events-none shrink-0" />
                                     <div class="flex-1 min-w-0">
                                         <div class="text-sm font-medium text-foreground">@prod.Name</div>
                                         <div class="text-[10px] text-muted-foreground">@prod.Brand</div>
+                                        <div class="mt-1 text-xs font-semibold @(isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")">
+                                            @(isAvailable ? "In stock" : "Out of stock")
+                                        </div>
                                     </div>
                                     <span class="text-sm font-bold text-primary shrink-0">₱@prod.Price.ToString("N0")</span>
                                 </label>
@@ -598,6 +612,8 @@
     private string? productModalCategory;
     private ServiceOption? productModalService;
     private ProductDto? productModalPicked;
+    private bool HasUnsavedBooking => !showSuccessModal &&
+        (SelectedServices.Any() || currentStep > 1 || newAppt.MotorcycleId.HasValue || !string.IsNullOrWhiteSpace(newAppt.TimeSlot));
 
     private List<(int Number, string Label)> Steps = new()
     {
@@ -617,6 +633,13 @@
 
     private void NextStep()
     {
+        if (HasUnavailableSelectedProduct())
+        {
+            Toast.Warning("One or more selected products are out of stock. Please choose an available product before continuing.", "Selection needs attention");
+            currentStep = 1;
+            return;
+        }
+
         if (CanProceed && currentStep < 4)
         {
             currentStep++;
@@ -819,10 +842,53 @@
 
     private void ConfirmProductSelection()
     {
+        if (productModalPicked != null && !IsProductAvailableForSlot(productModalPicked, productModalService, productModalCategory))
+        {
+            Toast.Warning($"{productModalPicked.Name} is out of stock. Please choose another product.", "Product unavailable");
+            return;
+        }
+
         if (productModalService != null && productModalCategory != null)
             productModalService.PickedProducts[productModalCategory] = productModalPicked;
         showProductModal = false;
     }
+
+    private static bool IsProductAvailable(ProductDto product) => product.IsActive && product.AvailableStock > 0;
+
+    private bool IsProductAvailableForSlot(ProductDto product, ServiceOption? currentService, string? currentCategory)
+    {
+        if (!IsProductAvailable(product)) return false;
+
+        var selectedElsewhere = SelectedServices.Sum(service => service.PickedProducts.Count(entry =>
+            entry.Value?.Id == product.Id &&
+            !(ReferenceEquals(service, currentService) && entry.Key == currentCategory)));
+
+        return selectedElsewhere < product.AvailableStock;
+    }
+
+    private bool HasAvailableProduct(ServiceOption service, string category)
+    {
+        var linkedIds = service.ItemLinkedProductIds.GetValueOrDefault(category) ?? [];
+        return allProductList.Any(product => linkedIds.Contains(product.Id) && IsProductAvailableForSlot(product, service, category));
+    }
+
+    private static string GetPartSelectorAriaLabel(string category, ProductDto? picked, bool hasAvailableProduct) =>
+        $"{category}: {picked?.Name ?? "no product selected"}. {(hasAvailableProduct ? "Products available" : "Out of stock")}.";
+
+    private void SelectModalProduct(ProductDto product)
+    {
+        if (IsProductAvailableForSlot(product, productModalService, productModalCategory)) productModalPicked = product;
+    }
+
+    private bool HasUnavailableSelectedProduct() => SelectedServices
+        .SelectMany(service => service.PickedProducts.Values)
+        .Where(product => product is not null)
+        .GroupBy(product => product!.Id)
+        .Any(group =>
+        {
+            var product = group.First()!;
+            return !product.IsActive || group.Count() > product.AvailableStock;
+        });
 
     private async Task LoadMechanics()
     {
@@ -924,6 +990,12 @@
 
         if (string.IsNullOrEmpty(newAppt.TimeSlot)) { Toast.Warning("Select a time slot."); return; }
 
+        if (HasUnavailableSelectedProduct())
+        {
+            Toast.Error("Insufficient stock. One or more selected products are unavailable. Please choose another product.", "Booking not submitted");
+            currentStep = 1;
+            return;
+        }
         isProcessing = true;
 
         newAppt.AppointmentDate = DateTime.SpecifyKind(newAppt.AppointmentDate.Date, DateTimeKind.Unspecified);
@@ -953,19 +1025,26 @@
             }
             else
             {
-                Toast.Error(await ApiErrorMessage.FromResponseAsync(
+                var error = await ApiErrorMessage.FromResponseAsync(
                     response,
-                    "The appointment could not be booked. Please try again."));
+                    "This appointment could not be booked. Check that the selected products are in stock, then try again.");
+                Toast.Error(ToBookingErrorDescription(error), "Booking not submitted");
             }
         }
         catch (Exception exception)
         {
-            Toast.Error(ApiErrorMessage.FromException(
+            var error = ApiErrorMessage.FromException(
                 exception,
-                "The appointment could not be booked. Please try again."));
+                "This appointment could not be booked. Please check your connection and try again.");
+            Toast.Error(ToBookingErrorDescription(error), "Booking not submitted");
         }
         finally { isProcessing = false; }
     }
+
+    private static string ToBookingErrorDescription(string error) =>
+        error.Contains("stock", StringComparison.OrdinalIgnoreCase)
+            ? "Insufficient stock. One or more selected products are unavailable. Please choose another product."
+            : error;
 
     private void CloseSuccessModal()
     {

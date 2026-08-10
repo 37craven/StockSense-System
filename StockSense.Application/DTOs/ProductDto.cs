@@ -14,6 +14,12 @@ public record ProductDto(
     string? Barcode = null,
     decimal UnitCost = 0m,
     byte[]? RowVersion = null,
-    bool IsActive = true
+    bool IsActive = true,
+    int ReservedStock = 0
 
-);
+)
+{
+    public int AvailableStock => IsActive
+        ? Math.Max(0, CurrentStock - ReservedStock)
+        : 0;
+}

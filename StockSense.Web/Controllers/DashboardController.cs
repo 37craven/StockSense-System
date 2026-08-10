@@ -35,7 +35,10 @@ public class DashboardController : ControllerBase
                 .Where(p => p.CurrentStock <= p.ReorderTarget)
                 .OrderBy(p => p.CurrentStock)
                 .Take(5)
-                .Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? ""))
+                .Select(p => new ProductDto(
+                    p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock,
+                    p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "",
+                    IsActive: p.IsActive, ReservedStock: p.ReservedStock))
                 .ToList()
         };
 

@@ -28,6 +28,10 @@ public interface IOrderSlipWorkflowService
         OrderSlipTransitionCommand command,
         CancellationToken cancellationToken = default);
 
+    Task<OperationResult<OrderSlipDto>> CloseShortAsync(
+        CloseOrderSlipShortCommand command,
+        CancellationToken cancellationToken = default);
+
     Task<OperationResult<OrderSlipDto>> CancelAsync(
         CancelOrderSlipCommand command,
         CancellationToken cancellationToken = default);

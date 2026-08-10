@@ -13,7 +13,13 @@ public class OrderEmailSender
         _config = config;
     }
 
-    public async Task SendEmailWithAttachmentAsync(string toEmail, string subject, string body, byte[] attachment, string fileName)
+    public async Task SendEmailWithAttachmentAsync(
+        string toEmail,
+        string subject,
+        string body,
+        byte[] attachment,
+        string fileName,
+        CancellationToken cancellationToken = default)
     {
         var smtpUser = _config["Smtp:User"];
         if (string.IsNullOrEmpty(smtpUser))
@@ -36,10 +42,10 @@ public class OrderEmailSender
         using var client = new SmtpClient();
         int port = _config.GetValue<int>("Smtp:Port");
 
-        await client.ConnectAsync(_config["Smtp:Host"], port, SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(smtpUser, _config["Smtp:Pass"]);
+        await client.ConnectAsync(_config["Smtp:Host"], port, SecureSocketOptions.StartTls, cancellationToken);
+        await client.AuthenticateAsync(smtpUser, _config["Smtp:Pass"], cancellationToken);
 
-        await client.SendAsync(message);
-        await client.DisconnectAsync(true);
+        await client.SendAsync(message, cancellationToken);
+        await client.DisconnectAsync(true, cancellationToken);
     }
 }

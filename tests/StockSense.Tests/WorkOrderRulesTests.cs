@@ -24,4 +24,23 @@ public sealed class WorkOrderRulesTests
     {
         Assert.NotNull(WorkOrderRules.ValidateStatusTransition(current, target));
     }
+
+    [Theory]
+    [InlineData(WorkOrderStatuses.Pending)]
+    [InlineData(WorkOrderStatuses.Confirmed)]
+    [InlineData(WorkOrderStatuses.Completed)]
+    [InlineData(WorkOrderStatuses.Cancelled)]
+    public void SameStatusTransition_IsRejected(string status)
+    {
+        Assert.NotNull(WorkOrderRules.ValidateStatusTransition(status, status));
+    }
+
+    [Theory]
+    [InlineData("Unknown", WorkOrderStatuses.Pending)]
+    [InlineData(WorkOrderStatuses.Pending, "Unknown")]
+    [InlineData("", "")]
+    public void UnknownStatusTransition_IsRejected(string current, string target)
+    {
+        Assert.NotNull(WorkOrderRules.ValidateStatusTransition(current, target));
+    }
 }

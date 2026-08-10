@@ -1,0 +1,56 @@
+@inject NavigationManager Navigation
+
+<NavigationLock ConfirmExternalNavigation="@IsDirty"
+                OnBeforeInternalNavigation="HandleInternalNavigation" />
+
+<BbDialog @bind-Open="confirmationOpen">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard unsaved changes?</BbDialogTitle>
+            <BbDialogDescription>@Message</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="KeepEditing">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardChanges">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    [Parameter] public bool IsDirty { get; set; }
+    [Parameter] public string Message { get; set; } = "Your changes have not been saved. If you leave now, they will be lost.";
+
+    private bool confirmationOpen;
+    private bool allowNextNavigation;
+    private string? pendingLocation;
+
+    private void HandleInternalNavigation(LocationChangingContext context)
+    {
+        if (!IsDirty || allowNextNavigation)
+        {
+            allowNextNavigation = false;
+            return;
+        }
+
+        context.PreventNavigation();
+        pendingLocation = context.TargetLocation;
+        confirmationOpen = true;
+    }
+
+    private void KeepEditing()
+    {
+        pendingLocation = null;
+        confirmationOpen = false;
+    }
+
+    private void DiscardChanges()
+    {
+        var target = pendingLocation;
+        pendingLocation = null;
+        confirmationOpen = false;
+        if (string.IsNullOrWhiteSpace(target)) return;
+
+        allowNextNavigation = true;
+        Navigation.NavigateTo(target);
+    }
+}

@@ -115,6 +115,7 @@ builder.Services.AddRateLimiter(options =>
 
 // --- 7. ADDITIONAL SERVICES ---
 builder.Services.AddScoped<IPasswordHasher<ApplicationUser>, BCryptPasswordHasher>();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-XSRF-TOKEN";
@@ -141,7 +142,9 @@ builder.Services.AddSingleton<PdfDownloadCache>();
 builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
 builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();
 builder.Services.AddScoped<IWorkOrderCheckoutService, WorkOrderCheckoutService>();
+builder.Services.AddScoped<IAdminPinService, AdminPinService>();
 builder.Services.AddScoped<IMotorCompatibilityLookupService, MotorCompatibilityLookupService>();
+builder.Services.AddScoped<IBuildWorkOrderMutationService, StockSense.Web.Services.BuildWorkOrderMutationService>();
 
 // --- HELPERS (concrete, no interfaces) ---
 builder.Services.AddScoped<OrderSlipHelper>();

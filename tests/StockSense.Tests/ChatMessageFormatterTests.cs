@@ -102,4 +102,54 @@ public sealed class ChatMessageFormatterTests
         Assert.False(list.Ordered);
         Assert.Equal(["Engine oil: 10W-40", "Spark plug: CPR8EA-9"], list.Items);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   \r\n  ")]
+    public void Parse_empty_content_returns_no_blocks(string? content)
+    {
+        Assert.Empty(ChatMessageFormatter.Parse(content));
+    }
+
+    [Theory]
+    [InlineData("1. First\n2. Second")]
+    [InlineData("1) First\n2) Second")]
+    public void Parse_recognizes_ordered_list_variants(string content)
+    {
+        var list = Assert.IsType<ChatListBlock>(Assert.Single(ChatMessageFormatter.Parse(content)));
+        Assert.True(list.Ordered);
+        Assert.Equal(["First", "Second"], list.Items);
+    }
+
+    [Fact]
+    public void Parse_preserves_unclosed_code_fence_as_code_text()
+    {
+        var code = Assert.IsType<ChatCodeBlock>(Assert.Single(ChatMessageFormatter.Parse("```sql\nSELECT * FROM Products")));
+        Assert.Equal("sql", code.Language);
+        Assert.Equal("SELECT * FROM Products", code.Code);
+    }
+
+    [Fact]
+    public void Parse_does_not_promote_malformed_markdown_table()
+    {
+        var blocks = ChatMessageFormatter.Parse("| Product | Stock |\n| -- | nope |\n| Oil | 2 |");
+        Assert.DoesNotContain(blocks, block => block is ChatTableBlock);
+    }
+
+    [Fact]
+    public void Formatter_preserves_links_and_script_payloads_as_plain_text_data()
+    {
+        const string payload = "[click](javascript:alert(1)) <script>steal()</script>";
+        var paragraph = Assert.IsType<ChatParagraphBlock>(Assert.Single(ChatMessageFormatter.Parse(payload)));
+        Assert.Equal(payload, paragraph.Text);
+    }
+
+    [Fact]
+    public void Parse_preserves_unicode_and_emoji()
+    {
+        const string content = "Available: ✅ 油 — ₱334.29";
+        var paragraph = Assert.IsType<ChatParagraphBlock>(Assert.Single(ChatMessageFormatter.Parse(content)));
+        Assert.Equal(content, paragraph.Text);
+    }
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StockSense.Application.DTOs;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
+using System.Security.Claims;
 
 namespace StockSense.Web.Controllers;
 
@@ -24,6 +25,29 @@ public class TransactionController : ControllerBase
         var transactions = await _repo.GetFilteredAsync(type);
         var dtos = transactions.Select(MapToDto).ToList();
         return Ok(dtos);
+    }
+
+    [HttpPost("{id:int}/void")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> VoidTransaction(int id, [FromBody] VoidTransactionRequest request)
+    {
+        var reason = request.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("Please enter a reason for voiding this transaction."));
+        if (reason.Length > 300)
+            return BadRequest(ApiResponse.Error("The void reason must be 300 characters or fewer."));
+
+        var transaction = await _repo.GetByIdWithItemsAsync(id);
+        if (transaction is null) return NotFound(ApiResponse.NotFound("Transaction"));
+        if (transaction.IsVoided)
+            return Conflict(ApiResponse.Error("This transaction has already been voided."));
+        if (transaction.TransactionType != TransactionTypes.Sale ||
+            !transaction.InvoiceNumber.StartsWith("TXN-", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(ApiResponse.Error("Only completed point-of-sale transactions can be voided here."));
+
+        var adminUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        await _repo.VoidSaleAsync(id, reason, adminUserId);
+        return Ok(ApiResponse.Success("The transaction was voided and its stock was restored."));
     }
 
     private static TransactionHistoryDto MapToDto(Transaction t) => new()
@@ -48,4 +72,9 @@ public class TransactionController : ControllerBase
             StockAfter = i.StockAfter
         }).ToList()
     };
+}
+
+public sealed class VoidTransactionRequest
+{
+    public string Reason { get; set; } = string.Empty;
 }

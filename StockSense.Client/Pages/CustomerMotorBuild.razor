@@ -6,6 +6,7 @@
 @using StockSense.Application.DTOs
 @using System.Net.Http.Json
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using BlazorBlueprint.Primitives.Services
@@ -20,7 +21,9 @@
     <Authorized>
         <BbPortalHost />
         <BbDialogProvider />
-        <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" />
+        <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
+        <UnsavedChangesGuard IsDirty="@(selectedParts.Any() || showBookingModal)"
+                             Message="Your build has not been submitted. If you leave now, the selected parts will be lost." />
 
         @if (isLoading)
         {
@@ -430,6 +433,14 @@
                         }
                     </div>
 
+                    @if (!string.IsNullOrWhiteSpace(bookingSubmissionError))
+                    {
+                        <div role="alert" aria-live="assertive" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                            <p class="m-0 font-semibold">Appointment not booked</p>
+                            <p class="m-0 mt-1">@bookingSubmissionError</p>
+                        </div>
+                    }
+
                 </div>
                 <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding-top: var(--space-3); display: flex; justify-content: flex-end; gap: var(--space-2);">
                     <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => showBookingModal = false)">Skip</BbButton>
@@ -614,6 +625,7 @@
 
     private int? bookingMotorcycleId;
     private bool isScheduling;
+    private string? bookingSubmissionError;
 
 
     private string? expandedCategory = null;
@@ -792,11 +804,42 @@
                 selectedMotorcycleId = null;
                 showBuildSuccessModal = true;
             }
-            else { Toast.Error("Failed to submit build."); }
+            else
+            {
+                var errorDetails = await ApiErrorMessage.FromResponseAsync(
+                    response,
+                    "This build could not be submitted. Check that all selected products are in stock, then try again.");
+                var message = response.StatusCode == System.Net.HttpStatusCode.Conflict
+                    ? ToInsufficientStockDescription(errorDetails)
+                    : errorDetails;
+                Toast.Error(message, "Build not submitted");
+            }
         }
-        catch { Toast.Error("Connection error."); }
+        catch (Exception exception)
+        {
+            var message = ApiErrorMessage.FromException(
+                exception,
+                "This build could not be submitted. Please check your connection and try again.");
+            Toast.Error(message, "Build not submitted");
+        }
         finally { isProcessing = false; }
     }
+
+    private static string ToInsufficientStockDescription(string error)
+    {
+        const string marker = "stock for:";
+        var markerIndex = error.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex >= 0)
+        {
+            var detail = error[(markerIndex + marker.Length)..].Trim();
+            return $"Insufficient stock. {RemoveStockQuantities(detail)}";
+        }
+
+        return "Insufficient stock. One or more selected products are unavailable. Please choose other parts or restock them first.";
+    }
+
+    private static string RemoveStockQuantities(string value) =>
+        Regex.Replace(value, @"\s*\(available:\s*\d+,\s*(?:needed|requested):\s*\d+\)", "", RegexOptions.IgnoreCase);
 
     private async Task OpenBookingModal()
     {
@@ -874,6 +917,7 @@
     private async Task ConfirmBooking()
     {
         if (!bookingTime.HasValue) return;
+        bookingSubmissionError = null;
         isScheduling = true;
         try
         {
@@ -894,12 +938,18 @@
             }
             else
             {
-                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not schedule the appointment."));
+                bookingSubmissionError = await ApiErrorMessage.FromResponseAsync(
+                    response,
+                    "This installation appointment could not be booked. Check product availability and try again.");
+                Toast.Error(bookingSubmissionError);
             }
         }
-        catch
+        catch (Exception exception)
         {
-            Toast.Error("Connection error. You can book an appointment later from My Appointments.");
+            bookingSubmissionError = ApiErrorMessage.FromException(
+                exception,
+                "This installation appointment could not be booked. Please check your connection and try again.");
+            Toast.Error(bookingSubmissionError);
         }
         finally { isScheduling = false; }
     }

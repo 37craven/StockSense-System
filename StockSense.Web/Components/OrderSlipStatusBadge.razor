@@ -1,0 +1,16 @@
+@using StockSense.Domain.Entities
+@using StockSense.Web.Helpers
+
+<span class="@CssClass" role="status" aria-label="Order status: @Label">
+    @Label
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = string.Empty;
+
+    private string Label => OrderSlipPresentation.Label(Status);
+
+    private string CssClass => $"order-status-badge {StatusClass}";
+
+    private string StatusClass => OrderSlipPresentation.BadgeClass(Status);
+}

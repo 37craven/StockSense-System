@@ -30,7 +30,8 @@ public class ServicesController : ControllerBase
             EstimatedMinutes = s.EstimatedMinutes, Status = s.Status,
             RequiredProducts = s.RequiredProducts.Select(p => new ProductDto(
                 p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock,
-                p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? ""
+                p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "",
+                IsActive: p.IsActive, ReservedStock: p.ReservedStock
             )).ToList()
         }).ToList();
         return Ok(dtos);
@@ -40,7 +41,10 @@ public class ServicesController : ControllerBase
     public async Task<IActionResult> GetInventory()
     {
         var products = await _productRepo.GetAllAsync();
-        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "")).ToList();
+        var dtos = products.Select(p => new ProductDto(
+            p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock,
+            p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "",
+            IsActive: p.IsActive, ReservedStock: p.ReservedStock)).ToList();
         return Ok(dtos);
     }
 

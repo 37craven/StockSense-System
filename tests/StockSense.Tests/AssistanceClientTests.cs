@@ -39,6 +39,69 @@ public sealed class AssistanceClientTests
         Assert.Equal("first answer", sentHistory[1].GetProperty("content").GetString());
     }
 
+    [Fact]
+    public async Task AskAsync_uses_chat_endpoint_for_trailing_slash_base_url()
+    {
+        var handler = new RecordingHandler();
+        var client = CreateClient(handler, "https://internal.example/chatbot/");
+
+        await client.AskAsync("question", "Customer", [], "corr", default);
+
+        Assert.Equal(new Uri("https://internal.example/chatbot/api/chat"), handler.RequestUri);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task AskAsync_maps_non_success_status_to_safe_upstream_exception(HttpStatusCode status)
+    {
+        var client = CreateClient(new StaticHandler(new HttpResponseMessage(status)));
+
+        await Assert.ThrowsAsync<AssistanceUpstreamException>(() =>
+            client.AskAsync("SECRET PROMPT", "Customer", [], "corr", default));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("{}")]
+    [InlineData("{\"reply\":\"   \"}")]
+    [InlineData("not-json")]
+    public async Task AskAsync_rejects_empty_or_malformed_responses(string body)
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
+        };
+        var client = CreateClient(new StaticHandler(response));
+
+        await Assert.ThrowsAsync<AssistanceUpstreamException>(() =>
+            client.AskAsync("question", "Customer", [], "corr", default));
+    }
+
+    [Fact]
+    public async Task AskAsync_propagates_cancellation_token_to_http_handler()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var client = CreateClient(new CancellationHandler());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            client.AskAsync("question", "Customer", [], "corr", cancellation.Token));
+    }
+
+    [Fact]
+    public async Task AskAsync_requires_a_configured_base_address()
+    {
+        var client = new AssistanceClient(new HttpClient(new RecordingHandler()), NullLogger<AssistanceClient>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.AskAsync("question", "Customer", [], "corr", default));
+    }
+
+    private static AssistanceClient CreateClient(HttpMessageHandler handler, string baseUrl = "https://internal.example/") =>
+        new(new HttpClient(handler) { BaseAddress = new Uri(baseUrl) }, NullLogger<AssistanceClient>.Instance);
+
     private sealed class RecordingHandler : HttpMessageHandler
     {
         public Uri? RequestUri { get; private set; }
@@ -57,5 +120,17 @@ public sealed class AssistanceClientTests
                 Content = new StringContent("{\"reply\":\"answer\"}", Encoding.UTF8, "application/json")
             };
         }
+    }
+
+    private sealed class StaticHandler(HttpResponseMessage response) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(response);
+    }
+
+    private sealed class CancellationHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromCanceled<HttpResponseMessage>(cancellationToken);
     }
 }

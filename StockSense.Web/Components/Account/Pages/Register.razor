@@ -67,9 +67,25 @@
 
             <div style="margin-bottom: var(--space-6);">
                 <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Password</label>
-                <InputText type="password" @bind-Value="Input.Password"
-                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
-                           autocomplete="new-password" aria-required="true" placeholder="password" />
+                <div class="relative">
+                    <InputText id="register-password" class="password-with-toggle" type="password" @bind-Value="Input.Password"
+                               style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                               autocomplete="new-password" aria-required="true" placeholder="password" />
+                    <button type="button"
+                            class="password-toggle-button"
+                            data-password-toggle
+                            data-password-target="register-password"
+                            aria-controls="register-password"
+                            aria-label="Show password"
+                            aria-pressed="false">
+                        <span data-password-icon-show aria-hidden="true">
+                            <LucideIcon Name="eye" Size="18" />
+                        </span>
+                        <span class="hidden" data-password-icon-hide aria-hidden="true">
+                            <LucideIcon Name="eye-off" Size="18" />
+                        </span>
+                    </button>
+                </div>
                 <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
                     <ValidationMessage For="() => Input.Password" />
                 </div>
@@ -77,9 +93,25 @@
 
             <div style="margin-bottom: var(--space-6);">
                 <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Confirm Password</label>
-                <InputText type="password" @bind-Value="Input.ConfirmPassword"
-                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
-                           autocomplete="new-password" aria-required="true" placeholder="confirm password" />
+                <div class="relative">
+                    <InputText id="register-confirm-password" class="password-with-toggle" type="password" @bind-Value="Input.ConfirmPassword"
+                               style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
+                               autocomplete="new-password" aria-required="true" placeholder="confirm password" />
+                    <button type="button"
+                            class="password-toggle-button"
+                            data-password-toggle
+                            data-password-target="register-confirm-password"
+                            aria-controls="register-confirm-password"
+                            aria-label="Show confirm password"
+                            aria-pressed="false">
+                        <span data-password-icon-show aria-hidden="true">
+                            <LucideIcon Name="eye" Size="18" />
+                        </span>
+                        <span class="hidden" data-password-icon-hide aria-hidden="true">
+                            <LucideIcon Name="eye-off" Size="18" />
+                        </span>
+                    </button>
+                </div>
                 <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
                     <ValidationMessage For="() => Input.ConfirmPassword" />
                 </div>

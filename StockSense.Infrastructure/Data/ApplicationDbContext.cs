@@ -26,6 +26,7 @@ namespace StockSense.Infrastructure.Data
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<TransactionItem> TransactionItems { get; set; }
         public DbSet<PinnedSlip> PinnedSlips { get; set; }
+        public DbSet<WorkOrderAudit> WorkOrderAudits { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -53,6 +54,20 @@ namespace StockSense.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(b => b.MotorcycleId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<WorkOrderAudit>(audit =>
+            {
+                audit.Property(value => value.WorkOrderType).HasMaxLength(32).IsRequired();
+                audit.Property(value => value.Action).HasMaxLength(64).IsRequired();
+                audit.Property(value => value.PreviousValue).HasMaxLength(500);
+                audit.Property(value => value.NewValue).HasMaxLength(500);
+                audit.Property(value => value.ActorUserId).HasMaxLength(450).IsRequired();
+                audit.Property(value => value.ActorRole).HasMaxLength(32).IsRequired();
+                audit.Property(value => value.ApproverUserId).HasMaxLength(450);
+                audit.Property(value => value.ApproverEmail).HasMaxLength(256);
+                audit.Property(value => value.Reason).HasMaxLength(500);
+                audit.HasIndex(value => new { value.WorkOrderType, value.WorkOrderId, value.CreatedAt });
+            });
         }
 
 

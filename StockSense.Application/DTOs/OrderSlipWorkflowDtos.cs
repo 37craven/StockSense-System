@@ -140,6 +140,19 @@ public sealed class CancelOrderSlipCommand
     public byte[] RowVersion { get; set; } = [];
 }
 
+public sealed class CloseOrderSlipShortCommand
+{
+    public int OrderSlipId { get; set; }
+    public string? ActingUserId { get; set; }
+    public string? ActorRole { get; set; }
+    public string? AdminUserId { get; set; }
+    public string? AdminPin { get; set; }
+    public string? ApproverUserId { get; set; }
+    public string? ApproverEmail { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public byte[] RowVersion { get; set; } = [];
+}
+
 public sealed class ReceiveOrderSlipCommand
 {
     public int OrderSlipId { get; set; }

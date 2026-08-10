@@ -75,7 +75,7 @@ public class TransactionRepository
         });
     }
 
-    public async Task VoidSaleAsync(int transactionId)
+    public async Task VoidSaleAsync(int transactionId, string? reason = null, string? actorUserId = null)
     {
         var txn = await _context.Transactions
             .Include(t => t.Items)
@@ -93,7 +93,10 @@ public class TransactionRepository
             TransactionType = TransactionTypes.StockCorrection,
             PaymentMethod = "N/A",
             LocationId = txn.LocationId,
-            Remarks = $"Stock restored from voided sale {txn.InvoiceNumber}",
+            UserId = actorUserId,
+            Remarks = string.IsNullOrWhiteSpace(reason)
+                ? $"Stock restored from voided sale {txn.InvoiceNumber}"
+                : $"Stock restored from voided sale {txn.InvoiceNumber}. Reason: {reason.Trim()}",
             TotalAmount = 0,
             IsVoided = false
         };
@@ -119,6 +122,13 @@ public class TransactionRepository
         }
 
         txn.IsVoided = true;
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            var voidRemark = string.IsNullOrWhiteSpace(txn.Remarks)
+                ? $"Voided. Reason: {reason.Trim()}"
+                : $"{txn.Remarks} | Voided. Reason: {reason.Trim()}";
+            txn.Remarks = voidRemark.Length <= 500 ? voidRemark : voidRemark[..500];
+        }
         _context.Transactions.Add(reversal);
         await _context.SaveChangesAsync();
     }

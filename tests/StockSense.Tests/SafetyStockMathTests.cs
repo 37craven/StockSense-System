@@ -183,6 +183,58 @@ public sealed class SafetyStockMathTests
         Assert.Contains("Maximum safety stock", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Calculate_ManualMode_AppliesOverridesAndMaximumStockLevel()
+    {
+        var setting = CreateSetting(leadTimeDays: 7, reviewPeriodDays: 7);
+        setting.CalculationMode = InventoryCalculationModes.Manual;
+        setting.ManualSafetyStock = 12;
+        setting.ManualReorderPoint = 30;
+        setting.MaximumStockLevel = 35;
+
+        var result = SafetyStockMath.Calculate(setting, Repeat(2m, 90), []);
+
+        Assert.Equal(InventoryCalculationStages.Manual, result.Stage);
+        Assert.True(result.ManualOverrideUsed);
+        Assert.Equal(12, result.SafetyStock);
+        Assert.Equal(30, result.ReorderPoint);
+        Assert.Equal(35, result.TargetStock);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ValidateSetting_RejectsNonPositiveMaximumStockLevel(int maximum)
+    {
+        var setting = CreateSetting();
+        setting.MaximumStockLevel = maximum;
+
+        var exception = Assert.Throws<InvalidOperationException>(() => SafetyStockMath.ValidateSetting(setting));
+
+        Assert.Contains("greater than zero", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Calculate_RejectsMaximumStockBelowAppliedReorderPoint()
+    {
+        var setting = CreateSetting(initialWeeklyDemand: 70m);
+        setting.MaximumStockLevel = 10;
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => SafetyStockMath.Calculate(setting, Repeat(0m, 1), []));
+
+        Assert.Contains("lower than", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PopulationStandardDeviation_UsesPopulationDenominator()
+    {
+        Assert.InRange(
+            SafetyStockMath.PopulationStandardDeviation([2m, 4m, 6m]),
+            1.6329m,
+            1.6330m);
+    }
+
     private static ProductInventorySetting CreateSetting(
         decimal initialWeeklyDemand = 0m,
         int leadTimeDays = 7,

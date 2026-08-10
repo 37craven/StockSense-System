@@ -230,26 +230,34 @@
                             <span style="white-space: nowrap;">Builds</span>
                         }
                     </a>
-                    <a href="/admin/transactions" title="Transactions" style="@NavLinkStyle(IsActive("/admin/transactions"), isCollapsed)">
-                        <LucideIcon Name="receipt" Size="16" />
-                        @if (!isCollapsed)
-                        {
-                            <span style="white-space: nowrap;">Transactions</span>
-                        }
-                    </a>
+                    <AuthorizeView Roles="Admin">
+                        <Authorized Context="transactionAdminContext">
+                            <a href="/admin/transactions" title="Transactions" style="@NavLinkStyle(IsActive("/admin/transactions"), isCollapsed)">
+                                <LucideIcon Name="receipt" Size="16" />
+                                @if (!isCollapsed)
+                                {
+                                    <span style="white-space: nowrap;">Transactions</span>
+                                }
+                            </a>
+                        </Authorized>
+                    </AuthorizeView>
 
                     <div style="margin: var(--space-4) 0 var(--space-1) 0; border-top: 1px solid var(--sidebar-border);"></div>
                     @if (!isCollapsed)
                     {
                         <p style="font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--muted-foreground); padding: 0 var(--space-2); margin: var(--space-2) 0 var(--space-1) 0; text-transform: uppercase; letter-spacing: 0.05em;">Inventory</p>
                     }
-                    <a href="/admin/prebuilts" title="Pre-Builts" style="@NavLinkStyle(IsActive("/admin/prebuilts"), isCollapsed)">
-                        <LucideIcon Name="package" Size="16" />
-                        @if (!isCollapsed)
-                        {
-                            <span style="white-space: nowrap;">Pre-Builts</span>
-                        }
-                    </a>
+                    <AuthorizeView Roles="Admin">
+                        <Authorized Context="preBuiltAdminContext">
+                            <a href="/admin/prebuilts" title="Pre-Builts" style="@NavLinkStyle(IsActive("/admin/prebuilts"), isCollapsed)">
+                                <LucideIcon Name="package" Size="16" />
+                                @if (!isCollapsed)
+                                {
+                                    <span style="white-space: nowrap;">Pre-Builts</span>
+                                }
+                            </a>
+                        </Authorized>
+                    </AuthorizeView>
                     <a href="/admin/services" title="Services" style="@NavLinkStyle(IsActive("/admin/services"), isCollapsed)">
                         <LucideIcon Name="wrench" Size="16" />
                         @if (!isCollapsed)

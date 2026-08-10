@@ -35,6 +35,7 @@ public class MechanicsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateMechanic([FromBody] MechanicDto dto)
     {
         var mechanic = new Mechanic { Name = dto.Name, IsActive = dto.IsActive };
@@ -44,6 +45,7 @@ public class MechanicsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateMechanic(int id, [FromBody] MechanicDto dto)
     {
         var existing = await _repo.GetByIdAsync(id);
@@ -57,6 +59,7 @@ public class MechanicsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteMechanic(int id)
     {
         var deleted = await _repo.DeleteAsync(id);

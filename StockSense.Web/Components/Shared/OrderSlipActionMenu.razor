@@ -1,0 +1,60 @@
+@using BlazorBlueprint.Components
+@using BlazorBlueprint.Primitives
+
+<BbDropdownMenu @bind-Open="open">
+    <BbDropdownMenuTrigger>
+        <BbButton Variant="ButtonVariant.Ghost"
+                  Size="ButtonSize.Icon"
+                  Class="order-action-menu-trigger"
+                  aria-label="@Label"
+                  title="More options">
+            <LucideIcon Name="ellipsis" class="h-4 w-4" aria-hidden="true" />
+        </BbButton>
+    </BbDropdownMenuTrigger>
+    <BbDropdownMenuContent Align="PopoverAlign.End" Class="min-w-44">
+        @if (ShowCloseRemaining)
+        {
+            <BbDropdownMenuItem OnClick="OpenCloseRemainingDialog"
+                                CloseOnSelect="true"
+                                Class="order-action-menu-warning">
+                <LucideIcon Name="package-x" class="mr-2 h-4 w-4" aria-hidden="true" />
+                Close remaining
+            </BbDropdownMenuItem>
+        }
+        @if (ShowCancel)
+        {
+            @if (ShowCloseRemaining)
+            {
+                <BbDropdownMenuSeparator />
+            }
+            <BbDropdownMenuItem OnClick="OpenCancelDialog"
+                                CloseOnSelect="true"
+                                Class="order-action-menu-danger">
+                <LucideIcon Name="circle-x" class="mr-2 h-4 w-4" aria-hidden="true" />
+                Cancel order
+            </BbDropdownMenuItem>
+        }
+    </BbDropdownMenuContent>
+</BbDropdownMenu>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "More order options";
+    [Parameter] public bool ShowCloseRemaining { get; set; }
+    [Parameter] public bool ShowCancel { get; set; }
+    [Parameter] public EventCallback OnCloseRemaining { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private bool open;
+
+    private async Task OpenCloseRemainingDialog()
+    {
+        open = false;
+        await OnCloseRemaining.InvokeAsync();
+    }
+
+    private async Task OpenCancelDialog()
+    {
+        open = false;
+        await OnCancel.InvokeAsync();
+    }
+}

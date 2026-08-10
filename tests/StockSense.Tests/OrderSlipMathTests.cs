@@ -39,6 +39,7 @@ public sealed class OrderSlipMathTests
     [InlineData(OrderSlipStatuses.Ordered, true, true)]
     [InlineData(OrderSlipStatuses.PartiallyReceived, true, true)]
     [InlineData(OrderSlipStatuses.Completed, false, false)]
+    [InlineData(OrderSlipStatuses.ClosedShort, false, false)]
     [InlineData(OrderSlipStatuses.Cancelled, false, false)]
     public void StatusClassification_SeparatesDuplicatePreventionFromIncoming(
         string status, bool isOpen, bool countsAsIncoming)
@@ -107,6 +108,7 @@ public sealed class OrderSlipMathTests
     [InlineData(OrderSlipStatuses.Approved, OrderSlipStatuses.Ordered)]
     [InlineData(OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived)]
     [InlineData(OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.Completed)]
+    [InlineData(OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.ClosedShort)]
     public void ValidStatusTransitions_AreAccepted(string current, string target)
     {
         Assert.Null(OrderSlipMath.ValidateTransition(current, target));
@@ -120,6 +122,29 @@ public sealed class OrderSlipMathTests
     public void InvalidStatusTransitions_AreRejected(string current, string target)
     {
         Assert.NotNull(OrderSlipMath.ValidateTransition(current, target));
+    }
+
+    [Theory]
+    [InlineData(10, 0, 4, 6)]
+    [InlineData(0, 8, 3, 5)]
+    [InlineData(5, 0, 7, 0)]
+    public void RemainingQuantity_UsesOrderedQuantityAndNeverGoesNegative(
+        int ordered, int legacy, int received, int expected)
+    {
+        Assert.Equal(expected, OrderSlipMath.CalculateRemainingQuantity(ordered, legacy, received));
+    }
+
+    [Theory]
+    [InlineData(OrderSlipStatuses.PartiallyReceived, true, true, "Supplier cannot fulfill", true)]
+    [InlineData(OrderSlipStatuses.PartiallyReceived, true, true, "", false)]
+    [InlineData(OrderSlipStatuses.Ordered, true, true, "Supplier cannot fulfill", false)]
+    [InlineData(OrderSlipStatuses.PartiallyReceived, false, true, "Supplier cannot fulfill", false)]
+    [InlineData(OrderSlipStatuses.PartiallyReceived, true, false, "Supplier cannot fulfill", false)]
+    public void CloseShort_RequiresPartialReceiptOutstandingItemsAndReason(
+        string status, bool hasReceived, bool hasRemaining, string reason, bool valid)
+    {
+        var error = OrderSlipMath.ValidateCloseShort(status, hasReceived, hasRemaining, reason);
+        Assert.Equal(valid, error is null);
     }
 
     [Fact]

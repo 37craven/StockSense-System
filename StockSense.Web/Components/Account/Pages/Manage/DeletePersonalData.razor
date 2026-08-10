@@ -36,11 +36,27 @@
         {
             <div style="display: flex; flex-direction: column; gap: var(--space-2);">
                 <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Confirm your password</label>
-                <InputText type="password" @bind-Value="Input.Password" autocomplete="current-password" aria-required="true"
-                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                <div class="relative">
+                    <InputText id="delete-account-password" class="password-with-toggle" type="password" @bind-Value="Input.Password" autocomplete="current-password" aria-required="true"
+                               style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                    <button type="button" class="password-toggle-button" data-password-toggle data-password-target="delete-account-password"
+                            aria-controls="delete-account-password" aria-label="Show password" aria-pressed="false">
+                        <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                        <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                    </button>
+                </div>
                 <ValidationMessage For="() => Input.Password" style="font-size: var(--text-sm); color: var(--destructive);" />
             </div>
         }
+
+        <div class="flex flex-col gap-2">
+            <label for="delete-confirmation" class="text-sm font-medium text-foreground">
+                Type <strong>DELETE</strong> to confirm
+            </label>
+            <InputText id="delete-confirmation" @bind-Value="Input.Confirmation" autocomplete="off" aria-required="true"
+                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" />
+            <ValidationMessage For="() => Input.Confirmation" class="text-sm text-destructive" />
+        </div>
 
         <button type="submit"
                 style="width: 100%; padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--destructive); color: var(--destructive-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer;">
@@ -92,5 +108,9 @@
     {
         [DataType(DataType.Password)]
         public string Password { get; set; } = "";
+
+        [Required(ErrorMessage = "Type DELETE to confirm permanent account deletion.")]
+        [RegularExpression("^DELETE$", ErrorMessage = "Type DELETE exactly as shown.")]
+        public string Confirmation { get; set; } = "";
     }
 }

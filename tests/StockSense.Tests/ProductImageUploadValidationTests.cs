@@ -99,6 +99,28 @@ public sealed class ProductImageUploadValidationTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    [Theory]
+    [InlineData("image.gif", "image/gif")]
+    [InlineData("image.txt", "text/plain")]
+    public async Task UploadProductImage_RejectsUnsupportedFileTypes(string fileName, string contentType)
+    {
+        await using var context = CreateContext();
+        var result = await CreateController(context).UploadProductImage(
+            1, FormFile([1, 2, 3], fileName, contentType), "", null!, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task UploadProductImage_RejectsEmptyFile()
+    {
+        await using var context = CreateContext();
+        var result = await CreateController(context).UploadProductImage(
+            1, FormFile([], "empty.png", "image/png"), "", null!, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
     private static FormFile FormFile(byte[] bytes, string fileName, string contentType) =>
         new(new MemoryStream(bytes), 0, bytes.Length, "file", fileName)
         {

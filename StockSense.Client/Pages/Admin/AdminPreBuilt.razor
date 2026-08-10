@@ -13,8 +13,9 @@
 @inject MotorcycleRepository MotorcycleRepo
 @inject ToastService Toast
 
-@attribute [Authorize(Roles = "Employee, Admin")]
+@attribute [Authorize(Roles = "Admin")]
 
+<BbPortalHost />
 
 @* ── Page Header ── *@
 <PageHeader Title="Pre-Built Packages"
@@ -60,7 +61,7 @@ else
 
                     @* Action Buttons *@
                     <div style="display: flex; gap: 4px; flex-shrink: 0;">
-                        <button @onclick="() => ToggleActive(pkg)" title="@(pkg.IsActive ? "Deactivate" : "Activate")"
+                        <button @onclick="() => RequestToggleActive(pkg)" title="@(pkg.IsActive ? "Deactivate" : "Activate")"
                                 style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--border); background: @(pkg.IsActive ? "color-mix(in oklch, var(--success) 12%, transparent)" : "var(--muted)"); color: @(pkg.IsActive ? "var(--success)" : "var(--muted-foreground)"); cursor: pointer;">
                             <LucideIcon Name="@(pkg.IsActive ? "eye" : "eye-off")" Size="14"/>
                         </button>
@@ -151,7 +152,7 @@ else
                             <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@motor.Brand — @motor.Model</div>
                             <div style="font-size: 10px; color: var(--muted-foreground);">Base CC: @motor.BaseCC</div>
                         </div>
-                        <button @onclick="() => DeleteMotorcycle(motor)" style="background: none; border: none; cursor: pointer; color: var(--destructive); padding: 4px; display: flex; flex-shrink: 0;" title="Delete @motor.Brand @motor.Model">
+                        <button @onclick="() => OpenMotorcycleDeleteConfirm(motor)" style="background: none; border: none; cursor: pointer; color: var(--destructive); padding: 4px; display: flex; flex-shrink: 0;" title="Delete @motor.Brand @motor.Model">
                             <LucideIcon Name="trash-2" Size="14"/>
                         </button>
                     </div>
@@ -173,14 +174,19 @@ else
             <BbDialogDescription>This action cannot be undone.</BbDialogDescription>
         </BbDialogHeader>
         
-        <div style="margin: var(--space-4) 0; font-size: var(--text-sm); color: var(--foreground);">
-            Are you sure you want to delete <strong>@packageToDelete?.Name</strong>?
+        <div class="space-y-4 py-4">
+            <p class="text-sm text-muted-foreground">You are about to permanently delete <strong class="text-foreground">@packageToDelete?.Name</strong>.</p>
+            <div class="space-y-2">
+                <label for="package-delete-confirmation" class="text-sm font-medium text-foreground">Type <strong>DELETE</strong> or the package name to continue</label>
+                <input id="package-delete-confirmation" @bind="packageDeleteConfirmation" @bind:event="oninput" autocomplete="off"
+                       class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            </div>
         </div>
         
         <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
             <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDeleteConfirm = false">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmDelete" Disabled="isProcessing"
-                      style="background: var(--destructive); color: var(--destructive-foreground);">
+            <BbButton Variant="ButtonVariant.Default" Class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      OnClick="ConfirmDelete" Disabled="@(!CanDeletePackage || isProcessing)">
                 @if (isProcessing)
                 {
                     <BbSpinner Size="SpinnerSize.Small"/>
@@ -195,8 +201,50 @@ else
     </BbDialogContent>
 </BbDialog>
 
+<BbDialog @bind-Open="showMotorcycleDeleteConfirm">
+    <BbDialogContent Class="w-[min(92vw,26rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Delete motorcycle permanently?</BbDialogTitle>
+            <BbDialogDescription>Packages using this motorcycle may prevent deletion.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="space-y-4 py-4">
+            <p class="text-sm text-muted-foreground">Motorcycle: <strong class="text-foreground">@MotorcycleDeleteName</strong></p>
+            <div class="space-y-2">
+                <label for="motorcycle-delete-confirmation" class="text-sm font-medium text-foreground">Type <strong>DELETE</strong> or the motorcycle name to continue</label>
+                <input id="motorcycle-delete-confirmation" @bind="motorcycleDeleteConfirmation" @bind:event="oninput" autocomplete="off"
+                       class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            </div>
+        </div>
+        <div class="flex justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseMotorcycleDeleteConfirm" Disabled="isMotorProcessing">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" Class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      OnClick="ConfirmMotorcycleDelete" Disabled="@(!CanDeleteMotorcycle || isMotorProcessing)">
+                @if (isMotorProcessing) { <BbSpinner Size="SpinnerSize.Small" /> }
+                Delete permanently
+            </BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showDeactivateConfirm">
+    <BbDialogContent Class="w-[min(92vw,26rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Deactivate package?</BbDialogTitle>
+            <BbDialogDescription>Customers will no longer be able to select this package.</BbDialogDescription>
+        </BbDialogHeader>
+        <p class="py-4 text-sm text-muted-foreground">Package: <strong class="text-foreground">@packageToToggle?.Name</strong></p>
+        <div class="flex justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDeactivateConfirm = false">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmDeactivate">Deactivate</BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
+
 @* ── Create / Edit Package Modal ── *@
-<BbDialog @bind-Open="showCreateModal">
+<UnsavedChangesGuard IsDirty="@(showCreateModal && PackageEditorDirty)"
+                     Message="Your pre-built package changes have not been saved. If you leave now, they will be lost." />
+
+<BbDialog Open="showCreateModal" OpenChanged="OnCreateModalOpenChanged">
     <BbDialogContent class="flex flex-col overflow-hidden p-0" Style="max-height: 90dvh; width: 98vw; max-width: 900px;">
 
         <div class="shrink-0 px-5 pt-5">
@@ -296,7 +344,7 @@ else
                 <span class="text-lg font-black text-primary ml-2">₱@CalculateCurrentTotal().ToString("N0")</span>
             </div>
             <div class="flex gap-2">
-                <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showCreateModal = false">Cancel</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestClosePackageEditor">Cancel</BbButton>
                 <BbButton Variant="ButtonVariant.Default" OnClick="SubmitPackage" Disabled="isProcessing">
                     @if (isProcessing)
                     {
@@ -315,10 +363,25 @@ else
     </BbDialogContent>
 </BbDialog>
 
+<BbDialog @bind-Open="showDiscardPackageEditor">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard package changes?</BbDialogTitle>
+            <BbDialogDescription>Your unsaved package information will be lost.</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardPackageEditor = false">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardPackageEditor">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     private bool isLoading = true;
     private bool isProcessing = false;
     private bool showCreateModal = false;
+    private bool showDiscardPackageEditor;
+    private string packageEditorBaseline = "";
     private bool showDeleteConfirm = false;
     private bool isEditMode = false;
     private string errorMessage = string.Empty;
@@ -328,6 +391,9 @@ else
     private List<Motorcycle> motorcycles = new();
     private CreatePreBuiltDto newPackage = new();
     private PreBuiltPackageDto? packageToDelete;
+    private string packageDeleteConfirmation = string.Empty;
+    private PreBuiltPackageDto? packageToToggle;
+    private bool showDeactivateConfirm;
     private int editingPackageId;
 
     private bool showMotorcycleModal = false;
@@ -336,6 +402,20 @@ else
     private string newMotorBrand = string.Empty;
     private string newMotorModel = string.Empty;
     private string newMotorBaseCC = string.Empty;
+    private Motorcycle? motorcycleToDelete;
+    private string motorcycleDeleteConfirmation = string.Empty;
+    private bool showMotorcycleDeleteConfirm;
+    private bool PackageEditorDirty => !string.Equals(packageEditorBaseline, PackageEditorFingerprint(), StringComparison.Ordinal);
+
+    private string PackageEditorFingerprint() => System.Text.Json.JsonSerializer.Serialize(new
+    {
+        newPackage.Name,
+        newPackage.Description,
+        newPackage.MinAddedCC,
+        newPackage.MaxAddedCC,
+        Motors = newPackage.CompatibleMotors.Select(m => new { m.Brand, m.Model, m.StockCC }).ToArray(),
+        Products = newPackage.SelectedProductIds.OrderBy(id => id).ToArray()
+    });
 
     protected override async Task OnInitializedAsync() => await LoadData();
 
@@ -397,6 +477,7 @@ else
         editingPackageId = 0;
         newPackage = new CreatePreBuiltDto();
         errorMessage = string.Empty;
+        packageEditorBaseline = PackageEditorFingerprint();
         showCreateModal = true;
     }
 
@@ -421,24 +502,50 @@ else
             .Where(m => knownMotors.Contains((m.Brand, m.Model, m.StockCC))).ToList();
 
         errorMessage = string.Empty;
+        packageEditorBaseline = PackageEditorFingerprint();
         showCreateModal = true;
+    }
+
+    private Task OnCreateModalOpenChanged(bool open)
+    {
+        if (open) showCreateModal = true;
+        else RequestClosePackageEditor();
+        return Task.CompletedTask;
+    }
+
+    private void RequestClosePackageEditor()
+    {
+        if (PackageEditorDirty) { showDiscardPackageEditor = true; return; }
+        showCreateModal = false;
+    }
+
+    private void DiscardPackageEditor()
+    {
+        showDiscardPackageEditor = false;
+        showCreateModal = false;
     }
 
     private void OpenDeleteConfirm(PreBuiltPackageDto pkg)
     {
         packageToDelete = pkg;
+        packageDeleteConfirmation = string.Empty;
         showDeleteConfirm = true;
     }
 
+    private bool CanDeletePackage => packageToDelete is not null &&
+        (string.Equals(packageDeleteConfirmation.Trim(), "DELETE", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(packageDeleteConfirmation.Trim(), packageToDelete.Name, StringComparison.OrdinalIgnoreCase));
+
     private async Task ConfirmDelete()
     {
-        if (packageToDelete == null) return;
+        if (packageToDelete == null || !CanDeletePackage) return;
         
         isProcessing = true;
         try
         {
             await PreBuiltRepo.DeleteAsync(packageToDelete.Id);
             showDeleteConfirm = false;
+            packageDeleteConfirmation = string.Empty;
             await LoadData();
         }
         catch (Exception ex)
@@ -473,6 +580,26 @@ else
         {
             Console.WriteLine($"Failed to toggle active status: {ex.Message}");
         }
+    }
+
+    private async Task RequestToggleActive(PreBuiltPackageDto pkg)
+    {
+        if (!pkg.IsActive)
+        {
+            await ToggleActive(pkg);
+            return;
+        }
+        packageToToggle = pkg;
+        showDeactivateConfirm = true;
+    }
+
+    private async Task ConfirmDeactivate()
+    {
+        var package = packageToToggle;
+        if (package is null) return;
+        showDeactivateConfirm = false;
+        packageToToggle = null;
+        await ToggleActive(package);
     }
 
     private bool IsMotorSelected(Motorcycle motor)
@@ -513,14 +640,42 @@ else
         }
     }
 
-    private async Task DeleteMotorcycle(Motorcycle motor)
+    private string MotorcycleDeleteName => motorcycleToDelete is null
+        ? string.Empty
+        : $"{motorcycleToDelete.Brand} {motorcycleToDelete.Model}";
+
+    private bool CanDeleteMotorcycle => motorcycleToDelete is not null &&
+        (string.Equals(motorcycleDeleteConfirmation.Trim(), "DELETE", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(motorcycleDeleteConfirmation.Trim(), MotorcycleDeleteName, StringComparison.OrdinalIgnoreCase));
+
+    private void OpenMotorcycleDeleteConfirm(Motorcycle motor)
     {
+        motorcycleToDelete = motor;
+        motorcycleDeleteConfirmation = string.Empty;
+        showMotorcycleDeleteConfirm = true;
+    }
+
+    private void CloseMotorcycleDeleteConfirm()
+    {
+        if (isMotorProcessing) return;
+        showMotorcycleDeleteConfirm = false;
+        motorcycleToDelete = null;
+        motorcycleDeleteConfirmation = string.Empty;
+    }
+
+    private async Task ConfirmMotorcycleDelete()
+    {
+        var motor = motorcycleToDelete;
+        if (motor is null || !CanDeleteMotorcycle) return;
         isMotorProcessing = true;
         motorErrorMessage = string.Empty;
         try
         {
             await MotorcycleRepo.DeleteAsync(motor.Id);
             motorcycles = await MotorcycleRepo.GetAllAsync();
+            showMotorcycleDeleteConfirm = false;
+            motorcycleToDelete = null;
+            motorcycleDeleteConfirmation = string.Empty;
         }
         catch (Exception)
         {
@@ -630,6 +785,7 @@ else
                 await PreBuiltRepo.AddAsync(package);
             }
 
+            packageEditorBaseline = PackageEditorFingerprint();
             showCreateModal = false;
             await LoadData();
         }

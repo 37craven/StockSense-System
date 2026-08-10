@@ -43,6 +43,7 @@ public class PreBuiltController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreatePreBuilt([FromBody] CreatePreBuiltDto dto)
     {
         if (dto.SelectedProductIds == null || !dto.SelectedProductIds.Any())
@@ -66,6 +67,7 @@ public class PreBuiltController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdatePreBuilt(int id, [FromBody] CreatePreBuiltDto dto)
     {
         var package = await _repo.GetByIdAsync(id);
@@ -84,6 +86,7 @@ public class PreBuiltController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeletePreBuilt(int id)
     {
         var package = await _repo.GetByIdAsync(id);
@@ -93,6 +96,7 @@ public class PreBuiltController : ControllerBase
     }
 
     [HttpPatch("{id}/toggle-active")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ToggleActive(int id)
     {
         var package = await _repo.GetByIdAsync(id);

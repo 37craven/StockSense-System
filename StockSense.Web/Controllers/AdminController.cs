@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StockSense.Application.DTOs;
+using StockSense.Application.Interfaces;
 using StockSense.Infrastructure.Data;
 
 namespace StockSense.Web.Controllers
@@ -15,11 +16,43 @@ namespace StockSense.Web.Controllers
         private static readonly string[] AllowedRoles = ["Customer", "Employee", "Admin"];
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext? _context;
+        private readonly IAdminPinService? _adminPinService;
 
-        public AdminController(UserManager<ApplicationUser> userManager, ApplicationDbContext? context = null)
+        public AdminController(
+            UserManager<ApplicationUser> userManager,
+            ApplicationDbContext? context = null,
+            IAdminPinService? adminPinService = null)
         {
             _userManager = userManager;
             _context = context;
+            _adminPinService = adminPinService;
+        }
+
+        [HttpPost("my-pin")]
+        public async Task<IActionResult> SetMyAdminPin(
+            [FromBody] SetAdminPinDto dto,
+            CancellationToken cancellationToken = default)
+        {
+            if (!string.Equals(dto.NewPin, dto.ConfirmPin, StringComparison.Ordinal))
+                return BadRequest(ApiResponse.Error("The new PIN and confirmation do not match."));
+
+            var currentUserId = _userManager.GetUserId(User);
+            if (string.IsNullOrWhiteSpace(currentUserId))
+                return Unauthorized(ApiResponse.Error("Please sign in again to update your admin PIN."));
+
+            if (_adminPinService is null)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    ApiResponse.Error("Admin PIN settings are temporarily unavailable."));
+
+            var result = await _adminPinService.SetPinAsync(
+                currentUserId,
+                dto.CurrentPassword,
+                dto.NewPin,
+                cancellationToken);
+
+            return result.Succeeded
+                ? Ok(ApiResponse.Success("Your admin PIN has been updated."))
+                : BadRequest(ApiResponse.Error(result.Error ?? "Your admin PIN could not be updated."));
         }
 
         [HttpGet("users")]

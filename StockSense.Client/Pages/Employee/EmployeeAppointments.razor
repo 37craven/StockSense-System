@@ -4,12 +4,16 @@
 @using StockSense.Application.DTOs
 @using System.Net.Http.Json
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using StockSense.Client.Layout
 @using BlazorBlueprint.Primitives.Services
 @using StockSense.Domain.Entities
 @using StockSense.Infrastructure.Data.Repositories
 @inject HttpClient Http
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ToastService Toast
 
 @attribute [Authorize(Roles = "Employee, Admin")]
 
@@ -48,9 +52,65 @@
     .appt-actions {
         display: flex;
         gap: 6px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         width: 100%;
     }
+
+    .appt-actions .appt-action-btn {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .appt-card-list { display: none; }
+
+    .appt-card {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+    }
+
+    .appt-card-summary {
+        display: grid;
+        width: 100%;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        padding: 16px;
+        border: 0;
+        background: transparent;
+        color: var(--foreground);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .appt-card-summary:hover { background: color-mix(in oklch, var(--primary) 5%, transparent); }
+    .appt-card-summary:focus-visible { outline: 3px solid color-mix(in srgb, #3b82f6 35%, transparent); outline-offset: -3px; }
+    .appt-card-customer { min-width: 0; }
+    .appt-card-name, .appt-card-email { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .appt-card-name { font-weight: 700; }
+    .appt-card-email { margin-top: 2px; color: var(--muted-foreground); font-size: var(--text-xs); }
+    .appt-card .appointment-status-badge { width: auto; min-width: 96px; align-self: start; white-space: nowrap; }
+
+    .appt-card-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        padding: 0 16px 16px;
+    }
+
+    .appt-card-label { display: block; margin-bottom: 3px; color: var(--muted-foreground); font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+    .appt-card-value { display: block; overflow-wrap: anywhere; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; }
+    .appt-card-services { grid-column: span 2; }
+
+    .appt-card-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        padding: 12px 16px 16px;
+        border-top: 1px solid var(--border);
+    }
+
+    .appt-card-actions .appt-action-btn { width: 100%; min-width: 0; min-height: 42px; }
 
     .appt-action-btn {
         flex: 1 1 78px;
@@ -101,6 +161,11 @@
         }
     }
 
+    @@media (max-width: 1100px) {
+        .appt-table-panel { display: none; }
+        .appt-card-list { display: grid; gap: 12px; }
+    }
+
     @@media (max-width: 1024px) {
         .col-cust {
             width: 30%;
@@ -146,6 +211,12 @@
     }
 
     @@media (max-width: 640px) {
+        .appt-card-summary { padding: 14px; }
+        .appt-card-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 14px 14px; }
+        .appt-card-services { grid-column: 1 / -1; }
+        .appt-card-actions { padding: 12px 14px 14px; }
+        .appt-card-actions .appt-action-btn:only-child { grid-column: 1 / -1; }
+
         .col-cust {
             width: 50%;
         }
@@ -157,6 +228,10 @@
         .col-act {
             width: 50%;
         }
+    }
+
+    @@media (max-width: 420px) {
+        .appt-card-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 </style>
 
@@ -199,7 +274,7 @@
 
         </div>
 
-        <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
+        <div class="appt-table-panel" style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
             <div style="overflow-x: auto;">
                 <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-sm);">
                     <colgroup>
@@ -260,8 +335,7 @@
                                     ₱@appt.TotalAmount.ToString("N2")
                                 </td>
                                 <td style="padding: 12px 16px;" class="col-stat">
-                                    <span style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(appt.Status); color: white; width: 100%;">
-                                        <span style="width: 6px; height: 6px; border-radius: 50%; background: white; opacity: 0.7;"></span>
+                                    <span class="appointment-status-badge @GetStatusClass(appt.Status)" aria-label="Status: @appt.Status">
                                         @appt.Status
                                     </span>
                                 </td>
@@ -277,12 +351,12 @@
                                         {
                                             <button @onclick="@(() => UpdateStatus(appt, "Confirmed"))"
                                                     title="Confirm"
-                                                    class="appt-action-btn" style="background:#10b981;">
+                                                    class="appt-action-btn appointment-action appointment-action--positive">
                                                 Confirm
                                             </button>
-                                            <button @onclick="@(() => UpdateStatus(appt, "Cancelled"))"
+                                            <button @onclick="@(() => RequestPendingCancellation(appt))"
                                                     title="Cancel"
-                                                    class="appt-action-btn" style="background:#ef4444;">
+                                                    class="appt-action-btn appointment-action appointment-action--danger">
                                                 Cancel
                                             </button>
                                         }
@@ -290,20 +364,19 @@
                                         {
                                             <button @onclick="@(() => OpenDetail(appt))"
                                                     title="Checkout"
-                                                    class="appt-action-btn" style="background:#10b981;">
+                                                    class="appt-action-btn appointment-action appointment-action--positive">
                                                 Checkout
                                             </button>
-                                            <button @onclick="@(() => UpdateStatus(appt, "Pending"))"
-                                                    title="Move to Pending"
-                                                    class="appt-action-btn" style="background:#f59e0b;">
-                                                Unconfirm
-                                            </button>
+                                            <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Pending", "Unconfirm appointment"))"
+                                                    title="Move to Pending" class="appt-action-btn appointment-action appointment-action--warning">Unconfirm</button>
+                                            <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Cancelled", "Cancel confirmed appointment"))"
+                                                    title="Cancel" class="appt-action-btn appointment-action appointment-action--danger">Cancel</button>
                                         }
                                         else if (isCompleted || isCancelled)
                                         {
-                                            <button @onclick="@(() => UpdateStatus(appt, "Pending"))"
+                                            <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Pending", "Reopen appointment"))"
                                                     title="Reopen"
-                                                    class="appt-action-btn reopen" style="background:#3b82f6;">
+                                                    class="appt-action-btn reopen appointment-action appointment-action--primary">
                                                 Reopen
                                             </button>
                                         }
@@ -314,6 +387,78 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+        <div class="appt-card-list" aria-label="Appointments">
+            @if (!DisplayAppointments.Any())
+            {
+                <div class="appt-card"><EmptyState Description="No appointments found in this section." Title="" /></div>
+            }
+            @foreach (var appt in DisplayAppointments)
+            {
+                var isPending = appt.Status == "Pending";
+                var isConfirmed = appt.Status == "Confirmed";
+                var isCompleted = appt.Status == "Completed";
+                var isCancelled = appt.Status == "Cancelled";
+
+                <article class="appt-card">
+                    <button type="button" class="appt-card-summary" @onclick="() => OpenDetail(appt)"
+                            aria-label="View details for @appt.CustomerName's appointment">
+                        <span class="appt-card-customer">
+                            <span class="appt-card-name">@appt.CustomerName</span>
+                            @if (!string.IsNullOrWhiteSpace(appt.CustomerEmail))
+                            {
+                                <span class="appt-card-email">@appt.CustomerEmail</span>
+                            }
+                        </span>
+                        <span class="appointment-status-badge @GetStatusClass(appt.Status)" role="status" aria-label="Appointment status: @appt.Status">
+                            @appt.Status
+                        </span>
+                    </button>
+
+                    <div class="appt-card-meta">
+                        <div>
+                            <span class="appt-card-label">Schedule</span>
+                            <span class="appt-card-value">@appt.AppointmentDate.ToString("MMM dd, yyyy") · @appt.TimeSlot</span>
+                        </div>
+                        <div>
+                            <span class="appt-card-label">Duration</span>
+                            <span class="appt-card-value">@appt.DurationMinutes mins</span>
+                        </div>
+                        <div>
+                            <span class="appt-card-label">Total value</span>
+                            <span class="appt-card-value">₱@appt.TotalAmount.ToString("N2")</span>
+                        </div>
+                        <div class="appt-card-services">
+                            <span class="appt-card-label">Services</span>
+                            <span class="appt-card-value">@appt.ServicesRequested</span>
+                        </div>
+                    </div>
+
+                    <div class="appt-card-actions" aria-label="Actions for @appt.CustomerName's appointment">
+                        @if (isPending)
+                        {
+                            <button @onclick="@(() => UpdateStatus(appt, "Confirmed"))"
+                                    title="Confirm" class="appt-action-btn appointment-action appointment-action--positive">Confirm</button>
+                            <button @onclick="@(() => RequestPendingCancellation(appt))"
+                                    title="Cancel" class="appt-action-btn appointment-action appointment-action--danger">Cancel</button>
+                        }
+                        else if (isConfirmed)
+                        {
+                            <button @onclick="@(() => OpenDetail(appt))"
+                                    title="Checkout" class="appt-action-btn appointment-action appointment-action--positive">Checkout</button>
+                            <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Pending", "Unconfirm appointment"))"
+                                    title="Move to Pending" class="appt-action-btn appointment-action appointment-action--warning">Unconfirm</button>
+                            <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Cancelled", "Cancel confirmed appointment"))"
+                                    title="Cancel" class="appt-action-btn appointment-action appointment-action--danger">Cancel</button>
+                        }
+                        else if (isCompleted || isCancelled)
+                        {
+                            <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Pending", "Reopen appointment"))"
+                                    title="Reopen" class="appt-action-btn appointment-action appointment-action--primary">Reopen</button>
+                        }
+                    </div>
+                </article>
+            }
         </div>
         @if (currentTab == "History")
         {
@@ -331,7 +476,7 @@
                     <BbDialogTitle>Appointment Details</BbDialogTitle>
                     @if (selectedAppointment != null)
                     {
-                        <span style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background-color: @GetStatusColor(selectedAppointment.Status); color: white; min-width: 90px;">
+                        <span class="appointment-status-badge @GetStatusClass(selectedAppointment.Status)" aria-label="Status: @selectedAppointment.Status">
                             @selectedAppointment.Status
                         </span>
                     }
@@ -497,25 +642,24 @@
                     <div style="display: flex; gap: 6px;">
                         @if (s.Status == "Pending")
                         {
-                            <BbButton Variant="ButtonVariant.Default" OnClick="@(async () => { await UpdateStatus(s, "Confirmed"); showDetailModal = false; })" Style="background: #10b981; border-color: #10b981;">
+                            <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--positive" OnClick="@(async () => await UpdateStatusFromDetail(s, "Confirmed"))">
                                 Confirm
                             </BbButton>
-                            <BbButton Variant="ButtonVariant.Destructive" OnClick="@(async () => { await UpdateStatus(s, "Cancelled"); showDetailModal = false; })">
+                            <BbButton Variant="ButtonVariant.Destructive" Class="appointment-action appointment-action--danger" OnClick="@(() => RequestPendingCancellation(s))">
                                 Cancel
                             </BbButton>
                         }
                         else if (s.Status == "Confirmed")
                         {
-                            <BbButton Variant="ButtonVariant.Default" OnClick="@(async () => await Complete(s))" Disabled="@isCheckingOut" Style="background: #10b981; border-color: #10b981;">
+                            <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--positive" OnClick="@(() => RequestCompletion(s))" Disabled="@(isCheckingOut || showCompletionConfirmation)">
                                 @(isCheckingOut ? "Processing..." : "Complete")
                             </BbButton>
-                            <BbButton Variant="ButtonVariant.Ghost" OnClick="@(async () => { await UpdateStatus(s, "Pending"); showDetailModal = false; })">
-                                Unconfirm
-                            </BbButton>
+                            <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--warning" OnClick="@(() => RequestRestrictedStatusChange(s, "Pending", "Unconfirm appointment"))">Unconfirm</BbButton>
+                            <BbButton Variant="ButtonVariant.Destructive" Class="appointment-action appointment-action--danger" OnClick="@(() => RequestRestrictedStatusChange(s, "Cancelled", "Cancel confirmed appointment"))">Cancel</BbButton>
                         }
                         else if (s.Status is "Completed" or "Cancelled")
                         {
-                            <BbButton Variant="ButtonVariant.Ghost" OnClick="@(async () => { await UpdateStatus(s, "Pending"); showDetailModal = false; })">
+                            <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--primary" OnClick="@(() => RequestRestrictedStatusChange(s, "Pending", "Reopen appointment"))">
                                 Reopen
                             </BbButton>
                         }
@@ -523,6 +667,115 @@
                 }
             </div>
         }
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showCompletionConfirmation">
+    <BbDialogContent class="w-[min(96vw,30rem)]">
+        <BbDialogHeader>
+            <BbDialogTitle>Complete appointment?</BbDialogTitle>
+            <BbDialogDescription>This will finalize checkout, create the transaction, and mark the appointment as completed.</BbDialogDescription>
+        </BbDialogHeader>
+        @if (completionAppointment is not null)
+        {
+            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg border border-border bg-muted/30 p-4 text-sm" aria-label="Appointment checkout summary">
+                <dt class="text-muted-foreground">Customer</dt><dd class="m-0 text-right font-medium">@completionAppointment.CustomerName</dd>
+                <dt class="text-muted-foreground">Payment</dt><dd class="m-0 text-right font-medium">@checkoutPaymentMethod</dd>
+                <dt class="text-muted-foreground">Reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(checkoutReference) ? "None" : checkoutReference)</dd>
+                <dt class="font-semibold">Total</dt><dd class="m-0 text-right text-lg font-bold text-primary">₱@completionAppointment.TotalAmount.ToString("N2")</dd>
+            </dl>
+        }
+        @if (!string.IsNullOrWhiteSpace(checkoutError))
+        {
+            <p role="alert" class="text-sm text-destructive">@checkoutError</p>
+        }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseCompletionConfirmation" Disabled="@isCheckingOut">Go back</BbButton>
+            <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--positive" OnClick="ConfirmCompletion" Disabled="@(isCheckingOut || completionAppointment is null)">
+                @if (isCheckingOut) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(isCheckingOut ? "Completing..." : "Complete appointment")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showPendingCancellationConfirmation">
+    <BbDialogContent class="w-[min(96vw,28rem)]">
+        <BbDialogHeader>
+            <BbDialogTitle>Cancel pending appointment?</BbDialogTitle>
+            <BbDialogDescription>The appointment will move to history. An admin can reopen it later if needed.</BbDialogDescription>
+        </BbDialogHeader>
+        @if (pendingCancellationAppointment is not null)
+        {
+            <div class="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+                <p class="m-0 font-semibold">@pendingCancellationAppointment.CustomerName</p>
+                <p class="mb-0 mt-1 text-muted-foreground">@pendingCancellationAppointment.AppointmentDate.ToString("MMM dd, yyyy") at @pendingCancellationAppointment.TimeSlot</p>
+            </div>
+        }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="ClosePendingCancellation" Disabled="@isCancellingPending">Keep appointment</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" Class="appointment-action appointment-action--danger" OnClick="ConfirmPendingCancellation" Disabled="@(isCancellingPending || pendingCancellationAppointment is null)">
+                @if (isCancellingPending) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(isCancellingPending ? "Cancelling..." : "Cancel appointment")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showReasonDialog" @bind-Open:after="OnReasonDialogOpenChanged">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>@restrictedActionTitle</BbDialogTitle>
+            <BbDialogDescription>@(isAdmin ? "Provide a reason for the audit log." : "Select the approving admin, then ask them to enter their 6-digit PIN for this one action.")</BbDialogDescription>
+        </BbDialogHeader>
+        @if (!isAdmin)
+        {
+            <label for="appointment-admin-user" class="text-sm font-medium">Approving admin</label>
+            <select id="appointment-admin-user" @bind="restrictedAdminUserId" disabled="@isLoadingAdminOptions"
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-required="true"
+                    aria-describedby="appointment-admin-help">
+                <option value="">@(isLoadingAdminOptions ? "Loading admins..." : "Select an admin")</option>
+                @foreach (var admin in adminOptions)
+                {
+                    <option value="@admin.Id">@admin.DisplayName</option>
+                }
+            </select>
+            @if (!isLoadingAdminOptions && adminOptions.Count == 0)
+            {
+                <p id="appointment-admin-help" role="status" class="text-xs text-destructive">No active admin accounts are available. Ask an administrator to check their account.</p>
+            }
+            else
+            {
+                <p id="appointment-admin-help" class="text-xs text-muted-foreground">Choose the admin who is approving this change.</p>
+            }
+            <label for="appointment-admin-pin" class="text-sm font-medium">Admin PIN</label>
+            <div class="relative">
+                <input id="appointment-admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"
+                       @bind="restrictedAdminPin" maxlength="6" class="password-with-toggle w-full rounded-md border border-input bg-background px-3 py-2 pr-12 text-sm"
+                       aria-required="true" aria-describedby="appointment-pin-help" />
+                <button type="button" class="password-toggle-button" data-password-toggle data-password-target="appointment-admin-pin" data-password-label="Admin PIN"
+                        aria-controls="appointment-admin-pin" aria-label="Show Admin PIN" aria-pressed="false">
+                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                </button>
+            </div>
+            <p id="appointment-pin-help" class="text-xs text-muted-foreground">Enter the admin's 6-digit PIN.</p>
+        }
+        <label for="appointment-change-reason" class="text-sm font-medium">Reason</label>
+        <textarea id="appointment-change-reason" @bind="restrictedReason" rows="4" maxlength="500"
+                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  aria-required="true" placeholder="Explain why this change is needed"></textarea>
+        @if (!string.IsNullOrWhiteSpace(restrictedActionError))
+        {
+            <p role="alert" class="text-sm text-destructive">@restrictedActionError</p>
+        }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseReasonDialog">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmRestrictedStatusChange"
+                      Disabled="@(!CanSubmitRestrictedAction || isChangingRestrictedStatus)">
+                @(isChangingRestrictedStatus ? "Saving..." : "Confirm change")
+            </BbButton>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
@@ -538,12 +791,30 @@
     private string? checkoutReference;
     private string? checkoutError;
     private bool isCheckingOut;
+    private bool showCompletionConfirmation;
+    private AppointmentDto? completionAppointment;
+    private bool showPendingCancellationConfirmation;
+    private AppointmentDto? pendingCancellationAppointment;
+    private bool isCancellingPending;
     private bool isEditingAppointment;
     private List<Product>? allProducts;
     private List<int> editPartIds = new();
     private decimal editPartsTotal;
     private Dictionary<int, decimal> editedPrices = new();
     private bool isProcessingParts;
+    private bool isAdmin;
+    private bool showReasonDialog;
+    private bool isChangingRestrictedStatus;
+    private AppointmentDto? restrictedAppointment;
+    private string restrictedTargetStatus = "";
+    private string restrictedActionTitle = "";
+    private string restrictedReason = "";
+    private string restrictedAdminUserId = "";
+    private string restrictedAdminPin = "";
+    private List<AdminOption> adminOptions = [];
+    private bool isLoadingAdminOptions;
+    private bool restrictedPartsChange;
+    private string? restrictedActionError;
 
     private decimal GetPartPrice(int productId, decimal defaultPrice) =>
         editedPrices.TryGetValue(productId, out var p) ? p : defaultPrice;
@@ -560,6 +831,7 @@
     private async Task BeginEditAppointment()
     {
         if (selectedAppointment == null) return;
+        if (selectedAppointment.Status is "Completed" or "Cancelled") return;
         allProducts = await Http.GetFromJsonAsync<List<Product>>("api/products");
         var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
         var allParts = (breakdown ?? new())
@@ -600,6 +872,18 @@
     private async Task SaveEditAppointment()
     {
         if (selectedAppointment == null) return;
+        if (selectedAppointment.Status is "Completed" or "Cancelled") return;
+        if (selectedAppointment.Status == "Confirmed")
+        {
+            RequestRestrictedPartsChange("Approve appointment parts and prices");
+            return;
+        }
+        await SaveEditAppointmentCore();
+    }
+
+    private async Task SaveEditAppointmentCore()
+    {
+        if (selectedAppointment == null) return;
         isProcessingParts = true;
         try
         {
@@ -625,7 +909,7 @@
             var newTotal = products.Sum(p => p.Price) + breakdown.Sum(s => s.servicePrice);
 
             var response = await Http.PutAsJsonAsync($"api/appointments/{selectedAppointment.Id}/products",
-                new { SelectedProductsJson = updatedJson, TotalAmount = newTotal });
+                new { SelectedProductsJson = updatedJson, TotalAmount = newTotal, AdminUserId = NullIfAdmin(restrictedAdminUserId), AdminPin = NullIfAdmin(restrictedAdminPin), Reason = RestrictedReasonOrNull() });
 
             if (response.IsSuccessStatusCode)
             {
@@ -633,8 +917,17 @@
                 selectedAppointment.TotalAmount = newTotal;
                 isEditingAppointment = false;
             }
+            else
+            {
+                restrictedActionError = await ApiErrorMessage.FromResponseAsync(response,
+                    "The parts could not be updated. Check the admin approval and try again.");
+            }
         }
-        catch { }
+        catch (Exception exception)
+        {
+            restrictedActionError = ApiErrorMessage.FromException(exception,
+                "The parts could not be updated. Please try again.");
+        }
         finally { isProcessingParts = false; }
     }
 
@@ -687,7 +980,32 @@
         return sortAsc ? "▲" : " ▼";
     }
 
-    protected override async Task OnInitializedAsync() => await LoadAppointments();
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdmin = authState.User.IsInRole("Admin");
+        if (!isAdmin)
+            await LoadAdminOptions();
+        await LoadAppointments();
+    }
+
+    private async Task LoadAdminOptions()
+    {
+        isLoadingAdminOptions = true;
+        try
+        {
+            adminOptions = await Http.GetFromJsonAsync<List<AdminOption>>("api/admin-overrides/admins") ?? [];
+        }
+        catch
+        {
+            adminOptions = [];
+            restrictedActionError = "The admin list could not be loaded. Please refresh the page and try again.";
+        }
+        finally
+        {
+            isLoadingAdminOptions = false;
+        }
+    }
 
     private async Task LoadAppointments()
     {
@@ -710,16 +1028,27 @@
         showDetailModal = true;
     }
 
-    private async Task UpdateStatus(AppointmentDto appt, string newStatus)
+    private async Task UpdateStatusFromDetail(AppointmentDto appointment, string newStatus)
     {
-        checkoutError = null;
+        if (await UpdateStatus(appointment, newStatus))
+            showDetailModal = false;
+    }
+
+    private async Task<bool> UpdateStatus(AppointmentDto appt, string newStatus, string? reason = null,
+        string? adminUserId = null, string? adminPin = null)
+    {
         try
         {
-            using var response = await Http.PutAsJsonAsync($"api/appointments/{appt.Id}/status", newStatus);
+            using var response = await Http.PutAsJsonAsync($"api/appointments/{appt.Id}/status",
+                new UpdateWorkOrderStatusDto { Status = newStatus, Reason = reason, AdminUserId = adminUserId, AdminPin = adminPin });
             if (!response.IsSuccessStatusCode)
             {
-                checkoutError = await ApiErrorMessage.FromResponseAsync(response, "The appointment status could not be updated.");
-                return;
+                var fallback = newStatus == "Confirmed"
+                    ? "This appointment cannot be confirmed because one or more selected parts are out of stock. Restock or change the parts, then try again."
+                    : "The appointment could not be updated. Please try again.";
+                var error = await ApiErrorMessage.FromResponseAsync(response, fallback);
+                ShowStatusError(newStatus, error);
+                return false;
             }
 
             appt.Status = newStatus;
@@ -732,10 +1061,127 @@
         }
         catch (Exception exception)
         {
-            checkoutError = ApiErrorMessage.FromException(exception, "The appointment status could not be updated.");
+            var fallback = newStatus == "Confirmed"
+                ? "This appointment could not be confirmed. Check that the selected parts are in stock, then try again."
+                : "The appointment could not be updated. Please try again.";
+            ShowStatusError(newStatus, ApiErrorMessage.FromException(exception, fallback));
+            return false;
         }
-        StateHasChanged();
+        return true;
     }
+
+    private void ShowStatusError(string newStatus, string error)
+    {
+        if (newStatus == "Confirmed" && error.Contains("stock", StringComparison.OrdinalIgnoreCase))
+        {
+            Toast.Error(ToInsufficientStockDescription(error), "Appointment cannot be confirmed");
+            return;
+        }
+
+        var title = newStatus switch
+        {
+            "Confirmed" => "Appointment cannot be confirmed",
+            "Completed" => "Appointment cannot be completed",
+            "Cancelled" => "Appointment cannot be cancelled",
+            "Pending" => "Appointment cannot be reopened",
+            _ => "Appointment cannot be updated"
+        };
+        Toast.Error(error, title);
+    }
+
+    private static string ToInsufficientStockDescription(string error)
+    {
+        const string marker = "stock for:";
+        var markerIndex = error.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex >= 0)
+        {
+            var detail = error[(markerIndex + marker.Length)..].Trim();
+            return $"Insufficient stock. {RemoveStockQuantities(detail)}";
+        }
+
+        return "Insufficient stock. One or more selected products are unavailable. Please update the selected parts or restock them first.";
+    }
+
+    private static string RemoveStockQuantities(string value) =>
+        Regex.Replace(value, @"\s*\(available:\s*\d+,\s*(?:needed|requested):\s*\d+\)", "", RegexOptions.IgnoreCase);
+
+    private void RequestRestrictedStatusChange(AppointmentDto appointment, string targetStatus, string title)
+    {
+        restrictedAppointment = appointment;
+        restrictedPartsChange = false;
+        restrictedTargetStatus = targetStatus;
+        restrictedActionTitle = title;
+        restrictedReason = "";
+        restrictedAdminUserId = "";
+        restrictedAdminPin = "";
+        restrictedActionError = null;
+        showReasonDialog = true;
+    }
+
+    private void CloseReasonDialog()
+    {
+        showReasonDialog = false;
+        restrictedAppointment = null;
+        restrictedReason = "";
+        restrictedAdminUserId = "";
+        restrictedAdminPin = "";
+        restrictedPartsChange = false;
+        restrictedActionError = null;
+    }
+
+    private void OnReasonDialogOpenChanged()
+    {
+        if (!showReasonDialog)
+            CloseReasonDialog();
+    }
+
+    private async Task ConfirmRestrictedStatusChange()
+    {
+        if (restrictedAppointment is null || !CanSubmitRestrictedAction) return;
+        isChangingRestrictedStatus = true;
+        restrictedActionError = null;
+        bool changed;
+        if (restrictedPartsChange)
+        {
+            await SaveEditAppointmentCore();
+            changed = !isEditingAppointment;
+        }
+        else
+        {
+            changed = await UpdateStatus(restrictedAppointment, restrictedTargetStatus, restrictedReason.Trim(),
+                NullIfAdmin(restrictedAdminUserId), NullIfAdmin(restrictedAdminPin));
+        }
+        isChangingRestrictedStatus = false;
+        restrictedAdminPin = "";
+        if (changed)
+        {
+            showDetailModal = false;
+            CloseReasonDialog();
+        }
+        else
+        {
+            restrictedActionError ??= "The change was not approved. Check the details and try again.";
+        }
+    }
+
+    private bool CanSubmitRestrictedAction => !string.IsNullOrWhiteSpace(restrictedReason)
+        && (isAdmin || (!string.IsNullOrWhiteSpace(restrictedAdminUserId) && restrictedAdminPin.Length == 6 && restrictedAdminPin.All(char.IsDigit)));
+
+    private void RequestRestrictedPartsChange(string title)
+    {
+        if (selectedAppointment is null) return;
+        restrictedAppointment = selectedAppointment;
+        restrictedPartsChange = true;
+        restrictedActionTitle = title;
+        restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
+        restrictedActionError = null;
+        showReasonDialog = true;
+    }
+
+    private string? NullIfAdmin(string value) => isAdmin ? null : value.Trim();
+    private string? RestrictedReasonOrNull() => string.IsNullOrWhiteSpace(restrictedReason) ? null : restrictedReason.Trim();
+
+    private sealed record AdminOption(string Id, string DisplayName);
 
     private async Task Complete(AppointmentDto appointment)
     {
@@ -760,6 +1206,8 @@
             appointment.TransactionId = receipt?.Id;
             appointment.InvoiceNumber = receipt?.InvoiceNumber;
             appointment.TotalAmount = receipt?.TotalAmount ?? appointment.TotalAmount;
+            showCompletionConfirmation = false;
+            completionAppointment = null;
             showDetailModal = false;
         }
         catch (Exception exception)
@@ -774,13 +1222,62 @@
         }
     }
 
-    private string GetStatusColor(string status) => status?.ToLower() switch
+    private void RequestCompletion(AppointmentDto appointment)
     {
-        "pending" => "#f59e0b",
-        "confirmed" => "#3b82f6",
-        "completed" => "#10b981",
-        "cancelled" => "#ef4444",
-        _ => "gray"
+        if (isCheckingOut || appointment.Status != "Confirmed") return;
+        checkoutError = null;
+        completionAppointment = appointment;
+        showCompletionConfirmation = true;
+    }
+
+    private void CloseCompletionConfirmation()
+    {
+        if (isCheckingOut) return;
+        checkoutError = null;
+        showCompletionConfirmation = false;
+        completionAppointment = null;
+    }
+
+    private async Task ConfirmCompletion()
+    {
+        if (isCheckingOut || completionAppointment is null) return;
+        await Complete(completionAppointment);
+    }
+
+    private void RequestPendingCancellation(AppointmentDto appointment)
+    {
+        if (appointment.Status != "Pending") return;
+        pendingCancellationAppointment = appointment;
+        showPendingCancellationConfirmation = true;
+    }
+
+    private void ClosePendingCancellation()
+    {
+        if (isCancellingPending) return;
+        showPendingCancellationConfirmation = false;
+        pendingCancellationAppointment = null;
+    }
+
+    private async Task ConfirmPendingCancellation()
+    {
+        if (isCancellingPending || pendingCancellationAppointment is null) return;
+        isCancellingPending = true;
+        var appointment = pendingCancellationAppointment;
+        var changed = await UpdateStatus(appointment, "Cancelled");
+        isCancellingPending = false;
+        if (!changed) return;
+        showPendingCancellationConfirmation = false;
+        pendingCancellationAppointment = null;
+        if (ReferenceEquals(selectedAppointment, appointment)) showDetailModal = false;
+    }
+
+    private static string GetStatusClass(string? status) => status?.ToLowerInvariant() switch
+    {
+        "pending" => "appointment-status--pending",
+        "confirmed" => "appointment-status--confirmed",
+        "completed" => "appointment-status--completed",
+        "cancelled" => "appointment-status--cancelled",
+        _ => "appointment-status--unknown"
     };
 
     private string FormatMechanicName(string? name)

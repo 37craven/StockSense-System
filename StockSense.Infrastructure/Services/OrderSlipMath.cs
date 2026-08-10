@@ -14,6 +14,10 @@ public static class OrderSlipMath
     public static int ResolveOrderedQuantity(int orderedQuantity, int legacyQuantity) =>
         orderedQuantity > 0 ? orderedQuantity : legacyQuantity;
 
+    public static int CalculateRemainingQuantity(
+        int orderedQuantity, int legacyQuantity, int receivedQuantity) =>
+        Math.Max(0, ResolveOrderedQuantity(orderedQuantity, legacyQuantity) - receivedQuantity);
+
     public static string? ValidateReceiptDate(DateTime receivedAt, DateTime? orderedAt, DateTime today)
     {
         if (receivedAt.Date > today.Date) return "Receipt date cannot be in the future.";
@@ -91,16 +95,28 @@ public static class OrderSlipMath
             (OrderSlipStatuses.Ordered, OrderSlipStatuses.Completed) => true,
             (OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.PartiallyReceived) => true,
             (OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.Completed) => true,
+            (OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.ClosedShort) => true,
             _ => false
         };
         return allowed ? null : $"An order slip cannot transition from {currentStatus} to {targetStatus}.";
     }
 
+    public static string? ValidateCloseShort(
+        string status, bool hasReceivedItems, bool hasRemainingItems, string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return "A reason is required to close the remaining order.";
+        if (status != OrderSlipStatuses.PartiallyReceived)
+            return "Only a partially received order can be closed with items outstanding.";
+        if (!hasReceivedItems) return "At least one item must have been received before closing the remaining order.";
+        if (!hasRemainingItems) return "This order has no remaining items to close.";
+        return null;
+    }
+
     public static string? ValidateCancellation(string status, bool hasReceivedItems, string? reason)
     {
         if (string.IsNullOrWhiteSpace(reason)) return "A cancellation reason is required.";
-        if (status is OrderSlipStatuses.Completed or OrderSlipStatuses.Cancelled)
-            return "A completed or cancelled order slip cannot be cancelled.";
+        if (status is OrderSlipStatuses.Completed or OrderSlipStatuses.ClosedShort or OrderSlipStatuses.Cancelled)
+            return "A completed, closed, or cancelled order slip cannot be cancelled.";
         if (status is not (OrderSlipStatuses.Draft or OrderSlipStatuses.Approved
             or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived))
             return $"An order slip with status {status} cannot be cancelled.";

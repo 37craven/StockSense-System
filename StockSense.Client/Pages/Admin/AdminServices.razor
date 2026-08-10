@@ -8,6 +8,11 @@
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
+<BbPortalHost />
+<BbDialogProvider />
+<UnsavedChangesGuard IsDirty="@HasUnsavedChanges"
+                     Message="Your service changes have not been saved. If you leave now, they will be lost." />
+
 <div>
     <PageHeader Title="Service Management"
                 Subtitle="Define generic parts needed per service and link them to inventory products.">
@@ -80,7 +85,7 @@
 @* Modal *@
 @if (showModal && selectedService != null)
 {
-    <div @onclick="CloseModal" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-4);">
+    <div @onclick="RequestCloseModal" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-4);">
         <div @onclick:stopPropagation style="background-color: var(--card); width: 680px; max-width: 100%; max-height: 88vh; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
 
             @* Modal Header *@
@@ -89,7 +94,7 @@
                     <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-2) 0;">@selectedService.Name</h3>
                     <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Define generic items and link them to inventory products.</p>
                 </div>
-                <button @onclick="CloseModal" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: var(--space-1); border-radius: var(--radius); display: flex;">
+                <button @onclick="RequestCloseModal" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: var(--space-1); border-radius: var(--radius); display: flex;">
                     <LucideIcon Name="x" Size="18" />
                 </button>
             </div>
@@ -202,7 +207,7 @@
                            style="width: 80px; padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--text-base);" />
                 </div>
                 <div style="display: flex; gap: var(--space-2);">
-                    <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseModal">Cancel</BbButton>
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestCloseModal">Cancel</BbButton>
                     <BbButton Variant="ButtonVariant.Default" OnClick="SaveItems" Disabled="@isSaving">
                         @if (isSaving)
                         {
@@ -223,14 +228,14 @@
 @* Create Modal *@
 @if (showCreateModal)
 {
-    <div @onclick="() => showCreateModal = false" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-4);">
+    <div @onclick="RequestCloseCreateModal" style="position: fixed; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: var(--space-4);">
         <div @onclick:stopPropagation style="background-color: var(--card); width: 480px; max-width: 100%; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
             <div style="padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
                     <h3 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Create Service</h3>
                     <p style="font-size: var(--text-sm); color: var(--muted-foreground); margin: var(--space-1) 0 0 0;">Add a new service to the catalog.</p>
                 </div>
-                <button @onclick="() => showCreateModal = false" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: var(--space-1); border-radius: var(--radius); display: flex;">
+                <button @onclick="RequestCloseCreateModal" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); padding: var(--space-1); border-radius: var(--radius); display: flex;">
                     <LucideIcon Name="x" Size="18" />
                 </button>
             </div>
@@ -259,7 +264,7 @@
                 </div>
             </div>
             <div style="padding: var(--space-3) var(--space-6); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--space-2);">
-                <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showCreateModal = false">Cancel</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestCloseCreateModal">Cancel</BbButton>
                 <BbButton Variant="ButtonVariant.Default" OnClick="CreateService" Disabled="@(isSaving || string.IsNullOrWhiteSpace(newServiceName))">
                     @if (isSaving)
                     {
@@ -275,6 +280,32 @@
     </div>
 }
 
+<BbDialog @bind-Open="showDiscardModal">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard service changes?</BbDialogTitle>
+            <BbDialogDescription>Your unsaved changes will be lost.</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardModal = false">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardAndCloseModal">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showDiscardCreateModal">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard new service?</BbDialogTitle>
+            <BbDialogDescription>The service information you entered will be lost.</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardCreateModal = false">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardAndCloseCreateModal">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     private List<StoreServiceDto>? services;
     private List<ProductDto>? allProducts;
@@ -288,6 +319,13 @@
     private decimal newServicePrice = 0;
     private int newServiceMinutes = 0;
     private decimal editPrice;
+    private string editBaseline = "";
+    private bool showDiscardModal;
+    private bool showDiscardCreateModal;
+    private bool HasUnsavedChanges => (showModal && IsEditDirty) || (showCreateModal && IsCreateDirty);
+    private bool IsCreateDirty => !string.IsNullOrWhiteSpace(newServiceName) ||
+        !string.Equals(newServiceCategory, "General", StringComparison.Ordinal) || newServicePrice != 0 || newServiceMinutes != 0;
+    private bool IsEditDirty => !string.Equals(editBaseline, EditorFingerprint(), StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(newItemName);
 
     // In-memory store: serviceId -> list of generic items
     private Dictionary<int, List<GenericItem>> serviceItemsMap = new();
@@ -418,8 +456,31 @@
         }
 
         newItemName = "";
+        editBaseline = EditorFingerprint();
         showModal = true;
     }
+
+    private string EditorFingerprint() => JsonSerializer.Serialize(new
+    {
+        Price = editPrice,
+        Items = editingItems.Select(item => new { item.Name, ProductIds = item.LinkedProductIds.OrderBy(id => id).ToArray() }).ToArray()
+    });
+
+    private void RequestCloseModal()
+    {
+        if (IsEditDirty) { showDiscardModal = true; return; }
+        CloseModal();
+    }
+
+    private void DiscardAndCloseModal() { showDiscardModal = false; CloseModal(); }
+
+    private void RequestCloseCreateModal()
+    {
+        if (IsCreateDirty) { showDiscardCreateModal = true; return; }
+        showCreateModal = false;
+    }
+
+    private void DiscardAndCloseCreateModal() { showDiscardCreateModal = false; showCreateModal = false; }
 
     private void CloseModal()
     {
@@ -501,6 +562,7 @@
         }
 
         isSaving = false;
+        editBaseline = EditorFingerprint();
         CloseModal();
     }
 }

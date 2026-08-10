@@ -81,7 +81,7 @@ public sealed class OrderSlipConfiguration : IEntityTypeConfiguration<OrderSlip>
         builder.ToTable("OrderSlips", table =>
         {
             table.HasCheckConstraint("CK_OrderSlips_TotalEstimatedCost", "[TotalEstimatedCost] >= 0");
-            table.HasCheckConstraint("CK_OrderSlips_Status", "[Status] IN ('Draft','Approved','Ordered','PartiallyReceived','Completed','Cancelled')");
+            table.HasCheckConstraint("CK_OrderSlips_Status", "[Status] IN ('Draft','Approved','Ordered','PartiallyReceived','ClosedShort','Completed','Cancelled')");
         });
         builder.Property(slip => slip.OrderSlipNumber).HasMaxLength(80).IsRequired();
         builder.Property(slip => slip.LocationId).HasMaxLength(50).HasDefaultValue(InventoryDefaults.LocationId).IsRequired();

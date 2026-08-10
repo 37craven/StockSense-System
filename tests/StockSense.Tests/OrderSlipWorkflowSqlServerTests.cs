@@ -153,6 +153,85 @@ public sealed class OrderSlipWorkflowSqlServerTests
     }
 
     [SqlServerFact]
+    public async Task CloseShort_PreservesReceivedStockAndClosesOutstandingQuantity()
+    {
+        await using var fixture = await WorkflowFixture.CreateAsync();
+        var ordered = await fixture.CreateOrderedSlipAsync(10);
+        var partial = await fixture.Workflow.ReceiveAsync(fixture.CreateReceiptCommand(ordered, 4));
+        Assert.True(partial.IsSuccess, partial.ErrorMessage);
+
+        fixture.Context.ChangeTracker.Clear();
+        var partialState = await fixture.LoadStateAsync(ordered.OrderSlipId);
+        var closed = await fixture.Workflow.CloseShortAsync(new CloseOrderSlipShortCommand
+        {
+            OrderSlipId = ordered.OrderSlipId,
+            ActingUserId = "employee-closer",
+            ActorRole = "Employee",
+            ApproverUserId = "admin-approver",
+            ApproverEmail = "approver@example.test",
+            Reason = "Supplier confirmed the remaining items will not arrive.",
+            RowVersion = partialState.RowVersion
+        });
+
+        Assert.True(closed.IsSuccess, closed.ErrorMessage);
+        fixture.Context.ChangeTracker.Clear();
+        var final = await fixture.LoadStateAsync(ordered.OrderSlipId);
+        Assert.Equal(14, final.Stock);
+        Assert.Equal(4, final.Received);
+        Assert.Equal(1, final.ReceiptCount);
+        Assert.Equal(OrderSlipStatuses.ClosedShort, final.Status);
+        Assert.NotNull(final.CompletedAt);
+        Assert.False(OrderSlipMath.CountsAsIncoming(final.Status));
+        Assert.Contains("Outstanding", closed.Value!.Remarks, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("6", closed.Value.Remarks, StringComparison.Ordinal);
+        var audit = await fixture.Context.WorkOrderAudits.SingleAsync(value =>
+            value.WorkOrderType == "OrderSlip" && value.WorkOrderId == ordered.OrderSlipId);
+        Assert.Equal("ClosedShort", audit.Action);
+        Assert.Equal("employee-closer", audit.ActorUserId);
+        Assert.Equal("Employee", audit.ActorRole);
+        Assert.Equal("admin-approver", audit.ApproverUserId);
+        Assert.Equal("approver@example.test", audit.ApproverEmail);
+        Assert.Equal("Supplier confirmed the remaining items will not arrive.", audit.Reason);
+    }
+
+    [SqlServerFact]
+    public async Task Draft_CanBeApprovedThenMarkedOrdered_WithActorAndDeliveryDetails()
+    {
+        await using var fixture = await WorkflowFixture.CreateAsync();
+        var draft = await fixture.CreateDraftAsync(10);
+        var expectedDeliveryDate = DateTime.Today.AddDays(5);
+
+        var approved = await fixture.Workflow.ApproveAsync(new OrderSlipTransitionCommand
+        {
+            OrderSlipId = draft.OrderSlipId,
+            TargetStatus = OrderSlipStatuses.Approved,
+            ActingUserId = "admin-reviewer",
+            Remarks = "Supplier and quantities reviewed.",
+            RowVersion = draft.RowVersion
+        });
+        Assert.True(approved.IsSuccess, approved.ErrorMessage);
+        var ordered = await fixture.Workflow.MarkOrderedAsync(new OrderSlipTransitionCommand
+        {
+            OrderSlipId = draft.OrderSlipId,
+            TargetStatus = OrderSlipStatuses.Ordered,
+            ActingUserId = "employee-buyer",
+            ExpectedDeliveryDate = expectedDeliveryDate,
+            RowVersion = approved.Value!.RowVersion
+        });
+
+        Assert.True(ordered.IsSuccess, ordered.ErrorMessage);
+        fixture.Context.ChangeTracker.Clear();
+        var slip = await fixture.Context.OrderSlips.AsNoTracking()
+            .SingleAsync(value => value.Id == draft.OrderSlipId);
+        Assert.Equal(OrderSlipStatuses.Ordered, slip.Status);
+        Assert.Equal("admin-reviewer", slip.ApprovedByUserId);
+        Assert.NotNull(slip.ApprovedAt);
+        Assert.NotNull(slip.OrderedAt);
+        Assert.Equal(expectedDeliveryDate, slip.ExpectedDeliveryDate);
+        Assert.Equal("Supplier and quantities reviewed.", slip.Remarks);
+    }
+
+    [SqlServerFact]
     public async Task RetryingExecutionStrategy_CanCommitWorkflowTransaction()
     {
         await using var fixture = await WorkflowFixture.CreateAsync();

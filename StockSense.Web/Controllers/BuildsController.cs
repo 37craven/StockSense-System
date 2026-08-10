@@ -10,6 +10,7 @@ using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Infrastructure.Data;
+using StockSense.Web.Services;
 
 namespace StockSense.Web.Controllers;
 
@@ -24,6 +25,7 @@ public class BuildsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ILogger<BuildsController> _logger;
     private readonly MotorcycleRepository _motorcycleRepository;
+    private readonly IAdminPinService? _adminPinService;
 
     public BuildsController(
         BuildRequestRepository buildRepo,
@@ -31,12 +33,14 @@ public class BuildsController : ControllerBase
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
         MotorcycleRepository motorcycleRepository,
-        ILogger<BuildsController> logger)
+        ILogger<BuildsController> logger,
+        IAdminPinService? adminPinService = null)
     {
         _buildRepo = buildRepo;
         _checkoutService = checkoutService;
         _userManager = userManager;
         _context = context;
+        _adminPinService = adminPinService;
         _motorcycleRepository = motorcycleRepository;
         _logger = logger;
     }
@@ -73,6 +77,11 @@ public class BuildsController : ControllerBase
         if (activeProducts.Count != distinctProductIds.Count)
             return BadRequest(ApiResponse.Error("One or more selected products are no longer available. Refresh the build page and choose active products."));
 
+        var stockError = await StockAvailabilityValidator.ValidateAsync(
+            _context, selectedProductIds, "build request", HttpContext.RequestAborted);
+        if (stockError is not null)
+            return Conflict(ApiResponse.Error(stockError));
+
         var productsById = activeProducts.ToDictionary(product => product.Id);
         var canonicalParts = selectedProductIds.Select(id => productsById[id]).Select(product => new ProductDto(
             product.Id,
@@ -88,7 +97,8 @@ public class BuildsController : ControllerBase
             product.Barcode,
             product.UnitCost,
             product.RowVersion,
-            product.IsActive)).ToList();
+            product.IsActive,
+            product.ReservedStock)).ToList();
 
         // Preserve the UI's non-product build metadata, but never trust submitted product details or prices.
         canonicalParts.AddRange(submittedParts.Where(part => part.Id <= 0));
@@ -130,7 +140,7 @@ public class BuildsController : ControllerBase
 
     [HttpPut("{id}/status")]
     [Authorize(Roles = "Employee,Admin")]
-    public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateWorkOrderStatusDto request)
     {
         var build = await _context.BuildRequests.FindAsync(id);
         if (build == null) return NotFound(ApiResponse.NotFound("Build"));
@@ -143,14 +153,30 @@ public class BuildsController : ControllerBase
             build.Transaction = txn;
         }
 
-        if (string.Equals(newStatus, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(request.Status, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse.Error("Use the completion checkout endpoint to complete a build."));
 
         var canonicalStatus = new[] { WorkOrderStatuses.Pending, WorkOrderStatuses.Confirmed, WorkOrderStatuses.Cancelled }
-            .SingleOrDefault(value => string.Equals(value, newStatus?.Trim(), StringComparison.OrdinalIgnoreCase));
+            .SingleOrDefault(value => string.Equals(value, request.Status?.Trim(), StringComparison.OrdinalIgnoreCase));
         if (canonicalStatus is null) return BadRequest(ApiResponse.Error("Unsupported build status."));
-        var transitionError = WorkOrderRules.ValidateStatusTransition(build.Status, canonicalStatus);
+        var isAdmin = User.IsInRole("Admin");
+        AdminPinVerificationResult? approval = null;
+        if (!isAdmin && build.Status != WorkOrderStatuses.Pending)
+        {
+            if (_adminPinService is null) return StatusCode(403, ApiResponse.Error("Admin approval is required."));
+            approval = !string.IsNullOrWhiteSpace(request.AdminUserId)
+                ? await _adminPinService.VerifyByUserIdAsync(request.AdminUserId, request.AdminPin ?? "")
+                : await _adminPinService.VerifyAsync(request.AdminEmail ?? "", request.AdminPin ?? "");
+            if (!approval.Succeeded)
+                return StatusCode(approval.LockedUntil.HasValue ? 429 : 403, ApiResponse.Error(approval.Error ?? "Admin approval failed."));
+        }
+        var transitionError = WorkOrderRules.ValidateStatusTransition(build.Status, canonicalStatus, isAdmin || approval?.Succeeded == true);
         if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
+        var reason = request.Reason?.Trim();
+        if (WorkOrderRules.RequiresAdminReason(build.Status, canonicalStatus) && string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("A reason is required for this admin action."));
+        if (reason?.Length > 500)
+            return BadRequest(ApiResponse.Error("The reason cannot exceed 500 characters."));
 
         try
         {
@@ -164,7 +190,9 @@ public class BuildsController : ControllerBase
                 build.CompletedAt = null;
             }
 
+            var previousStatus = build.Status;
             build.Status = canonicalStatus;
+            AddAudit("Build", id, "StatusChanged", previousStatus, canonicalStatus, reason, approval);
             await _context.SaveChangesAsync();
             return Ok(new { message = "Status updated" });
         }
@@ -219,13 +247,27 @@ public class BuildsController : ControllerBase
 
     [HttpPut("{id}/parts")]
     [Authorize(Roles = "Employee,Admin")]
-    public async Task<IActionResult> UpdateParts(int id, [FromBody] List<int> productIds)
+    public async Task<IActionResult> UpdateParts(int id, [FromBody] UpdateBuildPartsDto dto)
     {
+        var productIds = dto.ProductIds;
         var build = await _buildRepo.GetByIdAsync(id);
         if (build == null) return NotFound(ApiResponse.NotFound("Build"));
 
         if (build.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled)
             return BadRequest(ApiResponse.Error("Cannot modify parts on a completed or cancelled build."));
+        AdminPinVerificationResult? approval = null;
+        if (build.Status != WorkOrderStatuses.Pending && !User.IsInRole("Admin"))
+        {
+            if (_adminPinService is null) return StatusCode(403, ApiResponse.Error("Admin approval is required."));
+            approval = !string.IsNullOrWhiteSpace(dto.AdminUserId)
+                ? await _adminPinService.VerifyByUserIdAsync(dto.AdminUserId, dto.AdminPin ?? "")
+                : await _adminPinService.VerifyAsync(dto.AdminEmail ?? "", dto.AdminPin ?? "");
+            if (!approval.Succeeded)
+                return StatusCode(approval.LockedUntil.HasValue ? 429 : 403, ApiResponse.Error(approval.Error ?? "Admin approval failed."));
+        }
+        var reason = dto.Reason?.Trim();
+        if (build.Status != WorkOrderStatuses.Pending && string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("Please provide a reason for this change."));
 
         var products = await _context.Products
             .Include(p => p.Supplier)
@@ -251,6 +293,7 @@ public class BuildsController : ControllerBase
 
         build.SelectedPartsJson = partsJson;
         build.TotalPrice = products.Sum(p => p.Price);
+        AddAudit("Build", id, "PartsChanged", null, string.Join(',', productIds), reason, approval);
         await _buildRepo.SaveChangesAsync();
         return Ok(new { message = "Parts updated.", totalPrice = build.TotalPrice });
     }
@@ -349,5 +392,24 @@ public class BuildsController : ControllerBase
             build.CustomerName = GetFullName(user);
             build.CustomerEmail = user.Email;
         }
+    }
+
+    private void AddAudit(string type, int id, string action, string? previousValue, string? newValue, string? reason,
+        AdminPinVerificationResult? approval = null)
+    {
+        _context.WorkOrderAudits.Add(new WorkOrderAudit
+        {
+            WorkOrderType = type,
+            WorkOrderId = id,
+            Action = action,
+            PreviousValue = previousValue,
+            NewValue = newValue,
+            ActorUserId = HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown",
+            ActorRole = HttpContext?.User.IsInRole("Admin") == true ? "Admin" : "Employee",
+            ApproverUserId = approval?.AdminUserId,
+            ApproverEmail = approval?.AdminEmail,
+            Reason = reason,
+            CreatedAt = DateTime.Now
+        });
     }
 }

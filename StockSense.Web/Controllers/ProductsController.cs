@@ -46,7 +46,7 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<List<ProductDto>>> GetProducts()
     {
         var products = await _productRepo.GetAllAsync();
-        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode, p.UnitCost, p.RowVersion, p.IsActive)).ToList();
+        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode, p.UnitCost, p.RowVersion, p.IsActive, p.ReservedStock)).ToList();
         return Ok(dtos);
     }
 
@@ -58,7 +58,7 @@ public class ProductsController : ControllerBase
 
         var dto = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive);
+            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive, product.ReservedStock);
         return Ok(dto);
     }
 
@@ -122,7 +122,8 @@ public class ProductsController : ControllerBase
 
         var dtoResult = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive);
+            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive,
+            product.ReservedStock);
         return Ok(dtoResult);
     }
 

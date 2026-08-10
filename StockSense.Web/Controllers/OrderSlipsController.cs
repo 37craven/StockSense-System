@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Collections.Concurrent;
+using System.Net.Mail;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,15 +22,24 @@ public sealed class OrderSlipsController : ControllerBase
     private readonly IOrderSlipWorkflowService _workflow;
     private readonly DocumentService _docService;
     private readonly PdfDownloadCache _pdfCache;
+    private readonly OrderEmailSender _orderEmailSender;
     private readonly ILogger<OrderSlipsController> _logger;
+    private readonly IAdminPinService? _adminPinService;
+    // Prevents duplicate dispatches from repeated clicks within this application instance.
+    // The rowversion/status checks remain the cross-instance safety boundary.
+    private static readonly ConcurrentDictionary<int, SemaphoreSlim> DispatchLocks = new();
 
-    public OrderSlipsController(ApplicationDbContext context, IOrderSlipWorkflowService workflow, DocumentService docService, PdfDownloadCache pdfCache, ILogger<OrderSlipsController> logger)
+    public OrderSlipsController(ApplicationDbContext context, IOrderSlipWorkflowService workflow,
+        DocumentService docService, PdfDownloadCache pdfCache, OrderEmailSender orderEmailSender,
+        ILogger<OrderSlipsController> logger, IAdminPinService? adminPinService = null)
     {
         _context = context;
         _workflow = workflow;
         _docService = docService;
         _pdfCache = pdfCache;
+        _orderEmailSender = orderEmailSender;
         _logger = logger;
+        _adminPinService = adminPinService;
     }
 
     [HttpGet]
@@ -87,6 +98,166 @@ public sealed class OrderSlipsController : ControllerBase
         return ToActionResult(await _workflow.CreateManualDraftAsync(command, cancellationToken));
     }
 
+    [HttpPost("{id:int}/approve")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Approve(
+        int id, OrderSlipTransitionCommand command, CancellationToken cancellationToken)
+    {
+        Prepare(command, id, OrderSlipStatuses.Approved);
+        return ToActionResult(await _workflow.ApproveAsync(command, cancellationToken));
+    }
+
+    [HttpPost("{id:int}/mark-ordered")]
+    public IActionResult MarkOrdered(
+        int id, OrderSlipTransitionCommand command, CancellationToken cancellationToken)
+    {
+        return BadRequest(new
+        {
+            error = "Send the approved order to the supplier before marking it as ordered.",
+            code = "SUPPLIER_EMAIL_REQUIRED",
+            nextAction = $"/api/order-slips/{id}/send-to-supplier"
+        });
+    }
+
+    [HttpPost("{id:int}/send-to-supplier")]
+    public async Task<IActionResult> SendToSupplier(
+        int id, OrderSlipTransitionCommand command, CancellationToken cancellationToken)
+    {
+        Prepare(command, id, OrderSlipStatuses.Ordered);
+        var dispatchLock = DispatchLocks.GetOrAdd(id, static _ => new SemaphoreSlim(1, 1));
+        await dispatchLock.WaitAsync(cancellationToken);
+        try
+        {
+            _context.ChangeTracker.Clear();
+            var slip = await _context.OrderSlips.AsNoTracking()
+                .Include(value => value.Supplier)
+                .Include(value => value.Items)
+                .SingleOrDefaultAsync(value => value.Id == id, cancellationToken);
+            if (slip is null)
+                return NotFound(new { error = "Order slip was not found.", code = "NOT_FOUND" });
+            if (slip.Status != OrderSlipStatuses.Approved)
+                return BadRequest(new
+                {
+                    error = "Only an approved order can be sent to its supplier.",
+                    code = "INVALID_STATUS"
+                });
+            if (command.RowVersion.Length == 0 || !command.RowVersion.SequenceEqual(slip.RowVersion))
+                return Conflict(new { error = "This order changed. Reload it and try again.", code = "CONCURRENCY_CONFLICT" });
+            if (slip.Supplier is null || string.IsNullOrWhiteSpace(slip.Supplier.Email)
+                || !IsValidEmail(slip.Supplier.Email))
+                return BadRequest(new
+                {
+                    error = "This supplier does not have a valid email address. Update the supplier first.",
+                    code = "INVALID_SUPPLIER_EMAIL"
+                });
+
+            var dto = ToDto(slip);
+            var pdf = _docService.GenerateOrderSlipPdf(dto);
+            var slipNumber = string.IsNullOrWhiteSpace(dto.OrderSlipNumber) ? dto.SlipNumber : dto.OrderSlipNumber;
+            var subject = $"Purchase Order - {slipNumber}";
+            var body = $"<h3>New Order Request</h3><p>Please find the attached order slip <strong>{slipNumber}</strong>.</p>"
+                + "<p>Kindly review the quantities and notify us once the items are ready for delivery.</p>"
+                + "<p>Regards,<br/>StockSense System</p>";
+            try
+            {
+                await _orderEmailSender.SendEmailWithAttachmentAsync(
+                    slip.Supplier.Email.Trim(), subject, body, pdf, $"Order_{slipNumber}.pdf", cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Sending order slip {OrderSlipId} to its supplier failed.", id);
+                return StatusCode(StatusCodes.Status502BadGateway, new
+                {
+                    error = "The order email could not be sent. Check the supplier email or mail settings, then try again.",
+                    code = "EMAIL_SEND_FAILED"
+                });
+            }
+
+            command.Remarks = string.IsNullOrWhiteSpace(command.Remarks)
+                ? $"Sent to supplier {slip.Supplier.Name}."
+                : command.Remarks;
+            var transition = await _workflow.MarkOrderedAsync(command, cancellationToken);
+            if (!transition.IsSuccess)
+            {
+                _logger.LogError(
+                    "Order slip {OrderSlipId} email was sent, but its Ordered transition failed with {ErrorCode}.",
+                    id, transition.ErrorCode);
+                return Conflict(new
+                {
+                    error = "The email was sent, but the order status could not be updated. Reload the order before taking another action.",
+                    code = "EMAIL_SENT_STATUS_CONFLICT"
+                });
+            }
+            return Ok(transition.Value);
+        }
+        finally
+        {
+            dispatchLock.Release();
+        }
+    }
+
+    [HttpPost("{id:int}/close-remaining")]
+    public async Task<IActionResult> CloseRemaining(
+        int id, CloseOrderSlipShortCommand command, CancellationToken cancellationToken)
+    {
+        command.OrderSlipId = id;
+        command.ActingUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(command.ActingUserId))
+            return Unauthorized(new { error = "Please sign in again before closing this order.", code = "USER_ID_REQUIRED" });
+        command.ActorRole = User.IsInRole("Admin") ? "Admin" : "Employee";
+        command.ApproverUserId = null;
+        command.ApproverEmail = null;
+
+        if (string.IsNullOrWhiteSpace(command.Reason))
+            return BadRequest(new
+            {
+                error = "Please enter a reason for closing the remaining order.",
+                code = "CLOSE_REASON_REQUIRED"
+            });
+        if (command.Reason.Trim().Length > 500)
+            return BadRequest(new
+            {
+                error = "The reason cannot exceed 500 characters.",
+                code = "CLOSE_REASON_TOO_LONG"
+            });
+
+        if (!User.IsInRole("Admin"))
+        {
+            if (_adminPinService is null)
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    error = "Admin approval is required to close the remaining order.",
+                    code = "ADMIN_APPROVAL_REQUIRED"
+                });
+
+            var approval = await _adminPinService.VerifyByUserIdAsync(
+                command.AdminUserId ?? string.Empty,
+                command.AdminPin ?? string.Empty,
+                cancellationToken);
+            if (!approval.Succeeded)
+                return StatusCode(
+                    approval.LockedUntil.HasValue
+                        ? StatusCodes.Status429TooManyRequests
+                        : StatusCodes.Status403Forbidden,
+                    new
+                    {
+                        error = approval.Error ?? "Admin approval failed.",
+                        code = "ADMIN_APPROVAL_FAILED"
+                    });
+
+            command.ApproverUserId = approval.AdminUserId;
+            command.ApproverEmail = approval.AdminEmail;
+        }
+
+        command.Reason = command.Reason.Trim();
+        command.AdminPin = null;
+        return ToActionResult(await _workflow.CloseShortAsync(command, cancellationToken));
+    }
+
     [HttpPost("{id:int}/cancel")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Cancel(int id, CancelOrderSlipCommand command, CancellationToken cancellationToken)
@@ -110,6 +281,12 @@ public sealed class OrderSlipsController : ControllerBase
         command.OrderSlipId = id;
         command.TargetStatus = status;
         command.ActingUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    private static bool IsValidEmail(string value)
+    {
+        try { return new MailAddress(value.Trim()).Address == value.Trim(); }
+        catch (FormatException) { return false; }
     }
 
     private IActionResult ToActionResult<T>(OperationResult<T> result)

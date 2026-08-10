@@ -55,6 +55,7 @@ public class OrderSlipRepository
     {
         return await _context.OrderSlips.CountAsync(
             s => s.Status != OrderSlipStatuses.Completed
+                 && s.Status != OrderSlipStatuses.ClosedShort
                  && s.Status != OrderSlipStatuses.Cancelled,
             cancellationToken);
     }

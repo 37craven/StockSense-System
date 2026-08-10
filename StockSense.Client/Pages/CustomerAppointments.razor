@@ -69,14 +69,9 @@
 
                         </div>
 
-                        @* Status badge with original solid background + small circle *@
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white shrink-0"
-                              style="background-color: @GetStatusColor(appt.Status);">
-
-                            <span class="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>
-
+                        <span class="appointment-status-badge @GetStatusClass(appt.Status) shrink-0"
+                              aria-label="Status: @appt.Status">
                             @appt.Status
-
                         </span>
 
                     </div>
@@ -97,7 +92,7 @@
                                  appt.CreatedAt > DateTime.UtcNow.AddMinutes(-30))
                             {
                                 <button @onclick="() => CancelAppointment(appt)"
-                                        class="text-[10px] font-semibold text-destructive border border-destructive/40 rounded-md px-2 py-0.5 hover:bg-destructive/10 transition-colors">
+                                        class="appointment-action appointment-action--danger rounded-md px-2 py-0.5 text-[10px] font-semibold">
                                     Cancel
                                 </button>
                             }
@@ -216,6 +211,15 @@
             "Cancelled" => "#ef4444",
             _ => "#888888"
         };
+
+    private static string GetStatusClass(string? status) => status switch
+    {
+        "Pending" => "appointment-status--pending",
+        "Confirmed" => "appointment-status--confirmed",
+        "Completed" => "appointment-status--completed",
+        "Cancelled" => "appointment-status--cancelled",
+        _ => "appointment-status--unknown"
+    };
 
 
     private async Task CancelAppointment(AppointmentDto appt)

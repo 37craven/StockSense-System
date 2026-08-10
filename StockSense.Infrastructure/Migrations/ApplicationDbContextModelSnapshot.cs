@@ -579,7 +579,7 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.ToTable("OrderSlips", null, t =>
                         {
-                            t.HasCheckConstraint("CK_OrderSlips_Status", "[Status] IN ('Draft','Approved','Ordered','PartiallyReceived','Completed','Cancelled')");
+                            t.HasCheckConstraint("CK_OrderSlips_Status", "[Status] IN ('Draft','Approved','Ordered','PartiallyReceived','ClosedShort','Completed','Cancelled')");
 
                             t.HasCheckConstraint("CK_OrderSlips_TotalEstimatedCost", "[TotalEstimatedCost] >= 0");
                         });
@@ -1374,6 +1374,67 @@ namespace StockSense.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("StockSense.Domain.Entities.WorkOrderAudit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ApproverEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ApproverUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("PreviousValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("WorkOrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("WorkOrderType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkOrderType", "WorkOrderId", "CreatedAt");
+
+                    b.ToTable("WorkOrderAudits");
+                });
+
             modelBuilder.Entity("StockSense.Infrastructure.Data.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
@@ -1381,6 +1442,15 @@ namespace StockSense.Infrastructure.Migrations
 
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("int");
+
+                    b.Property<int>("AdminPinFailedAccessCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AdminPinHash")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("AdminPinLockoutEnd")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()

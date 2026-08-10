@@ -84,7 +84,7 @@
                         </div>
                     </div>
                     @CheckoutFields("desktop")
-                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="Checkout" Disabled="@isProcessing">
+                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="() => OpenCheckoutConfirmation(false)" Disabled="@(isProcessing || checkoutConfirmationOpen)">
                         @if (isProcessing)
                         {
                             <BbSpinner Size="SpinnerSize.Small" />
@@ -185,7 +185,7 @@
                     </div>
                 </div>
                 @CheckoutFields("mobile")
-                <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="CheckoutFromModal" Disabled="@(isProcessing || !cart.Any())">
+                <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="() => OpenCheckoutConfirmation(true)" Disabled="@(isProcessing || checkoutConfirmationOpen || !cart.Any())">
                     @if (isProcessing)
                     {
                         <BbSpinner Size="SpinnerSize.Small" />
@@ -199,6 +199,51 @@
                 </BbButton>
             </div>
         }
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="checkoutConfirmationOpen">
+    <BbDialogContent class="flex max-h-[90dvh] w-[min(96vw,34rem)] flex-col overflow-hidden">
+        <BbDialogHeader>
+            <BbDialogTitle>Confirm sale</BbDialogTitle>
+            <BbDialogDescription>Review this payment before recording the sale. Inventory and transaction records will be updated.</BbDialogDescription>
+        </BbDialogHeader>
+
+        <div class="min-h-0 space-y-4 overflow-y-auto" aria-label="Sale summary">
+            <div class="rounded-lg border border-border bg-muted/30">
+                @foreach (var item in cart)
+                {
+                    <div class="flex items-start justify-between gap-4 border-b border-border px-3 py-2 last:border-b-0">
+                        <div class="min-w-0">
+                            <p class="m-0 truncate text-sm font-medium text-foreground">@item.ProductName</p>
+                            <p class="m-0 text-xs text-muted-foreground">@item.Quantity × ₱@item.Price.ToString("N2")</p>
+                        </div>
+                        <span class="shrink-0 text-sm font-semibold">₱@((item.Price * item.Quantity).ToString("N2"))</span>
+                    </div>
+                }
+            </div>
+            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt class="text-muted-foreground">Items</dt><dd class="m-0 text-right font-medium">@cart.Sum(item => item.Quantity)</dd>
+                <dt class="text-muted-foreground">Payment</dt><dd class="m-0 text-right font-medium">@paymentMethod</dd>
+                <dt class="text-muted-foreground">Reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(referenceNumber) ? "None" : referenceNumber)</dd>
+                <dt class="text-base font-semibold">Total</dt><dd class="m-0 text-right text-lg font-bold text-primary">₱@TotalAmount.ToString("N2")</dd>
+            </dl>
+        </div>
+
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelCheckoutConfirmation" Disabled="@isProcessing">Go back</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmCheckout" Disabled="@(isProcessing || !cart.Any())">
+                @if (isProcessing)
+                {
+                    <BbSpinner Size="SpinnerSize.Small" />
+                    <span>Recording sale...</span>
+                }
+                else
+                {
+                    <span>Record sale · ₱@TotalAmount.ToString("N2")</span>
+                }
+            </BbButton>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
@@ -751,9 +796,27 @@
         item.Quantity++;
     }
 
-    private async Task CheckoutFromModal()
+    private bool checkoutConfirmationOpen;
+    private bool checkoutConfirmationFromMobile;
+
+    private void OpenCheckoutConfirmation(bool fromMobile)
     {
-        cartModalOpen = false;
+        if (isProcessing || !cart.Any()) return;
+        checkoutConfirmationFromMobile = fromMobile;
+        if (fromMobile) cartModalOpen = false;
+        checkoutConfirmationOpen = true;
+    }
+
+    private void CancelCheckoutConfirmation()
+    {
+        if (isProcessing) return;
+        checkoutConfirmationOpen = false;
+        if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
+    }
+
+    private async Task ConfirmCheckout()
+    {
+        if (isProcessing || !cart.Any()) return;
         await Checkout();
     }
 
@@ -786,6 +849,7 @@
             statusMessage = "Sale complete! Transaction summary generated.";
 
             showOrderSummaryModal = true;
+            checkoutConfirmationOpen = false;
             Toast.Success("Transaction Recorded");
 
             cart.Clear();

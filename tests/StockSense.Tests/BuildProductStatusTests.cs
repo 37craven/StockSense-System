@@ -50,6 +50,64 @@ public sealed class BuildProductStatusTests
         Assert.Contains(savedParts, part => part.Id == -999 && part.Name == "TYPE_CUSTOM");
     }
 
+    [Fact]
+    public async Task CreateBuild_rejects_duplicate_parts_when_available_stock_is_too_low()
+    {
+        await using var fixture = await Fixture.CreateAsync(active: true, currentStock: 2, reservedStock: 1);
+        var command = fixture.Command(1, 1m, "Client value");
+        var parts = JsonSerializer.Deserialize<List<ProductDto>>(command.SelectedPartsJson)!;
+        parts.Insert(1, parts[0]);
+        command.SelectedPartsJson = JsonSerializer.Serialize(parts);
+
+        var result = await fixture.Controller.CreateBuild(command);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Contains("Trusted product", conflict.Value!.ToString());
+        Assert.DoesNotContain("available:", conflict.Value!.ToString());
+        Assert.DoesNotContain("needed:", conflict.Value!.ToString());
+        Assert.Empty(await fixture.Context.BuildRequests.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
+    public async Task CreateAppointment_rejects_out_of_stock_selected_parts_without_creating_booking()
+    {
+        await using var fixture = await Fixture.CreateAsync(active: true, currentStock: 1, reservedStock: 1);
+        var controller = new AppointmentsController(
+            new AppointmentRepository(fixture.Context),
+            new StoreServiceRepository(fixture.Context),
+            new CheckoutStub(),
+            fixture.UserManager,
+            fixture.Context,
+            new MotorcycleRepository(fixture.Context),
+            NullLogger<AppointmentsController>.Instance)
+        {
+            ControllerContext = fixture.Controller.ControllerContext
+        };
+        var selectedProducts = JsonSerializer.Serialize(new[]
+        {
+            new
+            {
+                ServiceName = "Oil change",
+                ServicePrice = 0m,
+                Products = new[] { new { Id = 1, Name = "Client value", Price = 1m, Selected = true } }
+            }
+        });
+
+        var result = await controller.Create(new CreateAppointmentDto
+        {
+            AppointmentDate = DateTime.Today.AddDays(1),
+            TimeSlot = "10:00",
+            SelectedServices = [],
+            SelectedProductsJson = selectedProducts
+        });
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Contains("Trusted product", conflict.Value!.ToString());
+        Assert.DoesNotContain("available:", conflict.Value!.ToString());
+        Assert.DoesNotContain("needed:", conflict.Value!.ToString());
+        Assert.Empty(await fixture.Context.Appointments.AsNoTracking().ToListAsync());
+    }
+
     private sealed class Fixture : IAsyncDisposable
     {
         private readonly UserManager<ApplicationUser> _userManager;
@@ -81,8 +139,9 @@ public sealed class BuildProductStatusTests
 
         public ApplicationDbContext Context { get; }
         public BuildsController Controller { get; }
+        public UserManager<ApplicationUser> UserManager => _userManager;
 
-        public static async Task<Fixture> CreateAsync(bool active)
+        public static async Task<Fixture> CreateAsync(bool active, int currentStock = 10, int reservedStock = 0)
         {
             var options = new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase($"build-product-status-{Guid.NewGuid():N}")
@@ -95,6 +154,8 @@ public sealed class BuildProductStatusTests
                 Category = "Engine",
                 Brand = "StockSense",
                 Price = 250m,
+                CurrentStock = currentStock,
+                ReservedStock = reservedStock,
                 IsActive = active
             });
             await context.SaveChangesAsync();

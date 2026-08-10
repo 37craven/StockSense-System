@@ -8,6 +8,8 @@
 @using StockSense.Application.Interfaces
 @using StockSense.Domain.Entities
 @using StockSense.Infrastructure.Data
+@using StockSense.Web.Helpers
+@using BlazorBlueprint.Primitives.Services
 @inject ApplicationDbContext Db
 @inject IOrderSlipWorkflowService Workflow
 @inject AuthenticationStateProvider AuthenticationState
@@ -15,32 +17,120 @@
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <PageTitle>Receive Order Slip</PageTitle>
+<BbPortalHost />
+<BbDialogProvider />
+<UnsavedChangesGuard IsDirty="@ReceiptIsDirty"
+                     Message="This stock receipt has not been recorded. If you leave now, the entered quantities and notes will be lost." />
 @if (slip == null) { <LoadingState /> }
 else
 {
-<div class="flex flex-col gap-5 max-w-5xl mx-auto">
+<div class="mx-auto flex max-w-5xl flex-col gap-5">
     <PageHeader Title="@("Record receipt · " + Number)"
                 Subtitle="Enter quantities received in this delivery. Partial receipts remain open."
                 BackHref="@("/admin/order-slips/" + Id)" />
-@if (!string.IsNullOrWhiteSpace(error)) { <div role="alert" class="rounded-md border p-3 text-sm" style="border-color:var(--destructive);color:var(--destructive)">@error</div> }
-<div class="grid grid-cols-1 md:grid-cols-3 gap-3"><label class="flex flex-col gap-1 text-sm">Received date<input type="date" @bind="receivedAt" @bind:format="yyyy-MM-dd" class="h-9 rounded-md border border-input bg-background px-2" /></label><label class="flex flex-col gap-1 text-sm">Supplier reference<input @bind="reference" maxlength="100" class="h-9 rounded-md border border-input bg-background px-2" /></label><label class="flex flex-col gap-1 text-sm">Remarks<input @bind="remarks" maxlength="500" class="h-9 rounded-md border border-input bg-background px-2" /></label></div>
-<div class="rounded-lg border border-border bg-card overflow-x-auto"><table class="w-full text-sm" style="border-collapse:collapse"><thead class="bg-muted/30"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-right">Ordered</th><th class="p-3 text-right">Previously received</th><th class="p-3 text-left">Receive now</th></tr></thead><tbody>@foreach (var item in slip.Items) { var remaining=Ordered(item)-item.ReceivedQuantity; <tr class="border-t border-border"><td class="p-3 font-medium">@item.ProductName</td><td class="p-3 text-right">@Ordered(item)</td><td class="p-3 text-right">@item.ReceivedQuantity</td><td class="p-3"><label class="sr-only" for="receive-@item.Id">Quantity received for @item.ProductName</label><input id="receive-@item.Id" type="number" min="0" max="@remaining" @bind="quantities[item.Id]" class="h-9 w-28 rounded-md border border-input bg-background px-2 text-right" /><span class="text-xs text-muted-foreground ml-2">@(quantities[item.Id] >= remaining && remaining > 0 ? "full delivery" : $"{remaining - quantities[item.Id]} remaining")</span></td></tr> }</tbody></table></div>
-<div class="flex justify-end"><BbButton OnClick="Save" Disabled="busy">@if (busy) { <BbSpinner Size="SpinnerSize.Small" /> } Save receipt</BbButton></div></div>
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div role="alert" class="rounded-md border border-destructive bg-destructive/5 p-3 text-sm text-destructive">@error</div>
+    }
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <label class="flex flex-col gap-1.5 text-sm font-medium" for="receiving-date">Received date<input id="receiving-date" type="date" @bind="receivedAt" @bind:format="yyyy-MM-dd" class="h-10 rounded-md border-2 border-input bg-background px-3 text-sm shadow-sm transition-colors hover:border-primary/60 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20" /></label>
+        <label class="flex flex-col gap-1.5 text-sm font-medium" for="receiving-reference">Supplier reference<input id="receiving-reference" @bind="reference" maxlength="100" placeholder="Optional" class="h-10 rounded-md border-2 border-input bg-background px-3 text-sm shadow-sm transition-colors hover:border-primary/60 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20" /></label>
+        <label class="flex flex-col gap-1.5 text-sm font-medium" for="receiving-remarks">Remarks<input id="receiving-remarks" @bind="remarks" maxlength="500" placeholder="Optional" class="h-10 rounded-md border-2 border-input bg-background px-3 text-sm shadow-sm transition-colors hover:border-primary/60 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20" /></label>
+    </div>
+    <div class="hidden overflow-hidden rounded-lg border border-border bg-card md:block">
+        <table class="w-full border-collapse text-sm">
+            <thead class="bg-muted/30"><tr><th class="p-3 text-left">Product</th><th class="p-3 text-right">Ordered</th><th class="p-3 text-right">Previously received</th><th class="p-3 text-left">Receive now</th></tr></thead>
+            <tbody>
+                @foreach (var item in slip.Items)
+                {
+                    var remaining = Ordered(item) - item.ReceivedQuantity;
+                    <tr class="border-t border-border">
+                        <td class="p-3 font-medium">@item.ProductName</td><td class="p-3 text-right font-medium tabular-nums">@Ordered(item)</td><td class="p-3 text-right text-muted-foreground tabular-nums">@item.ReceivedQuantity</td>
+                        <td class="p-3"><label class="sr-only" for="receive-@item.Id">Quantity received for @item.ProductName</label><div class="flex items-center gap-2"><input id="receive-@item.Id" type="number" min="0" max="@remaining" inputmode="numeric" title="Enter quantity received" @bind="quantities[item.Id]" class="@OrderSlipPresentation.EditableQuantityClass" /><span class="text-xs text-muted-foreground">@(quantities[item.Id] >= remaining && remaining > 0 ? "Full delivery" : $"{remaining - quantities[item.Id]} remaining")</span></div></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="space-y-3 md:hidden">
+        @foreach (var item in slip.Items)
+        {
+            var remaining = Ordered(item) - item.ReceivedQuantity;
+            <section class="rounded-lg border border-border bg-card p-4" aria-labelledby="mobile-product-@item.Id">
+                <h2 id="mobile-product-@item.Id" class="font-semibold">@item.ProductName</h2>
+                <dl class="mt-3 grid grid-cols-2 gap-2 text-sm"><dt class="text-muted-foreground">Ordered</dt><dd class="m-0 text-right font-medium">@Ordered(item)</dd><dt class="text-muted-foreground">Previously received</dt><dd class="m-0 text-right font-medium">@item.ReceivedQuantity</dd></dl>
+                <label class="mt-4 flex flex-col gap-1.5 text-sm font-medium" for="receive-mobile-@item.Id">Receive now <span class="text-xs font-normal text-muted-foreground">Enter the quantity delivered today</span><input id="receive-mobile-@item.Id" type="number" min="0" max="@remaining" inputmode="numeric" @bind="quantities[item.Id]" class="order-receipt-quantity order-receipt-quantity--full" /></label>
+                <p class="mt-1 text-right text-xs text-muted-foreground">@(quantities[item.Id] >= remaining && remaining > 0 ? "Full delivery" : $"{remaining - quantities[item.Id]} remaining")</p>
+            </section>
+        }
+    </div>
+    <div class="flex justify-end"><BbButton Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="RequestConfirmation" Disabled="@(busy || confirmationOpen)">Save receipt</BbButton></div>
+</div>
 }
+
+<BbDialog @bind-Open="confirmationOpen">
+    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,32rem)] flex-col overflow-hidden">
+        <BbDialogHeader>
+            <BbDialogTitle>Record this stock receipt?</BbDialogTitle>
+            <BbDialogDescription>Confirm the delivered quantities. Product stock will increase immediately.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="min-h-0 space-y-4 overflow-y-auto">
+            <div class="rounded-lg border border-border bg-muted/30">
+                @foreach (var line in ReceiptLines)
+                {
+                    <div class="flex items-center justify-between gap-4 border-b border-border px-3 py-2 text-sm last:border-b-0">
+                        <span class="min-w-0 truncate font-medium">@line.Name</span>
+                        <span class="shrink-0 font-semibold">+@line.Quantity unit@(line.Quantity == 1 ? "" : "s")</span>
+                    </div>
+                }
+            </div>
+            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt class="text-muted-foreground">Affected SKUs</dt><dd class="m-0 text-right font-medium">@ReceiptLines.Count</dd>
+                <dt class="text-muted-foreground">Total units</dt><dd class="m-0 text-right font-medium">@ReceiptLines.Sum(line => line.Quantity)</dd>
+                <dt class="text-muted-foreground">Received date</dt><dd class="m-0 text-right font-medium">@receivedAt.ToString("MMM dd, yyyy")</dd>
+                <dt class="text-muted-foreground">Supplier reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(reference) ? "None" : reference)</dd>
+            </dl>
+            @if (!string.IsNullOrWhiteSpace(error)) { <p role="alert" class="text-sm text-destructive">@error</p> }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => confirmationOpen = false" Disabled="busy">Go back</BbButton>
+            <BbButton Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="Save" Disabled="busy">
+                @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(busy ? "Recording..." : "Record receipt")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
 @code {
     [Parameter] public int Id { get; set; }
-    private OrderSlip? slip; private Dictionary<int,int> quantities=[]; private DateTime receivedAt=DateTime.Today; private string? reference,remarks; private string error=""; private bool busy;
-    protected override async Task OnParametersSetAsync() { slip=await Db.OrderSlips.AsNoTracking().Include(x=>x.Items).SingleOrDefaultAsync(x=>x.Id==Id); quantities=slip?.Items.ToDictionary(x=>x.Id,x=>Math.Max(0, (x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity) - x.ReceivedQuantity)) ?? []; }
+    private OrderSlip? slip; private Dictionary<int,int> quantities=[]; private DateTime receivedAt=DateTime.Today; private string? reference,remarks; private string error=""; private bool busy, confirmationOpen, receiptSaved;
+    private string receiptBaseline = "";
+    protected override async Task OnParametersSetAsync() { slip=await Db.OrderSlips.AsNoTracking().Include(x=>x.Items).SingleOrDefaultAsync(x=>x.Id==Id); quantities=slip?.Items.ToDictionary(x=>x.Id,x=>Math.Max(0, (x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity) - x.ReceivedQuantity)) ?? []; receiptBaseline=ReceiptFingerprint(); receiptSaved=false; }
+    private string ReceiptFingerprint() => System.Text.Json.JsonSerializer.Serialize(new { receivedAt, reference, remarks, Quantities = quantities.OrderBy(x => x.Key).ToArray() });
+    private bool ReceiptIsDirty => !receiptSaved && !string.Equals(receiptBaseline, ReceiptFingerprint(), StringComparison.Ordinal);
     private string Number => string.IsNullOrWhiteSpace(slip!.OrderSlipNumber) ? slip.SlipNumber : slip.OrderSlipNumber;
     private static int Ordered(OrderSlipItem x) => x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity;
+    private List<ReceiptLine> ReceiptLines => slip?.Items.Select(item => new ReceiptLine(item.ProductName, quantities.GetValueOrDefault(item.Id))).Where(item => item.Quantity > 0).ToList() ?? [];
+    private void RequestConfirmation()
+    {
+        if (busy || !ValidateReceipt()) return;
+        confirmationOpen = true;
+    }
+    private bool ValidateReceipt()
+    {
+        if (slip==null) return false; error="";
+        foreach(var item in slip.Items) if(quantities[item.Id] < 0 || quantities[item.Id] > Ordered(item)-item.ReceivedQuantity) { error=$"Invalid received quantity for {item.ProductName}."; return false; }
+        if(ReceiptLines.Count==0) { error="Enter at least one received quantity."; return false; }
+        return true;
+    }
     private async Task Save()
     {
-        if (slip==null) return; error="";
-        foreach(var item in slip.Items) if(quantities[item.Id] < 0 || quantities[item.Id] > Ordered(item)-item.ReceivedQuantity) { error=$"Invalid received quantity for {item.ProductName}."; return; }
-        var received=quantities.Where(x=>x.Value>0).ToList(); if(received.Count==0) { error="Enter at least one received quantity."; return; }
+        if (busy || slip==null || !ValidateReceipt()) return;
+        var received=quantities.Where(x=>x.Value>0).ToList();
         busy=true;
-        try { var user=(await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier); var result=await Workflow.ReceiveAsync(new ReceiveOrderSlipCommand { OrderSlipId=Id, LocationId=InventoryDefaults.LocationId, ReceivedAt=receivedAt, ReferenceNumber=reference, Remarks=remarks, ReceivedByUserId=user, RowVersion=slip.RowVersion, Items=received.Select(x=>new ReceiveOrderSlipItemCommand { OrderSlipItemId=x.Key, QuantityReceived=x.Value }).ToList() }); if(!result.IsSuccess || result.Value==null) throw new UserFacingApiException(result.ErrorMessage ?? "The receipt could not be saved."); Navigation.NavigateTo($"/admin/order-slips/{Id}"); }
+        try { var user=(await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier); var result=await Workflow.ReceiveAsync(new ReceiveOrderSlipCommand { OrderSlipId=Id, LocationId=InventoryDefaults.LocationId, ReceivedAt=receivedAt, ReferenceNumber=reference, Remarks=remarks, ReceivedByUserId=user, RowVersion=slip.RowVersion, Items=received.Select(x=>new ReceiveOrderSlipItemCommand { OrderSlipItemId=x.Key, QuantityReceived=x.Value }).ToList() }); if(!result.IsSuccess || result.Value==null) throw new UserFacingApiException(result.ErrorMessage ?? "The receipt could not be saved."); receiptSaved=true; Navigation.NavigateTo($"/admin/order-slips/{Id}"); }
         catch(Exception ex) { error=ApiErrorMessage.FromException(ex, "The receipt could not be saved. Please try again."); }
         finally { busy=false; }
     }
+    private sealed record ReceiptLine(string Name, int Quantity);
 }

@@ -10,6 +10,7 @@ using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Infrastructure.Data;
+using StockSense.Web.Services;
 
 namespace StockSense.Web.Controllers;
 
@@ -25,6 +26,7 @@ public class AppointmentsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly MotorcycleRepository _motorcycleRepository;
     private readonly ILogger<AppointmentsController> _logger;
+    private readonly IAdminPinService? _adminPinService;
     private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
@@ -35,13 +37,15 @@ public class AppointmentsController : ControllerBase
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
         MotorcycleRepository motorcycleRepository,
-        ILogger<AppointmentsController> logger)
+        ILogger<AppointmentsController> logger,
+        IAdminPinService? adminPinService = null)
     {
         _repo = repo;
         _serviceRepo = serviceRepo;
         _checkoutService = checkoutService;
         _userManager = userManager;
         _context = context;
+        _adminPinService = adminPinService;
         _motorcycleRepository = motorcycleRepository;
         _logger = logger;
     }
@@ -67,13 +71,34 @@ public class AppointmentsController : ControllerBase
             var matchedServices = await _serviceRepo.GetByNamesAsync(dto.SelectedServices);
             decimal serviceTotal = matchedServices.Sum(s => s.Price);
             decimal productTotal = 0m;
+            List<int> selectedProductIds = [];
 
             if (!string.IsNullOrWhiteSpace(dto.SelectedProductsJson))
             {
-                var breakdown = JsonSerializer.Deserialize<List<ServiceProductBreakdown>>(dto.SelectedProductsJson, JsonOpts);
+                List<ServiceProductBreakdown>? breakdown;
+                try
+                {
+                    breakdown = JsonSerializer.Deserialize<List<ServiceProductBreakdown>>(dto.SelectedProductsJson, JsonOpts);
+                }
+                catch (JsonException)
+                {
+                    return BadRequest(ApiResponse.Error("The selected parts are invalid. Refresh the booking page and try again."));
+                }
                 if (breakdown != null)
+                {
                     productTotal = breakdown.Sum(s => s.Products.Where(p => p.Selected).Sum(p => p.Price));
+                    selectedProductIds = breakdown
+                        .SelectMany(service => service.Products)
+                        .Where(product => product.Selected && product.Id > 0)
+                        .Select(product => product.Id)
+                        .ToList();
+                }
             }
+
+            var stockError = await StockAvailabilityValidator.ValidateAsync(
+                _context, selectedProductIds, "appointment", HttpContext.RequestAborted);
+            if (stockError is not null)
+                return Conflict(ApiResponse.Error(stockError));
 
             int totalDuration = matchedServices.Sum(s => s.EstimatedMinutes);
             DateTime phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
@@ -144,21 +169,29 @@ public class AppointmentsController : ControllerBase
         var appointment = await _repo.GetByIdAsync(id);
         if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
 
-        var transitionError = WorkOrderRules.ValidateStatusTransition(
-            appointment.Status,
-            WorkOrderStatuses.Confirmed);
-        if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
+        if (appointment.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled)
+            return Conflict(ApiResponse.Error("Completed and cancelled appointments are read-only."));
+        if (appointment.Status == WorkOrderStatuses.Pending)
+        {
+            var transitionError = WorkOrderRules.ValidateStatusTransition(
+                appointment.Status,
+                WorkOrderStatuses.Confirmed,
+                User.IsInRole("Admin"));
+            if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
+        }
 
+        var previousMechanic = appointment.MechanicName;
         appointment.MechanicName = assignment.MechanicName;
         appointment.DurationMinutes = assignment.DurationMinutes;
         appointment.Status = WorkOrderStatuses.Confirmed;
+        AddAudit("Appointment", id, "MechanicAssigned", previousMechanic, assignment.MechanicName, null);
         await _repo.UpdateAsync(appointment);
         return Ok(new { message = $"Assigned to {assignment.MechanicName}" });
     }
 
     [HttpPut("{id}/status")]
     [Authorize(Roles = "Employee,Admin")]
-    public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateWorkOrderStatusDto request)
     {
         var appointment = await _context.Appointments.FindAsync(id);
         if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
@@ -171,14 +204,30 @@ public class AppointmentsController : ControllerBase
             appointment.Transaction = txn;
         }
 
-        if (string.Equals(newStatus, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(request.Status, WorkOrderStatuses.Completed, StringComparison.OrdinalIgnoreCase))
             return BadRequest(ApiResponse.Error("Use the completion checkout endpoint to complete an appointment."));
 
         var canonicalStatus = new[] { WorkOrderStatuses.Pending, WorkOrderStatuses.Confirmed, WorkOrderStatuses.Cancelled }
-            .SingleOrDefault(value => string.Equals(value, newStatus?.Trim(), StringComparison.OrdinalIgnoreCase));
+            .SingleOrDefault(value => string.Equals(value, request.Status?.Trim(), StringComparison.OrdinalIgnoreCase));
         if (canonicalStatus is null) return BadRequest(ApiResponse.Error("Unsupported appointment status."));
-        var transitionError = WorkOrderRules.ValidateStatusTransition(appointment.Status, canonicalStatus);
+        var isAdmin = User.IsInRole("Admin");
+        AdminPinVerificationResult? approval = null;
+        if (!isAdmin && appointment.Status != WorkOrderStatuses.Pending)
+        {
+            if (_adminPinService is null) return StatusCode(403, ApiResponse.Error("Admin approval is required."));
+            approval = !string.IsNullOrWhiteSpace(request.AdminUserId)
+                ? await _adminPinService.VerifyByUserIdAsync(request.AdminUserId, request.AdminPin ?? "")
+                : await _adminPinService.VerifyAsync(request.AdminEmail ?? "", request.AdminPin ?? "");
+            if (!approval.Succeeded)
+                return StatusCode(approval.LockedUntil.HasValue ? 429 : 403, ApiResponse.Error(approval.Error ?? "Admin approval failed."));
+        }
+        var transitionError = WorkOrderRules.ValidateStatusTransition(appointment.Status, canonicalStatus, isAdmin || approval?.Succeeded == true);
         if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
+        var reason = request.Reason?.Trim();
+        if (WorkOrderRules.RequiresAdminReason(appointment.Status, canonicalStatus) && string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("A reason is required for this admin action."));
+        if (reason?.Length > 500)
+            return BadRequest(ApiResponse.Error("The reason cannot exceed 500 characters."));
 
         try
         {
@@ -200,10 +249,14 @@ public class AppointmentsController : ControllerBase
             }
             else if (canonicalStatus == WorkOrderStatuses.Confirmed && !wasConfirmed)
             {
-                await ReserveAppointmentProducts(appointment);
+                var reservationError = await TryReserveAppointmentProducts(appointment);
+                if (reservationError is not null)
+                    return Conflict(ApiResponse.Error(reservationError));
             }
 
+            var previousStatus = appointment.Status;
             appointment.Status = canonicalStatus;
+            AddAudit("Appointment", id, "StatusChanged", previousStatus, canonicalStatus, reason, approval);
             await _context.SaveChangesAsync();
             return Ok(new { message = "Status updated" });
         }
@@ -256,17 +309,28 @@ public class AppointmentsController : ControllerBase
         _context.Transactions.Add(reversal);
     }
 
-    private async Task ReserveAppointmentProducts(Appointment appointment)
+    private async Task<string?> TryReserveAppointmentProducts(Appointment appointment)
     {
         var productIds = ExtractProductIds(appointment.SelectedProductsJson);
-        if (productIds.Count == 0) return;
+        if (productIds.Count == 0) return null;
         var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
         var lookup = products.ToDictionary(p => p.Id);
+
+        // Validate the complete selection before changing any reservation. This ensures
+        // one unavailable part cannot leave earlier parts partially reserved.
+        var unavailable = productIds
+            .Where(id => !lookup.TryGetValue(id, out var product) || !product.IsActive || product.AvailableStock < 1)
+            .Select(id => lookup.TryGetValue(id, out var product)
+                ? product.Name
+                : $"part #{id} (no longer available)")
+            .ToList();
+        if (unavailable.Count > 0)
+            return $"This appointment cannot be confirmed because there is not enough stock for: {string.Join(", ", unavailable)}. Please update the selected parts or restock them first.";
+
         foreach (var id in productIds)
-        {
-            if (lookup.TryGetValue(id, out var product))
-                product.ReserveStock(1);
-        }
+            lookup[id].ReserveStock(1);
+
+        return null;
     }
 
     private async Task ReleaseAppointmentReservations(Appointment appointment)
@@ -301,11 +365,45 @@ public class AppointmentsController : ControllerBase
         if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
         if (appointment.Status is "Completed" or "Cancelled")
             return Conflict(ApiResponse.Error("Cannot edit parts for completed or cancelled appointments."));
+        AdminPinVerificationResult? approval = null;
+        if (appointment.Status != WorkOrderStatuses.Pending && !User.IsInRole("Admin"))
+        {
+            if (_adminPinService is null) return StatusCode(403, ApiResponse.Error("Admin approval is required."));
+            approval = !string.IsNullOrWhiteSpace(dto.AdminUserId)
+                ? await _adminPinService.VerifyByUserIdAsync(dto.AdminUserId, dto.AdminPin ?? "")
+                : await _adminPinService.VerifyAsync(dto.AdminEmail ?? "", dto.AdminPin ?? "");
+            if (!approval.Succeeded)
+                return StatusCode(approval.LockedUntil.HasValue ? 429 : 403, ApiResponse.Error(approval.Error ?? "Admin approval failed."));
+        }
+        var reason = dto.Reason?.Trim();
+        if (appointment.Status != WorkOrderStatuses.Pending && string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("Please provide a reason for this change."));
         if (string.Equals(appointment.Category, "Build", StringComparison.OrdinalIgnoreCase))
             return Conflict(ApiResponse.Error("Build installation appointments do not support parts editing."));
 
-        appointment.SelectedProductsJson = dto.SelectedProductsJson;
-        appointment.TotalAmount = dto.TotalAmount;
+        List<ServiceProductBreakdown> breakdown;
+        try
+        {
+            breakdown = JsonSerializer.Deserialize<List<ServiceProductBreakdown>>(dto.SelectedProductsJson, JsonOpts) ?? [];
+        }
+        catch (JsonException)
+        {
+            return BadRequest(ApiResponse.Error("The selected products are invalid."));
+        }
+        var selectedIds = breakdown.SelectMany(item => item.Products).Where(product => product.Selected && product.Id > 0).Select(product => product.Id).ToList();
+        var products = await _context.Products.Where(product => selectedIds.Contains(product.Id) && product.IsActive).ToDictionaryAsync(product => product.Id);
+        if (products.Count != selectedIds.Distinct().Count())
+            return BadRequest(ApiResponse.Error("One or more selected products are unavailable."));
+        foreach (var product in breakdown.SelectMany(item => item.Products).Where(product => product.Selected && product.Id > 0))
+        {
+            product.Name = products[product.Id].Name;
+            product.Price = products[product.Id].Price;
+        }
+        var serviceNames = appointment.ServicesRequested.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var services = await _serviceRepo.GetByNamesAsync(serviceNames);
+        appointment.SelectedProductsJson = JsonSerializer.Serialize(breakdown);
+        appointment.TotalAmount = services.Sum(service => service.Price) + selectedIds.Sum(id => products[id].Price);
+        AddAudit("Appointment", id, "ProductsChanged", null, string.Join(',', selectedIds), reason, approval);
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "Products updated" });
@@ -434,6 +532,25 @@ public class AppointmentsController : ControllerBase
         }
     }
 
+    private void AddAudit(string type, int id, string action, string? previousValue, string? newValue, string? reason,
+        AdminPinVerificationResult? approval = null)
+    {
+        _context.WorkOrderAudits.Add(new WorkOrderAudit
+        {
+            WorkOrderType = type,
+            WorkOrderId = id,
+            Action = action,
+            PreviousValue = previousValue,
+            NewValue = newValue,
+            ActorUserId = HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown",
+            ActorRole = HttpContext?.User.IsInRole("Admin") == true ? "Admin" : "Employee",
+            ApproverUserId = approval?.AdminUserId,
+            ApproverEmail = approval?.AdminEmail,
+            Reason = reason,
+            CreatedAt = DateTime.Now
+        });
+    }
+
     private class ServiceProductBreakdown
     {
         public string ServiceName { get; set; } = "";
@@ -453,5 +570,9 @@ public class AppointmentsController : ControllerBase
     {
         public string SelectedProductsJson { get; set; } = "";
         public decimal TotalAmount { get; set; }
+        public string? AdminUserId { get; set; }
+        public string? AdminEmail { get; set; }
+        public string? AdminPin { get; set; }
+        public string? Reason { get; set; }
     }
 }

@@ -449,6 +449,71 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
     public Task<OperationResult<OrderSlipDto>> MarkOrderedAsync(OrderSlipTransitionCommand command, CancellationToken cancellationToken = default) =>
         TransitionAsync(command, OrderSlipStatuses.Approved, OrderSlipStatuses.Ordered, cancellationToken);
 
+    public async Task<OperationResult<OrderSlipDto>> CloseShortAsync(
+        CloseOrderSlipShortCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await ExecuteWriteAsync(async ct =>
+        {
+            var slip = await LoadSlipAsync(command.OrderSlipId, ct);
+            if (slip is null) return OperationResult<OrderSlipDto>.Failure("NOT_FOUND", "Order slip was not found.");
+
+            var hasReceived = slip.Items.Any(item => item.ReceivedQuantity > 0);
+            var hasRemaining = slip.Items.Any(item => OrderSlipMath.CalculateRemainingQuantity(
+                item.OrderedQuantity, item.Quantity, item.ReceivedQuantity) > 0);
+            var validationError = OrderSlipMath.ValidateCloseShort(
+                slip.Status, hasReceived, hasRemaining, command.Reason);
+            if (validationError is not null)
+            {
+                var code = string.IsNullOrWhiteSpace(command.Reason)
+                    ? "CLOSE_REASON_REQUIRED"
+                    : "INVALID_STATUS";
+                return OperationResult<OrderSlipDto>.Failure(code, validationError);
+            }
+
+            ApplyRowVersion(slip, command.RowVersion);
+            slip.Status = OrderSlipStatuses.ClosedShort;
+            slip.CompletedAt = DateTime.Now;
+            slip.IsReceived = false;
+            var remainingSummary = string.Join(", ", slip.Items
+                .Select(item => new
+                {
+                    item.ProductName,
+                    Remaining = OrderSlipMath.CalculateRemainingQuantity(
+                        item.OrderedQuantity, item.Quantity, item.ReceivedQuantity)
+                })
+                .Where(item => item.Remaining > 0)
+                .Select(item => $"{item.ProductName}: {item.Remaining}"));
+            var actor = string.IsNullOrWhiteSpace(command.ActingUserId) ? "an administrator" : command.ActingUserId;
+            var closeRemark = AppendRemark(slip.Remarks,
+                $"Closed with remaining items by {actor}. Reason: {command.Reason.Trim()}. Outstanding: {remainingSummary}");
+            slip.Remarks = closeRemark.Length <= 500 ? closeRemark : closeRemark[..500];
+            _context.WorkOrderAudits.Add(new WorkOrderAudit
+            {
+                WorkOrderType = "OrderSlip",
+                WorkOrderId = slip.Id,
+                Action = "ClosedShort",
+                PreviousValue = OrderSlipStatuses.PartiallyReceived,
+                NewValue = OrderSlipStatuses.ClosedShort,
+                ActorUserId = command.ActingUserId ?? string.Empty,
+                ActorRole = command.ActorRole is "Admin" ? "Admin" : "Employee",
+                ApproverUserId = command.ApproverUserId,
+                ApproverEmail = command.ApproverEmail,
+                Reason = command.Reason.Trim(),
+                CreatedAt = DateTime.Now
+            });
+            await _context.SaveChangesAsync(ct);
+            return OperationResult<OrderSlipDto>.Success(ToDto(slip));
+        }, cancellationToken);
+
+        if (result.IsSuccess && result.Value is not null)
+            await TryRecalculateProductsAsync(
+                result.Value.Items.Select(item => item.ProductId),
+                result.Value.LocationId,
+                "closing the remaining order");
+        return result;
+    }
+
     public async Task<OperationResult<OrderSlipDto>> CancelAsync(
         CancelOrderSlipCommand command,
         CancellationToken cancellationToken = default)

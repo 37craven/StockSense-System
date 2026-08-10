@@ -13,6 +13,8 @@
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <PageTitle>Generate Orders</PageTitle>
+<UnsavedChangesGuard IsDirty="@HasUnsavedDraft"
+                     Message="Your order-slip draft has not been created. If you leave now, the selected products and quantities will be lost." />
 
 <div>
     <PageHeader Title="Generate Orders"
@@ -308,6 +310,9 @@
     private bool CanCreateAutomatic => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && !SelectedAutomaticItems.Any(x => errors.ContainsKey(x.ProductId));
     private IEnumerable<OrderSlipPreviewItemDto> SelectedAutomaticItems => preview?.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected) ?? [];
     private bool CanCreateManual => manualSupplierId > 0 && manualLines.Count > 0 && manualLines.All(x => x.ProductId > 0 && x.Quantity > 0) && manualLines.Select(x => x.ProductId).Distinct().Count() == manualLines.Count && !string.IsNullOrWhiteSpace(manualReason) && manualReason.Length <= 500;
+    private bool HasUnsavedDraft => mode == CreationMode.Automatic
+        ? preview is not null && SelectedAutomaticItems.Any()
+        : manualSupplierId > 0 || manualLines.Count > 0 || !string.IsNullOrWhiteSpace(manualReason);
 
     private void ShowAutomatic() { mode = CreationMode.Automatic; error = message = ""; }
     private async Task ShowManual() { mode = CreationMode.Manual; error = message = ""; if (manualCatalog == null) await LoadManualCatalog(); }

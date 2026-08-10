@@ -13,6 +13,8 @@
 
 <BbPortalHost />
 <BbDialogProvider />
+<UnsavedChangesGuard IsDirty="@HasUnsavedChanges"
+                     Message="Your inventory changes have not been saved. If you leave now, they will be lost." />
 
 <div class="flex flex-col gap-5 min-h-full">
     <PageHeader Title="Safety Stock Dashboard"
@@ -25,7 +27,7 @@
         <BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(ModalOperationLocked || selectedIds.Count == 0)">
             <LucideIcon Name="refresh-cw" Size="16" /> Recalculate selected
         </BbButton>
-        <BbButton OnClick="RecalculateAll" Disabled="ModalOperationLocked">
+        <BbButton OnClick="RequestRecalculateAll" Disabled="@(ModalOperationLocked || recalculateAllConfirmationOpen)">
             @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
             <LucideIcon Name="calculator" Size="16" /> Recalculate all
         </BbButton>
@@ -283,7 +285,7 @@
                                 <div class="editor-grid two-fields"><label for="edit-price">Selling price<input id="edit-price" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock">Current stock<input id="edit-stock" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
                                 <label class="editor-label" for="stock-reason">Reason for change<textarea id="stock-reason" class="w-full border border-input rounded-md bg-background text-foreground px-2 py-2 resize-y" rows="2" maxlength="500" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/500 characters</small></label>
                                 @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="form-error">@productEditorError</p> }
-                                <div class="section-actions"><BbButton OnClick="SaveProductInventory" Disabled="@(ModalOperationLocked || !ProductEditorValid || !ProductWillChange)">@if (productSaving) { <BbSpinner Size="SpinnerSize.Small" /> } Save inventory values</BbButton></div>
+                                <div class="section-actions"><BbButton OnClick="RequestProductInventorySave" Disabled="@(ModalOperationLocked || inventoryConfirmationOpen || !ProductEditorValid || !ProductWillChange)">Save inventory values</BbButton></div>
                             </section>
                             <section aria-labelledby="policy-settings-heading">
                                 <div class="section-heading"><div><h3 id="policy-settings-heading">Safety-stock settings</h3><p>Saving recalculates this product immediately.</p></div></div>
@@ -335,16 +337,93 @@
 </BbDialog>
 
 @* ── New Product Modal ── *@
+<BbDialog @bind-Open="inventoryConfirmationOpen">
+    <BbDialogContent class="w-[min(96vw,32rem)]">
+        <BbDialogHeader>
+            <BbDialogTitle>Confirm inventory correction</BbDialogTitle>
+            <BbDialogDescription>Review the new price and stock count before updating inventory and its audit record.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="space-y-4">
+            <div class="rounded-lg border border-border bg-muted/30 p-4">
+                <p class="mb-3 mt-0 font-semibold">@editingProductName</p>
+                <dl class="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 text-sm">
+                    <dt class="text-muted-foreground"></dt><dd class="m-0 text-right text-xs font-medium uppercase text-muted-foreground">Current</dd><dd class="m-0 text-right text-xs font-medium uppercase text-muted-foreground">New</dd>
+                    <dt>Price</dt><dd class="m-0 text-right">₱@originalPrice.ToString("N2")</dd><dd class="m-0 text-right font-semibold">₱@PendingInventoryPrice.ToString("N2")</dd>
+                    <dt>Stock</dt><dd class="m-0 text-right">@originalStock</dd><dd class="m-0 text-right font-semibold">@PendingInventoryStock</dd>
+                </dl>
+            </div>
+            <div>
+                <p class="mb-1 mt-0 text-xs font-medium uppercase text-muted-foreground">Reason</p>
+                <p class="m-0 whitespace-pre-wrap rounded-md border border-border p-3 text-sm">@stockCorrectionReason.Trim()</p>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="text-sm text-destructive">@productEditorError</p> }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => inventoryConfirmationOpen = false" Disabled="productSaving">Go back</BbButton>
+            <BbButton OnClick="ConfirmProductInventorySave" Disabled="productSaving">
+                @if (productSaving) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(productSaving ? "Saving..." : "Confirm correction")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="recalculateAllConfirmationOpen">
+    <BbDialogContent class="w-[min(96vw,30rem)]">
+        <BbDialogHeader>
+            <BbDialogTitle>Recalculate all inventory?</BbDialogTitle>
+            <BbDialogDescription>This system-wide action will refresh safety stock, reorder points, and target stock for every product.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+            <div class="flex items-center justify-between gap-4"><span class="text-muted-foreground">Products affected</span><strong>@(rows?.Count ?? 0)</strong></div>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(error)) { <p role="alert" class="text-sm text-destructive">@error</p> }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => recalculateAllConfirmationOpen = false" Disabled="busy">Go back</BbButton>
+            <BbButton OnClick="ConfirmRecalculateAll" Disabled="busy">
+                @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(busy ? "Recalculating..." : "Recalculate all")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showDiscardDetails">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard inventory changes?</BbDialogTitle>
+            <BbDialogDescription>Your unsaved product or inventory settings will be lost.</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardDetails = false">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardDetails">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showDiscardNewProduct">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard new product?</BbDialogTitle>
+            <BbDialogDescription>The product information you entered will be lost.</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardNewProduct = false">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardNewProduct">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @if (showNewProductModal)
 {
-    <div @onclick="CloseNewProductModal" class="fixed inset-0 bg-black/70 flex justify-center items-center z-[1000] p-4">
+    <div @onclick="RequestCloseNewProductModal" class="fixed inset-0 bg-black/70 flex justify-center items-center z-[1000] p-4">
         <div @onclick:stopPropagation class="bg-card max-w-full w-[520px] max-h-[88vh] rounded-lg border border-border shadow-lg flex flex-col">
             <div class="px-6 py-5 border-b border-border flex justify-between items-start shrink-0">
                 <div>
                     <h3 class="text-lg font-semibold text-foreground m-0">New Product</h3>
                     <p class="text-sm text-muted-foreground mt-1">Add a new product to inventory.</p>
                 </div>
-                <button @onclick="CloseNewProductModal" class="bg-transparent border-0 cursor-pointer text-muted-foreground p-1 rounded-md flex">
+                <button @onclick="RequestCloseNewProductModal" class="bg-transparent border-0 cursor-pointer text-muted-foreground p-1 rounded-md flex">
                     <LucideIcon Name="x" Size="18" />
                 </button>
             </div>
@@ -436,7 +515,7 @@
                 </div>
             </div>
             <div class="px-6 py-4 border-t border-border flex justify-end gap-2 shrink-0">
-                <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseNewProductModal">Cancel</BbButton>
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestCloseNewProductModal">Cancel</BbButton>
                 <BbButton Variant="ButtonVariant.Default" OnClick="SaveNewProduct" Disabled="@(isSavingNewProduct)">
                     @if (isSavingNewProduct)
                     {
@@ -457,12 +536,15 @@
     private readonly HashSet<int> selectedIds = [];
     private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", productStatus = "", message = "", error = "", settingsError = "";
     private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed;
+    private bool inventoryConfirmationOpen, recalculateAllConfirmationOpen, showDiscardDetails, showDiscardNewProduct;
+    private string settingsBaseline = "";
     private bool detailOpen
     {
         get => _detailOpen;
         set
         {
             if (_detailOpen == value || (!value && ModalOperationLocked)) return;
+            if (!value && DetailEditorDirty) { showDiscardDetails = true; return; }
             _detailOpen = value;
             if (!value) ClearDetailSelection();
         }
@@ -488,7 +570,17 @@
     private bool ProductWillChange => (TryPrice(out var price) && price != originalPrice)
                                       || StockWillChange;
     private bool ProductEditorValid => !editPriceInvalid && !editStockInvalid && !reasonInvalid;
+    private decimal PendingInventoryPrice => TryPrice(out var value) ? value : originalPrice;
+    private int PendingInventoryStock => TryStock(out var value) ? value : originalStock;
     private bool ModalOperationLocked => busy || productSaving || imageUploading || supplierSaving || statusSaving || addingSupplier;
+    private bool DetailEditorDirty => ProductWillChange || selectedImageFile is not null ||
+        (selectedRow is not null && detailSupplierId != selectedRow.SupplierId) ||
+        !string.IsNullOrWhiteSpace(newSupplierName) || !string.IsNullOrWhiteSpace(newSupplierEmail) || !string.IsNullOrWhiteSpace(newSupplierMobile) ||
+        (settings is not null && !string.Equals(settingsBaseline, System.Text.Json.JsonSerializer.Serialize(settings), StringComparison.Ordinal));
+    private bool NewProductDirty => !string.IsNullOrWhiteSpace(newProduct.Name) || !string.IsNullOrWhiteSpace(newProduct.Brand) ||
+        !string.IsNullOrWhiteSpace(newProduct.Category) || newProduct.SupplierId.HasValue || newProduct.Price != 0 ||
+        newProduct.InitialStock != 0 || newProduct.ReorderTarget != 0 || newProductImageFile is not null;
+    private bool HasUnsavedChanges => (detailOpen && DetailEditorDirty) || (showNewProductModal && NewProductDirty);
     private List<SupplierDto> supplierList = [];
     private int? detailSupplierId;
     private string detailTab = "overview";
@@ -615,6 +707,11 @@
         if (ModalOperationLocked) return;
         detailOpen = false;
     }
+    private void DiscardDetails()
+    {
+        showDiscardDetails = false;
+        ForceCloseDetails();
+    }
     private void ClearDetailSelection()
     {
         InvalidateSettingsLoad();
@@ -679,6 +776,18 @@
         {
             productSaving = false;
         }
+    }
+    private void RequestProductInventorySave()
+    {
+        if (ModalOperationLocked || !ProductEditorValid || !ProductWillChange) return;
+        productEditorError = "";
+        inventoryConfirmationOpen = true;
+    }
+    private async Task ConfirmProductInventorySave()
+    {
+        if (productSaving) return;
+        await SaveProductInventory();
+        if (string.IsNullOrWhiteSpace(productEditorError)) inventoryConfirmationOpen = false;
     }
     private async Task SaveProductSupplier()
     {
@@ -907,6 +1016,18 @@
         catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "Inventory could not be recalculated. Please try again."); }
         finally { busy = false; }
     }
+    private void RequestRecalculateAll()
+    {
+        if (ModalOperationLocked || rows is null || rows.Count == 0) return;
+        error = "";
+        recalculateAllConfirmationOpen = true;
+    }
+    private async Task ConfirmRecalculateAll()
+    {
+        if (busy) return;
+        await RecalculateAll();
+        if (string.IsNullOrWhiteSpace(error)) recalculateAllConfirmationOpen = false;
+    }
     private async Task Run(Func<Task> action) { busy = true; error = ""; message = ""; try { await action(); await LoadAsync(); } catch (Exception ex) { error = ApiErrorMessage.FromException(ex); } finally { busy = false; } }
     private async Task LoadSettingsAsync(int productId, long generation, CancellationToken cancellationToken)
     {
@@ -935,6 +1056,7 @@
                 ?? throw new InvalidOperationException("The server returned empty inventory settings.");
             if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
             settings = loadedSettings;
+            settingsBaseline = System.Text.Json.JsonSerializer.Serialize(loadedSettings);
             if (initialized)
             {
                 await LoadAsync();
@@ -1045,6 +1167,18 @@
     private void CloseNewProductModal()
     {
         showNewProductModal = false;
+    }
+
+    private void RequestCloseNewProductModal()
+    {
+        if (NewProductDirty) { showDiscardNewProduct = true; return; }
+        CloseNewProductModal();
+    }
+
+    private void DiscardNewProduct()
+    {
+        showDiscardNewProduct = false;
+        CloseNewProductModal();
     }
 
     private async Task SaveNewProduct()

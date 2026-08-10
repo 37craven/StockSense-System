@@ -51,4 +51,57 @@ public sealed class BarcodePdfTests
     {
         Assert.Equal(expected, BarcodeService.IsValidEan13(value));
     }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(42)]
+    [InlineData(999999)]
+    public void GenerateBarcodeValue_IsDeterministicUniqueAndValid(int productId)
+    {
+        var first = BarcodeService.GenerateBarcodeValue(productId);
+        var second = BarcodeService.GenerateBarcodeValue(productId);
+
+        Assert.Equal(first, second);
+        Assert.StartsWith("20", first, StringComparison.Ordinal);
+        Assert.True(BarcodeService.IsValidEan13(first));
+        Assert.NotEqual(first, BarcodeService.GenerateBarcodeValue(productId + 1));
+    }
+
+    [Fact]
+    public void GenerateBarcodeAndQrImages_ReturnPngPayloads()
+    {
+        var service = new BarcodeService();
+        var product = new Product { Id = 7, Name = "Filter", Barcode = BarcodeService.GenerateBarcodeValue(7) };
+
+        var barcode = service.GenerateBarcodeImage(product.Barcode);
+        var qr = service.GenerateQrCodeImage(product);
+
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, barcode[..4]);
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, qr[..4]);
+    }
+
+    [Theory]
+    [InlineData("invalid")]
+    [InlineData("")]
+    public void GenerateBarcodeLabelPdf_RejectsUnsupportedFormat(string format)
+    {
+        var service = new BarcodeService();
+        var product = new Product { Name = "Filter", Category = "Test" };
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => service.GenerateBarcodeLabelPdf(product, null, null, format));
+    }
+
+    [Fact]
+    public void PdfDownloadCache_ReturnsPayloadExactlyOnce()
+    {
+        var cache = new PdfDownloadCache();
+        byte[] payload = [1, 2, 3];
+
+        var token = cache.Store(payload);
+
+        Assert.Equal(payload, cache.Retrieve(token));
+        Assert.Null(cache.Retrieve(token));
+        Assert.Null(cache.Retrieve("missing-token"));
+    }
 }

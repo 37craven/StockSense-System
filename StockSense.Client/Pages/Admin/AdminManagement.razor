@@ -9,6 +9,7 @@
 
 @attribute [Authorize(Roles = "Admin")]
 
+<BbPortalHost />
 
 <PageHeader Title="System Management"
                 Subtitle="Manage users, employees, and shop mechanics." />
@@ -32,6 +33,12 @@
             <button @onclick='() => currentTab = "Mechanics"'
                     style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "Mechanics" ? "var(--secondary)" : "transparent"); color: @(currentTab == "Mechanics" ? "var(--foreground)" : "var(--muted-foreground)");">
                 Shop Mechanics
+            </button>
+            <button type="button"
+                    @onclick='() => SelectTab("AdminPin")'
+                    class="rounded-md border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 @(currentTab == "AdminPin" ? "bg-secondary text-foreground" : "bg-transparent text-muted-foreground")"
+                    aria-pressed="@(currentTab == "AdminPin")">
+                My Admin PIN
             </button>
         </div>
 
@@ -91,7 +98,7 @@
                                     }
                                     else
                                     {
-                                        <button @onclick="() => ToggleBlockUser(user)"
+                                        <button @onclick="() => OpenBlockConfirm(user)"
                                                 style="padding: 4px 8px; border: 1px solid var(--border); background: transparent; color: @(user.IsBlocked ? "var(--destructive)" : "#4CAF50"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;">
                                             @(user.IsBlocked ? "Blocked" : "Active")
                                         </button>
@@ -159,25 +166,183 @@
                 </table>
             }
         }
+        else if (currentTab == "AdminPin")
+        {
+            <section class="w-full" aria-labelledby="admin-pin-heading">
+                <div class="border-b border-border px-3 pb-4 pt-1">
+                    <h2 id="admin-pin-heading" class="text-base font-semibold text-foreground">My Admin PIN</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Set the personal 6-digit PIN you use to approve restricted employee actions.
+                    </p>
+                </div>
+
+                <div class="space-y-5 px-3 py-5">
+                    <div class="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground" role="note" aria-labelledby="admin-pin-first-setup">
+                        <div class="flex items-start gap-2">
+                            <LucideIcon Name="info" Size="16" Class="mt-0.5 shrink-0 text-muted-foreground" />
+                            <div>
+                                <p id="admin-pin-first-setup" class="font-medium">First-time setup</p>
+                                <p class="mt-1 leading-5 text-muted-foreground">
+                                    You do not need a default or current Admin PIN. Enter your normal account login password, then choose a new 6-digit PIN. Use this same form to replace an existing PIN.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                        @if (!string.IsNullOrWhiteSpace(pinSuccess))
+                        {
+                            <div class="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300" role="status">
+                                <LucideIcon Name="circle-check" Size="18" Class="mt-0.5 shrink-0" />
+                                <span>@pinSuccess</span>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(pinError))
+                        {
+                            <div class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+                                <LucideIcon Name="circle-alert" Size="18" Class="mt-0.5 shrink-0" />
+                                <span>@pinError</span>
+                            </div>
+                        }
+
+                    <form @onsubmit="SaveAdminPin" @onsubmit:preventDefault class="space-y-5" aria-busy="@isSavingPin">
+                    <div class="max-w-xl space-y-2">
+                        <label for="admin-current-password" class="text-sm font-medium text-foreground">Current account password</label>
+                        <div class="relative">
+                            <input id="admin-current-password"
+                                   @bind="pinForm.CurrentPassword"
+                                   type="password"
+                                   autocomplete="current-password"
+                                   required
+                                   disabled="@isSavingPin"
+                                   class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                   aria-describedby="admin-password-help" />
+                            <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-current-password" data-password-label="current password"
+                                    aria-controls="admin-current-password" aria-label="Show current password" aria-pressed="false">
+                                <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                                <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                            </button>
+                        </div>
+                        <p id="admin-password-help" class="text-xs leading-5 text-muted-foreground">This is the password you normally use to sign in—not an Admin PIN.</p>
+                    </div>
+
+                    <div class="grid max-w-xl gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <label for="admin-new-pin" class="text-sm font-medium text-foreground">New 6-digit PIN</label>
+                            <div class="relative">
+                                <input id="admin-new-pin"
+                                       @bind="pinForm.NewPin"
+                                       type="password"
+                                       inputmode="numeric"
+                                       pattern="[0-9]{6}"
+                                       maxlength="6"
+                                       autocomplete="new-password"
+                                       required
+                                       disabled="@isSavingPin"
+                                       class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm tracking-[0.35em] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                       aria-describedby="admin-pin-help" />
+                                <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-new-pin" data-password-label="new PIN"
+                                        aria-controls="admin-new-pin" aria-label="Show new PIN" aria-pressed="false">
+                                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                </button>
+                            </div>
+                            <p id="admin-pin-help" class="text-xs leading-5 text-muted-foreground">Use exactly 6 numbers. Do not share it with employees.</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label for="admin-confirm-pin" class="text-sm font-medium text-foreground">Confirm new PIN</label>
+                            <div class="relative">
+                                <input id="admin-confirm-pin"
+                                       @bind="pinForm.ConfirmPin"
+                                       type="password"
+                                       inputmode="numeric"
+                                       pattern="[0-9]{6}"
+                                       maxlength="6"
+                                       autocomplete="new-password"
+                                       required
+                                       disabled="@isSavingPin"
+                                       class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm tracking-[0.35em] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                       aria-describedby="admin-confirm-pin-help" />
+                                <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-confirm-pin" data-password-label="confirm PIN"
+                                        aria-controls="admin-confirm-pin" aria-label="Show confirm PIN" aria-pressed="false">
+                                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                </button>
+                            </div>
+                            <p id="admin-confirm-pin-help" class="text-xs leading-5 text-muted-foreground">Enter the same 6 digits again.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex max-w-xl justify-end pt-1 max-sm:block">
+                        <BbButton Type="ButtonType.Submit" Variant="ButtonVariant.Default" Disabled="@isSavingPin" Class="max-sm:w-full">
+                            @if (isSavingPin)
+                            {
+                                <BbSpinner Size="SpinnerSize.Small" />
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <LucideIcon Name="key-round" Size="16" />
+                                <span>Set or replace PIN</span>
+                            }
+                        </BbButton>
+                    </div>
+                    </form>
+                </div>
+            </section>
+        }
     </div>
 
-@* --- DELETE CONFIRMATION MODAL --- *@
-@if (pendingDeleteTarget != null)
-{
-    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 2000;">
-        <div style="background: var(--card); width: 380px; padding: 24px; border-radius: 12px; border: 1px solid var(--border); text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
-            <h3 style="color: var(--foreground); margin: 0 0 8px 0;">Are you sure?</h3>
-            <p style="color: var(--muted-foreground); font-size: 0.9rem; line-height: 1.5;">
-                You are about to delete <strong>@pendingDeleteName</strong>. This action is permanent and cannot be reversed.
-            </p>
-
-            <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button @onclick="ExecuteDelete" style="flex: 1; padding: 12px; background: #f44336; color: white; border: none; border-radius: var(--radius); font-weight: bold; cursor: pointer;">Delete Now</button>
-                <button @onclick="() => pendingDeleteTarget = null" style="flex: 1; padding: 12px; background: var(--secondary); color: var(--foreground); border: none; border-radius: var(--radius); font-weight: bold; cursor: pointer;">Cancel</button>
+@* --- DESTRUCTIVE ACTION CONFIRMATIONS --- *@
+<BbDialog @bind-Open="showDeleteDialog">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Delete permanently?</BbDialogTitle>
+            <BbDialogDescription>This action cannot be undone.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="space-y-4 py-4">
+            <p class="text-sm text-muted-foreground">You are about to permanently delete <strong class="text-foreground">@pendingDeleteName</strong>.</p>
+            <div class="space-y-2">
+                <label for="delete-confirmation" class="text-sm font-medium text-foreground">Type <strong>DELETE</strong> or the name shown above to continue</label>
+                <input id="delete-confirmation" @bind="deleteConfirmationText" @bind:event="oninput" autocomplete="off"
+                       class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                       aria-describedby="delete-confirmation-help" />
+                <p id="delete-confirmation-help" class="text-xs text-muted-foreground">This check helps prevent accidental permanent deletion.</p>
             </div>
         </div>
-    </div>
-}
+        <div class="flex justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDeleteDialog" Disabled="isDeleting">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" Class="bg-destructive text-destructive-foreground hover:bg-destructive/90" OnClick="ExecuteDelete" Disabled="@(!CanConfirmDelete || isDeleting)">
+                @if (isDeleting) { <BbSpinner Size="SpinnerSize.Small" /> }
+                Delete permanently
+            </BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showBlockDialog">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>@(userToToggleBlock?.IsBlocked == true ? "Unblock account?" : "Block account?")</BbDialogTitle>
+            <BbDialogDescription>
+                @(userToToggleBlock?.IsBlocked == true
+                    ? "This user will be able to sign in again."
+                    : "This user will immediately lose access to the system.")
+            </BbDialogDescription>
+        </BbDialogHeader>
+        <p class="py-4 text-sm text-muted-foreground">Account: <strong class="text-foreground">@userToToggleBlock?.FullName</strong></p>
+        <div class="flex justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseBlockDialog" Disabled="isChangingBlock">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default"
+                      Class="@(userToToggleBlock?.IsBlocked == true ? string.Empty : "bg-destructive text-destructive-foreground hover:bg-destructive/90")"
+                      OnClick="ConfirmToggleBlock" Disabled="isChangingBlock">
+                @if (isChangingBlock) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(userToToggleBlock?.IsBlocked == true ? "Unblock account" : "Block account")
+            </BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
 
 @* --- ADD EMPLOYEE MODAL --- *@
 @if (showEmployeeModal)
@@ -217,8 +382,15 @@
 
                 <div style="display: flex; flex-direction: column; gap: var(--space-2);">
                     <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Temporary Password</label>
-                    <input @bind="newEmp.Password" type="password" placeholder="Temporary password"
-                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                    <div class="relative">
+                        <input id="new-staff-password" class="password-with-toggle" @bind="newEmp.Password" type="password" placeholder="Temporary password" autocomplete="new-password"
+                               style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                        <button type="button" class="password-toggle-button" data-password-toggle data-password-target="new-staff-password" data-password-label="temporary password"
+                                aria-controls="new-staff-password" aria-label="Show temporary password" aria-pressed="false">
+                            <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                            <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                        </button>
+                    </div>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: var(--space-2);">
@@ -287,6 +459,12 @@
 
     private object? pendingDeleteTarget;
     private string pendingDeleteName = "";
+    private string deleteConfirmationText = "";
+    private bool showDeleteDialog;
+    private bool isDeleting;
+    private UserDto? userToToggleBlock;
+    private bool showBlockDialog;
+    private bool isChangingBlock;
 
     private IEnumerable<UserDto> FilteredUsers => users?
         .Where(user => roleFilter == "All" || user.Role.Equals(roleFilter, StringComparison.OrdinalIgnoreCase))
@@ -298,6 +476,10 @@
     private string managementMessage = "", managementError = "";
     private CreateEmployeeDto newEmp = new();
     private string newMechanicName = "";
+    private AdminPinForm pinForm = new();
+    private string pinError = "";
+    private string pinSuccess = "";
+    private bool isSavingPin;
 
     protected override async Task OnInitializedAsync()
     {
@@ -312,10 +494,29 @@
     {
         pendingDeleteTarget = target;
         pendingDeleteName = name;
+        deleteConfirmationText = "";
+        showDeleteDialog = true;
+    }
+
+    private bool CanConfirmDelete =>
+        string.Equals(deleteConfirmationText.Trim(), "DELETE", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(deleteConfirmationText.Trim(), pendingDeleteName, StringComparison.OrdinalIgnoreCase) ||
+        pendingDeleteTarget is UserDto user && string.Equals(deleteConfirmationText.Trim(), user.Email, StringComparison.OrdinalIgnoreCase);
+
+    private void CloseDeleteDialog()
+    {
+        if (isDeleting) return;
+        showDeleteDialog = false;
+        pendingDeleteTarget = null;
+        deleteConfirmationText = "";
     }
 
     private async Task ExecuteDelete()
     {
+        if (!CanConfirmDelete || isDeleting) return;
+        isDeleting = true;
+        try
+        {
         if (pendingDeleteTarget is UserDto user)
         {
             if (user.IsCurrentUser) { managementError = "You cannot delete your own admin account."; pendingDeleteTarget = null; return; }
@@ -326,17 +527,42 @@
         else if (pendingDeleteTarget is Mechanic mech)
         {
             var res = await Http.DeleteAsync($"api/mechanics/{mech.Id}");
-            if (res.IsSuccessStatusCode) await LoadMechanics();
+            if (res.IsSuccessStatusCode) { await LoadMechanics(); managementMessage = $"Deleted {mech.Name}."; managementError = ""; }
+            else { managementError = await ApiErrorMessage.FromResponseAsync(res, "The mechanic could not be deleted."); }
         }
+        showDeleteDialog = false;
         pendingDeleteTarget = null;
+        deleteConfirmationText = "";
+        }
+        finally { isDeleting = false; }
     }
 
-    private async Task ToggleBlockUser(UserDto user)
+    private void OpenBlockConfirm(UserDto user)
     {
         if (user.IsCurrentUser) { managementError = "You cannot change your own account status."; return; }
+        userToToggleBlock = user;
+        showBlockDialog = true;
+    }
+
+    private void CloseBlockDialog()
+    {
+        if (isChangingBlock) return;
+        showBlockDialog = false;
+        userToToggleBlock = null;
+    }
+
+    private async Task ConfirmToggleBlock()
+    {
+        var user = userToToggleBlock;
+        if (user is null || isChangingBlock) return;
+        if (user.IsCurrentUser) { managementError = "You cannot change your own account status."; return; }
+        isChangingBlock = true;
         var response = await Http.PostAsync($"api/admin/toggle-block/{user.Id}", null);
         if (response.IsSuccessStatusCode) { user.IsBlocked = !user.IsBlocked; managementMessage = $"Account status updated for {user.FullName}."; managementError = ""; }
         else { managementError = await ApiErrorMessage.FromResponseAsync(response, "The account status could not be updated."); }
+        isChangingBlock = false;
+        showBlockDialog = false;
+        userToToggleBlock = null;
     }
 
     private void OpenEmployeeModal() { newEmp = new() { Role = "Employee" }; modalError = ""; showEmployeeModal = true; }
@@ -363,6 +589,66 @@
     {
         mech.IsActive = !mech.IsActive;
         await Http.PutAsJsonAsync($"api/mechanics/{mech.Id}", mech);
+    }
+
+    private void SelectTab(string tab)
+    {
+        currentTab = tab;
+        pinError = "";
+        pinSuccess = "";
+    }
+
+    private async Task SaveAdminPin()
+    {
+        pinError = "";
+        pinSuccess = "";
+
+        if (string.IsNullOrWhiteSpace(pinForm.CurrentPassword))
+        {
+            pinError = "Enter your current account password.";
+            return;
+        }
+
+        if (pinForm.NewPin.Length != 6 || pinForm.NewPin.Any(character => !char.IsDigit(character)))
+        {
+            pinError = "Your new PIN must contain exactly 6 numbers.";
+            return;
+        }
+
+        if (!string.Equals(pinForm.NewPin, pinForm.ConfirmPin, StringComparison.Ordinal))
+        {
+            pinError = "The new PIN and confirmation do not match.";
+            return;
+        }
+
+        isSavingPin = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/admin/my-pin", pinForm);
+            if (!response.IsSuccessStatusCode)
+            {
+                pinError = await ApiErrorMessage.FromResponseAsync(response, "Your Admin PIN could not be saved. Check your password and try again.");
+                return;
+            }
+
+            pinForm = new();
+            pinSuccess = "Your Admin PIN has been saved.";
+        }
+        catch (HttpRequestException)
+        {
+            pinError = "We could not connect to the server. Please try again.";
+        }
+        finally
+        {
+            isSavingPin = false;
+        }
+    }
+
+    private sealed class AdminPinForm
+    {
+        public string CurrentPassword { get; set; } = "";
+        public string NewPin { get; set; } = "";
+        public string ConfirmPin { get; set; } = "";
     }
 
 }
