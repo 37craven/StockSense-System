@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using StockSense.Application.DTOs;
 using StockSense.Application.Interfaces;
 using StockSense.Infrastructure.Data;
+using StockSense.Web.Helpers;
 
 namespace StockSense.Web.Controllers
 {
@@ -84,8 +85,7 @@ namespace StockSense.Web.Controllers
             var result = await _userManager.CreateAsync(user, dto.Password);
             if (!result.Succeeded)
             {
-                var firstError = result.Errors.FirstOrDefault()?.Description ?? "Registration failed";
-                return BadRequest(ApiResponse.Error(firstError));
+                return BadRequest(ApiResponse.Error(IdentityErrorFeedback.GetUserMessage(result.Errors)));
             }
 
             try

@@ -2,8 +2,6 @@
 @layout PublicLayout
 @using BlazorBlueprint.Components
 @using StockSense.Client.Layout
-@inject NavigationManager NavigationManager
-@rendermode InteractiveWebAssembly
 
 
 <div class="home" style="display: flex; flex-direction: column; font-family: var(--font-sans); background-color: var(--background);">
@@ -119,12 +117,3 @@
         }
     }
 </style>
-
-@code {
-    private string? currentUrl;
-
-    protected override void OnInitialized()
-    {
-        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-    }
-}

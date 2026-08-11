@@ -10,6 +10,7 @@
 @inject IOrderSlipWorkflowService Workflow
 @inject AuthenticationStateProvider AuthenticationState
 @inject NavigationManager Navigation
+@inject ToastService Toast
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <PageTitle>Generate Orders</PageTitle>
@@ -391,7 +392,11 @@
             var state = await AuthenticationState.GetAuthenticationStateAsync();
             var result = await Workflow.CreateManualDraftAsync(new CreateManualOrderSlipDraftCommand { LocationId = InventoryDefaults.LocationId, CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierId = manualSupplierId, Reason = manualReason, Items = manualLines.Select(x => new CreateManualOrderSlipItemCommand { ProductId = x.ProductId, OrderedQuantity = x.Quantity }).ToList() });
             if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slip could not be created.");
-            message = $"Created manual draft {result.Value.OrderSlipNumber}."; manualLines.Clear(); manualReason = "";
+            Toast.Success(
+                $"Order slip {result.Value.OrderSlipNumber} is ready in Order History.",
+                "Manual draft created");
+            manualLines.Clear();
+            manualReason = "";
         }
         catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slip could not be created."); }
         finally { busy = false; }

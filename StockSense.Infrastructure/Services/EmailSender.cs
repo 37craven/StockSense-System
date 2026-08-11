@@ -93,6 +93,16 @@ public class EmailSender : IEmailSender<ApplicationUser>
 
                     </div>
 
+                    <p style='
+                        font-size: 14px;
+                        color: #52525b;
+                        margin-top: 24px;
+                        line-height: 1.6;
+                    '>
+                        Regards,<br>
+                        <strong style='color: #18181b;'>Sap Shop (Motor Parts &amp; Accessories)</strong>
+                    </p>
+
                 </div>
             </div>";
 
@@ -192,6 +202,16 @@ public class EmailSender : IEmailSender<ApplicationUser>
                         you can safely ignore this email.
                     </p>
 
+                    <p style='
+                        font-size: 14px;
+                        color: #52525b;
+                        margin-top: 24px;
+                        line-height: 1.6;
+                    '>
+                        Regards,<br>
+                        <strong style='color: #18181b;'>Sap Shop (Motor Parts &amp; Accessories)</strong>
+                    </p>
+
                 </div>
             </div>";
 
@@ -279,6 +299,16 @@ public class EmailSender : IEmailSender<ApplicationUser>
 
                     </div>
 
+                    <p style='
+                        font-size: 14px;
+                        color: #52525b;
+                        margin-top: 24px;
+                        line-height: 1.6;
+                    '>
+                        Regards,<br>
+                        <strong style='color: #18181b;'>Sap Shop (Motor Parts &amp; Accessories)</strong>
+                    </p>
+
                 </div>
             </div>";
 
@@ -294,13 +324,23 @@ public class EmailSender : IEmailSender<ApplicationUser>
         string subject,
         string body)
     {
+        var smtpHost = _config["Smtp:Host"]
+            ?? throw new InvalidOperationException("SMTP host is not configured.");
+        var smtpUser = _config["Smtp:User"]
+            ?? throw new InvalidOperationException("SMTP user is not configured.");
+        var smtpPassword = _config["Smtp:Pass"]
+            ?? throw new InvalidOperationException("SMTP password is not configured.");
+        var port = _config.GetValue<int?>("Smtp:Port")
+            ?? throw new InvalidOperationException("SMTP port is not configured.");
+        if (port is <= 0 or > 65535)
+            throw new InvalidOperationException("SMTP port must be between 1 and 65535.");
+
         var message = new MimeMessage();
 
         message.From.Add(
             new MailboxAddress(
-                "Sap Shop Support",
-                _config["Smtp:User"]
-                    ?? "noreply@yourdomain.com"
+                "Sap Shop (Motor Parts & Accessories)",
+                smtpUser
             )
         );
 
@@ -324,22 +364,16 @@ public class EmailSender : IEmailSender<ApplicationUser>
             new SmtpClient();
 
 
-        int port =
-            _config.GetValue<int>(
-                "Smtp:Port"
-            );
-
-
         await client.ConnectAsync(
-            _config["Smtp:Host"],
+            smtpHost,
             port,
             SecureSocketOptions.StartTls
         );
 
 
         await client.AuthenticateAsync(
-            _config["Smtp:User"],
-            _config["Smtp:Pass"]
+            smtpUser,
+            smtpPassword
         );
 
 

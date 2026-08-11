@@ -1,0 +1,2 @@
+[Migrations/*.Designer.cs]
+dotnet_diagnostic.CS8669.severity = none

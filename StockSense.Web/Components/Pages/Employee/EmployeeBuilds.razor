@@ -586,6 +586,7 @@
                 <div style="min-width: 0; display: flex; flex-direction: column;">
                     <div style="border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; flex: 1;">
                         <ProductCatalog Columns="3"
+                                        Products="catalogProducts"
                                         OnProductClick="p => ToggleEditPart(p)"
                                         IsSelected="p => editPartIds.Contains(p.Id)"
                                         ShowCheckbox="false"
@@ -794,6 +795,7 @@
     private List<int> editPartIds = new();
     private decimal editPartsTotal;
     private Dictionary<int, decimal> editedPrices = new();
+    private List<Product> catalogProducts = [];
 
     private decimal GetPartPrice(int productId, decimal defaultPrice) =>
         editedPrices.TryGetValue(productId, out var p) ? p : defaultPrice;
@@ -938,6 +940,7 @@
         if (!isAdmin)
             await LoadAdminOptions();
         await LoadBuilds();
+        catalogProducts = (await ProductRepo.GetAllAsync()).ToList();
     }
 
     private async Task LoadAdminOptions()

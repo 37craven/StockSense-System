@@ -32,19 +32,60 @@
     }
     else
     {
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4);">
-            @foreach (var s in services)
+        <div class="service-management-toolbar" role="search" aria-label="Filter services">
+            <div class="service-management-search">
+                <LucideIcon Name="search" Size="16" />
+                <label for="service-search" class="sr-only">Search services</label>
+                <input id="service-search"
+                       @bind="serviceSearch"
+                       @bind:event="oninput"
+                       placeholder="Search services or products..."
+                       autocomplete="off" />
+            </div>
+            <div class="service-management-filter">
+                <label for="service-category-filter">Category</label>
+                <select id="service-category-filter" @bind="selectedCategory">
+                    <option value="">All categories</option>
+                    @foreach (var category in ServiceCategories)
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </select>
+            </div>
+            <span class="service-management-results" aria-live="polite">
+                @FilteredServices.Count @((FilteredServices.Count == 1) ? "service" : "services")
+            </span>
+            @if (!string.IsNullOrWhiteSpace(serviceSearch) || !string.IsNullOrWhiteSpace(selectedCategory))
             {
-                <div style="justify-content: space-between; background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: auto; ">
+                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearServiceFilters">
+                    Clear filters
+                </BbButton>
+            }
+        </div>
+
+        @if (FilteredServices.Count == 0)
+        {
+            <div class="service-management-no-results">
+                <LucideIcon Name="search-x" Size="22" />
+                <strong>No matching services</strong>
+                <span>Try another search or clear the category filter.</span>
+            </div>
+        }
+        else
+        {
+        <div class="service-management-grid">
+            @foreach (var s in FilteredServices)
+            {
+                <article class="service-management-card">
                     <div>
                         @* Card header *@
-                        <div style="padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: var(--space-2);">
-                            <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); flex: 1;">@s.Name</span>
-                            <BbBadge Variant="BadgeVariant.Secondary">@s.Category</BbBadge>
+                        <div class="service-management-card__header">
+                            <span class="service-management-card__title">@s.Name</span>
+                            <span class="service-management-card__category">@s.Category</span>
                         </div>
 
                         @* Card body *@
-                        <div style="padding: var(--space-2) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); overflow: auto; max-height: 200px;">
+                        <div class="service-management-card__body">
                             @{
                                 var linkedProducts = s.RequiredProducts?.ToList() ?? new();
                                 var localItems = GetServiceItems(s.Id);
@@ -54,31 +95,35 @@
                             }
                             @if (items != null)
                             {
-                                <div style="display: flex; flex-wrap: wrap; gap: 4px; overflow: auto;">
+                                <div class="service-management-card__products">
                                     @foreach (var item in items)
                                     {
-                                        <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: var(--text-xs); background-color: var(--muted); color: var(--foreground); white-space: nowrap;">@item</span>
+                                        <span class="service-management-card__product">@item</span>
                                     }
                                 </div>
                             }
                             else
                             {
-                                <span style="font-style: italic; font-size: var(--text-xs); color: var(--muted-foreground);">No products linked</span>
+                                <div class="service-management-card__empty">
+                                    <LucideIcon Name="link-2-off" Size="14" />
+                                    No products linked
+                                </div>
                             }
                         </div>
                     </div>
 
                     @* Card footer *@
-                    <div style="padding: var(--space-2) var(--space-4); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <div class="service-management-card__footer">
                         <span style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--foreground);">₱@s.Price.ToString("N0")</span>
-                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="() => OpenModal(s)">
+                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="service-management-card__action" OnClick="() => OpenModal(s)">
                             <LucideIcon Name="settings-2" Size="14" />
                             Manage Service
                         </BbButton>
                     </div>
-                </div>
+                </article>
             }
         </div>
+        }
     }
 </div>
 
@@ -318,6 +363,8 @@
     private string newServiceCategory = "General";
     private decimal newServicePrice = 0;
     private int newServiceMinutes = 0;
+    private string serviceSearch = "";
+    private string selectedCategory = "";
     private decimal editPrice;
     private string editBaseline = "";
     private bool showDiscardModal;
@@ -326,6 +373,38 @@
     private bool IsCreateDirty => !string.IsNullOrWhiteSpace(newServiceName) ||
         !string.Equals(newServiceCategory, "General", StringComparison.Ordinal) || newServicePrice != 0 || newServiceMinutes != 0;
     private bool IsEditDirty => !string.Equals(editBaseline, EditorFingerprint(), StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(newItemName);
+
+    private IReadOnlyList<string> ServiceCategories => services?
+        .Select(service => service.Category)
+        .Where(category => !string.IsNullOrWhiteSpace(category))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(category => category)
+        .ToList() ?? [];
+
+    private IReadOnlyList<StoreServiceDto> FilteredServices => services?
+        .Where(service =>
+            (string.IsNullOrWhiteSpace(selectedCategory) ||
+             string.Equals(service.Category, selectedCategory, StringComparison.OrdinalIgnoreCase)) &&
+            ServiceMatchesSearch(service))
+        .ToList() ?? [];
+
+    private bool ServiceMatchesSearch(StoreServiceDto service)
+    {
+        if (string.IsNullOrWhiteSpace(serviceSearch))
+            return true;
+
+        var search = serviceSearch.Trim();
+        return service.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               service.Category.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               service.RequiredProducts?.Any(product => product.Name.Contains(search, StringComparison.OrdinalIgnoreCase)) == true ||
+               GetServiceItems(service.Id).Any(item => item.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void ClearServiceFilters()
+    {
+        serviceSearch = "";
+        selectedCategory = "";
+    }
 
     // In-memory store: serviceId -> list of generic items
     private Dictionary<int, List<GenericItem>> serviceItemsMap = new();

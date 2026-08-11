@@ -21,12 +21,19 @@ public class OrderEmailSender
         string fileName,
         CancellationToken cancellationToken = default)
     {
-        var smtpUser = _config["Smtp:User"];
-        if (string.IsNullOrEmpty(smtpUser))
-            throw new InvalidOperationException("SMTP user is not configured.");
+        var smtpUser = _config["Smtp:User"]
+            ?? throw new InvalidOperationException("SMTP user is not configured.");
+        var smtpHost = _config["Smtp:Host"]
+            ?? throw new InvalidOperationException("SMTP host is not configured.");
+        var smtpPassword = _config["Smtp:Pass"]
+            ?? throw new InvalidOperationException("SMTP password is not configured.");
+        var port = _config.GetValue<int?>("Smtp:Port")
+            ?? throw new InvalidOperationException("SMTP port is not configured.");
+        if (port is <= 0 or > 65535)
+            throw new InvalidOperationException("SMTP port must be between 1 and 65535.");
 
         var message = new MimeMessage();
-        message.From.Add(new MailboxAddress("SapShop Orders", smtpUser));
+        message.From.Add(new MailboxAddress("Sap Shop (Motor Parts & Accessories)", smtpUser));
         message.To.Add(new MailboxAddress("", toEmail));
         message.Subject = subject;
 
@@ -40,10 +47,8 @@ public class OrderEmailSender
         message.Body = builder.ToMessageBody();
 
         using var client = new SmtpClient();
-        int port = _config.GetValue<int>("Smtp:Port");
-
-        await client.ConnectAsync(_config["Smtp:Host"], port, SecureSocketOptions.StartTls, cancellationToken);
-        await client.AuthenticateAsync(smtpUser, _config["Smtp:Pass"], cancellationToken);
+        await client.ConnectAsync(smtpHost, port, SecureSocketOptions.StartTls, cancellationToken);
+        await client.AuthenticateAsync(smtpUser, smtpPassword, cancellationToken);
 
         await client.SendAsync(message, cancellationToken);
         await client.DisconnectAsync(true, cancellationToken);

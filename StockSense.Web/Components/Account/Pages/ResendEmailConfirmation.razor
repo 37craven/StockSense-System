@@ -27,7 +27,7 @@
 
         <EditForm Model="Input" FormName="resend-email-confirmation" OnValidSubmit="OnValidSubmitAsync" method="post">
             <DataAnnotationsValidator />
-            <ValidationSummary style="margin-bottom: var(--space-6); color: var(--destructive); background-color: var(--destructive-muted); padding: var(--space-2); border: 1px solid var(--destructive-border); border-radius: var(--radius); font-size: var(--text-sm);" role="alert" />
+            <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
 
             <div style="margin-bottom: var(--space-6);">
                 <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Email</label>

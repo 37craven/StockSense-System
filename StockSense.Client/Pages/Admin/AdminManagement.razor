@@ -361,29 +361,57 @@
             </div>
 
             <div style="padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-3);">
+                @if (!string.IsNullOrEmpty(modalError))
+                {
+                    <div class="account-error-feedback" role="alert" aria-live="assertive">
+                        <span class="account-error-feedback__icon" aria-hidden="true">
+                            <LucideIcon Name="circle-alert" Size="18" />
+                        </span>
+                        <div>
+                            <strong>Account not created</strong>
+                            @if (ModalErrorMessages.Count > 1)
+                            {
+                                <ul class="account-error-feedback__list">
+                                    @foreach (var error in ModalErrorMessages)
+                                    {
+                                        <li>@error</li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <p>@ModalErrorMessages[0]</p>
+                            }
+                        </div>
+                    </div>
+                }
+
                 <div style="display: flex; gap: var(--space-3);">
                     <div style="flex: 1; display: flex; flex-direction: column; gap: var(--space-2);">
-                        <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">First Name</label>
+                        <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">First Name <span aria-hidden="true" class="text-destructive">*</span></label>
                         <input @bind="newEmp.FirstName" placeholder="First name"
+                               aria-required="true"
                                style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                     </div>
                     <div style="flex: 1; display: flex; flex-direction: column; gap: var(--space-2);">
-                        <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Last Name</label>
+                        <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Last Name <span aria-hidden="true" class="text-destructive">*</span></label>
                         <input @bind="newEmp.LastName" placeholder="Last name"
+                               aria-required="true"
                                style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                     </div>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Email Address</label>
+                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Email Address <span aria-hidden="true" class="text-destructive">*</span></label>
                     <input @bind="newEmp.Email" type="email" placeholder="email@example.com"
+                           aria-required="true"
                            style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Temporary Password</label>
+                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Temporary Password <span aria-hidden="true" class="text-destructive">*</span></label>
                     <div class="relative">
-                        <input id="new-staff-password" class="password-with-toggle" @bind="newEmp.Password" type="password" placeholder="Temporary password" autocomplete="new-password"
+                        <input id="new-staff-password" class="password-with-toggle" @bind="newEmp.Password" type="password" placeholder="Temporary password" autocomplete="new-password" aria-required="true"
                                style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                         <button type="button" class="password-toggle-button" data-password-toggle data-password-target="new-staff-password" data-password-label="temporary password"
                                 aria-controls="new-staff-password" aria-label="Show temporary password" aria-pressed="false">
@@ -402,12 +430,6 @@
                     </select>
                 </div>
 
-                @if (!string.IsNullOrEmpty(modalError))
-                {
-                    <div style="padding: var(--space-3); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive-muted-foreground); font-size: var(--text-sm);">
-                        @modalError
-                    </div>
-                }
             </div>
 
             <div style="padding: var(--space-4) var(--space-6); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--space-2);">
@@ -567,9 +589,45 @@
 
     private void OpenEmployeeModal() { newEmp = new() { Role = "Employee" }; modalError = ""; showEmployeeModal = true; }
 
+    private IReadOnlyList<string> ModalErrorMessages
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(modalError))
+                return [];
+
+            return System.Text.RegularExpressions.Regex
+                .Split(
+                    modalError,
+                    @"(?:\r?\n)+|(?=Passwords?\s+must\b)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                .Select(message => message.Trim())
+                .Where(message => !string.IsNullOrWhiteSpace(message))
+                .ToList();
+        }
+    }
+
     private async Task CreateEmployee()
     {
         modalError = "";
+
+        var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(newEmp);
+        if (!System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
+                newEmp,
+                validationContext,
+                validationResults,
+                validateAllProperties: true))
+        {
+            modalError = string.Join(
+                Environment.NewLine,
+                validationResults
+                    .Select(result => result.ErrorMessage)
+                    .Where(message => !string.IsNullOrWhiteSpace(message))
+                    .Distinct());
+            return;
+        }
+
         var response = await Http.PostAsJsonAsync("api/admin/create-employee", newEmp);
         if (response.IsSuccessStatusCode) { showEmployeeModal = false; await LoadUsers(); }
         else { modalError = await ApiErrorMessage.FromResponseAsync(response, "The employee account could not be created."); }

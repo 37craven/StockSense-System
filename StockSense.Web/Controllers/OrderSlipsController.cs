@@ -10,6 +10,7 @@ using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Services;
+using StockSense.Web.Helpers;
 
 namespace StockSense.Web.Controllers;
 
@@ -155,9 +156,7 @@ public sealed class OrderSlipsController : ControllerBase
             var pdf = _docService.GenerateOrderSlipPdf(dto);
             var slipNumber = string.IsNullOrWhiteSpace(dto.OrderSlipNumber) ? dto.SlipNumber : dto.OrderSlipNumber;
             var subject = $"Purchase Order - {slipNumber}";
-            var body = $"<h3>New Order Request</h3><p>Please find the attached order slip <strong>{slipNumber}</strong>.</p>"
-                + "<p>Kindly review the quantities and notify us once the items are ready for delivery.</p>"
-                + "<p>Regards,<br/>StockSense System</p>";
+            var body = PurchaseOrderEmailTemplate.Build(slipNumber);
             try
             {
                 await _orderEmailSender.SendEmailWithAttachmentAsync(

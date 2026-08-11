@@ -8,7 +8,6 @@
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
-@inject RoleManager<IdentityRole> RoleManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
@@ -34,7 +33,7 @@
             }
 
             @* --- VALIDATION SUMMARY --- *@
-            <ValidationSummary style="margin-bottom: 1.5rem; font-size: var(--text-sm); color: var(--destructive); background-color: var(--destructive-muted); padding: 0.75rem; border: 1px solid var(--destructive-border); border-radius: var(--radius); list-style-position: inside;" role="alert" />
+            <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
 
             <div style="margin-bottom: 1.5rem;">
                 <label style="display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 0.5rem; color: var(--foreground);">Email</label>
@@ -115,25 +114,24 @@
 
     public async Task LoginUser()
     {
-        var result = await SignInManager.PasswordSignInAsync(
-            Input.Email,
-            Input.Password,
-            Input.RememberMe,
-            lockoutOnFailure: true);
+        // Load the account once, then pass that instance to Identity. The string
+        // overload performs its own lookup, and the previous success path queried
+        // the same account and its roles again.
+        var user = await UserManager.FindByEmailAsync(Input.Email);
+        var result = user is null
+            ? SignInResult.Failed
+            : await SignInManager.PasswordSignInAsync(
+                user,
+                Input.Password,
+                Input.RememberMe,
+                lockoutOnFailure: true);
 
         if (result.Succeeded)
         {
-            var user = await UserManager.FindByEmailAsync(Input.Email);
-            if (user == null) { errorMessage = "Error: Account not found."; return; }
-
-            var roles = await UserManager.GetRolesAsync(user);
-            Logger.LogInformation($"DEBUG: User {user.Email} has roles: {string.Join(", ", roles)}");
-
-            if (roles.Any(r => r.Equals("Admin", StringComparison.OrdinalIgnoreCase)))
-            {
-                RedirectManager.RedirectTo("/dashboard");
-            }
-            else if (roles.Any(r => r.Equals("Employee", StringComparison.OrdinalIgnoreCase)))
+            // Role controls only the landing page. Identity roles/claims still
+            // enforce authorization after navigation.
+            if (string.Equals(user!.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(user.Role, "Employee", StringComparison.OrdinalIgnoreCase))
             {
                 RedirectManager.RedirectTo("/dashboard");
             }

@@ -4,6 +4,11 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
+@if (ShowInitialLoading && isInitializing)
+{
+    <LoadingState FullPage="true" Description="syncing with the server..." />
+}
+<div class="@(ShowInitialLoading && isInitializing ? "hidden" : "contents")">
 <section class="chat-shell" aria-labelledby="assistance-title">
     <h1 id="assistance-title" class="sr-only">@roleCopy.AssistantName</h1>
 
@@ -157,6 +162,7 @@
         </div>
     </div>
 </section>
+</div>
 
 <style>
     .chat-shell {
@@ -661,6 +667,8 @@
     private string? errorMessage;
     private FailedAssistanceRequest? failedRequest;
     private bool isSending;
+    private bool isInitializing = true;
+    private bool chatModuleInitializationStarted;
     private bool isDisposed;
     private IJSObjectReference? chatModule;
     private ElementReference messagesElement;
@@ -668,6 +676,9 @@
     private ElementReference sendButtonElement;
     private IReadOnlyList<AssistanceSuggestion> suggestions = AssistanceSuggestions.ForRole(null);
     private AssistanceRoleCopy roleCopy = AssistanceRolePresentation.ForRole(null);
+
+    [Parameter]
+    public bool ShowInitialLoading { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -679,9 +690,10 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || isDisposed)
+        if (isDisposed || chatModule is not null || chatModuleInitializationStarted)
             return;
 
+        chatModuleInitializationStarted = true;
         try
         {
             var importedModule = await JS.InvokeAsync<IJSObjectReference>(
@@ -716,6 +728,17 @@
             chatModule = null;
             if (failedModule is not null)
                 await DisposeModuleAsync(failedModule);
+        }
+        finally
+        {
+            if (chatModule is null)
+                chatModuleInitializationStarted = false;
+
+            if (!isDisposed && isInitializing)
+            {
+                isInitializing = false;
+                await InvokeAsync(StateHasChanged);
+            }
         }
     }
 

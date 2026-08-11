@@ -10,7 +10,6 @@
 @using StockSense.Client.Layout
 @using BlazorBlueprint.Primitives.Services
 @using StockSense.Domain.Entities
-@using StockSense.Infrastructure.Data.Repositories
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ToastService Toast
@@ -1287,8 +1286,10 @@
         return parts.Length > 1 ? parts[^1] : name;
     }
 
-    private List<ProductBreakdownEntry>? ParseProductBreakdown(string json)
+    private List<ProductBreakdownEntry>? ParseProductBreakdown(string? json)
     {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+
         try
         {
             return JsonSerializer.Deserialize<List<ProductBreakdownEntry>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });

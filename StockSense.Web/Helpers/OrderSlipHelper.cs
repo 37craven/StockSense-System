@@ -59,7 +59,8 @@ public class OrderSlipHelper
             var allProducts = await _productRepo.GetAllAsync();
             var matched = allProducts.FirstOrDefault(p =>
                 command.Items.Any(i => i.ProductName == p.Name && i.Brand == p.Brand));
-            if ((matched?.SupplierId ?? 0) > 0) supplierId = matched.SupplierId ?? 0;
+            if (matched?.SupplierId is int matchedSupplierId && matchedSupplierId > 0)
+                supplierId = matchedSupplierId;
         }
 
         var newSlip = new OrderSlip
@@ -143,12 +144,7 @@ public class OrderSlipHelper
     public async Task<bool> SendEmailAsync(string recipientEmail, byte[] pdfAttachment, string slipNumber)
     {
         string subject = $"Purchase Order - {slipNumber}";
-        string body = $@"
-            <h3>New Order Request</h3>
-            <p>Please find the attached order slip <strong>{slipNumber}</strong> for motor parts.</p>
-            <p>Kindly review the quantities and notify us once the items are ready for delivery.</p>
-            <br/>
-            <p>Regards,<br/>StockSense System</p>";
+        string body = PurchaseOrderEmailTemplate.Build(slipNumber);
         await _orderEmailSender.SendEmailWithAttachmentAsync(recipientEmail, subject, body, pdfAttachment, $"Order_{slipNumber}.pdf");
         return true;
     }

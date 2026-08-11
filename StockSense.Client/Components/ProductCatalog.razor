@@ -1,6 +1,4 @@
 @using StockSense.Domain.Entities
-@using StockSense.Infrastructure.Data.Repositories
-@inject IServiceScopeFactory ScopeFactory
 
 <div class="pc-catalog">
     <div style="flex-shrink: 0; padding: var(--space-4); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-3);">
@@ -93,15 +91,13 @@
     [Parameter] public bool ShowCheckbox { get; set; }
     [Parameter] public bool AllowDisabledClick { get; set; }
     [Parameter] public bool ActiveOnly { get; set; }
-    [Parameter] public List<Product>? Products { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyCollection<Product>? Products { get; set; }
 
     private List<Product> allProducts = new();
     private bool isLoaded;
-    private bool isLoading;
     private List<string> categories = new();
     private string? selectedCategory;
     private string searchTerm = "";
-    private List<Product>? previousProducts;
 
     private bool IsProductDisabled(Product p) => IsDisabled?.Invoke(p) ?? p.CurrentStock <= 0;
 
@@ -111,49 +107,24 @@
         if (OnProductClick.HasDelegate) await OnProductClick.InvokeAsync(p);
     }
 
-    public async Task ReloadAsync() => await LoadAsync();
-
-    protected override Task OnInitializedAsync() => LoadAsync();
-
-    protected override async Task OnParametersSetAsync()
+    public Task ReloadAsync()
     {
-        if (Products != previousProducts)
-        {
-            previousProducts = Products;
-            await LoadAsync();
-        }
+        BindProducts();
+        return Task.CompletedTask;
     }
 
-    private async Task LoadAsync()
+    protected override void OnParametersSet() => BindProducts();
+
+    private void BindProducts()
     {
-        if (isLoading) return;
-        isLoading = true;
-        try
-        {
-            if (Products is not null)
-            {
-                allProducts = Products;
-            }
-            else
-            {
-                using var scope = ScopeFactory.CreateScope();
-                var repo = scope.ServiceProvider.GetRequiredService<ProductRepository>();
-                allProducts = ActiveOnly
-                    ? await repo.GetActiveAsync()
-                    : await repo.GetAllAsync();
-            }
-            isLoaded = true;
-            categories = allProducts
-                .Select(p => p.Category)
-                .Where(c => !string.IsNullOrEmpty(c))
-                .Distinct()
-                .OrderBy(c => c)
-                .ToList();
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        allProducts = Products?.ToList() ?? [];
+        isLoaded = Products is not null;
+        categories = allProducts
+            .Select(p => p.Category)
+            .Where(c => !string.IsNullOrEmpty(c))
+            .Distinct()
+            .OrderBy(c => c)
+            .ToList();
     }
 
     private IEnumerable<Product> FilteredProducts => allProducts

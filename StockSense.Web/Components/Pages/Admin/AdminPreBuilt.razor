@@ -328,6 +328,7 @@ else
                 <label class="text-xs font-semibold mb-1 block text-foreground shrink-0">Select Products <span class="font-normal text-muted-foreground">(@newPackage.SelectedProductIds.Count selected)</span></label>
                 <div class="overflow-hidden border border-border rounded-md flex flex-col" style="height: 50vh">
                     <ProductCatalog Columns="3"
+                                    Products="allProducts"
                                     OnProductClick="p => ToggleProductSelection(p.Id)"
                                     IsSelected="p => newPackage.SelectedProductIds.Contains(p.Id)"
                                     ShowCheckbox="false"
@@ -387,7 +388,7 @@ else
     private string errorMessage = string.Empty;
 
     private List<PreBuiltPackageDto> existingPackages = new();
-    private List<ProductDto>? allProducts;
+    private List<Product>? allProducts;
     private List<Motorcycle> motorcycles = new();
     private CreatePreBuiltDto newPackage = new();
     private PreBuiltPackageDto? packageToDelete;
@@ -438,10 +439,7 @@ else
             existingPackages = packages.Select(MapToDto).ToList();
 
             var products = await ProductRepo.GetAllAsync();
-            allProducts = products.Select(p => new ProductDto(
-                p.Id, p.Name, p.Category, p.Brand, p.Price,
-                p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0,
-                p.Supplier?.Name ?? "", p.ImageUrl ?? "")).ToList();
+            allProducts = products.ToList();
 
             motorcycles = await MotorcycleRepo.GetAllAsync();
         }

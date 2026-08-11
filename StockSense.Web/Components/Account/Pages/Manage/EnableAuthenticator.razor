@@ -78,7 +78,7 @@ else
 
             <EditForm Model="Input" FormName="send-code" OnValidSubmit="OnValidSubmitAsync" method="post">
                 <DataAnnotationsValidator />
-                <ValidationSummary style="margin-bottom: var(--space-4); color: var(--destructive); background-color: var(--destructive-muted); padding: var(--space-2); border: 1px solid var(--destructive-border); border-radius: var(--radius); font-size: var(--text-sm);" role="alert" />
+                <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
 
                 <div style="display: flex; flex-direction: column; gap: var(--space-4);">
                     <div style="display: flex; flex-direction: column; gap: var(--space-2);">

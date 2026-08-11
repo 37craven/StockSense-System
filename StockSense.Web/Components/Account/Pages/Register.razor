@@ -7,15 +7,14 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using StockSense.Web.Components.Account
+@using StockSense.Web.Helpers
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
-@inject SignInManager<ApplicationUser> SignInManager
 @inject Application.Interfaces.IEmailSender<ApplicationUser> EmailSender
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
-@inject RoleManager<IdentityRole> RoleManager
 
 <PageTitle>Register</PageTitle>
 
@@ -30,9 +29,32 @@
             <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-bottom: var(--space-4); color: var(--muted-foreground);">Create a new account.</h2>
             <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
 
-            <StatusMessage Message="@Message" />
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <div class="account-error-feedback" role="alert" aria-live="assertive">
+                    <span class="account-error-feedback__icon" aria-hidden="true">
+                        <LucideIcon Name="circle-alert" Size="18" />
+                    </span>
+                    <div>
+                        <strong>Account not created</strong>
+                        @if (IdentityErrorMessages.Count > 1)
+                        {
+                            <ul class="account-error-feedback__list">
+                                @foreach (var error in IdentityErrorMessages)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p>@IdentityErrorMessages[0]</p>
+                        }
+                    </div>
+                </div>
+            }
 
-            <ValidationSummary style="margin-bottom: var(--space-6); color: var(--destructive); background-color: var(--destructive-muted); padding: var(--space-2); border: 1px solid var(--destructive-border); border-radius: var(--radius); font-size: var(--text-sm);" role="alert" />
+            <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
 
             <div style="display: flex; gap: var(--space-3); margin-bottom: var(--space-6);">
                 <div style="flex: 1;">
@@ -150,7 +172,13 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private string? Message => identityErrors is null
+        ? null
+        : IdentityErrorFeedback.GetUserMessage(identityErrors);
+
+    private IReadOnlyList<string> IdentityErrorMessages => identityErrors is null
+        ? []
+        : IdentityErrorFeedback.GetUserMessages(identityErrors);
 
     public async Task RegisterUser(EditContext editContext)
     {
@@ -164,6 +192,8 @@
 
             user.FirstName = Input.FirstName;
             user.LastName = Input.LastName;
+            const string defaultRole = "Customer";
+            user.Role = defaultRole;
 
             await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
             var emailStore = GetEmailStore();
@@ -177,19 +207,23 @@
                 return;
             }
 
-            // --- START OF DEFAULT ROLE LOGIC ---
-            const string defaultRole = "Customer";
-
-            if (!await RoleManager.RoleExistsAsync(defaultRole))
+            // Roles are seeded during application startup/deployment. Avoid the
+            // per-registration existence query and redundant user update.
+            var roleResult = await UserManager.AddToRoleAsync(user, defaultRole);
+            if (!roleResult.Succeeded)
             {
-                await RoleManager.CreateAsync(new IdentityRole(defaultRole));
+                // Do not leave an account without its required authorization role.
+                var deleteResult = await UserManager.DeleteAsync(user);
+                if (!deleteResult.Succeeded)
+                {
+                    Logger.LogError(
+                        "Registration role assignment failed and cleanup was unsuccessful for user {UserId}.",
+                        user.Id);
+                }
+
+                identityErrors = roleResult.Errors;
+                return;
             }
-
-            await UserManager.AddToRoleAsync(user, defaultRole);
-
-            user.Role = defaultRole;
-            await UserManager.UpdateAsync(user);
-            // --- END OF DEFAULT ROLE LOGIC ---
 
             Logger.LogInformation("User created a new account with Customer role.");
 
@@ -246,28 +280,29 @@
 
     private sealed class InputModel
     {
-        [Required]
+        [Required(ErrorMessage = "First name is required.")]
         [Display(Name = "First Name")]
         public string FirstName { get; set; } = "";
 
-        [Required]
+        [Required(ErrorMessage = "Last name is required.")]
         [Display(Name = "Last Name")]
         public string LastName { get; set; } = "";
 
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         [Display(Name = "Email")]
         public string Email { get; set; } = "";
 
-        [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [Required(ErrorMessage = "Password is required.")]
+        [StringLength(100, ErrorMessage = "Password must be between {2} and {1} characters.", MinimumLength = 6)]
         [DataType(DataType.Password)]
         [Display(Name = "Password")]
         public string Password { get; set; } = "";
 
         [DataType(DataType.Password)]
         [Display(Name = "Confirm password")]
-        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        [Required(ErrorMessage = "Confirm your password.")]
+        [Compare("Password", ErrorMessage = "Passwords do not match.")]
         public string ConfirmPassword { get; set; } = "";
     }
 }

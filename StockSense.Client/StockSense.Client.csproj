@@ -10,16 +10,12 @@
 
   <ItemGroup>
     <PackageReference Include="BlazorBlueprint.Components" Version="3.14.1" />
-    <PackageReference Include="MailKit" Version="4.15.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.23" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" Version="8.0.23" />
-    <PackageReference Include="MimeKit" Version="4.15.1" />
-    <PackageReference Include="QuestPDF" Version="2026.7.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.29" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" Version="8.0.29" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\StockSense.Application\StockSense.Application.csproj" />
-    <ProjectReference Include="..\StockSense.Infrastructure\StockSense.Infrastructure.csproj" />
   </ItemGroup>
 
 

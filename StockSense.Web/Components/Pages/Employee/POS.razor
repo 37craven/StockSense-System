@@ -33,6 +33,7 @@
     <div class="pos-catalog flex-1 min-w-0 overflow-hidden bg-card border border-border rounded-lg flex flex-col"
          style="@(scannerEnabled ? "padding-bottom: 360px" : "padding-bottom: 56px")">
         <ProductCatalog @ref="catalog"
+                        Products="catalogProducts"
                         ActiveOnly="true"
                         OnProductClick="AddToCart"
                         IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
@@ -482,6 +483,7 @@
     </div>;
 
     private ProductCatalog? catalog;
+    private List<Product> catalogProducts = [];
     private List<CartItemDto> cart = new();
     private bool isProcessing = false;
     private string? statusMessage;
@@ -761,6 +763,7 @@
     {
         var authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
         authenticatedUserId = authenticationState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        catalogProducts = (await ProductRepo.GetActiveAsync()).ToList();
     }
 
     private decimal SubtotalAmount => cart.Sum(item => item.OriginalPrice * item.Quantity);
@@ -858,6 +861,7 @@
             referenceNumber = null;
             remarks = null;
 
+            catalogProducts = (await ProductRepo.GetActiveAsync()).ToList();
             if (catalog is not null) await catalog.ReloadAsync();
         }
         catch (Exception ex)

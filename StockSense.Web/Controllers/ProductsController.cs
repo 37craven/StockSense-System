@@ -83,6 +83,7 @@ public class ProductsController : ControllerBase
         }
         sb.AppendLine("</table>");
         sb.AppendLine($"<h3>Grand Total: P {grandTotal:N2}</h3>");
+        sb.AppendLine("<p>Regards,<br><strong>Sap Shop (Motor Parts &amp; Accessories)</strong></p>");
 
         try
         {
