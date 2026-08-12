@@ -13,14 +13,6 @@ window.barcodeScanner = (function () {
         fps: 10,
         aspectRatio: 1.777,
 
-        qrbox: function (viewfinderWidth, viewfinderHeight) {
-            const width = Math.floor(viewfinderWidth * 0.8);
-            const height = Math.floor(viewfinderHeight * 0.55);
-
-            return {
-                width: Math.max(150, width),
-                height: Math.max(100, height)
-            };
         }
     };
 

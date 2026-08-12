@@ -51,13 +51,8 @@
     .appt-actions {
         display: flex;
         gap: 6px;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         width: 100%;
-    }
-
-    .appt-actions .appt-action-btn {
-        flex: 1 1 0;
-        min-width: 0;
     }
 
     .appt-card-list { display: none; }
@@ -213,7 +208,7 @@
         .appt-card-summary { padding: 14px; }
         .appt-card-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 14px 14px; }
         .appt-card-services { grid-column: 1 / -1; }
-        .appt-card-actions { padding: 12px 14px 14px; }
+        .appt-card-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px 14px 14px; }
         .appt-card-actions .appt-action-btn:only-child { grid-column: 1 / -1; }
 
         .col-cust {
@@ -227,10 +222,6 @@
         .col-act {
             width: 50%;
         }
-    }
-
-    @@media (max-width: 420px) {
-        .appt-card-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 </style>
 

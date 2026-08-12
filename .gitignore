@@ -374,3 +374,6 @@ tailwindcss
 
 # Local notes
 NOTES.md.agents/
+
+# App secrets
+StockSense.Web/appsettings.json
