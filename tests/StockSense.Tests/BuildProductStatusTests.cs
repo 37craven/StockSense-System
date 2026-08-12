@@ -51,6 +51,29 @@ public sealed class BuildProductStatusTests
     }
 
     [Fact]
+    public async Task CreateBuild_then_mine_returns_only_current_customers_builds()
+    {
+        await using var fixture = await Fixture.CreateAsync(active: true);
+
+        Assert.IsType<OkObjectResult>(await fixture.Controller.CreateBuild(fixture.Command(1, 250m, "Trusted product")));
+        fixture.Context.BuildRequests.Add(new BuildRequest
+        {
+            CustomerUserId = "customer-2",
+            CustomerEmail = "other@example.com",
+            CustomerName = "Other Customer",
+            SelectedPartsJson = "[]"
+        });
+        await fixture.Context.SaveChangesAsync();
+
+        var response = await fixture.Controller.GetCustomerBuilds();
+        var ok = Assert.IsType<OkObjectResult>(response.Result);
+        var builds = Assert.IsType<List<BuildRequestDto>>(ok.Value);
+
+        Assert.Single(builds);
+        Assert.Equal("customer@example.com", builds[0].CustomerEmail);
+    }
+
+    [Fact]
     public async Task CreateBuild_rejects_duplicate_parts_when_available_stock_is_too_low()
     {
         await using var fixture = await Fixture.CreateAsync(active: true, currentStock: 2, reservedStock: 1);

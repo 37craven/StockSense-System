@@ -5,6 +5,7 @@ namespace StockSense.Application.DTOs;
 public class CompatibleMotorDto
 {
     public int Id { get; set; }
+    public int? MotorcycleId { get; set; }
     public string Brand { get; set; } = string.Empty;
     public string Model { get; set; } = string.Empty;
     public string StockCC { get; set; } = string.Empty;

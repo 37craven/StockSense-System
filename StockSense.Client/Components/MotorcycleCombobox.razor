@@ -14,6 +14,7 @@
                aria-expanded="@(isOpen ? "true" : "false")"
                aria-controls="@ListboxId"
                aria-activedescendant="@ActiveDescendant"
+               aria-required="@(Required ? "true" : "false")"
                disabled="@IsLoading"
                @onfocus="Open"
                @oninput="Filter"
@@ -85,6 +86,7 @@
     [Parameter] public int? Value { get; set; }
     [Parameter] public EventCallback<int?> ValueChanged { get; set; }
     [Parameter] public string Label { get; set; } = "Motorcycle";
+    [Parameter] public bool Required { get; set; }
     [Parameter] public string Placeholder { get; set; } = "Search motorcycles…";
     [Parameter] public string Id { get; set; } = $"mc-{Guid.NewGuid():N}";
     [Parameter] public bool IsLoading { get; set; }

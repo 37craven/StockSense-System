@@ -381,8 +381,8 @@
 </div>
 
 @* DETAIL MODAL *@
-<BbDialog @bind-Open="detailOpen">
-    <BbDialogContent class="flex flex-col p-0 overflow-hidden" Style="width:min(94vw,980px);max-height:82vh;">
+<BbDialog @bind-Open="detailOpen" @bind-Open:after="OnDetailOpenChanged">
+    <BbDialogContent class="flex max-h-[82dvh] w-[min(94vw,61.25rem)] flex-col overflow-hidden p-0">
         <div class="px-4 pt-4 shrink-0">
             <BbDialogHeader>
                 <div class="flex flex-wrap items-center gap-2">
@@ -440,7 +440,7 @@
                 <BbButton Variant="ButtonVariant.Outline" Class="@OrderSlipPresentation.DetailsActionClass" OnClick="CloseDetail">Close</BbButton>
                 @if (selectedSlip != null)
                 {
-                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PrintSlip"><LucideIcon Name="printer" Size="14" /> Print</BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PrintSlip" title="Print this order slip" aria-label="Print this order slip"><LucideIcon Name="printer" Size="14" aria-hidden="true" /> Print</BbButton>
                 }
             </div>
             <div class="detail-footer-group">
@@ -579,8 +579,8 @@
                                    aria-required="true" aria-describedby="close-remaining-pin-help" />
                             <button type="button" class="password-toggle-button" data-password-toggle data-password-target="close-remaining-admin-pin"
                                     data-password-label="Admin PIN" aria-controls="close-remaining-admin-pin" aria-label="Show Admin PIN" aria-pressed="false">
-                                <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                                <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
                             </button>
                         </div>
                         <p id="close-remaining-pin-help" class="m-0 text-xs text-muted-foreground">Ask the selected admin to enter their 6-digit PIN.</p>
@@ -718,6 +718,8 @@
     private OrderSlip? cancelling;
     private bool detailOpen;
     private OrderSlip? selectedSlip;
+    [SupplyParameterFromQuery(Name = "orderSlip")]
+    public int? RequestedOrderSlipId { get; set; }
     private bool receiveOpen;
     private Dictionary<int, int> receiveQtys = [];
     private DateTime receiveDate = DateTime.Today;
@@ -782,6 +784,10 @@
         isAdmin = authState.User.IsInRole("Admin");
         if (!isAdmin) await LoadAdminOptions();
         await Load();
+        if (RequestedOrderSlipId is int requestedId)
+        {
+            await OpenDetailById(requestedId);
+        }
     }
 
     private async Task Load()
@@ -798,12 +804,19 @@
         x.GeneratedAt == default ? x.DateGenerated : x.GeneratedAt;
 
     private async Task OpenDetail(OrderSlip slip)
+        => await OpenDetailById(slip.Id);
+
+    private async Task OpenDetailById(int id)
     {
         selectedSlip = await Db.OrderSlips.AsNoTracking()
             .Include(x => x.Supplier)
             .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == slip.Id);
-        detailOpen = true;
+            .FirstOrDefaultAsync(x => x.Id == id);
+        detailOpen = selectedSlip != null;
+        if (selectedSlip == null)
+        {
+            error = "That order slip could not be found.";
+        }
     }
 
     private async Task<OrderSlip?> LoadSlip(int id) => await Db.OrderSlips.AsNoTracking()
@@ -1107,13 +1120,22 @@
         public int Status { get; set; }
         public string Body { get; set; } = "";
     }
-    private void CloseDetail() { detailOpen = false; selectedSlip = null; }
+    private void CloseDetail() => detailOpen = false;
+
+    private void OnDetailOpenChanged()
+    {
+        if (detailOpen) return;
+        selectedSlip = null;
+        if (RequestedOrderSlipId.HasValue)
+        {
+            Navigation.NavigateTo("/admin/order-history", replace: true);
+        }
+    }
 
     private async Task PrintSlip()
     {
         if (selectedSlip == null) return;
-        await JS.InvokeVoidAsync("eval",
-            $"fetch('/api/order-slips/{selectedSlip.Id}/download-pdf').then(r=>r.json()).then(d=>{{window.location.href='/api/download/'+d.token;}})");
+        await JS.InvokeVoidAsync("print");
     }
 
     private async Task OpenDetailForReceive(OrderSlip slip)

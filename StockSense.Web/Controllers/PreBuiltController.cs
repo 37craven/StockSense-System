@@ -113,7 +113,7 @@ public class PreBuiltController : ControllerBase
         IsActive = p.IsActive, TotalPrice = p.TotalPrice,
         CompatibleMotors = p.CompatibleMotors.Select(m => new CompatibleMotorDto
         {
-            Id = m.Id, Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+            Id = m.Id, MotorcycleId = m.MotorcycleId, Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
         }).ToList(),
         IncludedProducts = p.IncludedProducts.Select(prod => new PreBuiltProductDto
         {

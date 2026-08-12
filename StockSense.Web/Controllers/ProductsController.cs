@@ -101,11 +101,17 @@ public class ProductsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductDto dto)
     {
+        var normalizedName = dto.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedName))
+            return BadRequest(ApiResponse.Error("Product name is required."));
+        if (await _productRepo.NameExistsAsync(normalizedName, HttpContext.RequestAborted))
+            return Conflict(ApiResponse.Error($"A product named \"{normalizedName}\" already exists."));
+
         var product = new Product
         {
-            Name = dto.Name,
-            Brand = dto.Brand,
-            Category = dto.Category,
+            Name = normalizedName,
+            Brand = dto.Brand?.Trim() ?? string.Empty,
+            Category = dto.Category?.Trim() ?? string.Empty,
             Price = dto.Price,
             UnitCost = dto.UnitCost,
             ReorderTarget = dto.ReorderTarget,

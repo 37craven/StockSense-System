@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using StockSense.Domain.Entities;
+using StockSense.Application.DTOs;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Infrastructure.Services;
@@ -12,6 +14,28 @@ namespace StockSense.Tests;
 
 public sealed class BarcodePdfTests
 {
+    [Fact]
+    public async Task CreateProduct_rejects_a_duplicate_name_ignoring_case_and_outer_whitespace()
+    {
+        await using var context = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options);
+        context.Products.Add(new Product { Name = "Premium Oil Filter", Category = "Filters" });
+        await context.SaveChangesAsync();
+        var controller = CreateController(context);
+
+        var result = await controller.CreateProduct(new CreateProductDto
+        {
+            Name = "  premium OIL filter  ",
+            Brand = "Test",
+            Category = "Filters",
+            Price = 100
+        });
+
+        Assert.IsType<ConflictObjectResult>(result);
+        Assert.Single(context.Products);
+    }
+
     [Fact]
     public async Task GetBarcodePdf_QrOnly_SucceedsWithInvalidLegacyBarcode()
     {
@@ -26,13 +50,7 @@ public sealed class BarcodePdfTests
         };
         context.Products.Add(product);
         await context.SaveChangesAsync();
-        var controller = new ProductsController(
-            new ProductRepository(context),
-            new EmailSender(new ConfigurationBuilder().Build()),
-            new BarcodeService(),
-            context,
-            new SafetyStockCalculationService(context, NullLogger<SafetyStockCalculationService>.Instance),
-            NullLogger<ProductsController>.Instance);
+        var controller = CreateController(context);
 
         var result = await controller.GetBarcodePdf(product.Id, "qr");
 
@@ -40,6 +58,19 @@ public sealed class BarcodePdfTests
         Assert.Equal("application/pdf", file.ContentType);
         Assert.NotEmpty(file.FileContents);
         Assert.Equal("INVALID-CODE!", product.Barcode);
+    }
+
+    private static ProductsController CreateController(ApplicationDbContext context)
+    {
+        var controller = new ProductsController(
+            new ProductRepository(context),
+            new EmailSender(new ConfigurationBuilder().Build()),
+            new BarcodeService(),
+            context,
+            new SafetyStockCalculationService(context, NullLogger<SafetyStockCalculationService>.Instance),
+            NullLogger<ProductsController>.Instance);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        return controller;
     }
 
     [Theory]

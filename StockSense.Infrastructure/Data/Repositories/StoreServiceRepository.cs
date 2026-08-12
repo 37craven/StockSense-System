@@ -39,6 +39,14 @@ public class StoreServiceRepository
         await _context.SaveChangesAsync();
     }
 
+    public Task<bool> NameExistsAsync(string name, CancellationToken cancellationToken = default)
+    {
+        var normalizedName = name.Trim().ToUpper();
+        return _context.StoreServices.AnyAsync(
+            service => service.Name.Trim().ToUpper() == normalizedName,
+            cancellationToken);
+    }
+
     public async Task SaveChangesAsync()
     {
         await _context.SaveChangesAsync();

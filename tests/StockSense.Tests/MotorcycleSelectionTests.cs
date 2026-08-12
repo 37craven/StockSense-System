@@ -62,6 +62,18 @@ public sealed class MotorcycleSelectionTests
     }
 
     [Fact]
+    public async Task Repository_detects_duplicate_motorcycles_ignoring_case_and_outer_whitespace()
+    {
+        await using var context = CreateContext();
+        context.Motorcycles.Add(new Motorcycle { Brand = "Honda", Model = "Click", BaseCC = "125cc" });
+        await context.SaveChangesAsync();
+        var repository = new MotorcycleRepository(context);
+
+        Assert.True(await repository.ExistsAsync(" hONDa ", " CLICK ", " 125CC "));
+        Assert.False(await repository.ExistsAsync("Honda", "Click", "150cc"));
+    }
+
+    [Fact]
     public async Task Motorcycle_options_endpoint_is_authenticated_and_returns_existing_records()
     {
         var authorization = typeof(MotorcyclesController).GetCustomAttribute<AuthorizeAttribute>();
@@ -102,10 +114,32 @@ public sealed class MotorcycleSelectionTests
         var appointments = await new AppointmentRepository(context)
             .GetByCustomerIdentityAsync("user-1", "customer@example.com", "Customer");
         var builds = await new BuildRequestRepository(context)
-            .GetByCustomerIdentityAsync("user-1", "customer@example.com", "Customer");
+            .GetByCustomerIdentityAsync("user-1", "customer@example.com");
 
         Assert.Equal("Burgman Street", Assert.Single(appointments).Motorcycle?.Model);
         Assert.Equal("Burgman Street", Assert.Single(builds).Motorcycle?.Model);
+    }
+
+    [Fact]
+    public async Task Customer_build_query_returns_only_owned_and_unclaimed_legacy_builds()
+    {
+        await using var context = CreateContext();
+        context.BuildRequests.AddRange(
+            new BuildRequest { CustomerName = "Customer", CustomerEmail = "customer@example.com", CustomerUserId = "user-1" },
+            new BuildRequest { CustomerName = "Legacy Customer", CustomerEmail = "customer@example.com" },
+            new BuildRequest { CustomerName = "Legacy Email", CustomerEmail = " CUSTOMER@EXAMPLE.COM ", CustomerUserId = "" },
+            new BuildRequest { CustomerName = "Other", CustomerEmail = "other@example.com", CustomerUserId = "user-2" },
+            // A claimed record must never be exposed merely because its legacy email matches.
+            new BuildRequest { CustomerName = "Other", CustomerEmail = "customer@example.com", CustomerUserId = "user-2" });
+        await context.SaveChangesAsync();
+
+        var builds = await new BuildRequestRepository(context)
+            .GetByCustomerIdentityAsync("user-1", "customer@example.com");
+
+        Assert.Equal(3, builds.Count);
+        Assert.Contains(builds, build => build.CustomerUserId == "user-1");
+        Assert.Contains(builds, build => build.CustomerUserId is null);
+        Assert.DoesNotContain(builds, build => build.CustomerUserId == "user-2");
     }
 
     private static List<ValidationResult> Validate(object value)

@@ -38,7 +38,13 @@ public class MechanicsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateMechanic([FromBody] MechanicDto dto)
     {
-        var mechanic = new Mechanic { Name = dto.Name, IsActive = dto.IsActive };
+        var normalizedName = dto.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedName))
+            return BadRequest(ApiResponse.Error("Mechanic name is required."));
+        if (await _repo.NameExistsAsync(normalizedName))
+            return Conflict(ApiResponse.Error($"A mechanic named \"{normalizedName}\" already exists."));
+
+        var mechanic = new Mechanic { Name = normalizedName, IsActive = dto.IsActive };
         await _repo.AddAsync(mechanic);
         await _repo.SaveChangesAsync();
         return Ok(new MechanicDto { Id = mechanic.Id, Name = mechanic.Name, IsActive = mechanic.IsActive });
@@ -51,7 +57,13 @@ public class MechanicsController : ControllerBase
         var existing = await _repo.GetByIdAsync(id);
         if (existing == null) return NotFound(ApiResponse.NotFound("Mechanic"));
 
-        existing.Name = dto.Name;
+        var normalizedName = dto.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedName))
+            return BadRequest(ApiResponse.Error("Mechanic name is required."));
+        if (await _repo.NameExistsAsync(normalizedName, id))
+            return Conflict(ApiResponse.Error($"A mechanic named \"{normalizedName}\" already exists."));
+
+        existing.Name = normalizedName;
         existing.IsActive = dto.IsActive;
         await _repo.UpdateAsync(existing);
         await _repo.SaveChangesAsync();

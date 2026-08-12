@@ -411,7 +411,7 @@
                 <div class="order-grid">
                     @foreach (var slip in openSlips.Take(4))
                     {
-                        <a href="/admin/order-slips/@slip.Id" style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
+                        <a href="/admin/order-history?orderSlip=@slip.Id" style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                 <span style="font-weight: var(--font-semibold); color: var(--foreground); font-size: var(--text-sm); font-family: monospace;">@DisplaySlipNumber(slip)</span>
                                 <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); background-color: @GetOrderStatusColor(slip.Status); color: white;">@slip.Status</span>

@@ -51,11 +51,17 @@ public class ServicesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateService([FromBody] CreateStoreServiceDto dto)
     {
+        var normalizedName = dto.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedName))
+            return BadRequest(ApiResponse.Error("Service name is required."));
+        if (await _serviceRepo.NameExistsAsync(normalizedName))
+            return Conflict(ApiResponse.Error($"A service named \"{normalizedName}\" already exists."));
+
         var service = new StoreService
         {
-            Name = dto.Name,
+            Name = normalizedName,
             Price = dto.Price,
-            Category = dto.Category,
+            Category = dto.Category?.Trim() ?? string.Empty,
             EstimatedMinutes = dto.EstimatedMinutes,
             Status = "Active"
         };

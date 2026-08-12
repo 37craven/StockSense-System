@@ -336,9 +336,7 @@ public class BuildsController : ControllerBase
         if (customer is null) return Unauthorized();
         var builds = await _buildRepo.GetByCustomerIdentityAsync(
             customer.Id,
-            customer.Email ?? string.Empty,
-            GetFullName(customer));
-        await EnrichCustomerIdentitiesAsync(builds);
+            customer.Email ?? string.Empty);
         return Ok(builds.Select(MapToDto).ToList());
     }
 

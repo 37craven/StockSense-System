@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Reflection;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using BlazorBlueprint.Components;
@@ -52,6 +54,14 @@ builder.Services.ConfigureApplicationCookie(options =>
     {
         if (context.Request.Path.StartsWithSegments("/api"))
             context.Response.StatusCode = 401;
+        else
+            context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+            context.Response.StatusCode = 403;
         else
             context.Response.Redirect(context.RedirectUri);
         return Task.CompletedTask;
@@ -178,6 +188,21 @@ builder.Services.AddControllers()
     });
 
 var app = builder.Build();
+var entryAssembly = Assembly.GetEntryAssembly() ?? typeof(Program).Assembly;
+var assemblyName = entryAssembly.GetName();
+var binaryFingerprint = new
+{
+    Name = assemblyName.Name ?? "unknown",
+    Version = assemblyName.Version?.ToString() ?? "unknown",
+    InformationalVersion = entryAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown",
+    ModuleVersionId = entryAssembly.ManifestModule.ModuleVersionId
+};
+app.Logger.LogInformation(
+    "Running binary: {AssemblyName} {AssemblyVersion}; informationalVersion={InformationalVersion}; moduleVersionId={ModuleVersionId}",
+    binaryFingerprint.Name,
+    binaryFingerprint.Version,
+    binaryFingerprint.InformationalVersion,
+    binaryFingerprint.ModuleVersionId);
 
 // --- 8. PIPELINE ---
 if (app.Environment.IsDevelopment())
@@ -260,6 +285,67 @@ if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    var isAuthorizationAuditRoute = path.StartsWithSegments("/api/products")
+        || path.StartsWithSegments("/api/inventory");
+    if (!isAuthorizationAuditRoute)
+    {
+        await next(context);
+        return;
+    }
+
+    var endpoint = context.GetEndpoint();
+    var authorizeData = endpoint?.Metadata.GetOrderedMetadata<IAuthorizeData>() ?? [];
+    var policyProvider = context.RequestServices.GetRequiredService<IAuthorizationPolicyProvider>();
+    var policy = authorizeData.Count == 0
+        ? null
+        : await AuthorizationPolicy.CombineAsync(policyProvider, authorizeData);
+    var email = context.User.FindFirstValue(ClaimTypes.Email)
+        ?? context.User.FindFirstValue(ClaimTypes.Name)
+        ?? "anonymous";
+    var roles = context.User.FindAll(ClaimTypes.Role)
+        .Select(claim => claim.Value)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+    var policyNames = authorizeData
+        .Select(data => data.Policy)
+        .Where(name => !string.IsNullOrWhiteSpace(name))
+        .ToArray();
+    var allowedRoles = authorizeData
+        .SelectMany(data => (data.Roles ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+    var requirements = policy?.Requirements
+        .Select(requirement => requirement.GetType().Name)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray() ?? [];
+
+    try
+    {
+        await next(context);
+    }
+    finally
+    {
+        app.Logger.LogInformation(
+            "Authorization audit: {Method} {Path} => {StatusCode}; authenticated={IsAuthenticated}; email={Email}; roles={Roles}; endpoint={Endpoint}; policies={Policies}; allowedRoles={AllowedRoles}; requirements={Requirements}; binary={AssemblyName}/{AssemblyVersion}/{InformationalVersion}/{ModuleVersionId}",
+            context.Request.Method,
+            path.Value,
+            context.Response.StatusCode,
+            context.User.Identity?.IsAuthenticated == true,
+            email,
+            roles.Length == 0 ? "(none)" : string.Join(',', roles),
+            endpoint?.DisplayName ?? "(unmatched)",
+            policyNames.Length == 0 ? "(default/inline)" : string.Join(',', policyNames),
+            allowedRoles.Length == 0 ? "(none)" : string.Join(',', allowedRoles),
+            requirements.Length == 0 ? "(none)" : string.Join(',', requirements),
+            binaryFingerprint.Name,
+            binaryFingerprint.Version,
+            binaryFingerprint.InformationalVersion,
+            binaryFingerprint.ModuleVersionId);
+    }
+});
 app.UseAuthorization();
 app.UseRateLimiter();
 app.UseAntiforgery();

@@ -33,6 +33,15 @@ public class MechanicRepository
         await Task.CompletedTask;
     }
 
+    public Task<bool> NameExistsAsync(string name, int? excludingId = null, CancellationToken cancellationToken = default)
+    {
+        var normalizedName = name.Trim().ToUpper();
+        return _context.Mechanics.AnyAsync(
+            mechanic => (!excludingId.HasValue || mechanic.Id != excludingId.Value) &&
+                        mechanic.Name.Trim().ToUpper() == normalizedName,
+            cancellationToken);
+    }
+
     public async Task UpdateAsync(Mechanic mechanic)
     {
         _context.Mechanics.Update(mechanic);

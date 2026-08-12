@@ -43,6 +43,22 @@ public class MotorcycleRepository
         await _context.SaveChangesAsync();
     }
 
+    public Task<bool> ExistsAsync(
+        string brand,
+        string model,
+        string baseCC,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedBrand = brand.Trim().ToUpper();
+        var normalizedModel = model.Trim().ToUpper();
+        var normalizedBaseCC = baseCC.Trim().ToUpper();
+        return _context.Motorcycles.AnyAsync(
+            motorcycle => motorcycle.Brand.Trim().ToUpper() == normalizedBrand
+                && motorcycle.Model.Trim().ToUpper() == normalizedModel
+                && motorcycle.BaseCC.Trim().ToUpper() == normalizedBaseCC,
+            cancellationToken);
+    }
+
     public async Task DeleteAsync(int id)
     {
         var motorcycle = await _context.Motorcycles.FindAsync(id);
