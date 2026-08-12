@@ -1218,12 +1218,12 @@
             }
             else
             {
-                error = await ApiErrorMessage.FromResponseAsync(response, "The product could not be created. Please try again.");
+                newProductFormError = await ApiErrorMessage.FromResponseAsync(response, "The product could not be created. Please try again.");
             }
         }
         catch (Exception ex)
         {
-            error = ApiErrorMessage.FromException(ex, "The product could not be created. Please try again.");
+            newProductFormError = ApiErrorMessage.FromException(ex, "The product could not be created. Please try again.");
         }
         isSavingNewProduct = false;
     }

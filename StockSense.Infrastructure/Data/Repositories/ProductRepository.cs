@@ -73,6 +73,14 @@ public class ProductRepository
             .FirstOrDefaultAsync(p => p.Barcode == barcode);
     }
 
+    public Task<bool> NameExistsAsync(string name, CancellationToken cancellationToken = default)
+    {
+        var normalizedName = name.Trim().ToUpper();
+        return _context.Products.AnyAsync(
+            product => product.Name.Trim().ToUpper() == normalizedName,
+            cancellationToken);
+    }
+
     public async Task<Product?> GetActiveByBarcodeAsync(string barcode)
     {
         return await _context.Products

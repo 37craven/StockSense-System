@@ -441,7 +441,7 @@ else
             var products = await ProductRepo.GetAllAsync();
             allProducts = products.ToList();
 
-            motorcycles = await MotorcycleRepo.GetAllAsync();
+            motorcycles = CollapseDuplicateMotorcycles(await MotorcycleRepo.GetAllAsync());
         }
         catch (Exception ex)
         {
@@ -460,7 +460,7 @@ else
         IsActive = p.IsActive, TotalPrice = p.TotalPrice,
         CompatibleMotors = p.CompatibleMotors.Select(m => new CompatibleMotorDto
         {
-            Id = m.Id, Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+            Id = m.Id, MotorcycleId = m.MotorcycleId, Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
         }).ToList(),
         IncludedProducts = p.IncludedProducts.Select(prod => new PreBuiltProductDto
         {
@@ -491,13 +491,17 @@ else
             MaxAddedCC = pkg.MaxAddedCC,
             CompatibleMotors = pkg.CompatibleMotors?.Select(m => new CompatibleMotorDto
             {
-                Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
+                MotorcycleId = m.MotorcycleId, Brand = m.Brand, Model = m.Model, StockCC = m.StockCC
             }).ToList() ?? new List<CompatibleMotorDto>(),
             SelectedProductIds = pkg.IncludedProducts?.Select(p => p.Id).ToList() ?? new List<int>()
         };
-        var knownMotors = motorcycles.Select(m => (m.Brand, m.Model, m.BaseCC)).ToHashSet();
+        var knownMotorIds = motorcycles.Select(m => m.Id).ToHashSet();
+        var knownMotors = motorcycles.Select(m => MotorKey(m.Brand, m.Model, m.BaseCC)).ToHashSet();
         newPackage.CompatibleMotors = newPackage.CompatibleMotors
-            .Where(m => knownMotors.Contains((m.Brand, m.Model, m.StockCC))).ToList();
+            .Where(m => (m.MotorcycleId is int id && knownMotorIds.Contains(id)) ||
+                        knownMotors.Contains(MotorKey(m.Brand, m.Model, m.StockCC)))
+            .GroupBy(m => m.MotorcycleId?.ToString() ?? string.Join('|', MotorKey(m.Brand, m.Model, m.StockCC)))
+            .Select(g => g.First()).ToList();
 
         errorMessage = string.Empty;
         packageEditorBaseline = PackageEditorFingerprint();
@@ -601,16 +605,18 @@ else
     }
 
     private bool IsMotorSelected(Motorcycle motor)
-        => newPackage.CompatibleMotors.Any(m => m.Brand == motor.Brand && m.Model == motor.Model && m.StockCC == motor.BaseCC);
+        => newPackage.CompatibleMotors.Any(m => m.MotorcycleId == motor.Id ||
+            (m.MotorcycleId is null && MotorKey(m.Brand, m.Model, m.StockCC) == MotorKey(motor.Brand, motor.Model, motor.BaseCC)));
 
     private void ToggleMotor(Motorcycle motor)
     {
         var existing = newPackage.CompatibleMotors
-            .FirstOrDefault(m => m.Brand == motor.Brand && m.Model == motor.Model && m.StockCC == motor.BaseCC);
+            .FirstOrDefault(m => m.MotorcycleId == motor.Id ||
+                (m.MotorcycleId is null && MotorKey(m.Brand, m.Model, m.StockCC) == MotorKey(motor.Brand, motor.Model, motor.BaseCC)));
         if (existing != null)
             newPackage.CompatibleMotors.Remove(existing);
         else
-            newPackage.CompatibleMotors.Add(new CompatibleMotorDto { Brand = motor.Brand, Model = motor.Model, StockCC = motor.BaseCC });
+            newPackage.CompatibleMotors.Add(new CompatibleMotorDto { MotorcycleId = motor.Id, Brand = motor.Brand, Model = motor.Model, StockCC = motor.BaseCC });
     }
 
     private async Task AddMotorcycle()
@@ -624,9 +630,18 @@ else
         isMotorProcessing = true;
         try
         {
-            await MotorcycleRepo.AddAsync(new Motorcycle { Brand = newMotorBrand.Trim(), Model = newMotorModel.Trim(), BaseCC = newMotorBaseCC.Trim() });
+            var brand = newMotorBrand.Trim();
+            var model = newMotorModel.Trim();
+            var baseCC = newMotorBaseCC.Trim();
+            if (await MotorcycleRepo.ExistsAsync(brand, model, baseCC))
+            {
+                motorErrorMessage = $"{brand} {model} ({baseCC}) already exists.";
+                return;
+            }
+
+            await MotorcycleRepo.AddAsync(new Motorcycle { Brand = brand, Model = model, BaseCC = baseCC });
             newMotorBrand = newMotorModel = newMotorBaseCC = string.Empty;
-            motorcycles = await MotorcycleRepo.GetAllAsync();
+            motorcycles = CollapseDuplicateMotorcycles(await MotorcycleRepo.GetAllAsync());
         }
         catch (Exception ex)
         {
@@ -670,7 +685,7 @@ else
         try
         {
             await MotorcycleRepo.DeleteAsync(motor.Id);
-            motorcycles = await MotorcycleRepo.GetAllAsync();
+            motorcycles = CollapseDuplicateMotorcycles(await MotorcycleRepo.GetAllAsync());
             showMotorcycleDeleteConfirm = false;
             motorcycleToDelete = null;
             motorcycleDeleteConfirmation = string.Empty;
@@ -722,15 +737,22 @@ else
             return;
         }
 
-        var motorLookup = motorcycles.ToDictionary(m => (m.Brand, m.Model, m.BaseCC), m => m.Id);
+        var motorById = motorcycles.ToDictionary(m => m.Id);
+        var motorLookup = motorcycles.ToDictionary(m => MotorKey(m.Brand, m.Model, m.BaseCC), m => m.Id);
+        var resolvedMotors = new List<(CompatibleMotorDto Motor, int MotorcycleId)>();
         foreach (var m in validMotors)
         {
-            if (!motorLookup.TryGetValue((m.Brand, m.Model, m.StockCC), out _))
+            var motorcycleId = m.MotorcycleId is int id && motorById.ContainsKey(id)
+                ? id
+                : motorLookup.GetValueOrDefault(MotorKey(m.Brand, m.Model, m.StockCC));
+            if (motorcycleId == 0)
             {
                 errorMessage = $"Motorcycle \"{m.Brand} — {m.Model} ({m.StockCC})\" does not exist in the database. Add it under Manage Motorcycles first.";
                 return;
             }
+            resolvedMotors.Add((m, motorcycleId));
         }
+        resolvedMotors = resolvedMotors.GroupBy(m => m.MotorcycleId).Select(g => g.First()).ToList();
 
         if (newPackage.MaxAddedCC < newPackage.MinAddedCC)
         {
@@ -755,10 +777,10 @@ else
                 package.Description = newPackage.Description;
                 package.MinAddedCC = newPackage.MinAddedCC;
                 package.MaxAddedCC = newPackage.MaxAddedCC;
-                package.CompatibleMotors = validMotors.Select(m => new PreBuiltPackageMotor
+                package.CompatibleMotors = resolvedMotors.Select(x => new PreBuiltPackageMotor
                 {
-                    Brand = m.Brand, Model = m.Model, StockCC = m.StockCC,
-                    MotorcycleId = motorLookup[(m.Brand, m.Model, m.StockCC)]
+                    Brand = x.Motor.Brand.Trim(), Model = x.Motor.Model.Trim(), StockCC = x.Motor.StockCC.Trim(),
+                    MotorcycleId = x.MotorcycleId
                 }).ToList();
                 package.IncludedProducts = await PreBuiltRepo.GetProductsByIdsAsync(newPackage.SelectedProductIds);
                 await PreBuiltRepo.UpdateAsync(package);
@@ -773,10 +795,10 @@ else
                     MinAddedCC = newPackage.MinAddedCC,
                     MaxAddedCC = newPackage.MaxAddedCC,
                     IsActive = true,
-                    CompatibleMotors = validMotors.Select(m => new PreBuiltPackageMotor
+                    CompatibleMotors = resolvedMotors.Select(x => new PreBuiltPackageMotor
                     {
-                        Brand = m.Brand, Model = m.Model, StockCC = m.StockCC,
-                        MotorcycleId = motorLookup[(m.Brand, m.Model, m.StockCC)]
+                        Brand = x.Motor.Brand.Trim(), Model = x.Motor.Model.Trim(), StockCC = x.Motor.StockCC.Trim(),
+                        MotorcycleId = x.MotorcycleId
                     }).ToList(),
                     IncludedProducts = products
                 };
@@ -796,4 +818,10 @@ else
             isProcessing = false;
         }
     }
+
+    private static (string Brand, string Model, string BaseCC) MotorKey(string brand, string model, string baseCC)
+        => MotorcycleCompatibility.Key(brand, model, baseCC);
+
+    private static List<Motorcycle> CollapseDuplicateMotorcycles(IEnumerable<Motorcycle> source)
+        => MotorcycleCompatibility.CollapseDuplicates(source);
 }

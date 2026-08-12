@@ -219,8 +219,8 @@
                                    aria-describedby="admin-password-help" />
                             <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-current-password" data-password-label="current password"
                                     aria-controls="admin-current-password" aria-label="Show current password" aria-pressed="false">
-                                <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                                <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
                             </button>
                         </div>
                         <p id="admin-password-help" class="text-xs leading-5 text-muted-foreground">This is the password you normally use to sign in—not an Admin PIN.</p>
@@ -243,8 +243,8 @@
                                        aria-describedby="admin-pin-help" />
                                 <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-new-pin" data-password-label="new PIN"
                                         aria-controls="admin-new-pin" aria-label="Show new PIN" aria-pressed="false">
-                                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
                                 </button>
                             </div>
                             <p id="admin-pin-help" class="text-xs leading-5 text-muted-foreground">Use exactly 6 numbers. Do not share it with employees.</p>
@@ -266,8 +266,8 @@
                                        aria-describedby="admin-confirm-pin-help" />
                                 <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-confirm-pin" data-password-label="confirm PIN"
                                         aria-controls="admin-confirm-pin" aria-label="Show confirm PIN" aria-pressed="false">
-                                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
                                 </button>
                             </div>
                             <p id="admin-confirm-pin-help" class="text-xs leading-5 text-muted-foreground">Enter the same 6 digits again.</p>
@@ -296,26 +296,63 @@
 
 @* --- DESTRUCTIVE ACTION CONFIRMATIONS --- *@
 <BbDialog @bind-Open="showDeleteDialog">
-    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
-        <BbDialogHeader>
-            <BbDialogTitle>Delete permanently?</BbDialogTitle>
-            <BbDialogDescription>This action cannot be undone.</BbDialogDescription>
+    <BbDialogContent Class="w-[calc(100vw-2rem)] max-w-lg overflow-hidden p-0 sm:w-full">
+        <BbDialogHeader Class="border-b border-border bg-destructive/5 px-5 py-5 pr-12 sm:px-6">
+            <div class="flex items-start gap-3">
+                <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive" aria-hidden="true">
+                    <LucideIcon Name="triangle-alert" Size="20" />
+                </div>
+                <div class="space-y-1">
+                    <BbDialogTitle>Delete this @PendingDeleteLabel.ToLowerInvariant() permanently?</BbDialogTitle>
+                    <BbDialogDescription>
+                        This action cannot be undone. @PendingDeleteConsequence
+                    </BbDialogDescription>
+                </div>
+            </div>
         </BbDialogHeader>
-        <div class="space-y-4 py-4">
-            <p class="text-sm text-muted-foreground">You are about to permanently delete <strong class="text-foreground">@pendingDeleteName</strong>.</p>
+
+        <div class="space-y-5 px-5 py-5 sm:px-6">
+            <div class="rounded-lg border border-border bg-muted/40 p-4" aria-label="@PendingDeleteLabel selected for deletion">
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">@PendingDeleteLabel to delete</p>
+                <p class="mt-1 font-semibold text-foreground">@pendingDeleteName</p>
+                @if (pendingDeleteTarget is UserDto pendingUser)
+                {
+                    <p class="mt-0.5 break-all text-sm text-muted-foreground">@pendingUser.Email</p>
+                }
+            </div>
+
             <div class="space-y-2">
-                <label for="delete-confirmation" class="text-sm font-medium text-foreground">Type <strong>DELETE</strong> or the name shown above to continue</label>
+                <label for="delete-confirmation" class="block text-sm font-medium text-foreground">
+                    Type <span class="font-bold text-destructive">DELETE</span> or the account name to confirm
+                </label>
                 <input id="delete-confirmation" @bind="deleteConfirmationText" @bind:event="oninput" autocomplete="off"
-                       class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                       aria-describedby="delete-confirmation-help" />
-                <p id="delete-confirmation-help" class="text-xs text-muted-foreground">This check helps prevent accidental permanent deletion.</p>
+                       spellcheck="false"
+                       class="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-destructive focus-visible:ring-2 focus-visible:ring-destructive/20 disabled:cursor-not-allowed disabled:opacity-50"
+                       aria-describedby="delete-confirmation-help delete-confirmation-status"
+                       disabled="@isDeleting"
+                       placeholder="Type DELETE or @pendingDeleteName" />
+                <p id="delete-confirmation-help" class="text-xs leading-relaxed text-muted-foreground">
+                    @(pendingDeleteTarget is UserDto ? "You may also enter the email address shown above." : "This check helps prevent accidental permanent deletion.")
+                </p>
+                <p id="delete-confirmation-status" class="sr-only" aria-live="polite">
+                    @(CanConfirmDelete ? "Confirmation accepted. The delete button is now enabled." : "Enter the required confirmation to enable deletion.")
+                </p>
             </div>
         </div>
-        <div class="flex justify-end gap-2">
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDeleteDialog" Disabled="isDeleting">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" Class="bg-destructive text-destructive-foreground hover:bg-destructive/90" OnClick="ExecuteDelete" Disabled="@(!CanConfirmDelete || isDeleting)">
-                @if (isDeleting) { <BbSpinner Size="SpinnerSize.Small" /> }
-                Delete permanently
+
+        <div class="flex flex-col-reverse gap-2 border-t border-border bg-muted/20 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+            <BbButton Variant="ButtonVariant.Ghost" Class="w-full sm:w-auto" OnClick="CloseDeleteDialog" Disabled="isDeleting">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" Class="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive sm:w-auto" OnClick="ExecuteDelete" Disabled="@(!CanConfirmDelete || isDeleting)">
+                @if (isDeleting)
+                {
+                    <BbSpinner Size="SpinnerSize.Small" />
+                    <span>Deleting…</span>
+                }
+                else
+                {
+                    <LucideIcon Name="trash-2" Size="16" />
+                    <span>Delete permanently</span>
+                }
             </BbButton>
         </div>
     </BbDialogContent>
@@ -415,8 +452,8 @@
                                style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                         <button type="button" class="password-toggle-button" data-password-toggle data-password-target="new-staff-password" data-password-label="temporary password"
                                 aria-controls="new-staff-password" aria-label="Show temporary password" aria-pressed="false">
-                            <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                            <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                            <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                            <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
                         </button>
                     </div>
                 </div>
@@ -460,7 +497,13 @@
             <div style="padding: var(--space-5) var(--space-6); display: flex; flex-direction: column; gap: var(--space-2);">
                 <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Full Name</label>
                 <input @bind="newMechanicName" placeholder="e.g. Juan dela Cruz"
+                       aria-invalid="@(!string.IsNullOrWhiteSpace(mechanicModalError))"
+                       aria-describedby="@(string.IsNullOrWhiteSpace(mechanicModalError) ? null : "mechanic-modal-error")"
                        style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                @if (!string.IsNullOrWhiteSpace(mechanicModalError))
+                {
+                    <p id="mechanic-modal-error" role="alert" class="m-0 text-sm text-destructive">@mechanicModalError</p>
+                }
             </div>
 
             <div style="padding: var(--space-4) var(--space-6); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--space-2);">
@@ -498,6 +541,7 @@
     private string managementMessage = "", managementError = "";
     private CreateEmployeeDto newEmp = new();
     private string newMechanicName = "";
+    private string mechanicModalError = "";
     private AdminPinForm pinForm = new();
     private string pinError = "";
     private string pinSuccess = "";
@@ -524,6 +568,12 @@
         string.Equals(deleteConfirmationText.Trim(), "DELETE", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(deleteConfirmationText.Trim(), pendingDeleteName, StringComparison.OrdinalIgnoreCase) ||
         pendingDeleteTarget is UserDto user && string.Equals(deleteConfirmationText.Trim(), user.Email, StringComparison.OrdinalIgnoreCase);
+
+    private string PendingDeleteLabel => pendingDeleteTarget is UserDto ? "Account" : "Mechanic";
+
+    private string PendingDeleteConsequence => pendingDeleteTarget is UserDto
+        ? "The account and its access will be permanently removed."
+        : "The mechanic record will be permanently removed.";
 
     private void CloseDeleteDialog()
     {
@@ -633,14 +683,34 @@
         else { modalError = await ApiErrorMessage.FromResponseAsync(response, "The employee account could not be created."); }
     }
 
-    private void OpenMechanicModal() { newMechanicName = ""; showMechanicModal = true; }
+    private void OpenMechanicModal() { newMechanicName = ""; mechanicModalError = ""; showMechanicModal = true; }
 
     private async Task CreateMechanic()
     {
         if (string.IsNullOrWhiteSpace(newMechanicName)) return;
-        await Http.PostAsJsonAsync("api/mechanics", new Mechanic { Name = newMechanicName, IsActive = true });
-        showMechanicModal = false;
-        await LoadMechanics();
+        mechanicModalError = "";
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                "api/mechanics",
+                new Mechanic { Name = newMechanicName.Trim(), IsActive = true });
+            if (!response.IsSuccessStatusCode)
+            {
+                mechanicModalError = await ApiErrorMessage.FromResponseAsync(
+                    response,
+                    "The mechanic could not be added. Please try again.");
+                return;
+            }
+
+            showMechanicModal = false;
+            await LoadMechanics();
+        }
+        catch (Exception ex)
+        {
+            mechanicModalError = ApiErrorMessage.FromException(
+                ex,
+                "The mechanic could not be added. Please try again.");
+        }
     }
 
     private async Task ToggleMechanic(Mechanic mech)

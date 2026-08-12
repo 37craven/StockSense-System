@@ -4,6 +4,7 @@
 @using System.Text.Json
 @using System.Globalization
 @using System.Net.Http.Json
+@using System.Net
 @using Microsoft.AspNetCore.Authorization
 @using StockSense.Client.Layout
 @using StockSense.Application.DTOs
@@ -12,30 +13,9 @@
 
 @attribute [Authorize]
 
-<style>
-    .customer-build-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid currentColor; border-radius: 999px; font-size: var(--text-xs); font-weight: 700 !important; line-height: 1rem; }
-    .customer-build-status * { font-weight: inherit !important; }
-    .customer-build-status::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; opacity: .75; }
-    .customer-build-status--pending { background: rgba(245, 158, 11, .14); color: #b45309; }
-    .customer-build-status--confirmed { background: rgba(59, 130, 246, .14); color: #2563eb; }
-    .customer-build-status--completed { background: rgba(16, 185, 129, .14); color: #047857; }
-    .customer-build-status--cancelled { background: rgba(239, 68, 68, .14); color: #dc2626; }
-    .customer-build-status--unknown { background: rgba(107, 114, 128, .14); color: #4b5563; }
-    .customer-build-accent--pending { border-left-color: #f59e0b !important; }
-    .customer-build-accent--confirmed { border-left-color: #3b82f6 !important; }
-    .customer-build-accent--completed { border-left-color: #10b981 !important; }
-    .customer-build-accent--cancelled { border-left-color: #ef4444 !important; }
-    .customer-build-accent--unknown { border-left-color: #6b7280 !important; }
-    .dark .customer-build-status--pending { background: rgba(245, 158, 11, .20); color: #fbbf24; }
-    .dark .customer-build-status--confirmed { background: rgba(59, 130, 246, .20); color: #93c5fd; }
-    .dark .customer-build-status--completed { background: rgba(16, 185, 129, .20); color: #6ee7b7; }
-    .dark .customer-build-status--cancelled { background: rgba(239, 68, 68, .20); color: #fca5a5; }
-    .dark .customer-build-status--unknown { background: rgba(156, 163, 175, .16); color: #d1d5db; }
-</style>
-
-
 <div class="w-full max-w-[900px] lg:max-w-[640px] mx-auto px-4 pt-8 pb-[200px] lg:pb-8">
-    <div style="margin-top: 28px; margin-bottom: 20px;">
+
+    <div class="mt-5 pt-2 mb-5">
         <PageHeader Title="My Builds"
                     Subtitle="Track the status of your submitted custom builds." />
     </div>
@@ -43,192 +23,555 @@
     @if (isLoading)
     {
         <div class="flex items-center gap-3 text-muted-foreground py-8 justify-center">
-            <span class="text-sm">Loading your builds...</span>
+            <span class="text-sm">
+                Loading your builds...
+            </span>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(loadError))
+    {
+        <div class="text-center p-8 bg-card border border-destructive/40 rounded-lg flex flex-col items-center gap-4"
+             role="alert">
+
+            <div>
+                <p class="text-base font-medium text-foreground m-0 mb-1">
+                    We couldn't load your builds
+                </p>
+
+                <p class="text-sm text-muted-foreground m-0">
+                    @loadError
+                </p>
+            </div>
+
+            <button @onclick="LoadBuildsAsync"
+                    class="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg border-none cursor-pointer font-bold text-sm">
+                Try Again
+            </button>
+
         </div>
     }
     else if (myBuilds == null || !myBuilds.Any())
     {
         <div class="text-center p-8 bg-card border border-border rounded-lg flex flex-col items-center gap-4">
+
             <div>
-                <p class="text-base font-medium text-foreground m-0 mb-1">No builds yet</p>
-                <p class="text-sm text-muted-foreground m-0">You haven't submitted any builds yet.</p>
+                <p class="text-base font-medium text-foreground m-0 mb-1">
+                    No builds yet
+                </p>
+
+                <p class="text-sm text-muted-foreground m-0">
+                    You haven't submitted any builds yet.
+                </p>
             </div>
-            <button @onclick='() => Nav.NavigateTo("/build")' class="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg border-none cursor-pointer font-bold text-sm">Start a New Build</button>
+
+            <button @onclick='() => Nav.NavigateTo("/build")'
+                    class="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg border-none cursor-pointer font-bold text-sm">
+                Start a New Build
+            </button>
+
         </div>
     }
     else
     {
-        @* Desktop: table *@
-        <div class="hidden md:block bg-card border border-border rounded-lg overflow-x-auto">
-            <table class="w-full border-collapse text-sm" style="min-width:600px">
+        @* Desktop table *@
+        <div class="hidden" aria-hidden="true">
+
+            <table class="customer-build-table w-full border-collapse text-sm">
+
                 <thead>
-                    <tr class="border-b border-border" style="background:rgba(0,0,0,0.02)">
-                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Date</th>
-                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Type</th>
-                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Items</th>
-                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Total</th>
-                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">Status</th>
-                        <th class="text-center p-3 px-4 text-muted-foreground font-medium">Action</th>
+                    <tr class="customer-build-table-header border-b border-border">
+
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">
+                            Date
+                        </th>
+
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">
+                            Type
+                        </th>
+
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">
+                            Items
+                        </th>
+
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">
+                            Total
+                        </th>
+
+                        <th class="text-left p-3 px-4 text-muted-foreground font-medium">
+                            Status
+                        </th>
+
+                        <th class="text-center p-3 px-4 text-muted-foreground font-medium">
+                            Action
+                        </th>
+
                     </tr>
                 </thead>
+
                 <tbody>
+
                     @foreach (var build in FilteredBuilds)
                     {
-                        var rawParts = ParseParts(build.SelectedPartsJson);
-                        var metaTag = rawParts.FirstOrDefault(p => p.Category == "SYSTEM_METADATA");
-                        bool isPreBuilt = metaTag?.Name == "TYPE_PREBUILT";
-                        string buildName = metaTag?.Brand ?? (isPreBuilt ? "Pre-Built Package" : "Custom Parts Selection");
-                        var actualParts = rawParts.Where(p => p.Category != "SYSTEM_METADATA").ToList();
+                        var rawParts =
+                            ParseParts(build.SelectedPartsJson);
+
+                        var metaTag =
+                            rawParts.FirstOrDefault(
+                                p => p.Category == "SYSTEM_METADATA"
+                            );
+
+                        bool isPreBuilt =
+                            metaTag?.Name == "TYPE_PREBUILT";
+
+                        string buildName =
+                            metaTag?.Brand
+                            ?? (isPreBuilt
+                                ? "Pre-Built Package"
+                                : "Custom Parts Selection");
+
+                        var actualParts =
+                            rawParts
+                                .Where(
+                                    p => p.Category != "SYSTEM_METADATA"
+                                )
+                                .ToList();
 
                         <tr class="border-b border-border transition-colors duration-200">
-                            <td class="p-3 px-4 text-muted-foreground text-xs">@build.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</td>
-                            <td class="p-3 px-4">
-                                <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase"
-                                      style="background: @(isPreBuilt ? "color-mix(in oklch, var(--primary) 15%, transparent)" : "var(--muted)"); color: @(isPreBuilt ? "var(--primary)" : "var(--foreground)");">
-                                    <LucideIcon Name="@(isPreBuilt ? "zap" : "wrench")" Size="10" class="mr-1" /> @(isPreBuilt ? "Pre-Built" : "Custom")
-                                </span>
+
+                            <td class="p-3 px-4 text-muted-foreground text-xs">
+                                @build.CreatedAt.ToString("MMM dd, yyyy h:mm tt")
                             </td>
-                            <td class="p-3 px-4"><span class="bg-muted px-2 py-0.5 rounded text-xs">@actualParts.Count items</span></td>
-                            <td class="p-3 px-4 font-bold text-foreground">₱@actualParts.Sum(p => p.Price).ToString("N2")</td>
+
                             <td class="p-3 px-4">
-                                <span class="customer-build-status @GetStatusClass(build.Status)" role="status" aria-label="Build status: @build.Status">
+
+                                <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase @(isPreBuilt ? "bg-primary/15 text-primary" : "bg-muted text-foreground")">
+
+                                    <LucideIcon Name="@(isPreBuilt ? "zap" : "wrench")"
+                                                Size="10"
+                                                class="mr-1" />
+
+                                    @(isPreBuilt
+                                        ? "Pre-Built"
+                                        : "Custom")
+
+                                </span>
+
+                            </td>
+
+                            <td class="p-3 px-4">
+
+                                <span class="bg-muted px-2 py-0.5 rounded text-xs">
+                                    @actualParts.Count
+                                    @(actualParts.Count == 1
+                                        ? "item"
+                                        : "items")
+                                </span>
+
+                            </td>
+
+                            <td class="p-3 px-4 font-bold text-foreground">
+                                ₱@actualParts.Sum(p => p.Price).ToString("N2")
+                            </td>
+
+                            <td class="p-3 px-4">
+
+                                <span class="appointment-status-badge @GetStatusClass(build.Status) shrink-0"
+                                      aria-label="Status: @build.Status">
                                     @build.Status
                                 </span>
+
                             </td>
+
                             <td class="p-3 px-4 text-center">
-                                <button @onclick="() => OpenModal(build, actualParts, buildName)" class="bg-transparent border border-border text-foreground px-3 py-1.5 rounded cursor-pointer text-xs">VIEW</button>
+
+                                <div class="flex justify-center items-center gap-2">
+
+                                    @if (build.Status == "Pending")
+                                    {
+                                        <button type="button"
+                                                @onclick="() => CancelBuild(build)"
+                                                class="appointment-action appointment-action--danger rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                            Cancel
+                                        </button>
+                                    }
+                                    else if (build.Status == "Confirmed")
+                                    {
+                                        <span class="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
+                                            Cancellation unavailable after confirmation.
+                                        </span>
+                                    }
+
+                                    <button type="button"
+                                            @onclick="() => OpenModal(build, actualParts, buildName)"
+                                            class="text-[10px] font-semibold text-primary border border-primary/40 rounded-md px-2 py-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        View
+                                    </button>
+
+                                </div>
+
                             </td>
+
                         </tr>
                     }
+
                 </tbody>
+
             </table>
+
         </div>
 
-        @* Mobile: card stack *@
-        <div class="flex flex-col gap-3 md:hidden">
+
+        @* Mobile/card layout *@
+        <div class="flex flex-col gap-3">
+
             @foreach (var build in FilteredBuilds)
             {
-                var rawParts = ParseParts(build.SelectedPartsJson);
-                var metaTag = rawParts.FirstOrDefault(p => p.Category == "SYSTEM_METADATA");
-                bool isPreBuilt = metaTag?.Name == "TYPE_PREBUILT";
-                string buildName = metaTag?.Brand ?? (isPreBuilt ? "Pre-Built Package" : "Custom Parts Selection");
-                var actualParts = rawParts.Where(p => p.Category != "SYSTEM_METADATA").ToList();
+                var rawParts =
+                    ParseParts(build.SelectedPartsJson);
 
-                <div class="bg-card border border-border rounded-lg p-3 border-l-4 @GetStatusAccentClass(build.Status)">
+                var metaTag =
+                    rawParts.FirstOrDefault(
+                        p => p.Category == "SYSTEM_METADATA"
+                    );
+
+                bool isPreBuilt =
+                    metaTag?.Name == "TYPE_PREBUILT";
+
+                string buildName =
+                    metaTag?.Brand
+                    ?? (isPreBuilt
+                        ? "Pre-Built Package"
+                        : "Custom Parts Selection");
+
+                var actualParts =
+                    rawParts
+                        .Where(
+                            p => p.Category != "SYSTEM_METADATA"
+                        )
+                        .ToList();
+
+                <article class="bg-card border border-border rounded-lg p-3 sm:p-4 border-l-4"
+                         style="border-left-color: @GetStatusColor(build.Status)">
+
                     <div class="flex justify-between items-start mb-2 gap-2">
+
                         <div class="min-w-0">
-                            <span class="text-sm font-semibold text-foreground">@build.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</span>
-                            <div class="text-xs text-muted-foreground mt-0.5">
-                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
-                                      style="background: @(isPreBuilt ? "color-mix(in oklch, var(--primary) 15%, transparent)" : "var(--muted)"); color: @(isPreBuilt ? "var(--primary)" : "var(--foreground)");">
-                                    @(isPreBuilt ? "Pre-Built" : "Custom")
-                                </span>
+
+                            <span class="text-sm font-semibold text-foreground">
+                                @build.CreatedAt.ToString("MMM dd, yyyy")
+                                ·
+                                @build.CreatedAt.ToString("h:mm tt")
+                            </span>
+
+                            <div class="text-xs text-muted-foreground mt-0.5 truncate">
+                                @(isPreBuilt
+                                    ? buildName
+                                    : "Custom Parts Selection")
                             </div>
+
                         </div>
-                        <span class="customer-build-status @GetStatusClass(build.Status) shrink-0" role="status" aria-label="Build status: @build.Status">
+
+                        <span class="appointment-status-badge @GetStatusClass(build.Status) shrink-0"
+                              aria-label="Status: @build.Status">
                             @build.Status
                         </span>
+
                     </div>
-                    <div class="flex justify-between items-center text-xs text-muted-foreground">
-                        <span>@actualParts.Count items</span>
+
+
+                    <div class="flex justify-between items-center text-xs text-muted-foreground gap-3">
+
+                        <span class="inline-flex items-center gap-1.5">
+
+                            <LucideIcon Name="@(isPreBuilt ? "zap" : "wrench")"
+                                        Size="12" />
+
+                            @(isPreBuilt
+                                ? "Pre-Built"
+                                : "Custom")
+
+                            ·
+
+                            @actualParts.Count
+                            @(actualParts.Count == 1
+                                ? "item"
+                                : "items")
+
+                        </span>
+
+
                         <div class="flex items-center gap-2">
-                            <button @onclick="() => OpenModal(build, actualParts, buildName)" class="text-[10px] font-semibold text-primary border border-primary/40 rounded-md px-2 py-0.5">View</button>
-                            <span class="text-sm font-bold text-primary">₱@actualParts.Sum(p => p.Price).ToString("N0")</span>
+
+                            @if (build.Status == "Pending")
+                            {
+                                <button type="button"
+                                        @onclick="() => CancelBuild(build)"
+                                        class="appointment-action appointment-action--danger rounded-md px-2 py-0.5 text-[10px] font-semibold">
+                                    Cancel
+                                </button>
+                            }
+                            else if (build.Status == "Confirmed")
+                            {
+                                <span class="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
+                                    Cancellation unavailable after confirmation.
+                                </span>
+                            }
+
+                            <button type="button"
+                                    @onclick="() => OpenModal(build, actualParts, buildName)"
+                                    class="text-[10px] font-semibold text-primary border border-primary/40 rounded-md px-2 py-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                View
+                            </button>
+
+                            <span class="text-sm font-bold text-primary whitespace-nowrap">
+                                ₱@actualParts.Sum(p => p.Price).ToString("N0")
+                            </span>
+
                         </div>
+
                     </div>
-                </div>
+
+                </article>
             }
+
         </div>
     }
+
 </div>
+
 
 @if (ShowModal && CurrentParts != null)
 {
-    <div class="fixed inset-0 bg-black/80 flex justify-center items-center z-[1000] p-5">
-        <div class="bg-card w-[600px] max-h-[85vh] rounded-xl border border-border flex flex-col overflow-hidden">
+    <div class="fixed inset-0 bg-black/80 flex justify-center items-center z-[1000] p-4"
+         role="presentation">
+
+        <div class="bg-card w-full max-w-[600px] max-h-[85vh] rounded-xl border border-border shadow-xl flex flex-col overflow-hidden"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="build-summary-title">
+
             <div class="p-5 border-b border-border flex justify-between items-start">
+
                 <div>
-                    <h3 class="m-0 mb-1.5 text-foreground text-xl">Build Summary</h3>
+
+                    <h3 id="build-summary-title"
+                        class="m-0 mb-1.5 text-foreground text-xl">
+                        Build Summary
+                    </h3>
+
                     @if (!string.IsNullOrEmpty(modalBuildName))
                     {
-                        <span class="inline-block text-[11px] text-blue-500 uppercase font-extrabold bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-md">@modalBuildName</span>
+                        <span class="inline-block text-[11px] text-blue-500 uppercase font-extrabold bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-md">
+                            @modalBuildName
+                        </span>
                     }
+
                     <p class="mt-2 mb-0 text-muted-foreground text-sm">
-                        <strong class="text-foreground">Motorcycle:</strong>
-                        @(CurrentBuild?.Motorcycle?.DisplayName ?? "Not recorded")
+
+                        <strong class="text-foreground">
+                            Motorcycle:
+                        </strong>
+
+                        @(CurrentBuild?.Motorcycle?.DisplayName
+                            ?? "Not recorded")
+
                     </p>
+
                 </div>
-                <button @onclick="CloseModal" class="bg-none border-none text-muted-foreground cursor-pointer text-2xl">&times;</button>
+
+                <button type="button"
+                        @onclick="CloseModal"
+                        aria-label="Close build summary"
+                        class="rounded-md border-none bg-transparent p-1 text-2xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    &times;
+                </button>
+
             </div>
+
+
             <div class="p-5 overflow-y-auto flex-1">
+
                 @foreach (var group in CurrentParts.GroupBy(p => p.Category))
                 {
                     <div class="mb-4">
-                        <h4 class="text-[0.7rem] text-primary uppercase mb-2">@group.Key</h4>
+
+                        <h4 class="text-[0.7rem] text-primary uppercase mb-2">
+                            @group.Key
+                        </h4>
+
                         @foreach (var part in group)
                         {
                             <div class="flex justify-between py-1.5 border-b border-white/5">
-                                <span class="text-sm text-foreground">@part.Brand @part.Name</span>
-                                <span class="font-bold">₱@part.Price.ToString("N2")</span>
+
+                                <span class="text-sm text-foreground">
+                                    @part.Brand @part.Name
+                                </span>
+
+                                <span class="font-bold">
+                                    ₱@part.Price.ToString("N2")
+                                </span>
+
                             </div>
                         }
+
                     </div>
                 }
+
             </div>
-            <div class="p-5 border-t border-border flex justify-between items-center">
-                <span class="font-bold text-lg">Total: ₱@CurrentParts.Sum(p => p.Price).ToString("N2")</span>
-                <button @onclick="CloseModal" class="px-5 py-2 bg-secondary text-foreground border-none rounded-md cursor-pointer">Close</button>
+
+
+            <div class="p-5 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-3">
+
+                <span class="font-bold text-lg">
+                    Total: ₱@CurrentParts.Sum(p => p.Price).ToString("N2")
+                </span>
+
+                <button type="button"
+                        @onclick="CloseModal"
+                        class="w-full sm:w-auto px-5 py-2 bg-secondary text-foreground border-none rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    Close
+                </button>
+
             </div>
+
         </div>
+
     </div>
 }
 
+
 @code {
-    [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
     private List<BuildRequestDto>? myBuilds;
+
     private bool isLoading = true;
+
+    private string? loadError;
+
     private bool showAllHistory = false;
 
     private bool ShowModal = false;
+
     private BuildRequestDto? CurrentBuild;
+
     private List<ProductDto> CurrentParts = new();
+
     private string modalBuildName = "";
+
 
     private IEnumerable<BuildRequestDto> FilteredBuilds
     {
         get
         {
-            if (myBuilds == null) return Enumerable.Empty<BuildRequestDto>();
+            if (myBuilds == null)
+            {
+                return Enumerable.Empty<BuildRequestDto>();
+            }
 
-            var active = myBuilds.Where(b => b.Status == "Pending" || b.Status == "Confirmed");
-            var history = myBuilds.Where(b => b.Status == "Completed" || b.Status == "Cancelled");
+            var active =
+                myBuilds.Where(
+                    b =>
+                        b.Status == "Pending"
+                        || b.Status == "Confirmed"
+                );
+
+            var history =
+                myBuilds.Where(
+                    b =>
+                        b.Status == "Completed"
+                        || b.Status == "Cancelled"
+                );
 
             if (!showAllHistory)
             {
-                var limitDate = DateTime.Now.AddDays(-30);
-                history = history.Where(b => b.CreatedAt >= limitDate);
+                var limitDate =
+                    DateTime.Now.AddDays(-30);
+
+                history =
+                    history.Where(
+                        b =>
+                            b.CreatedAt >= limitDate
+                    );
             }
 
-            return active.Concat(history).OrderByDescending(b => b.CreatedAt);
+            return active
+                .Concat(history)
+                .OrderByDescending(
+                    b =>
+                        b.CreatedAt
+                );
         }
     }
 
+
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateTask!;
-        if (authState.User.Identity == null || !authState.User.Identity.IsAuthenticated)
+        if (AuthStateTask is not null)
         {
-            Nav.NavigateTo($"/Account/Login?returnUrl={Uri.EscapeDataString(Nav.Uri)}", true);
-            return;
+            var authState =
+                await AuthStateTask;
+
+            if (
+                authState.User.Identity == null
+                ||
+                !authState.User.Identity.IsAuthenticated
+            )
+            {
+                Nav.NavigateTo(
+                    $"/Account/Login?returnUrl={Uri.EscapeDataString(Nav.Uri)}",
+                    true
+                );
+
+                return;
+            }
         }
+
+        await LoadBuildsAsync();
+    }
+
+
+    private async Task LoadBuildsAsync()
+    {
+        isLoading = true;
+
+        loadError = null;
 
         try
         {
-            myBuilds = await Http.GetFromJsonAsync<List<BuildRequestDto>>("api/builds/mine");
+            using var response =
+                await Http.GetAsync(
+                    "api/builds/mine"
+                );
+
+            if (
+                response.StatusCode ==
+                HttpStatusCode.Unauthorized
+            )
+            {
+                Nav.NavigateTo(
+                    $"/Account/Login?returnUrl={Uri.EscapeDataString(Nav.Uri)}",
+                    true
+                );
+
+                return;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            myBuilds =
+                await response.Content
+                    .ReadFromJsonAsync<List<BuildRequestDto>>()
+                ?? [];
         }
         catch
         {
-            myBuilds = new();
+            myBuilds = null;
+
+            loadError =
+                "Please check your connection and try again.";
         }
         finally
         {
@@ -236,12 +579,32 @@
         }
     }
 
+
     private List<ProductDto> ParseParts(string json)
     {
-        if (string.IsNullOrWhiteSpace(json) || json == "[]") return new();
+        if (
+            string.IsNullOrWhiteSpace(json)
+            ||
+            json == "[]"
+        )
+        {
+            return new();
+        }
+
         try
         {
-            return JsonSerializer.Deserialize<List<ProductDto>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+            return (
+                JsonSerializer.Deserialize<List<ProductDto?>>(
+                    json,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }
+                )
+                ?? []
+            )
+            .OfType<ProductDto>()
+            .ToList();
         }
         catch
         {
@@ -249,31 +612,87 @@
         }
     }
 
-    private void OpenModal(BuildRequestDto build, List<ProductDto> parts, string buildName)
+
+    private void OpenModal(
+        BuildRequestDto build,
+        List<ProductDto> parts,
+        string buildName)
     {
-        CurrentBuild = build;
-        CurrentParts = parts;
-        modalBuildName = string.IsNullOrWhiteSpace(buildName) ? "Custom Parts Selection" : buildName;
-        ShowModal = true;
+        CurrentBuild =
+            build;
+
+        CurrentParts =
+            parts;
+
+        modalBuildName =
+            string.IsNullOrWhiteSpace(buildName)
+                ? "Custom Parts Selection"
+                : buildName;
+
+        ShowModal =
+            true;
     }
 
-    private void CloseModal() => ShowModal = false;
 
-    private static string GetStatusClass(string? status) => status?.ToLowerInvariant() switch
+    private void CloseModal()
     {
-        "pending" => "customer-build-status--pending",
-        "confirmed" => "customer-build-status--confirmed",
-        "completed" => "customer-build-status--completed",
-        "cancelled" => "customer-build-status--cancelled",
-        _ => "customer-build-status--unknown"
-    };
+        ShowModal =
+            false;
+    }
 
-    private static string GetStatusAccentClass(string? status) => status?.ToLowerInvariant() switch
+
+    private string GetStatusColor(string status) =>
+        status switch
+        {
+            "Pending" => "#f59e0b",
+            "Confirmed" => "#3b82f6",
+            "Completed" => "#10b981",
+            "Cancelled" => "#ef4444",
+            _ => "#888888"
+        };
+
+
+    private static string GetStatusClass(string? status) =>
+        status switch
+        {
+            "Pending" => "appointment-status--pending",
+            "Confirmed" => "appointment-status--confirmed",
+            "Completed" => "appointment-status--completed",
+            "Cancelled" => "appointment-status--cancelled",
+            _ => "appointment-status--unknown"
+        };
+
+
+    private async Task CancelBuild(BuildRequestDto build)
     {
-        "pending" => "customer-build-accent--pending",
-        "confirmed" => "customer-build-accent--confirmed",
-        "completed" => "customer-build-accent--completed",
-        "cancelled" => "customer-build-accent--cancelled",
-        _ => "customer-build-accent--unknown"
-    };
+        if (build.Status != "Pending")
+        {
+            return;
+        }
+
+        try
+        {
+            var response =
+                await Http.PutAsync(
+                    $"api/builds/{build.Id}/cancel",
+                    null
+                );
+
+            if (response.IsSuccessStatusCode)
+            {
+                build.Status =
+                    "Cancelled";
+
+                myBuilds =
+                    new List<BuildRequestDto>(
+                        myBuilds!
+                    );
+
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+        }
+    }
 }

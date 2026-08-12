@@ -38,16 +38,18 @@ public class BuildRequestRepository
 
     public async Task<List<BuildRequest>> GetByCustomerIdentityAsync(
         string userId,
-        string email,
-        string fullName)
+        string email)
     {
+        var normalizedEmail = email.Trim().ToUpper();
         return await _context.BuildRequests
             .Include(b => b.Transaction)
             .Include(b => b.Motorcycle)
             .Where(b => b.CustomerUserId == userId
-                || (b.CustomerUserId == null && b.CustomerEmail == email)
-                || (b.CustomerUserId == null && b.CustomerEmail == null
-                    && (b.CustomerName == email || b.CustomerName == fullName)))
+                || ((b.CustomerUserId == null || b.CustomerUserId == "")
+                    && normalizedEmail != ""
+                    && ((b.CustomerEmail != null && b.CustomerEmail.Trim().ToUpper() == normalizedEmail)
+                        || ((b.CustomerEmail == null || b.CustomerEmail == "")
+                            && b.CustomerName.Trim().ToUpper() == normalizedEmail))))
             .OrderByDescending(b => b.CreatedAt)
             .ToListAsync();
     }

@@ -80,6 +80,36 @@ public sealed class BusinessControllerUnitTests
     }
 
     [Fact]
+    public async Task Mechanics_Create_RejectsDuplicateNormalizedName()
+    {
+        await using var db = NewDb();
+        db.Mechanics.Add(new Mechanic { Name = "Juan Dela Cruz", IsActive = true });
+        await db.SaveChangesAsync();
+
+        var result = await new MechanicsController(new MechanicRepository(db))
+            .CreateMechanic(new MechanicDto { Name = "  juan dela cruz  ", IsActive = true });
+
+        Assert.IsType<ConflictObjectResult>(result);
+        Assert.Single(db.Mechanics);
+    }
+
+    [Fact]
+    public async Task Mechanics_Update_RejectsAnotherMechanicsNormalizedName()
+    {
+        await using var db = NewDb();
+        var first = new Mechanic { Name = "Juan", IsActive = true };
+        var second = new Mechanic { Name = "Mia", IsActive = true };
+        db.Mechanics.AddRange(first, second);
+        await db.SaveChangesAsync();
+
+        var result = await new MechanicsController(new MechanicRepository(db))
+            .UpdateMechanic(second.Id, new MechanicDto { Name = "  JUAN ", IsActive = true });
+
+        Assert.IsType<ConflictObjectResult>(result);
+        Assert.Equal("Mia", second.Name);
+    }
+
+    [Fact]
     public async Task Services_Create_SetsActiveAndPersistsFields()
     {
         await using var db = NewDb();
@@ -91,6 +121,25 @@ public sealed class BusinessControllerUnitTests
         var service = Assert.Single(db.StoreServices);
         Assert.Equal("Active", service.Status);
         Assert.Equal(850m, service.Price);
+    }
+
+    [Fact]
+    public async Task Services_Create_RejectsDuplicateNormalizedName()
+    {
+        await using var db = NewDb();
+        db.StoreServices.Add(new StoreService
+        {
+            Name = "Change Oil", Category = "Maintenance", Status = "Active"
+        });
+        await db.SaveChangesAsync();
+
+        var result = await Services(db).CreateService(new CreateStoreServiceDto
+        {
+            Name = "  change oil  ", Category = "General", Price = 500m, EstimatedMinutes = 30
+        });
+
+        Assert.IsType<ConflictObjectResult>(result);
+        Assert.Single(db.StoreServices);
     }
 
     [Fact]

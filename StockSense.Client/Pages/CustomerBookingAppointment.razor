@@ -76,8 +76,9 @@
 
                     <div class="mb-4 pb-4 border-b border-border">
                         <MotorcycleCombobox Id="appointment-motorcycle"
-                                              Label="Motorcycle (optional)"
-                                              Placeholder="None selected"
+                                              Label="Motorcycle"
+                                              Placeholder="Select a motorcycle"
+                                              Required="true"
                                               Options="motorcycles"
                                               IsLoading="isLoadingMotorcycles"
                                               LoadError="@motorcycleLoadError"
@@ -988,6 +989,7 @@
     {
         if (isProcessing) return;
 
+        if (!newAppt.MotorcycleId.HasValue) { Toast.Warning("Select a motorcycle."); return; }
         if (string.IsNullOrEmpty(newAppt.TimeSlot)) { Toast.Warning("Select a time slot."); return; }
 
         if (HasUnavailableSelectedProduct())

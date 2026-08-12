@@ -9,7 +9,6 @@
 
 @attribute [Authorize]
 
-
 <div class="w-full max-w-[900px] lg:max-w-[640px] mx-auto px-4 pt-8 pb-[200px] lg:pb-8">
 
     <div style="margin-top: 28px; margin-bottom: 20px;">
@@ -76,7 +75,7 @@
 
                     </div>
 
-                    <div class="flex justify-between items-center text-xs text-muted-foreground">
+                    <div class="flex justify-between items-center text-xs text-muted-foreground gap-3">
 
                         <span>
                             @(string.IsNullOrEmpty(appt.MechanicName)
@@ -88,16 +87,21 @@
 
                         <div class="flex items-center gap-2">
 
-                            @if (appt.Status == "Pending" &&
-                                 appt.CreatedAt > DateTime.UtcNow.AddMinutes(-30))
+                            @if (appt.Status == "Pending")
                             {
                                 <button @onclick="() => CancelAppointment(appt)"
                                         class="appointment-action appointment-action--danger rounded-md px-2 py-0.5 text-[10px] font-semibold">
                                     Cancel
                                 </button>
                             }
+                            else if (appt.Status == "Confirmed")
+                            {
+                                <span class="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
+                                    Cancellation unavailable after confirmation.
+                                </span>
+                            }
 
-                            <span class="text-sm font-bold text-primary">
+                            <span class="text-sm font-bold text-primary whitespace-nowrap">
                                 ₱@appt.TotalAmount.ToString("N0")
                             </span>
 
@@ -112,7 +116,6 @@
     }
 
 </div>
-
 
 @code {
 
@@ -212,18 +215,25 @@
             _ => "#888888"
         };
 
-    private static string GetStatusClass(string? status) => status switch
-    {
-        "Pending" => "appointment-status--pending",
-        "Confirmed" => "appointment-status--confirmed",
-        "Completed" => "appointment-status--completed",
-        "Cancelled" => "appointment-status--cancelled",
-        _ => "appointment-status--unknown"
-    };
+
+    private static string GetStatusClass(string? status) =>
+        status switch
+        {
+            "Pending" => "appointment-status--pending",
+            "Confirmed" => "appointment-status--confirmed",
+            "Completed" => "appointment-status--completed",
+            "Cancelled" => "appointment-status--cancelled",
+            _ => "appointment-status--unknown"
+        };
 
 
     private async Task CancelAppointment(AppointmentDto appt)
     {
+        if (appt.Status != "Pending")
+        {
+            return;
+        }
+
         try
         {
             var response =
