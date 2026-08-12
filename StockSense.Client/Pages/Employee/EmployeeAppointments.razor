@@ -476,7 +476,7 @@
         </div>
 
         <div style="flex: 1; overflow: hidden; padding: var(--space-4); display: flex; gap: var(--space-3); min-height: 0;">
-            <div style="min-width: 0; width: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);">
+            <div class="@(isEditingAppointment ? "hidden md:flex" : "flex") flex-col gap-4 min-w-0 w-full overflow-y-auto">
                 @if (selectedAppointment != null)
                 {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">

@@ -57,6 +57,13 @@
                 </BbButton>
             </div>
         }
+        else if (currentTab == "Mechanics")
+        {
+            <BbButton Variant="ButtonVariant.Default" @onclick="OpenMechanicModal" Class="shrink-0">
+                <LucideIcon Name="bolt" Size="16" />
+                Add Mechanic
+            </BbButton>
+        }
     </div>
 
 
@@ -124,13 +131,6 @@
         }
         else if (currentTab == "Mechanics")
         {
-            <div style="display: flex; justify-content: flex-end; margin-bottom: var(--space-4);">
-                <BbButton Variant="ButtonVariant.Default" @onclick="OpenMechanicModal">
-                    <LucideIcon Name="bolt" Size="16" />
-                    Add Mechanic
-                </BbButton>
-            </div>
-
             @if (mechanics == null)
             {
                 <LoadingState Description="Loading mechanics..." />
@@ -169,14 +169,14 @@
         else if (currentTab == "AdminPin")
         {
             <section class="w-full" aria-labelledby="admin-pin-heading">
-                <div class="border-b border-border px-3 pb-4 pt-1">
+                <div class="border-b border-border pb-4 pt-1">
                     <h2 id="admin-pin-heading" class="text-base font-semibold text-foreground">My Admin PIN</h2>
                     <p class="mt-1 text-sm text-muted-foreground">
                         Set the personal 6-digit PIN you use to approve restricted employee actions.
                     </p>
                 </div>
 
-                <div class="space-y-5 px-3 py-5">
+                <div class="space-y-6 py-5">
                     <div class="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground" role="note" aria-labelledby="admin-pin-first-setup">
                         <div class="flex items-start gap-2">
                             <LucideIcon Name="info" Size="16" Class="mt-0.5 shrink-0 text-muted-foreground" />
@@ -189,105 +189,105 @@
                         </div>
                     </div>
 
-                        @if (!string.IsNullOrWhiteSpace(pinSuccess))
-                        {
-                            <div class="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300" role="status">
-                                <LucideIcon Name="circle-check" Size="18" Class="mt-0.5 shrink-0" />
-                                <span>@pinSuccess</span>
-                            </div>
-                        }
-
-                        @if (!string.IsNullOrWhiteSpace(pinError))
-                        {
-                            <div class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-                                <LucideIcon Name="circle-alert" Size="18" Class="mt-0.5 shrink-0" />
-                                <span>@pinError</span>
-                            </div>
-                        }
-
-                    <form @onsubmit="SaveAdminPin" @onsubmit:preventDefault class="space-y-5" aria-busy="@isSavingPin">
-                    <div class="max-w-xl space-y-2">
-                        <label for="admin-current-password" class="text-sm font-medium text-foreground">Current account password</label>
-                        <div class="relative">
-                            <input id="admin-current-password"
-                                   @bind="pinForm.CurrentPassword"
-                                   type="password"
-                                   autocomplete="current-password"
-                                   required
-                                   disabled="@isSavingPin"
-                                   class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                   aria-describedby="admin-password-help" />
-                            <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-current-password" data-password-label="current password"
-                                    aria-controls="admin-current-password" aria-label="Show current password" aria-pressed="false">
-                                <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
-                                <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                            </button>
+                    @if (!string.IsNullOrWhiteSpace(pinSuccess))
+                    {
+                        <div class="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300" role="status">
+                            <LucideIcon Name="circle-check" Size="18" Class="mt-0.5 shrink-0" />
+                            <span>@pinSuccess</span>
                         </div>
-                        <p id="admin-password-help" class="text-xs leading-5 text-muted-foreground">This is the password you normally use to sign in—not an Admin PIN.</p>
-                    </div>
+                    }
 
-                    <div class="grid max-w-xl gap-4 sm:grid-cols-2">
-                        <div class="space-y-2">
-                            <label for="admin-new-pin" class="text-sm font-medium text-foreground">New 6-digit PIN</label>
+                    @if (!string.IsNullOrWhiteSpace(pinError))
+                    {
+                        <div class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+                            <LucideIcon Name="circle-alert" Size="18" Class="mt-0.5 shrink-0" />
+                            <span>@pinError</span>
+                        </div>
+                    }
+
+                    <form @onsubmit="SaveAdminPin" @onsubmit:preventDefault class="space-y-6" aria-busy="@isSavingPin">
+                        <div class="max-w-xl space-y-3">
+                            <label for="admin-current-password" class="text-sm font-medium text-foreground">Current account password</label>
                             <div class="relative">
-                                <input id="admin-new-pin"
-                                       @bind="pinForm.NewPin"
+                                <input id="admin-current-password"
+                                       @bind="pinForm.CurrentPassword"
                                        type="password"
-                                       inputmode="numeric"
-                                       pattern="[0-9]{6}"
-                                       maxlength="6"
-                                       autocomplete="new-password"
+                                       autocomplete="current-password"
                                        required
                                        disabled="@isSavingPin"
-                                       class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm tracking-[0.35em] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                       aria-describedby="admin-pin-help" />
-                                <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-new-pin" data-password-label="new PIN"
-                                        aria-controls="admin-new-pin" aria-label="Show new PIN" aria-pressed="false">
+                                       class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                       aria-describedby="admin-password-help" />
+                                <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-current-password" data-password-label="current password"
+                                        aria-controls="admin-current-password" aria-label="Show current password" aria-pressed="false">
                                     <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
                                     <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
                                 </button>
                             </div>
-                            <p id="admin-pin-help" class="text-xs leading-5 text-muted-foreground">Use exactly 6 numbers. Do not share it with employees.</p>
+                            <p id="admin-password-help" class="text-xs leading-5 text-muted-foreground">This is the password you normally use to sign in—not an Admin PIN.</p>
                         </div>
 
-                        <div class="space-y-2">
-                            <label for="admin-confirm-pin" class="text-sm font-medium text-foreground">Confirm new PIN</label>
-                            <div class="relative">
-                                <input id="admin-confirm-pin"
-                                       @bind="pinForm.ConfirmPin"
-                                       type="password"
-                                       inputmode="numeric"
-                                       pattern="[0-9]{6}"
-                                       maxlength="6"
-                                       autocomplete="new-password"
-                                       required
-                                       disabled="@isSavingPin"
-                                       class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm tracking-[0.35em] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                       aria-describedby="admin-confirm-pin-help" />
-                                <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-confirm-pin" data-password-label="confirm PIN"
-                                        aria-controls="admin-confirm-pin" aria-label="Show confirm PIN" aria-pressed="false">
-                                    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
-                                    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                                </button>
+                        <div class="grid max-w-xl gap-4 sm:grid-cols-2">
+                            <div class="space-y-3">
+                                <label for="admin-new-pin" class="text-sm font-medium text-foreground">New 6-digit PIN</label>
+                                <div class="relative">
+                                    <input id="admin-new-pin"
+                                           @bind="pinForm.NewPin"
+                                           type="password"
+                                           inputmode="numeric"
+                                           pattern="[0-9]{6}"
+                                           maxlength="6"
+                                           autocomplete="new-password"
+                                           required
+                                           disabled="@isSavingPin"
+                                           class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm tracking-[0.35em] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                           aria-describedby="admin-pin-help" />
+                                    <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-new-pin" data-password-label="new PIN"
+                                            aria-controls="admin-new-pin" aria-label="Show new PIN" aria-pressed="false">
+                                        <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                        <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                                    </button>
+                                </div>
+                                <p id="admin-pin-help" class="text-xs leading-5 text-muted-foreground">Use exactly 6 numbers. Do not share it with employees.</p>
                             </div>
-                            <p id="admin-confirm-pin-help" class="text-xs leading-5 text-muted-foreground">Enter the same 6 digits again.</p>
-                        </div>
-                    </div>
 
-                    <div class="flex max-w-xl justify-end pt-1 max-sm:block">
-                        <BbButton Type="ButtonType.Submit" Variant="ButtonVariant.Default" Disabled="@isSavingPin" Class="max-sm:w-full">
-                            @if (isSavingPin)
-                            {
-                                <BbSpinner Size="SpinnerSize.Small" />
-                                <span>Saving...</span>
-                            }
-                            else
-                            {
-                                <LucideIcon Name="key-round" Size="16" />
-                                <span>Set or replace PIN</span>
-                            }
-                        </BbButton>
-                    </div>
+                            <div class="space-y-3">
+                                <label for="admin-confirm-pin" class="text-sm font-medium text-foreground">Confirm new PIN</label>
+                                <div class="relative">
+                                    <input id="admin-confirm-pin"
+                                           @bind="pinForm.ConfirmPin"
+                                           type="password"
+                                           inputmode="numeric"
+                                           pattern="[0-9]{6}"
+                                           maxlength="6"
+                                           autocomplete="new-password"
+                                           required
+                                           disabled="@isSavingPin"
+                                           class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm tracking-[0.35em] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                           aria-describedby="admin-confirm-pin-help" />
+                                    <button type="button" class="password-toggle-button" data-password-toggle data-password-target="admin-confirm-pin" data-password-label="confirm PIN"
+                                            aria-controls="admin-confirm-pin" aria-label="Show confirm PIN" aria-pressed="false">
+                                        <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+                                        <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+                                    </button>
+                                </div>
+                                <p id="admin-confirm-pin-help" class="text-xs leading-5 text-muted-foreground">Enter the same 6 digits again.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex max-w-xl justify-end pt-1 max-sm:block">
+                            <BbButton Type="ButtonType.Submit" Variant="ButtonVariant.Default" Disabled="@isSavingPin" Class="max-sm:w-full">
+                                @if (isSavingPin)
+                                {
+                                    <BbSpinner Size="SpinnerSize.Small" />
+                                    <span>Saving...</span>
+                                }
+                                else
+                                {
+                                    <LucideIcon Name="key-round" Size="16" />
+                                    <span>Set or replace PIN</span>
+                                }
+                            </BbButton>
+                        </div>
                     </form>
                 </div>
             </section>

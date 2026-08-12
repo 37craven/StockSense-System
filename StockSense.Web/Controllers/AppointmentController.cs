@@ -473,9 +473,6 @@ public class AppointmentsController : ControllerBase
         if (appointment.Status != WorkOrderStatuses.Pending)
             return Conflict(ApiResponse.Error("Only pending appointments can be cancelled."));
 
-        if (appointment.CreatedAt < DateTime.UtcNow.AddMinutes(-30))
-            return Conflict(ApiResponse.Error("Appointments can only be cancelled within 30 minutes of booking."));
-
         appointment.Status = WorkOrderStatuses.Cancelled;
         await _context.SaveChangesAsync();
 

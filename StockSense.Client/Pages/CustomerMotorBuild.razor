@@ -57,12 +57,20 @@
                 @* Sidebar filter content *@
                 <div style="flex: 1; overflow-y: auto; padding: var(--space-3) var(--space-2);">
                     <div style="padding: var(--space-2) var(--space-2) var(--space-4); margin-bottom: var(--space-2); border-bottom: 1px solid var(--border);">
-                        <MotorcycleCombobox Id="build-motorcycle-desktop"
-                                              Label="Motorcycle for this build"
-                                              Options="motorcycles"
-                                              IsLoading="isLoadingMotorcycles"
-                                              LoadError="@motorcycleLoadError"
-                                              @bind-Value="selectedMotorcycleId" />
+                        <div class="flex flex-col gap-1">
+                            <label for="build-motorcycle-desktop" class="text-sm font-medium">Motorcycle for this build</label>
+                            <select id="build-motorcycle-desktop" @bind="selectedMotorcycleId" class="w-full text-sm" disabled="@isLoadingMotorcycles">
+                                <option value="">No motorcycle</option>
+                                @foreach (var m in motorcycles)
+                                {
+                                    <option value="@m.Id">@m.DisplayName</option>
+                                }
+                            </select>
+                            @if (!string.IsNullOrWhiteSpace(motorcycleLoadError))
+                            {
+                                <p class="text-xs text-destructive m-0">@motorcycleLoadError</p>
+                            }
+                        </div>
                     </div>
                     @if (filterMode == FilterMode.Prebuilt)
                     {
@@ -166,12 +174,20 @@
                     </div>
 
                     <div style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border);">
-                        <MotorcycleCombobox Id="build-motorcycle-mobile"
-                                              Label="Motorcycle for this build"
-                                              Options="motorcycles"
-                                              IsLoading="isLoadingMotorcycles"
-                                              LoadError="@motorcycleLoadError"
-                                              @bind-Value="selectedMotorcycleId" />
+                        <div class="flex flex-col gap-1">
+                            <label for="build-motorcycle-mobile" class="text-sm font-medium">Motorcycle for this build</label>
+                            <select id="build-motorcycle-mobile" @bind="selectedMotorcycleId" class="w-full text-sm" disabled="@isLoadingMotorcycles">
+                                <option value="">No motorcycle</option>
+                                @foreach (var m in motorcycles)
+                                {
+                                    <option value="@m.Id">@m.DisplayName</option>
+                                }
+                            </select>
+                            @if (!string.IsNullOrWhiteSpace(motorcycleLoadError))
+                            {
+                                <p class="text-xs text-destructive m-0">@motorcycleLoadError</p>
+                            }
+                        </div>
                     </div>
 
                     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-3" aria-label="Selected build parts">
@@ -407,7 +423,7 @@
                     </div>
                     <div>
                         <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Mechanic</label>
-                        <select value="@selectedMechanic" @onchange="OnMechanicChanged" style="width: 100%; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;">
+                        <select value="@selectedMechanic" @onchange="OnMechanicChanged" class="w-full">
                             @foreach (var mech in mechanics)
                             {
                                 <option value="@mech">@mech</option>

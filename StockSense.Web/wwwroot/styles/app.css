@@ -7,6 +7,14 @@
     scrollbar-color: var(--border) transparent;
 }
 
+select {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--background);
+    color: var(--foreground);
+    padding: 0.5rem 0.75rem;
+}
+
 /* Hide number input spinners globally */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
@@ -828,10 +836,6 @@ input[type="number"] {
     align-items: end;
     gap: 0.75rem;
     margin-bottom: 1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    background: var(--card);
-    padding: 0.875rem;
 }
 .service-management-search {
     display: flex;
@@ -882,13 +886,6 @@ input[type="number"] {
     outline: 2px solid #ef4444;
     outline-offset: 2px;
 }
-.service-management-results {
-    flex: 0 0 auto;
-    color: var(--muted-foreground);
-    padding-bottom: 0.65rem;
-    font-size: 0.75rem;
-    white-space: nowrap;
-}
 .service-management-no-results {
     display: grid;
     min-height: 12rem;
@@ -905,7 +902,6 @@ input[type="number"] {
     .service-management-toolbar { align-items: stretch; flex-direction: column; }
     .service-management-search { min-width: 0; flex-basis: auto; }
     .service-management-filter { min-width: 0; }
-    .service-management-results { padding: 0; }
 }
 @media (min-width: 768px) {
     .service-management-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -924,7 +920,6 @@ input[type="number"] {
     justify-content: space-between;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-top: 2px solid #ef4444;
     border-radius: 0.75rem;
     background: var(--card);
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -932,9 +927,7 @@ input[type="number"] {
 }
 .service-management-card:hover {
     border-color: rgba(239, 68, 68, 0.48);
-    border-top-color: #ef4444;
     box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-    transform: translateY(-1px);
 }
 .service-management-card__header {
     display: flex;
@@ -1029,7 +1022,6 @@ input[type="number"] {
 .dark .service-management-card { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28); }
 .dark .service-management-card:hover {
     border-color: rgba(248, 113, 113, 0.48);
-    border-top-color: #f87171;
     box-shadow: 0 8px 24px rgba(127, 29, 29, 0.20);
 }
 .dark .service-management-card__header { background: var(--card); }

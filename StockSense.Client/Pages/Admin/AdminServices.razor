@@ -15,7 +15,8 @@
 
 <div>
     <PageHeader Title="Service Management"
-                Subtitle="Define generic parts needed per service and link them to inventory products.">
+                Subtitle="Define generic parts needed per service and link them to inventory products."
+                Badge="@(services == null ? null : $"{services.Count} {(services.Count == 1 ? "service" : "services")}")">
         <BbButton Variant="ButtonVariant.Default" OnClick="OpenCreateModal">
             <LucideIcon Name="plus" Size="16"/>
             Create Service
@@ -52,9 +53,6 @@
                     }
                 </select>
             </div>
-            <span class="service-management-results" aria-live="polite">
-                @FilteredServices.Count @((FilteredServices.Count == 1) ? "service" : "services")
-            </span>
             @if (!string.IsNullOrWhiteSpace(serviceSearch) || !string.IsNullOrWhiteSpace(selectedCategory))
             {
                 <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearServiceFilters">

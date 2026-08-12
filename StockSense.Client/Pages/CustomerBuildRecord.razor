@@ -101,10 +101,6 @@
                             Status
                         </th>
 
-                        <th class="text-center p-3 px-4 text-muted-foreground font-medium">
-                            Action
-                        </th>
-
                     </tr>
                 </thead>
 
@@ -182,35 +178,6 @@
 
                             </td>
 
-                            <td class="p-3 px-4 text-center">
-
-                                <div class="flex justify-center items-center gap-2">
-
-                                    @if (build.Status == "Pending")
-                                    {
-                                        <button type="button"
-                                                @onclick="() => CancelBuild(build)"
-                                                class="appointment-action appointment-action--danger rounded-md px-2 py-0.5 text-[10px] font-semibold">
-                                            Cancel
-                                        </button>
-                                    }
-                                    else if (build.Status == "Confirmed")
-                                    {
-                                        <span class="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
-                                            Cancellation unavailable after confirmation.
-                                        </span>
-                                    }
-
-                                    <button type="button"
-                                            @onclick="() => OpenModal(build, actualParts, buildName)"
-                                            class="text-[10px] font-semibold text-primary border border-primary/40 rounded-md px-2 py-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                        View
-                                    </button>
-
-                                </div>
-
-                            </td>
-
                         </tr>
                     }
 
@@ -250,8 +217,9 @@
                         )
                         .ToList();
 
-                <article class="bg-card border border-border rounded-lg p-3 sm:p-4 border-l-4"
-                         style="border-left-color: @GetStatusColor(build.Status)">
+                <article class="bg-card border border-border rounded-lg p-3 sm:p-4 border-l-4 cursor-pointer"
+                         style="border-left-color: @GetStatusColor(build.Status)"
+                         @onclick="() => OpenBuildDetail(build)">
 
                     <div class="flex justify-between items-start mb-2 gap-2">
 
@@ -302,27 +270,6 @@
 
                         <div class="flex items-center gap-2">
 
-                            @if (build.Status == "Pending")
-                            {
-                                <button type="button"
-                                        @onclick="() => CancelBuild(build)"
-                                        class="appointment-action appointment-action--danger rounded-md px-2 py-0.5 text-[10px] font-semibold">
-                                    Cancel
-                                </button>
-                            }
-                            else if (build.Status == "Confirmed")
-                            {
-                                <span class="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
-                                    Cancellation unavailable after confirmation.
-                                </span>
-                            }
-
-                            <button type="button"
-                                    @onclick="() => OpenModal(build, actualParts, buildName)"
-                                    class="text-[10px] font-semibold text-primary border border-primary/40 rounded-md px-2 py-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                View
-                            </button>
-
                             <span class="text-sm font-bold text-primary whitespace-nowrap">
                                 ₱@actualParts.Sum(p => p.Price).ToString("N0")
                             </span>
@@ -339,106 +286,88 @@
 
 </div>
 
+<BbPortalHost />
+<BbDialogProvider />
 
-@if (ShowModal && CurrentParts != null)
-{
-    <div class="fixed inset-0 bg-black/80 flex justify-center items-center z-[1000] p-4"
-         role="presentation">
-
-        <div class="bg-card w-full max-w-[600px] max-h-[85vh] rounded-xl border border-border shadow-xl flex flex-col overflow-hidden"
-             role="dialog"
-             aria-modal="true"
-             aria-labelledby="build-summary-title">
-
-            <div class="p-5 border-b border-border flex justify-between items-start">
-
-                <div>
-
-                    <h3 id="build-summary-title"
-                        class="m-0 mb-1.5 text-foreground text-xl">
-                        Build Summary
-                    </h3>
-
-                    @if (!string.IsNullOrEmpty(modalBuildName))
+<BbDialog @bind-Open="showDetailModal">
+    <BbDialogContent Style="display: flex; flex-direction: column; height: min(85vh, 800px); width: min(96vw, 420px); max-width: 400px; padding: 0; overflow: hidden;">
+        <div class="p-4 pb-0 shrink-0">
+            <BbDialogHeader>
+                <div class="flex items-center gap-1.5">
+                    <BbDialogTitle>Build Details</BbDialogTitle>
+                    @if (CurrentBuild != null)
                     {
-                        <span class="inline-block text-[11px] text-blue-500 uppercase font-extrabold bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-md">
-                            @modalBuildName
+                        <span class="appointment-status-badge @GetStatusClass(CurrentBuild.Status)" aria-label="Status: @CurrentBuild.Status">
+                            @CurrentBuild.Status
                         </span>
                     }
-
-                    <p class="mt-2 mb-0 text-muted-foreground text-sm">
-
-                        <strong class="text-foreground">
-                            Motorcycle:
-                        </strong>
-
-                        @(CurrentBuild?.Motorcycle?.DisplayName
-                            ?? "Not recorded")
-
-                    </p>
-
                 </div>
-
-                <button type="button"
-                        @onclick="CloseModal"
-                        aria-label="Close build summary"
-                        class="rounded-md border-none bg-transparent p-1 text-2xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    &times;
-                </button>
-
-            </div>
-
-
-            <div class="p-5 overflow-y-auto flex-1">
-
-                @foreach (var group in CurrentParts.GroupBy(p => p.Category))
-                {
-                    <div class="mb-4">
-
-                        <h4 class="text-[0.7rem] text-primary uppercase mb-2">
-                            @group.Key
-                        </h4>
-
-                        @foreach (var part in group)
-                        {
-                            <div class="flex justify-between py-1.5 border-b border-white/5">
-
-                                <span class="text-sm text-foreground">
-                                    @part.Brand @part.Name
-                                </span>
-
-                                <span class="font-bold">
-                                    ₱@part.Price.ToString("N2")
-                                </span>
-
-                            </div>
-                        }
-
-                    </div>
-                }
-
-            </div>
-
-
-            <div class="p-5 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-3">
-
-                <span class="font-bold text-lg">
-                    Total: ₱@CurrentParts.Sum(p => p.Price).ToString("N2")
-                </span>
-
-                <button type="button"
-                        @onclick="CloseModal"
-                        class="w-full sm:w-auto px-5 py-2 bg-secondary text-foreground border-none rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    Close
-                </button>
-
-            </div>
-
+                <BbDialogDescription>Reference #@CurrentBuild?.Id</BbDialogDescription>
+            </BbDialogHeader>
         </div>
 
-    </div>
-}
+        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+            @if (CurrentBuild != null && CurrentParts != null)
+            {
+                var rawParts = CurrentParts;
+                var metaTag = rawParts.FirstOrDefault(p => p.Category == "SYSTEM_METADATA");
+                bool isPreBuilt = metaTag?.Name == "TYPE_PREBUILT";
+                string buildName = metaTag?.Brand ?? (isPreBuilt ? "Pre-Built Package" : "Custom Parts Selection");
+                var actualParts = rawParts.Where(p => p.Category != "SYSTEM_METADATA").ToList();
 
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 rounded-lg bg-muted">
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Type</div>
+                        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase mt-1 @(isPreBuilt ? "bg-primary/15 text-primary" : "bg-muted text-foreground")">
+                            @(isPreBuilt ? "Pre-Built" : "Custom")
+                        </span>
+                    </div>
+                    <div class="p-3 rounded-lg bg-muted">
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Motorcycle</div>
+                        <div class="text-sm font-semibold text-foreground mt-1">@(CurrentBuild.Motorcycle?.DisplayName ?? "Not recorded")</div>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-lg bg-muted">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Date Submitted</div>
+                    <div class="text-sm font-semibold text-foreground mt-1">@CurrentBuild.CreatedAt.ToString("MMMM dd, yyyy h:mm tt")</div>
+                </div>
+
+                <div class="p-3 rounded-lg bg-muted">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Parts</div>
+                    <div class="mt-2 flex flex-col gap-3">
+                        @foreach (var group in actualParts.GroupBy(p => p.Category))
+                        {
+                            <div>
+                                <div class="text-[10px] text-primary font-bold uppercase mb-1.5 border-b border-border pb-1">@group.Key</div>
+                                @foreach (var part in group)
+                                {
+                                    <div class="flex justify-between py-1.5 border-b border-white/5">
+                                        <span class="text-sm text-foreground">@part.Brand @part.Name</span>
+                                        <span class="font-bold text-sm">₱@part.Price.ToString("N2")</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-lg bg-muted">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
+                    <span class="text-xl font-black text-primary">₱@actualParts.Sum(p => p.Price).ToString("N2")</span>
+                </div>
+            }
+        </div>
+
+        <div class="flex justify-end items-center gap-2 p-3 px-4 border-t border-border shrink-0">
+            @if (CurrentBuild?.Status == "Pending")
+            {
+                <BbButton Variant="ButtonVariant.Destructive" OnClick="() => CancelFromDetail(CurrentBuild!)">Cancel Build</BbButton>
+            }
+            <BbButton Variant="ButtonVariant.Outline" OnClick="CloseBuildDetail">Close</BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
 
 @code {
 
@@ -453,13 +382,11 @@
 
     private bool showAllHistory = false;
 
-    private bool ShowModal = false;
+    private bool showDetailModal;
 
     private BuildRequestDto? CurrentBuild;
 
     private List<ProductDto> CurrentParts = new();
-
-    private string modalBuildName = "";
 
 
     private IEnumerable<BuildRequestDto> FilteredBuilds
@@ -613,33 +540,25 @@
     }
 
 
-    private void OpenModal(
-        BuildRequestDto build,
-        List<ProductDto> parts,
-        string buildName)
+    private void OpenBuildDetail(BuildRequestDto build)
     {
-        CurrentBuild =
-            build;
-
-        CurrentParts =
-            parts;
-
-        modalBuildName =
-            string.IsNullOrWhiteSpace(buildName)
-                ? "Custom Parts Selection"
-                : buildName;
-
-        ShowModal =
-            true;
+        var rawParts = ParseParts(build.SelectedPartsJson);
+        CurrentBuild = build;
+        CurrentParts = rawParts;
+        showDetailModal = true;
     }
 
-
-    private void CloseModal()
+    private void CloseBuildDetail()
     {
-        ShowModal =
-            false;
+        showDetailModal = false;
     }
 
+    private async Task CancelFromDetail(BuildRequestDto build)
+    {
+        await CancelBuild(build);
+        if (build.Status == "Cancelled")
+            showDetailModal = false;
+    }
 
     private string GetStatusColor(string status) =>
         status switch

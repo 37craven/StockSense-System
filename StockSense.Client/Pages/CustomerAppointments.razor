@@ -51,8 +51,9 @@
 
             @foreach (var appt in FilteredAppointments)
             {
-                <div class="bg-card border border-border rounded-lg p-3 sm:p-4 border-l-4"
-                     style="border-left-color: @GetStatusColor(appt.Status)">
+                <div class="bg-card border border-border rounded-lg p-3 sm:p-4 border-l-4 cursor-pointer"
+                     style="border-left-color: @GetStatusColor(appt.Status)"
+                     @onclick="() => OpenAppointmentDetail(appt)">
 
                     <div class="flex justify-between items-start mb-2 gap-2">
 
@@ -87,20 +88,6 @@
 
                         <div class="flex items-center gap-2">
 
-                            @if (appt.Status == "Pending")
-                            {
-                                <button @onclick="() => CancelAppointment(appt)"
-                                        class="appointment-action appointment-action--danger rounded-md px-2 py-0.5 text-[10px] font-semibold">
-                                    Cancel
-                                </button>
-                            }
-                            else if (appt.Status == "Confirmed")
-                            {
-                                <span class="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
-                                    Cancellation unavailable after confirmation.
-                                </span>
-                            }
-
                             <span class="text-sm font-bold text-primary whitespace-nowrap">
                                 ₱@appt.TotalAmount.ToString("N0")
                             </span>
@@ -117,6 +104,89 @@
 
 </div>
 
+<BbPortalHost />
+<BbDialogProvider />
+
+<BbDialog @bind-Open="showDetailModal">
+    <BbDialogContent Style="display: flex; flex-direction: column; height: min(85vh, 800px); width: min(96vw, 420px); max-width: 400px; padding: 0; overflow: hidden;">
+        <div class="p-4 pb-0 shrink-0">
+            <BbDialogHeader>
+                <div class="flex items-center gap-1.5">
+                    <BbDialogTitle>Appointment Details</BbDialogTitle>
+                    @if (selectedAppointment != null)
+                    {
+                        <span class="appointment-status-badge @GetStatusClass(selectedAppointment.Status)" aria-label="Status: @selectedAppointment.Status">
+                            @selectedAppointment.Status
+                        </span>
+                    }
+                </div>
+                <BbDialogDescription>Reference #@selectedAppointment?.Id</BbDialogDescription>
+            </BbDialogHeader>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+            @if (selectedAppointment != null)
+            {
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 rounded-lg bg-muted">
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Customer</div>
+                        <div class="text-sm font-semibold text-foreground mt-1">@selectedAppointment.CustomerName</div>
+                        @if (!string.IsNullOrWhiteSpace(selectedAppointment.CustomerEmail))
+                        {
+                            <div class="text-xs text-muted-foreground mt-0.5">@selectedAppointment.CustomerEmail</div>
+                        }
+                        @if (!string.IsNullOrEmpty(selectedAppointment.ContactNumber))
+                        {
+                            <div class="text-xs text-muted-foreground mt-0.5">@selectedAppointment.ContactNumber</div>
+                        }
+                    </div>
+                    <div class="p-3 rounded-lg bg-muted">
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Mechanic</div>
+                        <div class="text-sm font-semibold text-foreground mt-1">@(string.IsNullOrEmpty(selectedAppointment.MechanicName) ? "Any mechanic" : selectedAppointment.MechanicName)</div>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-lg bg-muted">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Schedule</div>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span class="text-sm font-semibold text-foreground">@selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy")</span>
+                        <span class="text-sm text-blue-500 font-bold">@selectedAppointment.TimeSlot</span>
+                        <span class="text-xs text-muted-foreground">(~@selectedAppointment.DurationMinutes mins)</span>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-lg bg-muted">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Motorcycle</div>
+                    <div class="text-sm font-semibold text-foreground mt-1">@(selectedAppointment.Motorcycle?.DisplayName ?? "Not recorded")</div>
+                </div>
+
+                <div class="p-3 rounded-lg bg-muted">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Services</div>
+                    <div class="mt-1 flex flex-col gap-1">
+                        @foreach (var svc in selectedAppointment.ServicesRequested.Split(", ", StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            <div class="text-sm text-foreground">@svc</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-lg bg-muted">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
+                    <span class="text-xl font-black text-primary">₱@selectedAppointment.TotalAmount.ToString("N2")</span>
+                </div>
+            }
+        </div>
+
+        <div class="flex justify-end items-center gap-2 p-3 px-4 border-t border-border shrink-0">
+            @if (selectedAppointment?.Status == "Pending")
+            {
+                <BbButton Variant="ButtonVariant.Destructive" OnClick="() => CancelFromDetail(selectedAppointment!)">Cancel Appointment</BbButton>
+            }
+            <BbButton Variant="ButtonVariant.Outline" OnClick="CloseAppointmentDetail">Close</BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
 
     [CascadingParameter]
@@ -127,6 +197,10 @@
     private bool isLoading = true;
 
     private bool showAllHistory = false;
+
+    private bool showDetailModal;
+
+    private AppointmentDto? selectedAppointment;
 
 
     private IEnumerable<AppointmentDto> FilteredAppointments
@@ -227,36 +301,38 @@
         };
 
 
+    private void OpenAppointmentDetail(AppointmentDto appt)
+    {
+        selectedAppointment = appt;
+        showDetailModal = true;
+    }
+
+    private void CloseAppointmentDetail()
+    {
+        showDetailModal = false;
+    }
+
+    private async Task CancelFromDetail(AppointmentDto appt)
+    {
+        await CancelAppointment(appt);
+        if (appt.Status == "Cancelled")
+            showDetailModal = false;
+    }
+
     private async Task CancelAppointment(AppointmentDto appt)
     {
-        if (appt.Status != "Pending")
-        {
-            return;
-        }
+        if (appt.Status != "Pending") return;
 
         try
         {
-            var response =
-                await Http.PutAsync(
-                    $"api/appointments/{appt.Id}/cancel",
-                    null
-                );
+            var response = await Http.PutAsync($"api/appointments/{appt.Id}/cancel", null);
 
             if (response.IsSuccessStatusCode)
             {
-                appt.Status =
-                    "Cancelled";
-
-                myAppointments =
-                    new List<AppointmentDto>(
-                        myAppointments!
-                    );
-
-                StateHasChanged();
+                appt.Status = "Cancelled";
+                myAppointments = new List<AppointmentDto>(myAppointments!);
             }
         }
-        catch
-        {
-        }
+        catch { }
     }
 }
