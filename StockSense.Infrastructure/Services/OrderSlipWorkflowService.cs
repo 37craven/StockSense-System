@@ -183,7 +183,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             var warnings = new List<OrderSlipGenerationWarningDto>();
             foreach (var group in command.SupplierGroups)
             {
-                var slipNumber = $"OS-{now:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..35].ToUpperInvariant();
+                var slipNumber = $"ORD-{now:yyMMdd}-{now:HHss}-{InvoiceHelper.ShortCode()}";
                 var slip = new OrderSlip
                 {
                     SlipNumber = slipNumber, OrderSlipNumber = slipNumber,
@@ -389,7 +389,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             }
 
             var now = DateTime.Now;
-            var slipNumber = $"OS-{now:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..35].ToUpperInvariant();
+            var slipNumber = $"ORD-{now:yyMMdd}-{now:HHss}-{InvoiceHelper.ShortCode()}";
             var slip = new OrderSlip
             {
                 SlipNumber = slipNumber,
@@ -572,7 +572,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             var receiptDateError = OrderSlipMath.ValidateReceiptDate(receivedAt, slip.OrderedAt, DateTime.Today);
             if (receiptDateError is not null)
                 return OperationResult<OrderSlipReceiptResult>.Failure("INVALID_RECEIPT_DATE", receiptDateError);
-            var number = $"PR-{receivedAt:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..35].ToUpperInvariant();
+            var number = $"PRC-{receivedAt:yyMMdd}-{receivedAt:HHss}-{InvoiceHelper.ShortCode()}";
             var receipt = new Transaction
             {
                 InvoiceNumber = number, TransactionDate = receivedAt,

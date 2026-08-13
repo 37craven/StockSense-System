@@ -17,8 +17,6 @@
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <PageTitle>Receive Order Slip</PageTitle>
-<BbPortalHost />
-<BbDialogProvider />
 <UnsavedChangesGuard IsDirty="@ReceiptIsDirty"
                      Message="This stock receipt has not been recorded. If you leave now, the entered quantities and notes will be lost." />
 @if (slip == null) { <LoadingState /> }

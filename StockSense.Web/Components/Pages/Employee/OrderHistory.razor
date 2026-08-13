@@ -22,25 +22,7 @@
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <style>
-.order-page { display:flex; flex-direction:column; gap:1.25rem; min-height:100%; }
-.order-toolbar { display:flex; align-items:end; justify-content:space-between; gap:.75rem; padding:1rem; border:1px solid rgba(127,127,127,.30); border-radius:.75rem; background:var(--card, transparent); box-shadow:0 1px 2px rgba(0,0,0,.04); }
-.order-filter { display:flex; flex-direction:column; gap:.3rem; min-width:210px; color:hsl(var(--muted-foreground)); font-size:.75rem; }
-.order-filter select {
-    width:100%;
-    height:2.5rem;
-    border:1px solid rgba(120,120,120,.55);
-    border-radius:.5rem;
-    background:hsl(var(--background));
-    color:hsl(var(--foreground));
-    padding:0 .75rem;
-    font-size:.875rem;
-    box-shadow:0 0 0 1px rgba(120,120,120,.06);
-}
-.order-filter select:focus {
-    outline:none;
-    border-color:hsl(var(--primary));
-    box-shadow:0 0 0 2px hsl(var(--primary) / .15);
-}
+.order-page { display:flex; flex-direction:column; min-height:100%; }
 .order-list-shell {
     overflow:hidden;
     border:1px solid rgba(120,120,120,.28);
@@ -48,12 +30,10 @@
     background:hsl(var(--card));
     box-shadow:0 1px 2px rgba(0,0,0,.03);
 }
-.order-list-summary { min-height:2.75rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.65rem 1rem; border-bottom:1px solid hsl(var(--border)); color:hsl(var(--muted-foreground)); font-size:.75rem; }
 .order-table-wrap {
     width:100%;
     overflow-x:auto;
     background:hsl(var(--card));
-    border-top:0;
 }
 .order-table { width:100%; min-width:760px; border-collapse:collapse; table-layout:fixed; font-size:.875rem; }
 .order-table col.col-order { width:28%; }
@@ -64,12 +44,6 @@
 .order-table {
     border-collapse:separate;
     border-spacing:0;
-}
-.order-table tbody tr:last-child td:first-child {
-    border-bottom-left-radius:.85rem;
-}
-.order-table tbody tr:last-child td:last-child {
-    border-bottom-right-radius:.85rem;
 }
 .order-table thead {
     background:hsl(var(--muted) / .20);
@@ -105,8 +79,7 @@
 
 .dark .order-table td,
 .dark .order-table tbody tr:not(:last-child) td,
-.dark .order-table th,
-.dark .order-list-summary {
+.dark .order-table th {
     border-bottom-color:rgba(255,255,255,.12) !important;
 }
 .order-row { cursor:pointer; }
@@ -115,7 +88,6 @@
 .order-primary strong { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:.85rem; color:hsl(var(--foreground)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .order-primary small { margin-top:.2rem; color:hsl(var(--muted-foreground)); font-size:.72rem; }
 .order-actions { display:flex; align-items:center; justify-content:flex-end; gap:.4rem; flex-wrap:nowrap; min-height:2rem; white-space:nowrap; }
-.order-empty { border:1px solid rgba(127,127,127,.30); border-radius:.75rem; background:var(--card, transparent); box-shadow:0 1px 2px rgba(0,0,0,.04); overflow:hidden; }
 .notice { border-radius:.55rem; border:1px solid hsl(var(--border)); padding:.75rem; font-size:.875rem; background:hsl(var(--muted) / .3); color:hsl(var(--foreground)); }
 .notice.error { border-color:hsl(var(--destructive)); color:hsl(var(--destructive)); background:hsl(var(--destructive) / .08); }
 .detail-body {
@@ -205,11 +177,6 @@
 }
 
 @@media (max-width: 767px) {
-    .order-page { gap:1rem; }
-    .order-toolbar { align-items:stretch; flex-direction:column; padding:.85rem; }
-    .order-filter { min-width:0; width:100%; }
-    .order-toolbar-action { width:100%; }
-    .order-list-summary { align-items:flex-start; flex-direction:column; gap:.15rem; }
     .order-table-wrap { overflow:visible; padding:.65rem; background:transparent; }
     .order-table { min-width:0; display:block; border-spacing:0; }
     .order-table thead { display:none; }
@@ -241,8 +208,6 @@
 </style>
 
 <PageTitle>Order History</PageTitle>
-<BbPortalHost />
-<BbDialogProvider />
 
 <div class="order-page">
     <PageHeader Title="Order Slips"
@@ -256,11 +221,11 @@
 
     @if (!string.IsNullOrEmpty(message))
     {
-        <div role="status" class="notice">@message</div>
+        <div role="status" class="notice mb-4">@message</div>
     }
     @if (!string.IsNullOrEmpty(error))
     {
-        <div role="alert" class="notice error">@error</div>
+        <div role="alert" class="notice error mb-4">@error</div>
     }
 
     @if (slips == null)
@@ -269,34 +234,42 @@
     }
     else
     {
-        <div class="order-toolbar">
-            <label class="order-filter">
-                Status
-                <select @bind="statusFilter" @bind:after="ApplyFilter" aria-label="Filter order slips by status">
-                    <option value="">All statuses</option>
-                    @foreach (var value in Statuses)
-                    {
-                        <option value="@value">@ShortStatus(value)</option>
-                    }
-                </select>
-            </label>
-            <div class="text-xs text-muted-foreground">
-                Showing <strong class="text-foreground">@filteredSlips.Count</strong> of <strong class="text-foreground">@slips.Count</strong> order slips
+        <div class="rounded-lg border border-border bg-card p-4 mb-5 flex flex-col gap-3" role="search" aria-label="Filter order slips">
+            <div class="flex flex-wrap items-end gap-3">
+                <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1">
+                    Order slips
+                    <input id="history-search"
+                           @bind="searchTerm"
+                           @bind:event="oninput"
+                           @bind:after="ApplyFilter"
+                           placeholder="Search order number or supplier..."
+                           autocomplete="off"
+                           class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground min-w-56 w-full" />
+                </label>
+                <div class="relative">
+                    <select @bind="statusFilter" @bind:after="ApplyFilter" aria-label="Filter order slips by status"
+                            class="h-9 w-40 appearance-none rounded-md border border-input bg-background px-4 pr-9 text-sm text-foreground">
+                        <option value="">All statuses</option>
+                        @foreach (var value in Statuses)
+                        {
+                            <option value="@value">@ShortStatus(value)</option>
+                        }
+                    </select>
+                    <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
             </div>
         </div>
 
         @if (filteredSlips.Count == 0)
         {
-            <div class="order-empty">
-                <EmptyState Icon="clipboard-list" Description="Try changing the status filter or generate a new order." Title="No order slips found" />
-            </div>
+            <EmptyState Icon="clipboard-list" Description="Try changing the search or status filter, or generate a new order." Title="No order slips found" />
         }
         else
         {
             <div class="order-list-shell">
-                <div class="order-list-summary">
-                    <span>@filteredSlips.Count order slip@(filteredSlips.Count == 1 ? "" : "s")</span>
+                <div class="flex items-center justify-between gap-4 border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
                     <span>Select an order to view receipt and inventory details</span>
+                    <span class="shrink-0">Showing <strong class="text-primary">@filteredSlips.Count</strong> order slip@(filteredSlips.Count == 1 ? "" : "s")</span>
                 </div>
                 <div class="order-table-wrap">
                     <table class="order-table">
@@ -516,7 +489,7 @@
                 </div>
                 <div class="rounded-lg border border-border bg-muted/20 p-4">
                     <label for="history-expected-delivery" class="text-sm font-medium">Expected delivery date <span class="font-normal text-muted-foreground">(optional)</span></label>
-                    <p id="history-expected-delivery-help" class="mb-3 mt-1 text-xs text-muted-foreground">Add the supplier's estimated arrival date if it is known.</p>
+                    <p id="history-expected-delivery-help" class="mb-3 mt-1 text-xs text-muted-foreground">Add the estimated arrival date if it is known.</p>
                     <input id="history-expected-delivery" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="expectedDeliveryDate" @bind:format="yyyy-MM-dd" aria-describedby="history-expected-delivery-help"
                            class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground" />
                 </div>
@@ -594,7 +567,7 @@
         </div>
         <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="CloseRemainingDialog" Disabled="closeRemainingBusy">Cancel</BbButton>
-            <BbButton Class="@OrderSlipPresentation.WarningActionClass" OnClick="CloseRemaining" Disabled="@(!CanCloseRemaining)">
+            <BbButton Class="@OrderSlipPresentation.WarningActionClass" OnClick="CloseRemaining" Disabled="closeRemainingBusy">
                 @if (closeRemainingBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
                 @(closeRemainingBusy ? "Closing..." : "Close remaining")
             </BbButton>
@@ -701,7 +674,7 @@
         </div>
         <div class="flex justify-end gap-2 pt-3 border-t border-border">
             <BbButton Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Back</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel" Disabled="@string.IsNullOrWhiteSpace(cancelReason)">Cancel Order</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel">Cancel Order</BbButton>
         </div>
     </BbDialogContent>
 </BbDialog>
@@ -711,6 +684,7 @@
     private List<OrderSlip>? slips;
     private List<OrderSlip> filteredSlips = new();
     private string statusFilter = "";
+    private string searchTerm = "";
     private string message = "";
     private string error = "";
     private string cancelReason = "";
@@ -755,9 +729,17 @@
     private void ApplyFilter()
     {
         filteredSlips = (slips ?? new())
-            .Where(s => string.IsNullOrEmpty(statusFilter) || s.Status == statusFilter)
+            .Where(s => (string.IsNullOrEmpty(statusFilter) || s.Status == statusFilter) && MatchesSearch(s))
             .ToList();
         ApplySort();
+    }
+
+    private bool MatchesSearch(OrderSlip s)
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm)) return true;
+        var search = searchTerm.Trim();
+        return DisplayNumber(s).Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               (s.Supplier?.Name ?? "").Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private void ApplySort()
@@ -924,7 +906,13 @@
         if (closingSlip == null || closeRemainingBusy) return;
         if (string.IsNullOrWhiteSpace(closeRemainingReason))
         {
-            closeRemainingError = "Enter a reason before closing the remaining order.";
+            Toast.Error("Enter a reason before closing the remaining order.", "Reason required");
+            return;
+        }
+        if (!isAdmin && (string.IsNullOrWhiteSpace(closeRemainingAdminUserId)
+            || closeRemainingAdminPin.Length != 6 || !closeRemainingAdminPin.All(char.IsDigit)))
+        {
+            Toast.Error("Select the approving admin and enter their 6-digit PIN.", "Approval required");
             return;
         }
 
@@ -978,11 +966,6 @@
             closeRemainingAdminPin = "";
         }
     }
-
-    private bool CanCloseRemaining => !closeRemainingBusy
-        && !string.IsNullOrWhiteSpace(closeRemainingReason)
-        && (isAdmin || (!string.IsNullOrWhiteSpace(closeRemainingAdminUserId)
-            && closeRemainingAdminPin.Length == 6 && closeRemainingAdminPin.All(char.IsDigit)));
 
     private bool HasSecondaryActions(OrderSlip slip) =>
         slip.Status == OrderSlipStatuses.PartiallyReceived || (isAdmin && CanCancel(slip));
@@ -1241,6 +1224,11 @@
     private async Task Cancel()
     {
         if (cancelling == null) return;
+        if (string.IsNullOrWhiteSpace(cancelReason))
+        {
+            Toast.Error("Enter a reason before cancelling this order.", "Reason required");
+            return;
+        }
         var s = cancelling;
         cancelOpen = false;
         await Act(async () => await Workflow.CancelAsync(new() { OrderSlipId = s.Id, ActingUserId = await UserId(), Reason = cancelReason, RowVersion = s.RowVersion }), "Order cancelled.");

@@ -182,7 +182,7 @@
     }
 
     private static string GetProfileLink(System.Security.Claims.ClaimsPrincipal user) =>
-        user.IsInRole("Employee") || user.IsInRole("Admin") ? "/dashboard" : "/Account/Manage";
+        user.IsInRole("Employee") || user.IsInRole("Admin") ? "/dashboard" : "/Account/Manage/Email";
 
     private static string GetProfileLabel(System.Security.Claims.ClaimsPrincipal user) =>
         user.IsInRole("Employee") || user.IsInRole("Admin") ? "Manage" : "Profile";

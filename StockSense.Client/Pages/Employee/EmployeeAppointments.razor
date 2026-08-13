@@ -45,7 +45,7 @@
     }
 
     .col-act {
-        width: 16%;
+        width: 18%;
     }
 
     .appt-actions {
@@ -762,7 +762,7 @@
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseReasonDialog">Cancel</BbButton>
             <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmRestrictedStatusChange"
-                      Disabled="@(!CanSubmitRestrictedAction || isChangingRestrictedStatus)">
+                      Disabled="isChangingRestrictedStatus">
                 @(isChangingRestrictedStatus ? "Saving..." : "Confirm change")
             </BbButton>
         </BbDialogFooter>
@@ -1127,7 +1127,18 @@
 
     private async Task ConfirmRestrictedStatusChange()
     {
-        if (restrictedAppointment is null || !CanSubmitRestrictedAction) return;
+        if (restrictedAppointment is null) return;
+        if (string.IsNullOrWhiteSpace(restrictedReason))
+        {
+            Toast.Error("Provide a reason for the audit log.", "Reason required");
+            return;
+        }
+        if (!isAdmin && (string.IsNullOrWhiteSpace(restrictedAdminUserId)
+            || restrictedAdminPin.Length != 6 || !restrictedAdminPin.All(char.IsDigit)))
+        {
+            Toast.Error("Select the approving admin and enter their 6-digit PIN.", "Approval required");
+            return;
+        }
         isChangingRestrictedStatus = true;
         restrictedActionError = null;
         bool changed;
@@ -1153,9 +1164,6 @@
             restrictedActionError ??= "The change was not approved. Check the details and try again.";
         }
     }
-
-    private bool CanSubmitRestrictedAction => !string.IsNullOrWhiteSpace(restrictedReason)
-        && (isAdmin || (!string.IsNullOrWhiteSpace(restrictedAdminUserId) && restrictedAdminPin.Length == 6 && restrictedAdminPin.All(char.IsDigit)));
 
     private void RequestRestrictedPartsChange(string title)
     {

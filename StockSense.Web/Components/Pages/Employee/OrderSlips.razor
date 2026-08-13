@@ -284,7 +284,7 @@
             </label>
 
             <div class="actions">
-                <BbButton OnClick="CreateManualDraft" Disabled="@(busy || !CanCreateManual)">
+                <BbButton OnClick="CreateManualDraft" Disabled="busy">
                     @if (busy)
                     {
                         <BbSpinner Size="SpinnerSize.Small" />
@@ -310,7 +310,6 @@
     private string manualReason = "", message = "", error = "";
     private bool CanCreateAutomatic => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && !SelectedAutomaticItems.Any(x => errors.ContainsKey(x.ProductId));
     private IEnumerable<OrderSlipPreviewItemDto> SelectedAutomaticItems => preview?.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected) ?? [];
-    private bool CanCreateManual => manualSupplierId > 0 && manualLines.Count > 0 && manualLines.All(x => x.ProductId > 0 && x.Quantity > 0) && manualLines.Select(x => x.ProductId).Distinct().Count() == manualLines.Count && !string.IsNullOrWhiteSpace(manualReason) && manualReason.Length <= 500;
     private bool HasUnsavedDraft => mode == CreationMode.Automatic
         ? preview is not null && SelectedAutomaticItems.Any()
         : manualSupplierId > 0 || manualLines.Count > 0 || !string.IsNullOrWhiteSpace(manualReason);
@@ -385,7 +384,11 @@
     private IEnumerable<ManualOrderSlipProductDto> AvailableProducts(ManualLine line) => manualCatalog?.Products.Where(x => x.SupplierId == manualSupplierId && (x.Id == line.ProductId || manualLines.All(y => ReferenceEquals(y, line) || y.ProductId != x.Id))) ?? [];
     private async Task CreateManualDraft()
     {
-        if (!CanCreateManual) return;
+        if (busy) return;
+        if (manualSupplierId <= 0) { Toast.Error("Select a supplier for the manual order.", "Supplier required"); return; }
+        if (manualLines.Count == 0 || !manualLines.All(x => x.ProductId > 0 && x.Quantity > 0)) { Toast.Error("Add at least one product with a quantity greater than zero.", "Items required"); return; }
+        if (manualLines.Select(x => x.ProductId).Distinct().Count() != manualLines.Count) { Toast.Error("Each product can appear only once in the order.", "Duplicate product"); return; }
+        if (string.IsNullOrWhiteSpace(manualReason)) { Toast.Error("Enter a reason for this manual order.", "Reason required"); return; }
         busy = true; error = message = "";
         try
         {

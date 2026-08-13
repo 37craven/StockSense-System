@@ -16,7 +16,7 @@
 <UnsavedChangesGuard IsDirty="@HasUnsavedChanges"
                      Message="Your inventory changes have not been saved. If you leave now, they will be lost." />
 
-<div class="flex flex-col gap-5 min-h-full">
+<div class="flex flex-col min-h-full">
     <PageHeader Title="Safety Stock Dashboard"
                 Subtitle="Historical demand and inventory-policy calculations.">
         <AuthorizeView Roles="Admin">
@@ -35,46 +35,72 @@
 
     @if (!string.IsNullOrWhiteSpace(message))
     {
-        <div role="status" class="rounded-md border border-border bg-muted/30 p-3 text-sm text-foreground">@message</div>
+        <div role="status" class="rounded-md border border-border bg-muted/30 p-3 mb-4 text-sm text-foreground">@message</div>
     }
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div role="alert" class="rounded-md border border-destructive p-3 text-sm text-destructive">@error</div>
+        <div role="alert" class="rounded-md border border-destructive p-3 mb-4 text-sm text-destructive">@error</div>
     }
 
-    <div class="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
-        <label class="flex flex-col gap-1 text-xs text-muted-foreground">
-            Product
-            <input aria-label="Filter by product name" @bind="search" @bind:event="oninput" placeholder="Name, category, or brand"
-                   class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground min-w-56" />
-        </label>
-        <label class="flex flex-col gap-1 text-xs text-muted-foreground">Stage
-            <select @bind="stage" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                <option value="">All stages</option><option>ColdStart</option><option>Learning</option><option>DataDriven</option><option>Manual</option><option>Not calculated</option>
-            </select>
-        </label>
-        <label class="flex flex-col gap-1 text-xs text-muted-foreground">Confidence
-            <select @bind="confidence" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                <option value="">All confidence</option><option>Low</option><option>Medium</option><option>High</option>
-            </select>
-        </label>
-        <label class="flex flex-col gap-1 text-xs text-muted-foreground">Category
-            <select @bind="category" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All categories</option>@foreach (var value in Categories) { <option>@value</option> }</select>
-        </label>
-        <label class="flex flex-col gap-1 text-xs text-muted-foreground">Brand
-            <select @bind="brand" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All brands</option>@foreach (var value in Brands) { <option>@value</option> }</select>
-        </label>
-        <label class="flex flex-col gap-1 text-xs text-muted-foreground">Supplier
-            <select @bind="supplier" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All suppliers</option><option value="__missing">Missing supplier</option>@foreach (var value in Suppliers) { <option>@value</option> }</select>
-        </label>
-        <label class="flex flex-col gap-1 text-xs text-muted-foreground">Product status
-            <select @bind="productStatus" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                <option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>
-            </select>
-        </label>
-        <label class="flex items-center gap-2 self-end h-9 text-sm text-foreground"><input type="checkbox" @bind="belowReorder" /> Below reorder point</label>
-        <label class="flex items-center gap-2 self-end h-9 text-sm text-foreground"><input type="checkbox" @bind="missingSupplier" /> Missing supplier</label>
-        <label class="flex items-center gap-2 self-end h-9 text-sm text-foreground"><input type="checkbox" @bind="automaticOnly" /> Automatic only</label>
+    <div class="rounded-lg border border-border bg-card p-4 mb-5 flex flex-col gap-3">
+        <div class="flex flex-wrap items-end gap-3">
+            <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1">
+                Product
+                <input aria-label="Filter by product name" @bind="search" @bind:event="oninput" placeholder="Name, category, or brand"
+                       class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground min-w-56 w-full" />
+            </label>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="() => filtersOpen = !filtersOpen" aria-expanded="@(filtersOpen || AnyFilterActive)">
+                <LucideIcon Name="sliders-horizontal" Size="16" /> Filters
+                @if (ActiveFilterCount > 0)
+                {
+                    <BbBadge Variant="BadgeVariant.Secondary">@ActiveFilterCount</BbBadge>
+                }
+            </BbButton>
+            @if (AnyFilterActive || !string.IsNullOrWhiteSpace(search))
+            {
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearFilters">
+                    <LucideIcon Name="x" Size="16" /> Clear
+                </BbButton>
+            }
+        </div>
+
+        @if (filtersOpen || AnyFilterActive)
+        {
+            <div class="border-t border-border pt-3 flex flex-col gap-3">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Stage
+                        <select @bind="stage" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                            <option value="">All stages</option><option>ColdStart</option><option>Learning</option><option>DataDriven</option><option>Manual</option><option>Not calculated</option>
+                        </select>
+                    </label>
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Confidence
+                        <select @bind="confidence" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                            <option value="">All confidence</option><option>Low</option><option>Medium</option><option>High</option>
+                        </select>
+                    </label>
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Category
+                        <select @bind="category" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All categories</option>@foreach (var value in Categories) { <option>@value</option> }</select>
+                    </label>
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Brand
+                        <select @bind="brand" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All brands</option>@foreach (var value in Brands) { <option>@value</option> }</select>
+                    </label>
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Supplier
+                        <select @bind="supplier" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All suppliers</option><option value="__missing">Missing supplier</option>@foreach (var value in Suppliers) { <option>@value</option> }</select>
+                    </label>
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">Product status
+                        <select @bind="productStatus" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                            <option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="rounded-md border border-border bg-muted/30 px-3 py-2 flex flex-wrap items-center gap-5">
+                    <span class="text-xs font-medium uppercase text-muted-foreground">Quick filters</span>
+                    <label class="flex items-center gap-2 h-9 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="belowReorder" /> Below reorder point</label>
+                    <label class="flex items-center gap-2 h-9 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="missingSupplier" /> Missing supplier</label>
+                    <label class="flex items-center gap-2 h-9 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="automaticOnly" /> Automatic only</label>
+                </div>
+            </div>
+        }
     </div>
 
     @if (loadFailed)
@@ -92,7 +118,10 @@
     else
     {
         <div class="inventory-list-shell">
-            <div class="inventory-list-summary"><span>@FilteredRows.Count() of @rows.Count products</span><span>Select a product to view metrics and settings</span></div>
+            <div class="flex items-center justify-between gap-4 border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
+                <span>Select a product to view metrics and settings</span>
+                <span class="shrink-0">Showing <strong class="text-primary">@FilteredRows.Count()</strong> products</span>
+            </div>
             <div class="inventory-table-wrap">
                 <table class="inventory-table">
                     <thead><tr><th><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th><th>Product</th><th>Status</th><th>Stock</th><th>Position</th><th>Reorder</th><th>Calculation</th><th><span class="sr-only">Open</span></th></tr></thead>
@@ -285,7 +314,7 @@
                                 <div class="editor-grid two-fields"><label for="edit-price">Selling price<input id="edit-price" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock">Current stock<input id="edit-stock" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
                                 <label class="editor-label" for="stock-reason">Reason for change<textarea id="stock-reason" class="w-full border border-input rounded-md bg-background text-foreground px-2 py-2 resize-y" rows="2" maxlength="500" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/500 characters</small></label>
                                 @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="form-error">@productEditorError</p> }
-                                <div class="section-actions"><BbButton OnClick="RequestProductInventorySave" Disabled="@(ModalOperationLocked || inventoryConfirmationOpen || !ProductEditorValid || !ProductWillChange)">Save inventory values</BbButton></div>
+                                <div class="section-actions"><BbButton OnClick="RequestProductInventorySave" Disabled="@(ModalOperationLocked || inventoryConfirmationOpen)">Save inventory values</BbButton></div>
                             </section>
                             <section aria-labelledby="policy-settings-heading">
                                 <div class="section-heading"><div><h3 id="policy-settings-heading">Safety-stock settings</h3><p>Saving recalculates this product immediately.</p></div></div>
@@ -414,128 +443,120 @@
     </BbDialogContent>
 </BbDialog>
 
-@if (showNewProductModal)
-{
-    <div @onclick="RequestCloseNewProductModal" class="fixed inset-0 bg-black/70 flex justify-center items-center z-[1000] p-4">
-        <div @onclick:stopPropagation class="bg-card max-w-full w-[520px] max-h-[88vh] rounded-lg border border-border shadow-lg flex flex-col">
-            <div class="px-6 py-5 border-b border-border flex justify-between items-start shrink-0">
+<BbDialog @bind-Open="newProductOpen">
+    <BbDialogContent Class="w-[min(96vw,520px)] max-h-[88vh] p-0 overflow-hidden flex flex-col">
+        <BbDialogHeader Class="px-6 py-5 border-b border-border">
+            <BbDialogTitle Class="text-lg font-semibold text-foreground m-0">New Product</BbDialogTitle>
+            <BbDialogDescription Class="text-sm text-muted-foreground mt-1">Add a new product to inventory.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
+            @if (!string.IsNullOrWhiteSpace(newProductFormError))
+            {
+                <p role="alert" class="form-error m-0">@newProductFormError</p>
+            }
+            <div class="grid gap-4" style="grid-template-columns:1fr">
                 <div>
-                    <h3 class="text-lg font-semibold text-foreground m-0">New Product</h3>
-                    <p class="text-sm text-muted-foreground mt-1">Add a new product to inventory.</p>
+                    <label for="new-product-name" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Name</label>
+                    <input id="new-product-name" @bind="newProduct.Name" placeholder="Product name" required
+                           class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                 </div>
-                <button @onclick="RequestCloseNewProductModal" class="bg-transparent border-0 cursor-pointer text-muted-foreground p-1 rounded-md flex">
-                    <LucideIcon Name="x" Size="18" />
-                </button>
             </div>
-            <div class="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-                @if (!string.IsNullOrWhiteSpace(newProductFormError))
-                {
-                    <p role="alert" class="form-error m-0">@newProductFormError</p>
-                }
-                <div class="grid gap-4" style="grid-template-columns:1fr">
-                    <div>
-                        <label for="new-product-name" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Name</label>
-                        <input id="new-product-name" @bind="newProduct.Name" placeholder="Product name" required
-                               class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
-                    </div>
+            <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
+                <div>
+                    <label for="new-product-brand" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Brand</label>
+                    <input id="new-product-brand" @bind="newProduct.Brand" placeholder="Brand name" required
+                           class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                 </div>
-                <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
-                    <div>
-                        <label for="new-product-brand" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Brand</label>
-                        <input id="new-product-brand" @bind="newProduct.Brand" placeholder="Brand name" required
-                               class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
-                    </div>
-                    <div>
-                        <label for="new-product-category" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Category</label>
-                        <input id="new-product-category" @bind="newProduct.Category" placeholder="e.g. Engine, Brakes" required
-                               class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
-                    </div>
+                <div>
+                    <label for="new-product-category" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Category</label>
+                    <input id="new-product-category" @bind="newProduct.Category" placeholder="e.g. Engine, Brakes" required
+                           class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
                 </div>
-                <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
-                    <div>
-                        <label for="new-product-supplier" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Supplier</label>
-                        <select id="new-product-supplier" @bind="newProduct.SupplierId" required class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none">
-                            <option value="">Select a supplier</option>
-                            @foreach (var supplier in NewProductSuppliers)
+            </div>
+            <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
+                <div>
+                    <label for="new-product-supplier" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Supplier</label>
+                    <select id="new-product-supplier" @bind="newProduct.SupplierId" required class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none">
+                        <option value="">Select a supplier</option>
+                        @foreach (var supplier in NewProductSuppliers)
+                        {
+                            <option value="@supplier.Id">@supplier.Name</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label for="new-product-price" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Selling Price (₱)</label>
+                    <input id="new-product-price" type="number" step="0.01" min="0.01" @bind="newProduct.Price" placeholder="0.00" required
+                           class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
+                </div>
+            </div>
+            <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
+                <div>
+                    <label for="new-product-initial-stock" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Initial Stock</label>
+                    <input id="new-product-initial-stock" type="number" min="0" @bind="newProduct.InitialStock" placeholder="0" required
+                           class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
+                </div>
+                <div>
+                    <label for="new-product-reorder-point" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Reorder Point</label>
+                    <input id="new-product-reorder-point" type="number" min="0" @bind="newProduct.ReorderTarget" placeholder="0" required
+                           class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
+                </div>
+            </div>
+            <div class="grid gap-4" style="grid-template-columns:1fr">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Image</label>
+                    <InputFile @key="newProductImageInputKey" id="new-product-image-input" class="upload-input" OnChange="HandleNewProductImageSelected" accept="image/jpeg,image/png,image/webp" required />
+                    <label class="upload-card" for="new-product-image-input">
+                        <span class="upload-card-visual" aria-hidden="true">
+                            @if (newProductImageFile is not null && !string.IsNullOrWhiteSpace(newProductImagePreview))
                             {
-                                <option value="@supplier.Id">@supplier.Name</option>
+                                <img src="@newProductImagePreview" alt="" />
                             }
-                        </select>
-                    </div>
-                    <div>
-                        <label for="new-product-price" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Selling Price (₱)</label>
-                        <input id="new-product-price" type="number" step="0.01" min="0.01" @bind="newProduct.Price" placeholder="0.00" required
-                               class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
-                    </div>
-                </div>
-                <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
-                    <div>
-                        <label for="new-product-initial-stock" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Initial Stock</label>
-                        <input id="new-product-initial-stock" type="number" min="0" @bind="newProduct.InitialStock" placeholder="0" required
-                               class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
-                    </div>
-                    <div>
-                        <label for="new-product-reorder-point" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Reorder Point</label>
-                        <input id="new-product-reorder-point" type="number" min="0" @bind="newProduct.ReorderTarget" placeholder="0" required
-                               class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
-                    </div>
-                </div>
-                <div class="grid gap-4" style="grid-template-columns:1fr">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Image</label>
-                        <InputFile @key="newProductImageInputKey" id="new-product-image-input" class="upload-input" OnChange="HandleNewProductImageSelected" accept="image/jpeg,image/png,image/webp" required />
-                        <label class="upload-card" for="new-product-image-input">
-                            <span class="upload-card-visual" aria-hidden="true">
-                                @if (newProductImageFile is not null && !string.IsNullOrWhiteSpace(newProductImagePreview))
-                                {
-                                    <img src="@newProductImagePreview" alt="" />
-                                }
-                                else
-                                {
-                                    <LucideIcon Name="image-up" Size="24" />
-                                }
-                            </span>
-                            <span class="upload-card-copy">
-                                <strong>@(newProductImageFile is not null ? "Change image" : "Upload product image")</strong>
-                                <span>JPEG, PNG, or WebP · max 5 MB</span>
-                            </span>
-                        </label>
-                        @if (newProductImageFile is not null)
-                        {
-                            <div class="upload-selection mt-2">
-                                <span class="selected-file-name"><LucideIcon Name="circle-check" Size="15" /> @newProductImageFile.Name</span>
-                                <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearNewProductImage" aria-label="Remove selected image">Remove</BbButton>
-                            </div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(newProductImageError))
-                        {
-                            <p role="alert" class="form-error">@newProductImageError</p>
-                        }
-                    </div>
-                </div>
-            </div>
-            <div class="px-6 py-4 border-t border-border flex justify-end gap-2 shrink-0">
-                <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestCloseNewProductModal">Cancel</BbButton>
-                <BbButton Variant="ButtonVariant.Default" OnClick="SaveNewProduct" Disabled="@(isSavingNewProduct)">
-                    @if (isSavingNewProduct)
+                            else
+                            {
+                                <LucideIcon Name="image-up" Size="24" />
+                            }
+                        </span>
+                        <span class="upload-card-copy">
+                            <strong>@(newProductImageFile is not null ? "Change image" : "Upload product image")</strong>
+                            <span>JPEG, PNG, or WebP · max 5 MB</span>
+                        </span>
+                    </label>
+                    @if (newProductImageFile is not null)
                     {
-                        <BbSpinner Size="SpinnerSize.Small" />
+                        <div class="upload-selection mt-2">
+                            <span class="selected-file-name"><LucideIcon Name="circle-check" Size="15" /> @newProductImageFile.Name</span>
+                            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearNewProductImage" aria-label="Remove selected image">Remove</BbButton>
+                        </div>
                     }
-                    else
+                    @if (!string.IsNullOrWhiteSpace(newProductImageError))
                     {
-                        <span>Add Product</span>
+                        <p role="alert" class="form-error">@newProductImageError</p>
                     }
-                </BbButton>
+                </div>
             </div>
         </div>
-    </div>
-}
+        <BbDialogFooter Class="px-6 py-4 border-t border-border">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestCloseNewProductModal">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="SaveNewProduct" Disabled="@(isSavingNewProduct)">
+                @if (isSavingNewProduct)
+                {
+                    <BbSpinner Size="SpinnerSize.Small" />
+                }
+                else
+                {
+                    <span>Add Product</span>
+                }
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
 
 @code {
     private List<InventoryDashboardRowDto>? rows;
     private readonly HashSet<int> selectedIds = [];
     private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", productStatus = "", message = "", error = "", settingsError = "";
-    private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed;
+    private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed, filtersOpen;
     private bool inventoryConfirmationOpen, recalculateAllConfirmationOpen, showDiscardDetails, showDiscardNewProduct;
     private string settingsBaseline = "";
     private bool detailOpen
@@ -573,6 +594,18 @@
     private decimal PendingInventoryPrice => TryPrice(out var value) ? value : originalPrice;
     private int PendingInventoryStock => TryStock(out var value) ? value : originalStock;
     private bool ModalOperationLocked => busy || productSaving || imageUploading || supplierSaving || statusSaving || addingSupplier;
+    private bool AnyFilterActive => !string.IsNullOrWhiteSpace(stage) || !string.IsNullOrWhiteSpace(confidence) ||
+        !string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(brand) || !string.IsNullOrWhiteSpace(supplier) ||
+        !string.IsNullOrWhiteSpace(productStatus) || belowReorder || missingSupplier || automaticOnly;
+    private int ActiveFilterCount => (string.IsNullOrWhiteSpace(stage) ? 0 : 1) + (string.IsNullOrWhiteSpace(confidence) ? 0 : 1) +
+        (string.IsNullOrWhiteSpace(category) ? 0 : 1) + (string.IsNullOrWhiteSpace(brand) ? 0 : 1) + (string.IsNullOrWhiteSpace(supplier) ? 0 : 1) +
+        (string.IsNullOrWhiteSpace(productStatus) ? 0 : 1) + (belowReorder ? 1 : 0) + (missingSupplier ? 1 : 0) + (automaticOnly ? 1 : 0);
+    private void ClearFilters()
+    {
+        search = stage = confidence = category = brand = supplier = productStatus = "";
+        belowReorder = missingSupplier = automaticOnly = false;
+        filtersOpen = false;
+    }
     private bool DetailEditorDirty => ProductWillChange || selectedImageFile is not null ||
         (selectedRow is not null && detailSupplierId != selectedRow.SupplierId) ||
         !string.IsNullOrWhiteSpace(newSupplierName) || !string.IsNullOrWhiteSpace(newSupplierEmail) || !string.IsNullOrWhiteSpace(newSupplierMobile) ||
@@ -580,7 +613,7 @@
     private bool NewProductDirty => !string.IsNullOrWhiteSpace(newProduct.Name) || !string.IsNullOrWhiteSpace(newProduct.Brand) ||
         !string.IsNullOrWhiteSpace(newProduct.Category) || newProduct.SupplierId.HasValue || newProduct.Price != 0 ||
         newProduct.InitialStock != 0 || newProduct.ReorderTarget != 0 || newProductImageFile is not null;
-    private bool HasUnsavedChanges => (detailOpen && DetailEditorDirty) || (showNewProductModal && NewProductDirty);
+    private bool HasUnsavedChanges => (detailOpen && DetailEditorDirty) || (newProductOpen && NewProductDirty);
     private List<SupplierDto> supplierList = [];
     private int? detailSupplierId;
     private string detailTab = "overview";
@@ -779,7 +812,11 @@
     }
     private void RequestProductInventorySave()
     {
-        if (ModalOperationLocked || !ProductEditorValid || !ProductWillChange) return;
+        if (ModalOperationLocked) return;
+        if (editPriceInvalid) { Toast.Error("Enter a valid selling price with up to 2 decimal places.", "Invalid price"); return; }
+        if (editStockInvalid) { Toast.Error("Enter a valid stock count between 0 and 999,999.", "Invalid stock"); return; }
+        if (reasonInvalid) { Toast.Error("Enter a reason for the price or stock change.", "Reason required"); return; }
+        if (!ProductWillChange) { Toast.Error("Change the price or stock count before saving.", "Nothing to save"); return; }
         productEditorError = "";
         inventoryConfirmationOpen = true;
     }
@@ -1142,7 +1179,7 @@
     }
     public void Dispose() => InvalidateSettingsLoad();
 
-    private bool showNewProductModal;
+    private bool _newProductOpen;
     private bool isSavingNewProduct;
     private CreateProductDto newProduct = new();
     private IEnumerable<(int Id, string Name)> NewProductSuppliers =>
@@ -1153,6 +1190,17 @@
     private string newProductFormError = "";
     private int newProductImageInputKey;
 
+    private bool newProductOpen
+    {
+        get => _newProductOpen;
+        set
+        {
+            if (_newProductOpen == value) return;
+            if (!value && NewProductDirty) { showDiscardNewProduct = true; return; }
+            _newProductOpen = value;
+        }
+    }
+
     private void OpenNewProductModal()
     {
         newProduct = new();
@@ -1161,12 +1209,12 @@
         newProductImageError = "";
         newProductFormError = "";
         newProductImageInputKey++;
-        showNewProductModal = true;
+        newProductOpen = true;
     }
 
     private void CloseNewProductModal()
     {
-        showNewProductModal = false;
+        newProductOpen = false;
     }
 
     private void RequestCloseNewProductModal()

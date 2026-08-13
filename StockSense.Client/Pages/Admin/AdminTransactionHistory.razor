@@ -589,7 +589,7 @@
                     {
                         <BbSpinner Size="SpinnerSize.Small" />
                     }
-                    <LucideIcon Name="x-circle" Size="14" />
+                    <LucideIcon Name="circle-x" Size="14" />
                     Void
                 </BbButton>
             }
@@ -629,7 +629,7 @@
         <div class="flex justify-end gap-2">
             <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseVoidConfirmation" Disabled="isProcessing">Cancel</BbButton>
             <BbButton Variant="ButtonVariant.Default" Class="txn-action-danger"
-                      OnClick="VoidSelected" Disabled="@(isProcessing || string.IsNullOrWhiteSpace(voidReason))">
+                      OnClick="VoidSelected" Disabled="isProcessing">
                 @if (isProcessing) { <BbSpinner Size="SpinnerSize.Small" /> }
                 Void and restore stock
             </BbButton>
@@ -734,6 +734,11 @@
     private async Task VoidSelected()
     {
         if (selectedTransaction == null || isProcessing) return;
+        if (string.IsNullOrWhiteSpace(voidReason))
+        {
+            Toast.Error("Enter a reason before voiding this transaction.", "Reason required");
+            return;
+        }
         isProcessing = true;
         try
         {
