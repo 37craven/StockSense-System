@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StockSense.Application.DTOs;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
+using StockSense.Infrastructure.Services;
 using System.Security.Claims;
 
 namespace StockSense.Web.Controllers;
@@ -13,10 +14,12 @@ namespace StockSense.Web.Controllers;
 public class TransactionController : ControllerBase
 {
     private readonly TransactionRepository _repo;
+    private readonly DocumentService _documents;
 
-    public TransactionController(TransactionRepository repo)
+    public TransactionController(TransactionRepository repo, DocumentService documents)
     {
         _repo = repo;
+        _documents = documents;
     }
 
     [HttpGet]
@@ -48,6 +51,40 @@ public class TransactionController : ControllerBase
         var adminUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         await _repo.VoidSaleAsync(id, reason, adminUserId);
         return Ok(ApiResponse.Success("The transaction was voided and its stock was restored."));
+    }
+
+    [HttpGet("{id:int}/receipt-pdf")]
+    public async Task<IActionResult> DownloadReceiptPdf(int id, [FromQuery] bool inline = false)
+    {
+        var transaction = await _repo.GetByIdWithItemsAsync(id);
+        if (transaction is null) return NotFound();
+
+        var dto = new ReceiptDto
+        {
+            Id = transaction.Id,
+            InvoiceNumber = transaction.InvoiceNumber,
+            TransactionDate = transaction.TransactionDate,
+            TransactionType = transaction.TransactionType,
+            PaymentMethod = transaction.PaymentMethod,
+            ReferenceNumber = transaction.ReferenceNumber,
+            Remarks = transaction.Remarks,
+            DiscountAmount = transaction.DiscountAmount,
+            TotalAmount = transaction.TotalAmount,
+            Items = transaction.Items.Select(i => new ReceiptItemDto
+            {
+                ProductId = i.ProductId,
+                ProductName = i.ProductName,
+                UnitPrice = i.UnitPrice,
+                Quantity = i.Quantity,
+                DiscountAmount = i.DiscountAmount,
+                LineTotal = i.LineTotal
+            }).ToList()
+        };
+
+        var bytes = _documents.GenerateTransactionReceiptPdf(dto);
+        return inline
+            ? File(bytes, "application/pdf")
+            : File(bytes, "application/pdf", $"Receipt_{transaction.InvoiceNumber}.pdf");
     }
 
     private static TransactionHistoryDto MapToDto(Transaction t) => new()

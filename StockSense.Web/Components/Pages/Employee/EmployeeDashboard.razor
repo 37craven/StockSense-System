@@ -32,13 +32,13 @@
 <div>
     <PageHeader Title="Dashboard"
                 Subtitle="@(lastUpdated == null ? "Loading..." : $"Updated {lastUpdated.Value.ToLocalTime():MMM d, yyyy · h:mm tt}")">
-        <BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync" Disabled="@isLoading" Size="ButtonSize.Small">
+        <BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync" Disabled="@isLoading">
             <LucideIcon Name="refresh-cw" Size="14" /> Refresh
         </BbButton>
-        <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/stock")' Size="ButtonSize.Small">
+        <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/stock")'>
             <LucideIcon Name="sliders-horizontal" Size="14" /> Inventory
         </BbButton>
-        <BbButton Variant="ButtonVariant.Default" OnClick='() => Navigation.NavigateTo("/admin/orderslips")' Size="ButtonSize.Small">
+        <BbButton Variant="ButtonVariant.Default" OnClick='() => Navigation.NavigateTo("/admin/orderslips")'>
             <LucideIcon Name="clipboard-plus" Size="14" /> Generate Orders
         </BbButton>
     </PageHeader>

@@ -212,7 +212,7 @@ public sealed class BusinessControllerUnitTests
             new Transaction { InvoiceNumber = "R-1", TransactionType = "Restock" });
         await db.SaveChangesAsync();
 
-        var result = await new TransactionController(new TransactionRepository(db)).GetTransactions("Sale");
+        var result = await new TransactionController(new TransactionRepository(db), null!).GetTransactions("Sale");
 
         var dto = Assert.Single(Assert.IsType<List<TransactionHistoryDto>>(Assert.IsType<OkObjectResult>(result).Value));
         Assert.Equal("S-1", dto.InvoiceNumber);
@@ -285,7 +285,7 @@ public sealed class BusinessControllerUnitTests
     public async Task VoidTransaction_RequiresReason()
     {
         await using var db = NewDb();
-        var controller = new TransactionController(new TransactionRepository(db));
+        var controller = new TransactionController(new TransactionRepository(db), null!);
 
         var result = await controller.VoidTransaction(1, new VoidTransactionRequest { Reason = "  " });
 

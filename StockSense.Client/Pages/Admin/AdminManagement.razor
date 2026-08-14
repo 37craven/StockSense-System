@@ -296,65 +296,35 @@
 
 @* --- DESTRUCTIVE ACTION CONFIRMATIONS --- *@
 <BbDialog @bind-Open="showDeleteDialog">
-    <BbDialogContent Class="w-[calc(100vw-2rem)] max-w-lg overflow-hidden p-0 sm:w-full">
-        <BbDialogHeader Class="border-b border-border bg-destructive/5 px-5 py-5 pr-12 sm:px-6">
-            <div class="flex items-start gap-3">
-                <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive" aria-hidden="true">
-                    <LucideIcon Name="triangle-alert" Size="20" />
-                </div>
-                <div class="space-y-1">
-                    <BbDialogTitle>Delete this @PendingDeleteLabel.ToLowerInvariant() permanently?</BbDialogTitle>
-                    <BbDialogDescription>
-                        This action cannot be undone. @PendingDeleteConsequence
-                    </BbDialogDescription>
-                </div>
-            </div>
+    <BbDialogContent Class="w-[min(92vw,28rem)]">
+        <BbDialogHeader>
+            <BbDialogTitle>Delete @pendingDeleteName?</BbDialogTitle>
+            <BbDialogDescription>This permanently removes the @PendingDeleteLabel.ToLowerInvariant(). This action cannot be undone.</BbDialogDescription>
         </BbDialogHeader>
 
-        <div class="space-y-5 px-5 py-5 sm:px-6">
-            <div class="rounded-lg border border-border bg-muted/40 p-4" aria-label="@PendingDeleteLabel selected for deletion">
-                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">@PendingDeleteLabel to delete</p>
-                <p class="mt-1 font-semibold text-foreground">@pendingDeleteName</p>
-                @if (pendingDeleteTarget is UserDto pendingUser)
-                {
-                    <p class="mt-0.5 break-all text-sm text-muted-foreground">@pendingUser.Email</p>
-                }
-            </div>
-
-            <div class="space-y-2">
-                <label for="delete-confirmation" class="block text-sm font-medium text-foreground">
-                    Type <span class="font-bold text-destructive">DELETE</span> or the account name to confirm
-                </label>
-                <input id="delete-confirmation" @bind="deleteConfirmationText" @bind:event="oninput" autocomplete="off"
-                       spellcheck="false"
-                       class="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-destructive focus-visible:ring-2 focus-visible:ring-destructive/20 disabled:cursor-not-allowed disabled:opacity-50"
-                       aria-describedby="delete-confirmation-help delete-confirmation-status"
-                       disabled="@isDeleting"
-                       placeholder="Type DELETE or @pendingDeleteName" />
-                <p id="delete-confirmation-help" class="text-xs leading-relaxed text-muted-foreground">
-                    @(pendingDeleteTarget is UserDto ? "You may also enter the email address shown above." : "This check helps prevent accidental permanent deletion.")
-                </p>
-                <p id="delete-confirmation-status" class="sr-only" aria-live="polite">
-                    @(CanConfirmDelete ? "Confirmation accepted. The delete button is now enabled." : "Enter the required confirmation to enable deletion.")
-                </p>
-            </div>
+        <div class="space-y-3">
+            <label class="flex flex-col gap-1 text-sm font-medium">
+                Type DELETE or @pendingDeleteName to confirm.
+                <input @bind="deleteConfirmationText" placeholder="DELETE or @pendingDeleteName" autocomplete="off"
+                       class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2"
+                       disabled="@isDeleting" />
+            </label>
+            @if (pendingDeleteTarget is UserDto pendingUser)
+            {
+                <p class="m-0 text-xs text-muted-foreground">You may also enter the email address: @pendingUser.Email</p>
+            }
         </div>
 
-        <div class="flex flex-col-reverse gap-2 border-t border-border bg-muted/20 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
-            <BbButton Variant="ButtonVariant.Ghost" Class="w-full sm:w-auto" OnClick="CloseDeleteDialog" Disabled="isDeleting">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" Class="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive sm:w-auto" OnClick="ExecuteDelete" Disabled="@(!CanConfirmDelete || isDeleting)">
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDeleteDialog" Disabled="isDeleting">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="ExecuteDelete" Disabled="@(!CanConfirmDelete || isDeleting)">
                 @if (isDeleting)
                 {
                     <BbSpinner Size="SpinnerSize.Small" />
-                    <span>Deleting…</span>
                 }
-                else
-                {
-                    <LucideIcon Name="trash-2" Size="16" />
-                    <span>Delete permanently</span>
-                }
+                Delete permanently
             </BbButton>
-        </div>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
@@ -549,10 +519,6 @@
         pendingDeleteTarget is UserDto user && string.Equals(deleteConfirmationText.Trim(), user.Email, StringComparison.OrdinalIgnoreCase);
 
     private string PendingDeleteLabel => pendingDeleteTarget is UserDto ? "Account" : "Mechanic";
-
-    private string PendingDeleteConsequence => pendingDeleteTarget is UserDto
-        ? "The account and its access will be permanently removed."
-        : "The mechanic record will be permanently removed.";
 
     private void CloseDeleteDialog()
     {

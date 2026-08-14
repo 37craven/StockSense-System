@@ -17,20 +17,20 @@
                      Message="Your inventory changes have not been saved. If you leave now, they will be lost." />
 
 <div class="flex flex-col min-h-full">
-    <PageHeader Title="Safety Stock Dashboard"
+    <PageHeader Title="Safety Stock"
                 Subtitle="Historical demand and inventory-policy calculations.">
+        <BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(ModalOperationLocked || selectedIds.Count == 0)">
+            <LucideIcon Name="refresh-cw" Size="16" /> Recalculate selected
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="RequestRecalculateAll" Disabled="@(ModalOperationLocked || recalculateAllConfirmationOpen)">
+            @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
+            <LucideIcon Name="calculator" Size="16" /> Recalculate all
+        </BbButton>
         <AuthorizeView Roles="Admin">
             <BbButton Variant="ButtonVariant.Default" OnClick="OpenNewProductModal">
                 <LucideIcon Name="package-plus" Size="16" /> New Product
             </BbButton>
         </AuthorizeView>
-        <BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(ModalOperationLocked || selectedIds.Count == 0)">
-            <LucideIcon Name="refresh-cw" Size="16" /> Recalculate selected
-        </BbButton>
-        <BbButton OnClick="RequestRecalculateAll" Disabled="@(ModalOperationLocked || recalculateAllConfirmationOpen)">
-            @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
-            <LucideIcon Name="calculator" Size="16" /> Recalculate all
-        </BbButton>
     </PageHeader>
 
     @if (!string.IsNullOrWhiteSpace(message))
@@ -105,7 +105,7 @@
 
     @if (loadFailed)
     {
-        <div class="inventory-empty" role="alert"><LucideIcon Name="circle-alert" Size="24" /><div><strong>Inventory data could not be loaded</strong><p>@error</p></div><BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync">Try again</BbButton></div>
+        <EmptyState Icon="circle-alert" Title="Inventory data could not be loaded" Description="@error" ActionTitle="Try again" Action="LoadAsync" Role="alert" />
     }
     else if (rows == null)
     {
@@ -113,7 +113,7 @@
     }
     else if (!FilteredRows.Any())
     {
-        <div class="inventory-empty" role="status"><LucideIcon Name="package-search" Size="24" /><div><strong>No products match these filters</strong><p>Adjust the search or inventory filters to see products.</p></div></div>
+        <EmptyState Icon="package-search" Title="No products match these filters" Description="Adjust the search or inventory filters to see products." Role="status" />
     }
     else
     {
@@ -147,24 +147,31 @@
 </div>
 
 <BbDialog @bind-Open="detailOpen">
-    <BbDialogContent Style="width:min(96vw,900px);height:90vh;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+    <BbDialogContent Style="width:min(96vw,1100px);height:90vh;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
         <BbDialogHeader><BbDialogTitle>@(selectedRow?.ProductName ?? "Inventory details")</BbDialogTitle><BbDialogDescription>@(selectedRow is null ? "Product inventory and safety-stock details." : $"{selectedRow.Brand} · {selectedRow.Category}")</BbDialogDescription></BbDialogHeader>
         @if (selectedRow is not null)
         {
             <div class="flex-1 min-h-0 flex flex-col">
-                <div class="flex gap-0 border-b border-border shrink-0" role="tablist" aria-label="Detail tabs">
+                <div class="flex gap-0 border-b border-border shrink-0 mb-3" role="tablist" aria-label="Detail tabs">
                     <button type="button" role="tab" aria-selected="@(detailTab == "overview")"
                             @onclick='() => detailTab = "overview"'
                             class="px-4 py-2 text-sm font-medium border-b-2 transition-colors @(detailTab == "overview" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")">
                         Overview
                     </button>
-                    <button type="button" role="tab" aria-selected="@(detailTab == "settings")"
-                            @onclick='() => detailTab = "settings"'
-                            class="px-4 py-2 text-sm font-medium border-b-2 transition-colors @(detailTab == "settings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")">
-                        Settings
+                    <AuthorizeView Roles="Admin">
+                        <button type="button" role="tab" aria-selected="@(detailTab == "product")"
+                                @onclick='() => detailTab = "product"'
+                                class="px-4 py-2 text-sm font-medium border-b-2 transition-colors @(detailTab == "product" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")">
+                            Product
+                        </button>
+                    </AuthorizeView>
+                    <button type="button" role="tab" aria-selected="@(detailTab == "policy")"
+                            @onclick='() => detailTab = "policy"'
+                            class="px-4 py-2 text-sm font-medium border-b-2 transition-colors @(detailTab == "policy" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")">
+                        Policy
                     </button>
                 </div>
-                <div class="detail-scroll" role="tabpanel" style="overflow-y:auto">
+                <div class="detail-scroll" role="tabpanel" style="overflow-y:auto ">
                     @if (detailTab == "overview")
                     {
                         <section class="product-image-section" aria-labelledby="product-image-heading">
@@ -196,125 +203,152 @@
                             </div>
                         </section>
                     }
+                    else if (detailTab == "product")
+                    {
+                        <section aria-labelledby="product-status-heading">
+                            <div class="flex items-center justify-between gap-3">
+                                <h3 id="product-status-heading" class="m-0 text-sm font-semibold text-foreground">Product status</h3>
+                                <button type="button"
+                                        role="switch"
+                                        aria-checked="@editingProductIsActive"
+                                        aria-label="Product status: @(editingProductIsActive ? "Active" : "Inactive"). Select to make @(editingProductIsActive ? "inactive" : "active")."
+                                        title="Set product @(editingProductIsActive ? "inactive" : "active")"
+                                        disabled="@ModalOperationLocked"
+                                        @onclick="ToggleProductStatus"
+                                        class="product-status-toggle ss-product-status @(editingProductIsActive ? "ss-status-active" : "ss-status-inactive")">
+                                    @if (statusSaving) { <BbSpinner Size="SpinnerSize.Small" /> }
+                                    else { <LucideIcon Name="@(editingProductIsActive ? "eye" : "eye-off")" Size="15" /> }
+                                    @(editingProductIsActive ? "Active" : "Inactive")
+                                </button>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(productStatusError)) { <p role="alert" class="form-error">@productStatusError</p> }
+                        </section>
+                        <section aria-labelledby="product-image-edit-heading">
+                            <div class="section-heading"><div><h3 id="product-image-edit-heading">Product image</h3><p>Upload or replace the product image.</p></div></div>
+                            @if (ModalOperationLocked)
+                            {
+                                <InputFile @key="imageInputKey" id="product-image-input" class="upload-input" OnChange="HandleImageSelected" accept="image/jpeg,image/png,image/webp" aria-describedby="product-image-help product-image-status" disabled />
+                            }
+                            else
+                            {
+                                <InputFile @key="imageInputKey" id="product-image-input" class="upload-input" OnChange="HandleImageSelected" accept="image/jpeg,image/png,image/webp" aria-describedby="product-image-help product-image-status" />
+                            }
+                            <label class="upload-card @(ModalOperationLocked ? "is-disabled" : null)" for="product-image-input" aria-disabled="@ModalOperationLocked">
+                                <span class="upload-card-visual" aria-hidden="true">
+                                    @if (selectedImageFile is not null && !string.IsNullOrWhiteSpace(imagePreviewUrl))
+                                    {
+                                        <img src="@imagePreviewUrl" alt="" />
+                                    }
+                                    else
+                                    {
+                                        <LucideIcon Name="image-up" Size="24" />
+                                    }
+                                </span>
+                                <span class="upload-card-copy">
+                                    <strong>@(selectedImageFile is not null ? "Choose a different image" : string.IsNullOrWhiteSpace(selectedRow.ImageUrl) ? "Choose product image" : "Replace image")</strong>
+                                    <span id="product-image-help">JPEG, PNG, or WebP · maximum 5 MB</span>
+                                </span>
+                            </label>
+                            <div id="product-image-status" class="upload-selection" aria-live="polite" aria-atomic="true">
+                                @if (selectedImageFile is null)
+                                {
+                                    <span>No new image selected</span>
+                                }
+                                else
+                                {
+                                    <span class="selected-file-name"><LucideIcon Name="circle-check" Size="15" /> @selectedImageFile.Name</span>
+                                    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearImageSelection" Disabled="@ModalOperationLocked" aria-label="Remove selected image">Remove</BbButton>
+                                }
+                            </div>
+                            @if (imageUploading) { <progress aria-label="Uploading product image" class="image-progress"></progress> }
+                            @if (!string.IsNullOrWhiteSpace(imageUploadError)) { <p role="alert" class="form-error">@imageUploadError</p> }
+                            <div class="section-actions" style="justify-content:space-between">
+                                @if (ModalOperationLocked)
+                                {
+                                    <span class="text-xs text-muted-foreground">Please wait for the current operation to finish.</span>
+                                }
+                                else if (selectedImageFile is null)
+                                {
+                                    <span class="text-xs text-muted-foreground">Choose a valid image to enable Save image.</span>
+                                }
+                                else
+                                {
+                                    <span></span>
+                                }
+                                <BbButton Variant="ButtonVariant.Default" OnClick="UploadProductImage" Disabled="@(ModalOperationLocked || selectedImageFile is null)">@if (imageUploading) { <BbSpinner Size="SpinnerSize.Small" /> } Save image</BbButton>
+                            </div>
+                        </section>
+                        <section aria-labelledby="inventory-values-heading">
+                            <div class="section-heading"><div><h3 id="inventory-values-heading">Price and stock</h3><p>Changes are audited and require a reason.</p></div></div>
+                            <div class="editor-grid two-fields"><label for="edit-price">Selling price<input id="edit-price" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock">Current stock<input id="edit-stock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
+                            <label class="editor-label" for="stock-reason">Reason for change<textarea id="stock-reason" class="w-full border border-input rounded-md bg-background text-foreground px-2 py-2 resize-y" rows="2" maxlength="500" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/500 characters</small></label>
+                            @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="form-error">@productEditorError</p> }
+                            <div class="section-actions"><BbButton Class="min-h-11 max-sm:w-full" OnClick="RequestProductInventorySave" Disabled="@(ModalOperationLocked || inventoryConfirmationOpen)">Save inventory values</BbButton></div>
+                        </section>
+                        <section aria-labelledby="danger-zone-heading">
+                            <div class="section-heading"><div><h3 id="danger-zone-heading" class="text-destructive">Danger zone</h3><p>Permanently delete this product from inventory.</p></div></div>
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 p-4">
+                                <p class="m-0 text-sm text-muted-foreground">Delete <strong class="text-foreground">@editingProductName</strong> and all of its inventory data. This cannot be undone.</p>
+                                <BbButton Variant="ButtonVariant.Destructive" OnClick="RequestDeleteProduct" Disabled="ModalOperationLocked"><LucideIcon Name="trash-2" Size="15" /> Delete product</BbButton>
+                            </div>
+                        </section>
+                    }
                     else
                     {
                         <AuthorizeView Roles="Admin">
                           <Authorized>
-                            <section aria-labelledby="product-status-heading">
-                                <div class="flex items-center justify-between gap-3">
-                                    <h3 id="product-status-heading" class="m-0 text-sm font-semibold text-foreground">Product status</h3>
-                                    <button type="button"
-                                            role="switch"
-                                            aria-checked="@editingProductIsActive"
-                                            aria-label="Product status: @(editingProductIsActive ? "Active" : "Inactive"). Select to make @(editingProductIsActive ? "inactive" : "active")."
-                                            title="Set product @(editingProductIsActive ? "inactive" : "active")"
-                                            disabled="@ModalOperationLocked"
-                                            @onclick="ToggleProductStatus"
-                                            class="product-status-toggle ss-product-status @(editingProductIsActive ? "ss-status-active" : "ss-status-inactive")">
-                                        @if (statusSaving) { <BbSpinner Size="SpinnerSize.Small" /> }
-                                        else { <LucideIcon Name="@(editingProductIsActive ? "eye" : "eye-off")" Size="15" /> }
-                                        @(editingProductIsActive ? "Active" : "Inactive")
-                                    </button>
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(productStatusError)) { <p role="alert" class="form-error">@productStatusError</p> }
-                            </section>
-                            <section aria-labelledby="product-image-edit-heading">
-                                <div class="section-heading"><div><h3 id="product-image-edit-heading">Product image</h3><p>Upload or replace the product image.</p></div></div>
-                                @if (ModalOperationLocked)
-                                {
-                                    <InputFile @key="imageInputKey" id="product-image-input" class="upload-input" OnChange="HandleImageSelected" accept="image/jpeg,image/png,image/webp" aria-describedby="product-image-help product-image-status" disabled />
-                                }
-                                else
-                                {
-                                    <InputFile @key="imageInputKey" id="product-image-input" class="upload-input" OnChange="HandleImageSelected" accept="image/jpeg,image/png,image/webp" aria-describedby="product-image-help product-image-status" />
-                                }
-                                <label class="upload-card @(ModalOperationLocked ? "is-disabled" : null)" for="product-image-input" aria-disabled="@ModalOperationLocked">
-                                    <span class="upload-card-visual" aria-hidden="true">
-                                        @if (selectedImageFile is not null && !string.IsNullOrWhiteSpace(imagePreviewUrl))
-                                        {
-                                            <img src="@imagePreviewUrl" alt="" />
-                                        }
-                                        else
-                                        {
-                                            <LucideIcon Name="image-up" Size="24" />
-                                        }
-                                    </span>
-                                    <span class="upload-card-copy">
-                                        <strong>@(selectedImageFile is not null ? "Choose a different image" : string.IsNullOrWhiteSpace(selectedRow.ImageUrl) ? "Choose product image" : "Replace image")</strong>
-                                        <span id="product-image-help">JPEG, PNG, or WebP · maximum 5 MB</span>
-                                    </span>
-                                </label>
-                                <div id="product-image-status" class="upload-selection" aria-live="polite" aria-atomic="true">
-                                    @if (selectedImageFile is null)
-                                    {
-                                        <span>No new image selected</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="selected-file-name"><LucideIcon Name="circle-check" Size="15" /> @selectedImageFile.Name</span>
-                                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearImageSelection" Disabled="@ModalOperationLocked" aria-label="Remove selected image">Remove</BbButton>
-                                    }
-                                </div>
-                                @if (imageUploading) { <progress aria-label="Uploading product image" class="image-progress"></progress> }
-                                @if (!string.IsNullOrWhiteSpace(imageUploadError)) { <p role="alert" class="form-error">@imageUploadError</p> }
-                                <div class="image-save-row">
-                                    <BbButton Variant="ButtonVariant.Default" OnClick="UploadProductImage" Disabled="@(ModalOperationLocked || selectedImageFile is null)">@if (imageUploading) { <BbSpinner Size="SpinnerSize.Small" /> } Save image</BbButton>
-                                    @if (ModalOperationLocked)
-                                    {
-                                        <span>Please wait for the current operation to finish.</span>
-                                    }
-                                    else if (selectedImageFile is null)
-                                    {
-                                        <span>Choose a valid image to enable Save image.</span>
-                                    }
-                                </div>
-                            </section>
                             <section aria-labelledby="supplier-mapping-heading">
-                                <div class="section-heading"><div><h3 id="supplier-mapping-heading">Supplier mapping</h3><p>Assign or change the supplier for this product.</p></div></div>
-                                <div class="editor-grid two-fields">
-                                    <label for="detail-supplier">Supplier
-                                        <select id="detail-supplier" @bind="detailSupplierId" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2">
-                                            <option value="">None</option>
-                                            @foreach (var s in supplierList)
-                                            {
-                                                <option value="@s.Id">@s.Name</option>
-                                            }
-                                        </select>
-                                    </label>
-                                </div>
+                                <div class="section-heading"><div><h3 id="supplier-mapping-heading">Supplier mapping</h3><p>@(showAddSupplierForm ? "Add a new supplier and their contact details." : "Assign or change the supplier for this product.")</p></div></div>
                                 @if (!showAddSupplierForm)
                                 {
-                                    <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
+                                    var selectedSupplier = supplierList.FirstOrDefault(s => s.Id == detailSupplierId);
+                                    <div class="supplier-stack">
+                                        <label for="detail-supplier">Supplier
+                                            <select id="detail-supplier" @bind="detailSupplierId" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2">
+                                                <option value="">None</option>
+                                                @foreach (var s in supplierList)
+                                                {
+                                                    <option value="@s.Id">@s.Name</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <label>Email
+                                            <input value="@(selectedSupplier?.Email ?? "")" disabled placeholder="—" class="w-full h-11 border border-input rounded-md bg-muted text-muted-foreground px-2" />
+                                        </label>
+                                        <label>Mobile number
+                                            <input value="@(selectedSupplier?.MobileNumber ?? "")" disabled placeholder="—" class="w-full h-11 border border-input rounded-md bg-muted text-muted-foreground px-2" />
+                                        </label>
+                                    </div>
+                                    <div class="section-actions flex-wrap">
                                         <BbButton Class="min-h-11 max-sm:w-full" OnClick="SaveProductSupplier" Disabled="@(ModalOperationLocked || supplierSaving)">
                                             @if (supplierSaving) { <BbSpinner Size="SpinnerSize.Small" /> }
                                             Save supplier
                                         </BbButton>
                                         <BbButton Class="min-h-11 max-sm:w-full" Variant="ButtonVariant.Outline" OnClick="OpenAddSupplierForm" Disabled="@ModalOperationLocked">
-                                            <LucideIcon Name="plus" Size="15" /> Add new supplier
+                                            <LucideIcon Name="plus" Size="15" /> Add supplier
                                         </BbButton>
                                     </div>
                                 }
                                 else
                                 {
-                                    <div class="editor-grid grid-cols-2 gap-3 mt-2">
-                                        <label>Supplier name<input @bind="newSupplierName" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" placeholder="e.g. Motostar" maxlength="200" /></label>
-                                        <label>Email<input @bind="newSupplierEmail" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" type="email" placeholder="supplier@example.com" maxlength="200" /></label>
-                                        <label>Mobile number<input @bind="newSupplierMobile" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" type="tel" placeholder="09123456789" maxlength="50" /></label>
+                                    <div class="supplier-stack">
+                                        <label for="new-supplier-name">New supplier name
+                                            <input id="new-supplier-name" type="text" @bind="newSupplierName" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="e.g. Motostar" maxlength="200" />
+                                        </label>
+                                        <label for="new-supplier-email">Email
+                                            <input id="new-supplier-email" type="email" @bind="newSupplierEmail" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="supplier@example.com" maxlength="200" />
+                                        </label>
+                                        <label for="new-supplier-mobile">Mobile number
+                                            <input id="new-supplier-mobile" type="tel" @bind="newSupplierMobile" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="09123456789" maxlength="50" />
+                                        </label>
                                     </div>
                                     @if (!string.IsNullOrWhiteSpace(newSupplierError)) { <p role="alert" class="form-error">@newSupplierError</p> }
-                                    <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
-                                        <BbButton Class="min-h-11 max-sm:w-full" OnClick="AddNewSupplier" Disabled="@(string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier)">@if (addingSupplier) { <BbSpinner Size="SpinnerSize.Small" /> } Add supplier</BbButton>
+                                    <div class="section-actions flex-wrap">
+                                        <BbButton Class="min-h-11 max-sm:w-full" OnClick="AddNewSupplier" Disabled="@(string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier)">@if (addingSupplier) { <BbSpinner Size="SpinnerSize.Small" /> } Save supplier</BbButton>
                                         <BbButton Class="min-h-11 max-sm:w-full" Variant="ButtonVariant.Outline" OnClick="CancelAddSupplierForm" Disabled="addingSupplier">Cancel</BbButton>
                                     </div>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(supplierUpdateError)) { <p role="alert" class="form-error">@supplierUpdateError</p> }
-                            </section>
-                            <section aria-labelledby="inventory-values-heading">
-                                <div class="section-heading"><div><h3 id="inventory-values-heading">Price and stock</h3><p>Changes are audited and require a reason.</p></div></div>
-                                <div class="editor-grid two-fields"><label for="edit-price">Selling price<input id="edit-price" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock">Current stock<input id="edit-stock" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
-                                <label class="editor-label" for="stock-reason">Reason for change<textarea id="stock-reason" class="w-full border border-input rounded-md bg-background text-foreground px-2 py-2 resize-y" rows="2" maxlength="500" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/500 characters</small></label>
-                                @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="form-error">@productEditorError</p> }
-                                <div class="section-actions"><BbButton OnClick="RequestProductInventorySave" Disabled="@(ModalOperationLocked || inventoryConfirmationOpen)">Save inventory values</BbButton></div>
                             </section>
                             <section aria-labelledby="policy-settings-heading">
                                 <div class="section-heading"><div><h3 id="policy-settings-heading">Safety-stock settings</h3><p>Saving recalculates this product immediately.</p></div></div>
@@ -325,15 +359,17 @@
                                 else
                                 {
                                     <div class="editor-grid policy-grid">
-                                        <label>Calculation mode<select @bind="settings.CalculationMode" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2"><option>Auto</option><option>Manual</option></select></label><label>Weekly demand estimate<input type="number" min="0" step="0.0001" @bind="settings.InitialEstimatedWeeklyDemand" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Supplier lead time (days)<input type="number" min="1" @bind="settings.DefaultLeadTimeDays" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label>
-                                        <label>Review period (days)<input type="number" min="1" @bind="settings.ReviewPeriodDays" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Buffer days<input type="number" min="0" @bind="settings.BufferDays" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Service level<input type="number" min="0.5" max="0.999" step="0.0001" @bind="settings.ServiceLevel" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label>
-                                        <label>Minimum safety stock<input type="number" min="0" @bind="settings.MinimumSafetyStock" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Maximum safety stock<input type="number" min="0" @bind="settings.MaximumSafetyStock" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Minimum order quantity<input type="number" min="1" @bind="settings.MinimumOrderQuantity" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label>
-                                        <label>Package size<input type="number" min="1" @bind="settings.PackageSize" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Maximum stock level<input type="number" min="1" @bind="settings.MaximumStockLevel" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Tracking start date<input type="date" @bind="settings.InventoryTrackingStartDate" @bind:format="yyyy-MM-dd" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label>
-                                        @if (settings.CalculationMode == "Manual") { <label>Manual safety stock<input type="number" min="0" @bind="settings.ManualSafetyStock" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Manual reorder point<input type="number" min="0" @bind="settings.ManualReorderPoint" class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" /></label> }
+                                        <label>Calculation mode<select @bind="settings.CalculationMode" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2"><option>Auto</option><option>Manual</option></select></label><label>Weekly demand estimate<input type="number" min="0" step="0.0001" @bind="settings.InitialEstimatedWeeklyDemand" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
+                                        <label>Supplier lead time (days)<input type="number" min="1" @bind="settings.DefaultLeadTimeDays" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Review period (days)<input type="number" min="1" @bind="settings.ReviewPeriodDays" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
+                                        <label>Buffer days<input type="number" min="0" @bind="settings.BufferDays" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Service level<input type="number" min="0.5" max="0.999" step="0.0001" @bind="settings.ServiceLevel" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
+                                        <label>Minimum safety stock<input type="number" min="0" @bind="settings.MinimumSafetyStock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Maximum safety stock<input type="number" min="0" @bind="settings.MaximumSafetyStock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
+                                        <label>Minimum order quantity<input type="number" min="1" @bind="settings.MinimumOrderQuantity" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Package size<input type="number" min="1" @bind="settings.PackageSize" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
+                                        <label>Maximum stock level<input type="number" min="1" @bind="settings.MaximumStockLevel" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Tracking start date<input type="date" @bind="settings.InventoryTrackingStartDate" @bind:format="yyyy-MM-dd" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
+                                        @if (settings.CalculationMode == "Manual") { <label>Manual safety stock<input type="number" min="0" @bind="settings.ManualSafetyStock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Manual reorder point<input type="number" min="0" @bind="settings.ManualReorderPoint" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label> }
                                     </div>
                                     <label class="checkbox-label"><input type="checkbox" @bind="settings.IsAutomaticOrderEnabled" /> Automatic order recommendations enabled</label>
                                     @if (!string.IsNullOrWhiteSpace(settingsError)) { <p role="alert" class="form-error">@settingsError</p> }
-                                    <div class="section-actions"><BbButton OnClick="SaveSettings" Disabled="ModalOperationLocked">Save settings and recalculate</BbButton></div>
+                                    <div class="section-actions"><BbButton Class="min-h-11 max-sm:w-full" OnClick="SaveSettings" Disabled="ModalOperationLocked">Save settings and recalculate</BbButton></div>
                                 }
                             </section>
                           </Authorized>
@@ -439,6 +475,30 @@
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardNewProduct = false">Keep editing</BbButton>
             <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardNewProduct">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="deleteProductOpen">
+    <BbDialogContent Class="w-[min(92vw,28rem)]">
+        <BbDialogHeader>
+            <BbDialogTitle>Delete @editingProductName?</BbDialogTitle>
+            <BbDialogDescription>This permanently removes the product and all of its inventory data. This action cannot be undone.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="space-y-3">
+            <label class="flex flex-col gap-1 text-sm font-medium">
+                Type DELETE or @editingProductName to confirm.
+                <input @bind="deleteConfirmationText" placeholder="DELETE or @editingProductName"
+                       class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" autocomplete="off" />
+            </label>
+            @if (!string.IsNullOrWhiteSpace(deleteProductError)) { <p role="alert" class="form-error">@deleteProductError</p> }
+        </div>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelDeleteProduct" Disabled="deletingProduct">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteProduct" Disabled="@(deletingProduct || !DeleteConfirmationValid)">
+                @if (deletingProduct) { <BbSpinner Size="SpinnerSize.Small" /> }
+                Delete product
+            </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
@@ -593,7 +653,7 @@
     private bool ProductEditorValid => !editPriceInvalid && !editStockInvalid && !reasonInvalid;
     private decimal PendingInventoryPrice => TryPrice(out var value) ? value : originalPrice;
     private int PendingInventoryStock => TryStock(out var value) ? value : originalStock;
-    private bool ModalOperationLocked => busy || productSaving || imageUploading || supplierSaving || statusSaving || addingSupplier;
+    private bool ModalOperationLocked => busy || productSaving || imageUploading || supplierSaving || statusSaving || addingSupplier || deletingProduct;
     private bool AnyFilterActive => !string.IsNullOrWhiteSpace(stage) || !string.IsNullOrWhiteSpace(confidence) ||
         !string.IsNullOrWhiteSpace(category) || !string.IsNullOrWhiteSpace(brand) || !string.IsNullOrWhiteSpace(supplier) ||
         !string.IsNullOrWhiteSpace(productStatus) || belowReorder || missingSupplier || automaticOnly;
@@ -1177,6 +1237,50 @@
         if (response.IsSuccessStatusCode) return;
         await ApiErrorMessage.EnsureSuccessAsync(response);
     }
+
+    private bool deleteProductOpen, deletingProduct;
+    private string deleteConfirmationText = "", deleteProductError = "";
+    private bool DeleteConfirmationValid => !string.IsNullOrWhiteSpace(deleteConfirmationText)
+        && (string.Equals(deleteConfirmationText.Trim(), "DELETE", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(deleteConfirmationText.Trim(), editingProductName.Trim(), StringComparison.OrdinalIgnoreCase));
+    private void RequestDeleteProduct()
+    {
+        if (ModalOperationLocked || selectedRow is null) return;
+        deleteConfirmationText = "";
+        deleteProductError = "";
+        deleteProductOpen = true;
+    }
+    private void CancelDeleteProduct()
+    {
+        if (deletingProduct) return;
+        deleteProductOpen = false;
+    }
+    private async Task ConfirmDeleteProduct()
+    {
+        if (deletingProduct || selectedRow is null || !DeleteConfirmationValid) return;
+        var productId = selectedRow.ProductId;
+        var productName = selectedRow.ProductName;
+        deletingProduct = true;
+        deleteProductError = "";
+        try
+        {
+            using var response = await Http.DeleteAsync($"api/products/{productId}");
+            await EnsureSuccess(response);
+            deleteProductOpen = false;
+            ForceCloseDetails();
+            await LoadAsync();
+            Toast.Success($"{productName} was permanently deleted.", "Product deleted");
+        }
+        catch (Exception ex)
+        {
+            deleteProductError = ApiErrorMessage.FromException(ex, "The product could not be deleted. Please try again.");
+        }
+        finally
+        {
+            deletingProduct = false;
+        }
+    }
+
     public void Dispose() => InvalidateSettingsLoad();
 
     private bool _newProductOpen;

@@ -200,139 +200,166 @@
     </BbDialogContent>
 </BbDialog>
 
-<BbDialog @bind-Open="checkoutConfirmationOpen">
-    <BbDialogContent class="flex max-h-[90dvh] w-[min(96vw,34rem)] flex-col overflow-hidden">
+<BbDialog @bind-Open="discountOpen">
+    <BbDialogContent Style="width: min(96vw, 36rem)">
         <BbDialogHeader>
-            <BbDialogTitle>Confirm sale</BbDialogTitle>
-            <BbDialogDescription>Review this payment before recording the sale. Inventory and transaction records will be updated.</BbDialogDescription>
+            <BbDialogTitle>Discount</BbDialogTitle>
+            <BbDialogDescription>@(discountItem?.ProductName ?? "Cart item")</BbDialogDescription>
         </BbDialogHeader>
-
-        <div class="min-h-0 space-y-4 overflow-y-auto" aria-label="Sale summary">
-            <div class="rounded-lg border border-border bg-muted/30">
-                @foreach (var item in cart)
-                {
-                    <div class="flex items-start justify-between gap-4 border-b border-border px-3 py-2 last:border-b-0">
-                        <div class="min-w-0">
-                            <p class="m-0 truncate text-sm font-medium text-foreground">@item.ProductName</p>
-                            <p class="m-0 text-xs text-muted-foreground">@item.Quantity × ₱@item.Price.ToString("N2")</p>
+        @if (discountItem is not null)
+        {
+            <div class="flex flex-col gap-3">
+                <label class="flex flex-col gap-1 text-xs font-medium text-foreground">
+                    @(discountMode == "percent" ? "Percent discount" : "Peso discount per unit")
+                    <div class="flex gap-1 items-center">
+                        @if (discountMode == "percent")
+                        {
+                            <input type="range" min="0" max="100" step="5" @bind="discountValueText" @bind:event="oninput"
+                                   aria-invalid="@(DiscountValueError is not null)"
+                                   aria-describedby="discount-value-help"
+                                   class="discount-slider h-10 min-w-0 flex-1" />
+                            <span class="shrink-0 w-12 text-right text-sm font-semibold text-foreground" aria-live="polite">@(TryParseDiscountValue()?.ToString("0.##") ?? "0")%</span>
+                        }
+                        else
+                        {
+                            <input type="number" min="0" step="0.01" @bind="discountValueText" @bind:event="oninput"
+                                   placeholder="e.g. 50" inputmode="decimal"
+                                   aria-invalid="@(DiscountValueError is not null)"
+                                   aria-describedby="discount-value-help"
+                                   class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground" />
+                        }
+                        <div class="flex gap-1 h-10 rounded-md border border-border bg-muted/30 p-1 shrink-0" role="group" aria-label="Discount type">
+                            <button type="button" @onclick="SetModePercent" title="Percent discount"
+                                    aria-label="Percent discount"
+                                    aria-pressed="@(discountMode == "percent")"
+                                    class="h-full px-3 rounded text-sm font-semibold @(discountMode == "percent" ? "discount-mode-active border" : "text-muted-foreground border border-transparent")">
+                                %
+                            </button>
+                            <button type="button" @onclick="SetModePeso" title="Peso discount per unit"
+                                    aria-label="Peso discount per unit"
+                                    aria-pressed="@(discountMode == "peso")"
+                                    class="h-full px-3 rounded text-sm font-semibold @(discountMode == "peso" ? "discount-mode-active border" : "text-muted-foreground border border-transparent")">
+                                ₱
+                            </button>
                         </div>
-                        <span class="shrink-0 text-sm font-semibold">₱@((item.Price * item.Quantity).ToString("N2"))</span>
                     </div>
+                </label>
+                <p id="discount-value-help" class="m-0 text-xs text-muted-foreground">
+                    @(discountMode == "percent"
+                        ? "Percentage taken off the original unit price."
+                        : "Pesos taken off each unit's original price.")
+                </p>
+                @if (DiscountValueError is not null)
+                {
+                    <p role="alert" class="m-0 text-sm text-destructive">@DiscountValueError</p>
                 }
+                <div class="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-1 text-sm" aria-live="polite">
+                    <div class="flex justify-between text-muted-foreground"><span>Regular unit price</span><span>₱@discountItem.OriginalPrice.ToString("N2")</span></div>
+                    <div class="flex justify-between text-muted-foreground"><span>Discounted unit price</span><span>₱@DiscountPreviewUnitPrice.ToString("N2")</span></div>
+                    <div class="flex justify-between font-semibold text-foreground"><span>Line total (×@discountItem.Quantity)</span><span>₱@((DiscountPreviewUnitPrice * discountItem.Quantity).ToString("N2"))</span></div>
+                    @if (DiscountPreviewSaved > 0)
+                    {
+                        <div class="flex justify-between text-primary text-xs font-bold"><span>Discounted total</span><span>-₱@DiscountPreviewSaved.ToString("N2")</span></div>
+                    }
+                </div>
+                <p class="m-0 text-xs text-muted-foreground">Applies to this sale only — the product's regular price is unchanged.</p>
             </div>
-            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <dt class="text-muted-foreground">Items</dt><dd class="m-0 text-right font-medium">@cart.Sum(item => item.Quantity)</dd>
-                <dt class="text-muted-foreground">Payment</dt><dd class="m-0 text-right font-medium">@paymentMethod</dd>
-                <dt class="text-muted-foreground">Reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(referenceNumber) ? "None" : referenceNumber)</dd>
-                <dt class="text-base font-semibold">Total</dt><dd class="m-0 text-right text-lg font-bold text-primary">₱@TotalAmount.ToString("N2")</dd>
-            </dl>
-        </div>
-
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelCheckoutConfirmation" Disabled="@isProcessing">Go back</BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmCheckout" Disabled="@(isProcessing || !cart.Any())">
-                @if (isProcessing)
-                {
-                    <BbSpinner Size="SpinnerSize.Small" />
-                    <span>Recording sale...</span>
-                }
-                else
-                {
-                    <span>Record sale · ₱@TotalAmount.ToString("N2")</span>
-                }
+        }
+        <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+            @if (discountItem is not null && discountItem.Price < discountItem.OriginalPrice)
+            {
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearDiscount">Clear discount</BbButton>
+            }
+            <BbButton Variant="ButtonVariant.Outline" OnClick="() => discountOpen = false">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="ApplyDiscount"
+                      Disabled="@(DiscountValueError is not null || (TryParseDiscountValue() ?? 0) <= 0)">
+                Apply
             </BbButton>
         </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
-@* ═══════════════════════════════════════════════════════════════════════
-   ORDER SUMMARY MODAL (post-checkout)
-   ═══════════════════════════════════════════════════════════════════════ *@
-@if (showOrderSummaryModal && completedTransaction != null)
-{
-    <div class="order-summary-backdrop no-print"></div>
-    <div class="order-summary-modal">
-        <div id="printableOrderSummary" class="order-summary-content">
+<BbDialog Open="checkoutConfirmationOpen" OpenChanged="OnCheckoutOpenChanged">
+    <BbDialogContent class="flex max-h-[90dvh] w-[min(96vw,34rem)] flex-col overflow-hidden">
+        @if (completedTransaction is null)
+        {
+            <BbDialogHeader>
+                <BbDialogTitle>Confirm sale</BbDialogTitle>
+                <BbDialogDescription>Review this payment before recording the sale. Inventory and transaction records will be updated.</BbDialogDescription>
+            </BbDialogHeader>
 
-            <div class="order-summary-header">
-                <h2>SAPSHOP MOTORCYCLE PARTS AND ACCESSORIES SHOP</h2>
-                <p>CHIA D. CUNANAN - Prop.</p>
-                <p>B1, L70, Model Community, Pio, 2008 Porac, Pampanga</p>
-                <h3 style="margin-top: 15px;">SALES TRANSACTION SUMMARY</h3>
-                <p style="margin-top: 6px;">Item and price record for transaction history and future reference.</p>
-            </div>
-
-            <div class="order-summary-meta">
-                <div><strong>Date:</strong> @completedTransaction.TransactionDate.ToString("MM/dd/yyyy HH:mm")</div>
-                <div><strong>Transaction No:</strong> @completedTransaction.InvoiceNumber</div>
-            </div>
-            <div class="order-summary-meta order-summary-payment-meta">
-                <div><strong>Payment:</strong> @completedTransaction.PaymentMethod</div>
-                @if (!string.IsNullOrWhiteSpace(completedTransaction.ReferenceNumber))
-                {
-                    <div><strong>Reference:</strong> @completedTransaction.ReferenceNumber</div>
-                }
-            </div>
-
-            <table class="order-summary-table">
-                <thead>
-                    <tr>
-                        <th style="text-align: left;">Item Description</th>
-                        <th style="text-align: center;">Qty</th>
-                        <th style="text-align: right;">Unit Price</th>
-                        <th style="text-align: right;">Discount</th>
-                        <th style="text-align: right;">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in completedTransaction.Items)
+            <div class="min-h-0 space-y-4 overflow-y-auto" aria-label="Sale summary">
+                <div class="rounded-lg border border-border bg-muted/30">
+                    @foreach (var item in cart)
                     {
-                        <tr>
-                            <td style="text-align: left;">@item.ProductName</td>
-                            <td style="text-align: center;">@item.Quantity</td>
-                            <td style="text-align: right;">@item.UnitPrice.ToString("N2")</td>
-                            <td style="text-align: right;">@item.DiscountAmount.ToString("N2")</td>
-                            <td style="text-align: right;">@item.LineTotal.ToString("N2")</td>
-                        </tr>
+                        <div class="flex items-start justify-between gap-4 border-b border-border px-3 py-2 last:border-b-0">
+                            <div class="min-w-0">
+                                <p class="m-0 truncate text-sm font-medium text-foreground">@item.ProductName</p>
+                                <p class="m-0 text-xs text-muted-foreground">@item.Quantity × ₱@item.Price.ToString("N2")</p>
+                            </div>
+                            <span class="shrink-0 text-sm font-semibold">₱@((item.Price * item.Quantity).ToString("N2"))</span>
+                        </div>
                     }
-                </tbody>
-            </table>
-
-            <div class="order-summary-totals">
-                <div class="summary-row">
-                    <span>Total Sales:</span>
-                    <span>@completedTransaction.TotalAmount.ToString("N2")</span>
                 </div>
-                <div class="summary-row">
-                    <span>Less: Discount:</span>
-                    <span>@completedTransaction.DiscountAmount.ToString("N2")</span>
-                </div>
-                <div class="summary-row" style="font-weight: bold; border-top: 1px dashed #000; padding-top: 5px; margin-top: 5px;">
-                    <span>TOTAL AMOUNT:</span>
-                    <span>₱@completedTransaction.TotalAmount.ToString("N2")</span>
-                </div>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                    <dt class="text-muted-foreground">Items</dt><dd class="m-0 text-right font-medium">@cart.Sum(item => item.Quantity)</dd>
+                    <dt class="text-muted-foreground">Payment</dt><dd class="m-0 text-right font-medium">@paymentMethod</dd>
+                    <dt class="text-muted-foreground">Reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(referenceNumber) ? "None" : referenceNumber)</dd>
+                    <dt class="text-base font-semibold">Total</dt><dd class="m-0 text-right text-lg font-bold text-primary">₱@TotalAmount.ToString("N2")</dd>
+                </dl>
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(completedTransaction.Remarks))
-            {
-                <div class="order-summary-remarks"><strong>Remarks:</strong> @completedTransaction.Remarks</div>
-            }
+            <BbDialogFooter>
+                <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelCheckoutConfirmation" Disabled="@isProcessing">Go back</BbButton>
+                <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmCheckout" Disabled="@(isProcessing || !cart.Any())">
+                    @if (isProcessing)
+                    {
+                        <BbSpinner Size="SpinnerSize.Small" />
+                        <span>Recording sale...</span>
+                    }
+                    else
+                    {
+                        <span>Record sale · ₱@TotalAmount.ToString("N2")</span>
+                    }
+                </BbButton>
+            </BbDialogFooter>
+        }
+        else
+        {
+            <BbDialogHeader>
+                <BbDialogTitle>Sale confirmed</BbDialogTitle>
+                <BbDialogDescription>Transaction @completedTransaction.InvoiceNumber has been recorded.</BbDialogDescription>
+            </BbDialogHeader>
 
-            <div class="order-summary-footer">
-                <p><strong>FOR RECORD-KEEPING AND FUTURE REFERENCE ONLY</strong></p>
-                <p>This document is not an official receipt or sales invoice.</p>
-                <p style="margin-top: 10px; font-style: italic;">Generated by Sap Shop Inventory System</p>
+            <div class="min-h-0 overflow-y-auto flex flex-col items-center gap-3 py-4 text-center" role="status" aria-live="polite">
+                <span class="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                    <LucideIcon Name="check" Size="24" />
+                </span>
+                <p class="m-0 text-2xl font-bold text-foreground">₱@completedTransaction.TotalAmount.ToString("N2")</p>
+                <p class="m-0 text-sm text-muted-foreground">
+                    @(completedTransaction.PaymentMethod) · @completedTransaction.TransactionDate.ToString("MM/dd/yyyy HH:mm")
+                </p>
+                <p class="m-0 text-xs text-muted-foreground">View or download the receipt for this sale.</p>
             </div>
-        </div>
 
-        <div class="order-summary-actions no-print">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="CloseOrderSummary">Close</BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="PrintOrderSummary">
-                <LucideIcon Name="printer" Size="16" /> Print / Save Summary
-            </BbButton>
-        </div>
-    </div>
-}
+            <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <BbButton Variant="ButtonVariant.Outline" OnClick="CloseCheckoutConfirmation">Close</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="ViewReceipt">
+                        <LucideIcon Name="external-link" Size="16" /> View Receipt
+                    </BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="DownloadReceipt">
+                        <LucideIcon Name="download" Size="16" /> Download Receipt
+                    </BbButton>
+                </div>
+            </BbDialogFooter>
+            <p class="w-full text-center text-xs text-muted-foreground m-0 px-6 pb-3">Closing in @(receiptCountdown)s…</p>
+            <div class="receipt-countdown-track w-full shrink-0" aria-hidden="true">
+                <div class="receipt-countdown-bar"></div>
+            </div>
+        }
+    </BbDialogContent>
+</BbDialog>
 
 @code {
     private RenderFragment CartTable() =>
@@ -368,13 +395,16 @@
                         </div>
                     </td>
                     <td class="p-1 text-center">
-                        <input type="number"
-                               @bind="item.Price"
-                               @bind:event="oninput"
-                               min="0.01"
-                               step="0.01"
-                               aria-label="Price for @item.ProductName"
-                               class="w-3/4 py-1 px-1 rounded-md border border-input bg-background text-foreground text-sm box-border text-center" />
+                        <button type="button"
+                                @onclick="() => OpenDiscountDialog(item)"
+                                aria-label="Edit price or discount for @item.ProductName"
+                                class="w-full min-h-[36px] rounded-md border border-transparent hover:border-input hover:bg-muted flex flex-col items-center justify-center px-1 gap-0.5 text-foreground">
+                            @if (item.Price < item.OriginalPrice)
+                            {
+                                <span class="text-[10px] text-muted-foreground line-through leading-none">₱@item.OriginalPrice.ToString("N2")</span>
+                            }
+                            <span class="text-sm font-semibold leading-tight @(item.Price < item.OriginalPrice ? "text-primary" : "")">₱@item.Price.ToString("N2")</span>
+                        </button>
                     </td>
                     <td class="p-1">
                         <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="() => cart.Remove(item)">
@@ -485,12 +515,15 @@
     private bool isProcessing = false;
     private string? statusMessage;
     private bool cartModalOpen = false;
+    private bool discountOpen;
+    private CartItemDto? discountItem;
+    private string discountMode = "percent";
+    private string discountValueText = "";
     private string paymentMethod = "Cash";
     private string? referenceNumber;
     private string? remarks;
     private string? authenticatedUserId;
 
-    private bool showOrderSummaryModal = false;
     private ReceiptDto? completedTransaction;
 
     // --- Barcode scanner inline state ---
@@ -739,6 +772,10 @@
 
     public async ValueTask DisposeAsync()
     {
+        receiptCloseCts?.Cancel();
+        receiptCloseCts?.Dispose();
+        receiptCloseCts = null;
+
         try
         {
             await JS.InvokeVoidAsync("barcodeScanner.unwatchViewport");
@@ -766,6 +803,74 @@
     private decimal SubtotalAmount => cart.Sum(item => item.OriginalPrice * item.Quantity);
     private decimal TotalDiscount => cart.Sum(item => (item.OriginalPrice - item.Price) * item.Quantity);
     private decimal TotalAmount => cart.Sum(item => item.Price * item.Quantity);
+
+    private void OpenDiscountDialog(CartItemDto item)
+    {
+        discountItem = item;
+        discountMode = "percent";
+        var currentOff = item.OriginalPrice - item.Price;
+        discountValueText = currentOff > 0 && item.OriginalPrice > 0
+            ? (currentOff / item.OriginalPrice * 100m).ToString("0.##")
+            : "0";
+        discountOpen = true;
+    }
+
+    private decimal? TryParseDiscountValue() =>
+        decimal.TryParse(discountValueText, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.CurrentCulture, out var value) ? value : null;
+
+    private string? DiscountValueError
+    {
+        get
+        {
+            if (discountItem is null) return null;
+            if (string.IsNullOrWhiteSpace(discountValueText)) return null;
+            var value = TryParseDiscountValue();
+            if (value is null) return "Enter a valid number.";
+            if (discountMode == "percent" && (value < 0 || value > 100)) return "Percentage must be between 0 and 100.";
+            if (discountMode == "peso" && value < 0) return "Discount cannot be negative.";
+            if (discountMode == "peso" && value > discountItem.OriginalPrice) return "Discount exceeds the original price.";
+            return null;
+        }
+    }
+
+    private decimal DiscountPreviewUnitPrice
+    {
+        get
+        {
+            if (discountItem is null) return 0;
+            var value = TryParseDiscountValue();
+            if (value is null || value <= 0) return discountItem.OriginalPrice;
+            return discountMode == "percent"
+                ? Math.Max(0, discountItem.OriginalPrice * (1 - value.Value / 100m))
+                : Math.Max(0, discountItem.OriginalPrice - value.Value);
+        }
+    }
+
+    private decimal DiscountPreviewSaved =>
+        discountItem is null ? 0 :
+        Math.Max(0, (discountItem.OriginalPrice - DiscountPreviewUnitPrice) * discountItem.Quantity);
+
+    private void ApplyDiscount()
+    {
+        if (discountItem is null || DiscountValueError is not null || string.IsNullOrWhiteSpace(discountValueText)) return;
+        discountItem.Price = DiscountPreviewUnitPrice;
+        discountOpen = false;
+        discountItem = null;
+        discountValueText = "";
+    }
+
+    private void SetModePercent() => discountMode = "percent";
+    private void SetModePeso() => discountMode = "peso";
+
+    private void ClearDiscount()
+    {
+        if (discountItem is null) return;
+        discountItem.Price = discountItem.OriginalPrice;
+        discountOpen = false;
+        discountItem = null;
+        discountValueText = "";
+    }
 
     private void AddToCart(Product p)
     {
@@ -804,6 +909,7 @@
         if (isProcessing || !cart.Any()) return;
         checkoutConfirmationFromMobile = fromMobile;
         if (fromMobile) cartModalOpen = false;
+        completedTransaction = null;
         checkoutConfirmationOpen = true;
     }
 
@@ -848,8 +954,7 @@
 
             statusMessage = "Sale complete! Transaction summary generated.";
 
-            showOrderSummaryModal = true;
-            checkoutConfirmationOpen = false;
+            StartReceiptCountdown();
             Toast.Success("Transaction Recorded");
 
             cart.Clear();
@@ -872,20 +977,101 @@
         }
     }
 
-    private async Task PrintOrderSummary()
+    private async Task ViewReceipt()
     {
-        await JS.InvokeVoidAsync("window.print");
+        if (completedTransaction is null) return;
+        await JS.InvokeVoidAsync("open", $"api/transactions/{completedTransaction.Id}/receipt-pdf?inline=true", "_blank");
     }
 
-    private void CloseOrderSummary()
+    private async Task DownloadReceipt()
     {
-        showOrderSummaryModal = false;
+        if (completedTransaction is null) return;
+        var safeName = string.Concat(completedTransaction.InvoiceNumber.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
+        await JS.InvokeVoidAsync("triggerDownload", $"api/transactions/{completedTransaction.Id}/receipt-pdf", $"Receipt_{safeName}.pdf");
+    }
+
+    private CancellationTokenSource? receiptCloseCts;
+    private int receiptCountdown;
+
+    private void StartReceiptCountdown()
+    {
+        receiptCloseCts?.Cancel();
+        receiptCloseCts = new CancellationTokenSource();
+        receiptCountdown = 10;
+        _ = RunReceiptCountdownAsync(receiptCloseCts.Token);
+    }
+
+    private async Task RunReceiptCountdownAsync(CancellationToken token)
+    {
+        try
+        {
+            while (receiptCountdown > 0)
+            {
+                await Task.Delay(1000, token);
+                if (token.IsCancellationRequested) return;
+                receiptCountdown--;
+                StateHasChanged();
+            }
+            if (completedTransaction is not null && checkoutConfirmationOpen) CloseCheckoutConfirmation();
+        }
+        catch (OperationCanceledException)
+        {
+            // Modal closed manually.
+        }
+    }
+
+    private void CloseCheckoutConfirmation()
+    {
+        receiptCloseCts?.Cancel();
+        receiptCloseCts = null;
+        checkoutConfirmationOpen = false;
         completedTransaction = null;
+        if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
+        StateHasChanged();
+    }
+
+    private Task OnCheckoutOpenChanged(bool open)
+    {
+        if (open)
+        {
+            checkoutConfirmationOpen = true;
+        }
+        else
+        {
+            CloseCheckoutConfirmation();
+        }
+        return Task.CompletedTask;
     }
 }
 
 <style>
     /* ─── POS responsive layout (pre-built Tailwind lacks these breakpoints) ─── */
+    .discount-slider {
+        accent-color: var(--primary);
+    }
+
+    .discount-mode-active {
+        background-color: color-mix(in oklch, var(--destructive) 10%, transparent);
+        border-color: color-mix(in oklch, var(--destructive) 45%, transparent);
+        color: var(--destructive);
+    }
+
+    .receipt-countdown-track {
+        height: 4px;
+        background: var(--muted);
+    }
+
+    .receipt-countdown-bar {
+        height: 100%;
+        background: var(--destructive);
+        animation: receipt-countdown-shrink 10s linear forwards;
+    }
+
+    @@keyframes receipt-countdown-shrink {
+        from { width: 100%; }
+        to { width: 0%; }
+    }
+
     .pos-wrapper {
         display: flex;
         flex-direction: column;
@@ -1145,27 +1331,4 @@
         }
     }
 
-    /* ─── Print styles for receipt ─── */
-    @@media print {
-        body * {
-            visibility: hidden;
-        }
-
-        .no-print {
-            display: none !important;
-        }
-
-        #printableOrderSummary, #printableOrderSummary * {
-            visibility: visible;
-        }
-
-        #printableOrderSummary {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-        }
-    }
 </style>

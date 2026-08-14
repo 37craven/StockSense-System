@@ -166,61 +166,54 @@ else
 
 @* ── Delete Confirmation Dialog ── *@
 <BbDialog @bind-Open="showDeleteConfirm">
-    <BbDialogContent Style="width: min(92vw, 420px); padding: var(--space-5);">
+    <BbDialogContent Class="w-[min(92vw,28rem)]">
         <BbDialogHeader>
-            <BbDialogTitle>Delete Package</BbDialogTitle>
-            <BbDialogDescription>This action cannot be undone.</BbDialogDescription>
+            <BbDialogTitle>Delete @packageToDelete?.Name?</BbDialogTitle>
+            <BbDialogDescription>This permanently removes the package. This action cannot be undone.</BbDialogDescription>
         </BbDialogHeader>
         
-        <div class="space-y-4 py-4">
-            <p class="text-sm text-muted-foreground">You are about to permanently delete <strong class="text-foreground">@packageToDelete?.Name</strong>.</p>
-            <div class="space-y-2">
-                <label for="package-delete-confirmation" class="text-sm font-medium text-foreground">Type <strong>DELETE</strong> or the package name to continue</label>
-                <input id="package-delete-confirmation" @bind="packageDeleteConfirmation" @bind:event="oninput" autocomplete="off"
-                       class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-            </div>
+        <div class="space-y-3">
+            <label class="flex flex-col gap-1 text-sm font-medium">
+                Type DELETE or @packageToDelete?.Name to confirm.
+                <input @bind="packageDeleteConfirmation" placeholder="DELETE or @packageToDelete?.Name" autocomplete="off"
+                       class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" />
+            </label>
         </div>
         
-        <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDeleteConfirm = false">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" Class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      OnClick="ConfirmDelete" Disabled="@(!CanDeletePackage || isProcessing)">
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDeleteConfirm = false" Disabled="isProcessing">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmDelete" Disabled="@(!CanDeletePackage || isProcessing)">
                 @if (isProcessing)
                 {
                     <BbSpinner Size="SpinnerSize.Small"/>
                 }
-                else
-                {
-                    <LucideIcon Name="trash-2" Size="14"/>
-                }
                 Delete
             </BbButton>
-        </div>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
 <BbDialog @bind-Open="showMotorcycleDeleteConfirm">
-    <BbDialogContent Class="w-[min(92vw,26rem)] p-5">
+    <BbDialogContent Class="w-[min(92vw,28rem)]">
         <BbDialogHeader>
-            <BbDialogTitle>Delete motorcycle permanently?</BbDialogTitle>
-            <BbDialogDescription>Packages using this motorcycle may prevent deletion.</BbDialogDescription>
+            <BbDialogTitle>Delete @MotorcycleDeleteName?</BbDialogTitle>
+            <BbDialogDescription>This permanently removes the motorcycle. This action cannot be undone.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="space-y-4 py-4">
-            <p class="text-sm text-muted-foreground">Motorcycle: <strong class="text-foreground">@MotorcycleDeleteName</strong></p>
-            <div class="space-y-2">
-                <label for="motorcycle-delete-confirmation" class="text-sm font-medium text-foreground">Type <strong>DELETE</strong> or the motorcycle name to continue</label>
-                <input id="motorcycle-delete-confirmation" @bind="motorcycleDeleteConfirmation" @bind:event="oninput" autocomplete="off"
-                       class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-            </div>
+        <div class="space-y-3">
+            <label class="flex flex-col gap-1 text-sm font-medium">
+                Type DELETE or @MotorcycleDeleteName to confirm.
+                <input @bind="motorcycleDeleteConfirmation" placeholder="DELETE or @MotorcycleDeleteName" autocomplete="off"
+                       class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" />
+            </label>
+            @if (!string.IsNullOrWhiteSpace(motorErrorMessage)) { <p role="alert" class="m-0 text-sm text-destructive">@motorErrorMessage</p> }
         </div>
-        <div class="flex justify-end gap-2">
+        <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseMotorcycleDeleteConfirm" Disabled="isMotorProcessing">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" Class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      OnClick="ConfirmMotorcycleDelete" Disabled="@(!CanDeleteMotorcycle || isMotorProcessing)">
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmMotorcycleDelete" Disabled="@(!CanDeleteMotorcycle || isMotorProcessing)">
                 @if (isMotorProcessing) { <BbSpinner Size="SpinnerSize.Small" /> }
                 Delete permanently
             </BbButton>
-        </div>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 
