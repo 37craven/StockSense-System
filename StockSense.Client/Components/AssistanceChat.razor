@@ -1,5 +1,4 @@
 @using System.Text.Json
-@inject HttpClient Http
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
@@ -18,7 +17,7 @@
             <div class="chat-empty-state">
                 <div class="chat-empty-logo">
                     <div class="chat-empty-logo-inner">
-                        <LucideIcon Name="bot" Size="28" />
+                        <LucideIcon Name="bot" Size="28" aria-hidden="true" />
                     </div>
                 </div>
 
@@ -35,11 +34,11 @@
                                 class="chat-suggestion-card">
                             <div class="chat-suggestion-left">
                                 <div class="chat-suggestion-icon">
-                                    <LucideIcon Name="message-circle" Size="15" />
+                                    <LucideIcon Name="message-circle" Size="15" aria-hidden="true" />
                                 </div>
                                 <span class="chat-suggestion-label">@suggestion.Label</span>
                             </div>
-                            <LucideIcon Name="arrow-up-right" Size="14" />
+                            <LucideIcon Name="arrow-up-right" Size="14" aria-hidden="true" />
                         </button>
                     }
                 </div>
@@ -53,7 +52,7 @@
                     type="button"
                     disabled="@isSending"
                     class="chat-new-button">
-                <LucideIcon Name="plus" Size="15" />
+                <LucideIcon Name="plus" Size="15" aria-hidden="true" />
                 <span>New chat</span>
             </button>
         </div>
@@ -115,7 +114,7 @@
                 @if (!string.IsNullOrWhiteSpace(errorMessage))
                 {
                     <div class="chat-error" role="alert">
-                        <LucideIcon Name="circle-alert" Size="15" />
+                        <LucideIcon Name="circle-alert" Size="15" aria-hidden="true" />
                         <div>
                             <span>@errorMessage</span>
                             @if (failedRequest is not null)
@@ -154,7 +153,7 @@
                         title="Send message"
                         aria-label="Send message"
                         class="chat-send-button">
-                    <LucideIcon Name="arrow-up" Size="16" />
+                    <LucideIcon Name="arrow-up" Size="16" aria-hidden="true" />
                 </button>
             </div>
 
@@ -737,7 +736,8 @@
             if (!isDisposed && isInitializing)
             {
                 isInitializing = false;
-                await InvokeAsync(StateHasChanged);
+                if (ShowInitialLoading)
+                    await InvokeAsync(StateHasChanged);
             }
         }
     }
@@ -777,25 +777,27 @@
         try
         {
             await ScrollToBottomAsync();
-            using var response = await Http.PostAsJsonAsync(
+            var response = await JS.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.postJson",
+                componentLifetime.Token,
                 "api/assistance",
-                new AssistanceRequest(request.Message, request.History),
-                componentLifetime.Token);
+                new AssistanceRequest(request.Message, request.History));
 
             if (isDisposed)
                 return;
 
-            if (!response.IsSuccessStatusCode)
+            if (!response.Ok)
             {
-                errorMessage = await ApiErrorMessage.FromResponseAsync(
-                    response,
-                    "The assistant could not answer right now. Please try again.",
-                    componentLifetime.Token);
+                errorMessage = ApiErrorMessage.FromStatus(
+                    (System.Net.HttpStatusCode)response.Status,
+                    "The assistant could not answer right now. Please try again.");
                 failedRequest = request;
                 return;
             }
 
-            var result = await response.Content.ReadFromJsonAsync<AssistanceResponse>();
+            var result = JsonSerializer.Deserialize<AssistanceResponse>(
+                response.Body,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
             if (string.IsNullOrWhiteSpace(result?.Reply))
             {
                 errorMessage = "The assistant returned an empty response. Please try again.";
@@ -815,6 +817,11 @@
         catch (JsonException exception)
         {
             errorMessage = ApiErrorMessage.FromException(exception);
+            failedRequest = request;
+        }
+        catch (JSException)
+        {
+            errorMessage = "Unable to reach the server. Check your connection and try again.";
             failedRequest = request;
         }
         catch (Exception exception) when (IsExpectedNavigationInterruption(exception))
@@ -948,4 +955,11 @@
     private sealed record ChatMessage(string Role, string Content);
     private sealed record AssistanceRequest(string Message, IReadOnlyList<ChatMessage> History);
     private sealed record AssistanceResponse(string Reply);
+
+    public sealed class BrowserApiResponse
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string Body { get; set; } = "";
+    }
 }

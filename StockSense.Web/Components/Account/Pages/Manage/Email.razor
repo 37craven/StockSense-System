@@ -30,11 +30,11 @@
 
         @if (isSuccess)
         {
-            <LucideIcon Name="check" Size="18" style="flex-shrink: 0;" />
+            <span aria-hidden="true"><LucideIcon Name="check" Size="18" style="flex-shrink: 0;" /></span>
         }
         else
         {
-            <LucideIcon Name="info" Size="18" style="flex-shrink: 0;" />
+            <span aria-hidden="true"><LucideIcon Name="info" Size="18" style="flex-shrink: 0;" /></span>
         }
         <span style="font-weight: var(--font-medium); font-size: var(--text-sm);">@message</span>
     </div>
@@ -53,23 +53,23 @@
     <div style="display: flex; flex-direction: column; gap: var(--space-4);">
 
         <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-            <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); display: flex; align-items: center;">
+            <label for="current-email" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); display: flex; align-items: center;">
                 Current email
                 @if (isEmailConfirmed)
                 {
-                    <span style="margin-left: var(--space-2); font-size: var(--text-xs); color: var(--success); font-weight: var(--font-normal); display: flex; align-items: center; gap: var(--space-1);">
-                        <LucideIcon Name="check" Size="14" /> Verified
+                    <span style="margin-left: var(--space-2); font-size: var(--text-xs); color: var(--foreground); font-weight: var(--font-normal); display: flex; align-items: center; gap: var(--space-1);">
+                        <span aria-hidden="true"><LucideIcon Name="check" Size="14" /></span> Verified
                     </span>
                 }
                 else
                 {
-                    <span style="margin-left: var(--space-2); font-size: var(--text-xs); color: var(--warning); font-weight: var(--font-normal); display: flex; align-items: center; gap: var(--space-1);">
-                        <LucideIcon Name="triangle-alert" Size="14" /> Unverified
+                    <span style="margin-left: var(--space-2); font-size: var(--text-xs); color: var(--foreground); font-weight: var(--font-normal); display: flex; align-items: center; gap: var(--space-1);">
+                        <span aria-hidden="true"><LucideIcon Name="triangle-alert" Size="14" /></span> Unverified
                     </span>
                 }
             </label>
-            <input type="text" value="@email" disabled
-                   style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--muted); color: var(--muted-foreground); font-size: var(--input-font-size); cursor: not-allowed; outline: none; box-sizing: border-box;" />
+            <input id="current-email" type="text" value="@email" aria-label="Current email address" disabled
+                   style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--muted); color: var(--foreground); font-size: var(--input-font-size); cursor: not-allowed; outline: none; box-sizing: border-box;" />
             @if (!isEmailConfirmed)
             {
                 <button type="submit" form="send-verification-form"
@@ -80,8 +80,8 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-            <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">New email</label>
-            <InputText @bind-Value="Input.NewEmail" autocomplete="email" aria-required="true"
+            <label for="new-email" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">New email</label>
+            <InputText id="new-email" @bind-Value="Input.NewEmail" autocomplete="email" aria-label="New email address" aria-required="true"
                        style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); outline: none; box-sizing: border-box;" />
             <ValidationMessage For="() => Input.NewEmail" style="font-size: var(--text-sm); color: var(--destructive);" />
         </div>

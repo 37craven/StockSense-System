@@ -1,0 +1,45 @@
+<header class="settings-public-header">
+    <div class="settings-public-inner">
+        <a href="/" class="settings-public-brand" aria-label="SAPShop home">
+            <span aria-hidden="true"><Logo Size="32" Color="#FF0000" /></span>
+        </a>
+
+        <nav class="settings-public-desktop" aria-label="Main navigation">
+            <a href="/">Home</a>
+            <a href="/appointment">Appointment</a>
+            <a href="/build">Build</a>
+            <a href="/assistance">Assistance</a>
+        </nav>
+
+        <div class="settings-public-actions">
+            <nav class="settings-public-desktop" aria-label="Account navigation">
+                <a href="/Account/Manage/Email" aria-current="page">Profile</a>
+                <LogoutForm ReturnUrl="/" FormStyle="display: inline-flex; margin: 0;" ButtonClass="settings-public-link">Logout</LogoutForm>
+            </nav>
+
+            <button type="button"
+                    class="settings-theme-toggle"
+                    data-settings-theme-toggle
+                    aria-label="Toggle color theme"
+                    title="Toggle color theme">
+                <span aria-hidden="true"><LucideIcon Name="sun-moon" Size="18" /></span>
+            </button>
+
+            <details class="settings-public-menu">
+                <summary aria-label="Open navigation menu" title="Navigation menu">
+                    <span aria-hidden="true"><LucideIcon Name="menu" Size="20" /></span>
+                </summary>
+                <nav aria-label="Mobile navigation">
+                    <a href="/">Home</a>
+                    <a href="/appointment">Appointment</a>
+                    <a href="/build">Build</a>
+                    <a href="/assistance">Assistance</a>
+                    <a href="/Account/Manage/Email" aria-current="page">Profile</a>
+                    <LogoutForm ReturnUrl="/" FormStyle="display: block; margin: 0;" ButtonClass="settings-public-mobile-logout">Logout</LogoutForm>
+                </nav>
+            </details>
+        </div>
+    </div>
+</header>
+
+<script src="js/settingsNav.js?v=20260818-static-profile-nav" defer></script>

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 using System.Reflection;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
@@ -19,6 +21,7 @@ using StockSense.Web.Services;
 using StockSense.Web.Utility.Security;
 using StockSense.Application.Interfaces;
 using StockSense.Web.Options;
+using StockSense.Web.Utility.Performance;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +29,25 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
+builder.Services.AddSignalR(options =>
+    options.MaximumReceiveMessageSize = 2 * 1024 * 1024);
+
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+    [
+        "application/wasm",
+        "application/octet-stream",
+        "application/json"
+    ]);
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+    options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+    options.Level = CompressionLevel.Fastest);
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
@@ -282,7 +304,28 @@ using (var scope = app.Services.CreateScope())
 }
 
 if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        if (WebResponsePolicy.ShouldPreventCaching(context.Request, context.Response))
+            WebResponsePolicy.PreventCaching(context.Response);
+
+        return Task.CompletedTask;
+    });
+
+    await next(context);
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        context.Context.Response.Headers.CacheControl = WebResponsePolicy.GetStaticAssetCacheControl(
+            context.Context.Request.Path,
+            context.Context.Request.QueryString);
+    }
+});
 app.UseRouting();
 app.UseAuthentication();
 app.Use(async (context, next) =>

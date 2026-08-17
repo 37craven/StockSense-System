@@ -1,4 +1,7 @@
 window.barcodeScanner = (function () {
+    const html5QrcodeScriptUrl =
+        "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+    let html5QrcodeLoadPromise = null;
     let html5QrCode = null;
     let dotNetRef = null;
     let allCameras = [];
@@ -13,6 +16,40 @@ window.barcodeScanner = (function () {
         fps: 10,
         aspectRatio: 1.777
     };
+
+    function ensureHtml5QrcodeLoaded() {
+        if (typeof window.Html5Qrcode === "function") {
+            return Promise.resolve();
+        }
+
+        if (html5QrcodeLoadPromise) {
+            return html5QrcodeLoadPromise;
+        }
+
+        html5QrcodeLoadPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = html5QrcodeScriptUrl;
+            script.async = true;
+            script.onload = () => {
+                if (typeof window.Html5Qrcode === "function") {
+                    resolve();
+                    return;
+                }
+
+                html5QrcodeLoadPromise = null;
+                script.remove();
+                reject(new Error("The barcode scanner library did not initialize."));
+            };
+            script.onerror = () => {
+                html5QrcodeLoadPromise = null;
+                script.remove();
+                reject(new Error("The barcode scanner library could not be downloaded."));
+            };
+            document.head.appendChild(script);
+        });
+
+        return html5QrcodeLoadPromise;
+    }
 
 
     // ============================================================
@@ -183,11 +220,7 @@ window.barcodeScanner = (function () {
                 );
             }
 
-            if (typeof window.Html5Qrcode !== "function") {
-                throw new Error(
-                    "The barcode scanner library did not load. Refresh the page and try again."
-                );
-            }
+            await ensureHtml5QrcodeLoaded();
 
             /*
              * Request / verify browser camera permission first.
