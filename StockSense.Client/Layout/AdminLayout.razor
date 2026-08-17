@@ -1,8 +1,18 @@
 @inherits LayoutComponentBase
 @using BlazorBlueprint.Primitives.Services
+@using Microsoft.AspNetCore.Components
+@implements IDisposable
+@inject NavigationManager NavigationManager
 
 <div class="admin-layout">
-    <AdminNav />
+    @if (IsWasmPage)
+    {
+        <AdminNav />
+    }
+    else
+    {
+        <AdminNavServer />
+    }
     <main class="admin-main">
         @Body
     </main>
@@ -11,7 +21,36 @@
 <BbPortalHost @rendermode="InteractiveServer" />
 <BbDialogProvider @rendermode="InteractiveServer" />
 <BbToastProvider @rendermode="InteractiveServer" Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
-<BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
+@if (IsWasmPage)
+{
+    <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
+}
+
+@code {
+    // Pages that are InteractiveWebAssembly islands must keep the WASM nav and toast provider.
+    // All admin pages are InteractiveServer now. Kept for the day a WASM admin page returns.
+    private static readonly string[] WasmPageRoutes = [];
+
+    private string currentPath = "";
+
+    private bool IsWasmPage => Array.Exists(WasmPageRoutes, r =>
+        currentPath.Equals(r, StringComparison.OrdinalIgnoreCase) ||
+        currentPath.StartsWith(r + "/", StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized()
+    {
+        currentPath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentPath = NavigationManager.ToBaseRelativePath(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
+}
 
 <style>
 .admin-layout {

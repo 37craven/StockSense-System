@@ -14,6 +14,34 @@ window.barcodeScanner = (function () {
         aspectRatio: 1.777
     };
 
+    let libraryPromise = null;
+
+    // Loads html5-qrcode on first scanner use instead of on every page.
+    function ensureLibrary() {
+        if (typeof window.Html5Qrcode === "function") {
+            return Promise.resolve();
+        }
+        if (libraryPromise) {
+            return libraryPromise;
+        }
+        libraryPromise = new Promise(function (resolve, reject) {
+            var script = document.createElement("script");
+            script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+            script.onload = function () {
+                if (typeof window.Html5Qrcode === "function") {
+                    resolve();
+                } else {
+                    reject(new Error("Barcode scanner library failed to initialize."));
+                }
+            };
+            script.onerror = function () {
+                reject(new Error("Barcode scanner library could not be downloaded."));
+            };
+            document.head.appendChild(script);
+        });
+        return libraryPromise;
+    }
+
 
     // ============================================================
     // REQUEST CAMERA PERMISSION
@@ -183,11 +211,7 @@ window.barcodeScanner = (function () {
                 );
             }
 
-            if (typeof window.Html5Qrcode !== "function") {
-                throw new Error(
-                    "The barcode scanner library did not load. Refresh the page and try again."
-                );
-            }
+            await ensureLibrary();
 
             /*
              * Request / verify browser camera permission first.

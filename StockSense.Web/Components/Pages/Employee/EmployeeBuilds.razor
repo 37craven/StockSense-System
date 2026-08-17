@@ -132,6 +132,7 @@
         color: white;
         cursor: pointer;
         font-size: var(--text-xs);
+        font-weight: 600;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -148,9 +149,9 @@
     .build-dialog-action:focus-visible { outline: 3px solid color-mix(in srgb, currentColor 30%, transparent); outline-offset: 2px; }
 
     .build-action--positive,
-    .build-dialog-action.build-action--positive { background: #10b981 !important; border-color: #10b981 !important; color: #fff !important; }
+    .build-dialog-action.build-action--positive { background: var(--status-success-strong) !important; border: 1px solid var(--status-success-strong) !important; color: var(--status-success-strong-foreground) !important; }
     .build-action--primary,
-    .build-dialog-action.build-action--primary { background: #3b82f6 !important; border-color: #3b82f6 !important; color: #fff !important; }
+    .build-dialog-action.build-action--primary { background: var(--status-info-strong) !important; border: 1px solid var(--status-info-strong) !important; color: var(--status-info-strong-foreground) !important; }
     .build-action--warning,
     .build-action--warning:hover,
     .build-action--warning:focus-visible,
@@ -167,10 +168,10 @@
     .dark .build-dialog-action.build-action--warning:hover,
     .dark .build-dialog-action.build-action--warning:focus-visible,
     .dark .build-dialog-action.build-action--warning:disabled {
-        background: #f59e0b !important;
-        border-color: #f59e0b !important;
-        color: #fff !important;
-        -webkit-text-fill-color: #fff !important;
+        background: var(--status-warning-strong) !important;
+        border: 1px solid var(--status-warning-strong) !important;
+        color: var(--status-warning-strong-foreground) !important;
+        -webkit-text-fill-color: var(--status-warning-strong-foreground) !important;
     }
     .build-action--warning *,
     .build-dialog-action.build-action--warning * {
@@ -178,23 +179,18 @@
         -webkit-text-fill-color: inherit !important;
     }
     .build-action--destructive,
-    .build-dialog-action.build-action--destructive { background: #ef4444 !important; border-color: #ef4444 !important; color: #fff !important; }
+    .build-dialog-action.build-action--destructive { background: var(--status-danger-strong) !important; border: 1px solid var(--status-danger-strong) !important; color: var(--status-danger-strong-foreground) !important; }
 
     .build-status-badge { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-width: 90px; padding: 4px 10px; border: 1px solid currentColor; border-radius: 999px; font-size: var(--text-xs); font-weight: 700 !important; line-height: 1rem; }
     .build-status-badge * { font-weight: inherit !important; }
     .build-status-badge::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; opacity: .75; }
     .build-detail-modal-heading { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px; padding-right: 32px; }
     .build-modal-status-badge { width: max-content; min-width: 0; max-width: 100%; flex: 0 0 auto; align-self: flex-start; }
-    .build-status--pending { background: rgba(245, 158, 11, .14); color: #b45309; }
-    .build-status--confirmed { background: rgba(59, 130, 246, .14); color: #2563eb; }
-    .build-status--completed { background: rgba(16, 185, 129, .14); color: #047857; }
-    .build-status--cancelled { background: rgba(239, 68, 68, .14); color: #dc2626; }
-    .build-status--unknown { background: rgba(107, 114, 128, .14); color: #4b5563; }
-    .dark .build-status--pending { background: rgba(245, 158, 11, .20); color: #fbbf24; }
-    .dark .build-status--confirmed { background: rgba(59, 130, 246, .20); color: #93c5fd; }
-    .dark .build-status--completed { background: rgba(16, 185, 129, .20); color: #6ee7b7; }
-    .dark .build-status--cancelled { background: rgba(239, 68, 68, .20); color: #fca5a5; }
-    .dark .build-status--unknown { background: rgba(156, 163, 175, .16); color: #d1d5db; }
+    .build-status--pending { border-color: var(--warning); background: var(--warning-muted); color: var(--warning-muted-foreground); }
+    .build-status--confirmed { border-color: var(--info); background: var(--info-muted); color: var(--info-muted-foreground); }
+    .build-status--completed { border-color: var(--success); background: var(--success-muted); color: var(--success-muted-foreground); }
+    .build-status--cancelled { border-color: var(--destructive); background: var(--destructive-muted); color: var(--destructive-muted-foreground); }
+    .build-status--unknown { border-color: var(--border); background: var(--muted); color: var(--muted-foreground); }
 
         .build-action-btn.reopen {
             max-width: 110px;
@@ -401,7 +397,7 @@
                                 <td style="padding: 12px 16px;" class="col-type">
                                     @if (isPreBuilt)
                                     {
-                                        <span style="display: inline-flex; align-items: center; background: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                                        <span style="display: inline-flex; align-items: center; background: var(--destructive-muted); color: var(--destructive-muted-foreground); padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
                                             <LucideIcon Name="zap" Size="10" style="margin-right: 4px;" /> Pre-Built
                                         </span>
                                     }
@@ -1380,7 +1376,7 @@
             </div>
             @if (!string.IsNullOrWhiteSpace(checkoutError))
             {
-                <span role="alert" style="color: var(--destructive); font-size: var(--text-xs);">@checkoutError</span>
+                <span role="alert" style="color: var(--destructive-muted-foreground); font-size: var(--text-xs);">@checkoutError</span>
             }
         }
     </text>;

@@ -1,11 +1,11 @@
 .order-page { display:flex; flex-direction:column; gap:1.25rem; }
 .mode-button-active {
-    background-color: color-mix(in oklch, var(--destructive) 10%, transparent);
-    border-color: color-mix(in oklch, var(--destructive) 45%, transparent);
-    color: var(--destructive);
+    background-color: var(--destructive-muted);
+    border-color: color-mix(in oklch, var(--destructive-muted-foreground) 45%, transparent);
+    color: var(--destructive-muted-foreground);
 }
 .notice { border:1px solid var(--border); border-radius:.5rem; background:color-mix(in srgb,var(--muted) 30%,transparent); padding:.75rem; font-size:.875rem; }
-.notice.error,.field-error { color:var(--destructive); border-color:var(--destructive); }
+.notice.error,.field-error { color:var(--destructive-muted-foreground); border-color:var(--destructive-muted-foreground); }
 .section-heading,.panel-header,.lines-heading,.actions { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .section-heading h2,.section-heading p,.panel-header h2,.panel-header p,.lines-heading h3 { margin:0; }
 .section-heading p,.panel-header p { margin-top:.25rem; font-size:.875rem; }
@@ -31,7 +31,7 @@ label { display:flex; flex-direction:column; gap:.4rem; font-size:.875rem; font-
 .manual-line { display:grid; grid-template-columns:minmax(13rem,2fr) minmax(5rem,.5fr) minmax(6rem,.5fr) auto; gap:.75rem; align-items:end; padding:.75rem 0; border-top:1px solid var(--border); }
 .line-meta { display:flex; flex-direction:column; gap:.35rem; justify-content:flex-end; }
 .line-meta span,.line-meta small { color:var(--muted-foreground); font-size:.75rem; }
-.remove-button { display:grid; place-items:center; width:2.4rem; height:2.4rem; border:1px solid var(--border); border-radius:.4rem; background:transparent; color:var(--destructive); cursor:pointer; }
+.remove-button { display:grid; place-items:center; width:2.4rem; height:2.4rem; border:1px solid var(--border); border-radius:.4rem; background:transparent; color:var(--destructive-muted-foreground); cursor:pointer; }
 .reason { margin:0; }
 .reason small { color:var(--muted-foreground); }
 .actions { justify-content:flex-end; padding:0 1rem; }

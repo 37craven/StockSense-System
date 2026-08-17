@@ -44,14 +44,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="stylesheet" href="styles/tailwind.css" />
-    <link rel="stylesheet" href="styles/app.css?v=20260812-select-global-rule" />
+    <link rel="stylesheet" href="styles/app.css?v=20260817-a11y-tokens" />
 
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
-    <link rel="stylesheet" href="styles/theme.css?v=20260814-destructive-dialog-width" />
+    <link rel="stylesheet" href="styles/theme.css?v=20260817-a11y-tokens" />
     <link rel="stylesheet" href="StockSense.Web.styles.css" />
 
     <link rel="icon" type="image/png" href="favicon.png" />
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
     <HeadOutlet />
 </head>
@@ -66,8 +65,53 @@
     </form>
 
     <script src="_framework/blazor.web.js"></script>
-    <script src="js/barcodeScanner.js?v=20260814-scanner-recovery-1"></script>
-    <script src="js/passwordVisibility.js?v=20260810-password-toggle-2"></script>
+    <script src="js/barcodeScanner.js?v=20260814-scanner-recovery-1" defer></script>
+    <script src="js/passwordVisibility.js?v=20260810-password-toggle-2" defer></script>
+
+    <script>
+            // LucideIcon renders role="img" without a text alternative. Give every icon
+            // an accessible outcome:
+            //   - icons with aria-label stay announced
+            //   - icon-only buttons/links with a title get an accessible name from it
+            //   - everything else is decorative -> hidden from assistive tech
+            (function() {
+                function hasAccessibleName(el) {
+                    return !!(el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') ||
+                              (el.textContent || '').trim());
+                }
+                function interactiveHost(el) {
+                    var n = el.parentElement;
+                    while (n && n !== document.body) {
+                        if (n.matches('button, a, [role="button"], [role="link"], summary')) return n;
+                        n = n.parentElement;
+                    }
+                    return null;
+                }
+                function fixIcons(root) {
+                    if (!root || !root.querySelectorAll) return;
+                    root.querySelectorAll('svg.lucide-icon').forEach(function(svg) {
+                        if (svg.getAttribute('aria-label')) {
+                            svg.removeAttribute('aria-hidden');
+                            return;
+                        }
+                        var host = interactiveHost(svg);
+                        if (host && !hasAccessibleName(host) && host.getAttribute('title')) {
+                            host.setAttribute('aria-label', host.getAttribute('title'));
+                        }
+                        svg.setAttribute('aria-hidden', 'true');
+                    });
+                }
+                fixIcons(document);
+                document.addEventListener('blazor:enhancedload', function() { fixIcons(document); });
+                new MutationObserver(function(mutations) {
+                    mutations.forEach(function(m) {
+                        m.addedNodes.forEach(function(n) {
+                            if (n.nodeType === 1) fixIcons(n);
+                        });
+                    });
+                }).observe(document.body, { childList: true, subtree: true });
+            })();
+    </script>
 
     <!-- Aggressive .NET 8 Title Enforcer -->
     <script>

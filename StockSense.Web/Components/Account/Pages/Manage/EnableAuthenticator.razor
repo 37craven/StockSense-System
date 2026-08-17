@@ -82,8 +82,8 @@ else
 
                 <div style="display: flex; flex-direction: column; gap: var(--space-4);">
                     <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-                        <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Verification Code</label>
-                        <InputText @bind-Value="Input.Code" autocomplete="off"
+                        <label for="authenticator-code" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Verification Code</label>
+                        <InputText id="authenticator-code" @bind-Value="Input.Code" autocomplete="off"
                                    style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                         <ValidationMessage For="() => Input.Code" style="font-size: var(--text-sm); color: var(--destructive);" />
                     </div>

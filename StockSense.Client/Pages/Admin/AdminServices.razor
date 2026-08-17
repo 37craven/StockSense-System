@@ -1,6 +1,6 @@
 @page "/admin/services"
 @layout AdminLayout
-@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using StockSense.Application.DTOs
 @using System.Net.Http.Json
 @using System.Text.Json
@@ -154,7 +154,7 @@
                                 @* Item header *@
                                 <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); background-color: var(--muted);">
                                     <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground);">@item.Name</span>
-                                    <button @onclick="() => RemoveGenericItem(item)" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); display: flex; align-items: center; padding: var(--space-1); border-radius: var(--radius);">
+                                    <button @onclick="() => RemoveGenericItem(item)" aria-label="@($"Remove {item.Name}")" title="@($"Remove {item.Name}")" style="background: none; border: none; cursor: pointer; color: var(--muted-foreground); display: flex; align-items: center; padding: var(--space-1); border-radius: var(--radius);">
                                         <LucideIcon Name="trash-2" Size="14" />
                                     </button>
                                 </div>

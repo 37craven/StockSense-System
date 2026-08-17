@@ -53,7 +53,7 @@
     <div style="display: flex; flex-direction: column; gap: var(--space-4);">
 
         <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-            <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); display: flex; align-items: center;">
+            <label for="current-email" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); display: flex; align-items: center;">
                 Current email
                 @if (isEmailConfirmed)
                 {
@@ -68,7 +68,7 @@
                     </span>
                 }
             </label>
-            <input type="text" value="@email" disabled
+            <input type="text" id="current-email" value="@email" disabled
                    style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--muted); color: var(--muted-foreground); font-size: var(--input-font-size); cursor: not-allowed; outline: none; box-sizing: border-box;" />
             @if (!isEmailConfirmed)
             {
@@ -80,8 +80,8 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-            <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">New email</label>
-            <InputText @bind-Value="Input.NewEmail" autocomplete="email" aria-required="true"
+            <label for="manage-new-email" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">New email</label>
+            <InputText id="manage-new-email" @bind-Value="Input.NewEmail" autocomplete="email" aria-required="true"
                        style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); outline: none; box-sizing: border-box;" />
             <ValidationMessage For="() => Input.NewEmail" style="font-size: var(--text-sm); color: var(--destructive);" />
         </div>

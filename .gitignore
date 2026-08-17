@@ -377,4 +377,5 @@ tailwindcss
 NOTES.md.agents/
 
 # App secrets
+run-local-prod.sh
 StockSense.Web/appsettings.json

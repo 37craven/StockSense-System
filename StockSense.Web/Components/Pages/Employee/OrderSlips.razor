@@ -53,7 +53,7 @@
     }
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div role="alert" class="p-3 mb-3 rounded-lg text-sm" style="border:1px solid var(--destructive);background:color-mix(in oklch,var(--destructive) 10%,transparent);color:var(--destructive)">@error</div>
+        <div role="alert" class="p-3 mb-3 rounded-lg text-sm" style="border:1px solid var(--destructive-muted-foreground);background:var(--destructive-muted);color:var(--destructive-muted-foreground)">@error</div>
     }
 
     @* AUTOMATIC MODE *@
@@ -69,8 +69,8 @@
         {
             @if (preview.Warnings.Count > 0)
             {
-                <div class="p-4 mb-4 rounded-lg text-sm" style="border:1px solid #f59e0b;background:color-mix(in oklch,#f59e0b 10%,transparent)">
-                    <div class="flex items-center gap-2 font-semibold mb-3" style="color:#f59e0b">
+                <div class="p-4 mb-4 rounded-lg text-sm" style="border:1px solid var(--warning);background:color-mix(in oklch,var(--warning) 10%,transparent)">
+                    <div class="flex items-center gap-2 font-semibold mb-3" style="color:var(--warning-muted-foreground)">
                         <LucideIcon Name="triangle-alert" Size="16" />
                         <span>Warnings</span>
                     </div>
@@ -128,7 +128,7 @@
                                                    class="w-16 py-1 px-1.5 rounded text-xs text-center" style="border:1px solid var(--border);background:var(--background);color:var(--foreground)" />
                                             @if (item.IsSelected && errors.TryGetValue(item.ProductId, out var itemError))
                                             {
-                                                <div style="font-size:10px;color:var(--destructive);margin-top:2px">@itemError</div>
+                                                <div style="font-size:10px;color:var(--destructive-muted-foreground);margin-top:2px">@itemError</div>
                                             }
                                         </td>
                                     </tr>
@@ -162,7 +162,7 @@
                                     </div>
                                     @if (item.IsSelected && errors.TryGetValue(item.ProductId, out var itemErrorM))
                                     {
-                                        <div style="font-size:10px;color:var(--destructive)">@itemErrorM</div>
+                                        <div style="font-size:10px;color:var(--destructive-muted-foreground)">@itemErrorM</div>
                                     }
                                 </div>
                             </div>
@@ -193,7 +193,7 @@
             <div class="manual-form">
                 <div class="form-grid">
                     <label>
-                        <span>Supplier<span style="color:var(--destructive)"> *</span></span>
+                        <span>Supplier<span style="color:var(--destructive-muted-foreground)"> *</span></span>
                         <select @bind="manualSupplierId" @bind:after="SupplierChanged">
                             <option value="0">Select supplier</option>
                             @foreach (var supplier in manualCatalog.Suppliers)
@@ -205,7 +205,7 @@
 
                     <label class="reason">
                         <span class="flex items-center justify-between">
-                            <span>Reason<span style="color:var(--destructive)"> *</span></span>
+                            <span>Reason<span style="color:var(--destructive-muted-foreground)"> *</span></span>
                             <small>@manualReason.Length/500 characters</small>
                         </span>
                         <textarea maxlength="500" rows="1" class="resize-none" placeholder="Why is this manual order needed?" @bind="manualReason"></textarea>

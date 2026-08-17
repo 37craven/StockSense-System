@@ -380,6 +380,7 @@
                     <td class="p-1">
                         <div class="flex items-center gap-0">
                             <button type="button" @onclick="() => DecrementQty(item)"
+                                    aria-label="Decrease quantity"
                                     class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
                                 <LucideIcon Name="chevron-left" Size="14" />
                             </button>
@@ -389,6 +390,7 @@
                                    min="1"
                                    class="w-8 py-1 px-0 text-center rounded border border-input bg-background text-foreground text-sm box-border" />
                             <button type="button" @onclick="() => IncrementQty(item)"
+                                    aria-label="Increase quantity"
                                     class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
                                 <LucideIcon Name="chevron-right" Size="14" />
                             </button>
@@ -455,7 +457,7 @@
                 <LucideIcon Name="switch-camera" Size="16" />
             </BbButton>
             <label class="switch">
-                <input type="checkbox" @bind="scannerEnabled" />
+                <input type="checkbox" id="scanner-toggle" role="switch" aria-label="Barcode scanner" @bind="scannerEnabled" />
                 <span class="slider"></span>
             </label>
         </div>
@@ -1081,7 +1083,7 @@
     .discount-mode-active {
         background-color: color-mix(in oklch, var(--destructive) 10%, transparent);
         border-color: color-mix(in oklch, var(--destructive) 45%, transparent);
-        color: var(--destructive);
+        color: var(--destructive-muted-foreground);
     }
 
     .receipt-countdown-track {

@@ -1,5 +1,11 @@
 
 /* =============================================================================
+   GLOBAL — Accessibility: text-primary must stay readable on card surfaces
+   in both light and dark mode. --accent-link is the mode-aware equivalent.
+   ============================================================================= */
+.text-primary { color: var(--accent-link) !important; }
+
+/* =============================================================================
    GLOBAL — Minimal scrollbars
    ============================================================================= */
 * {
@@ -506,32 +512,27 @@ input[type="number"] {
     border-color: var(--order-amber) !important;
     background: rgba(245, 158, 11, 0.14) !important;
     color: #92400e !important;
-    color: color-mix(in srgb, var(--order-amber) 58%, #000000) !important;
 }
 .order-status--approved {
     border-color: var(--order-violet) !important;
     background: rgba(139, 92, 246, 0.14) !important;
     color: #6d28d9 !important;
-    color: color-mix(in srgb, var(--order-violet) 72%, #000000) !important;
 }
 .order-status--completed {
     border-color: var(--order-green) !important;
     background: rgba(16, 185, 129, 0.14) !important;
     color: #047857 !important;
-    color: color-mix(in srgb, var(--order-green) 68%, #000000) !important;
 }
 .order-status--ordered,
 .order-status--partial {
     border-color: var(--order-blue) !important;
     background: rgba(59, 130, 246, 0.14) !important;
     color: #1d4ed8 !important;
-    color: color-mix(in srgb, var(--order-blue) 74%, #000000) !important;
 }
 .order-status--cancelled {
     border-color: var(--order-red) !important;
     background: rgba(239, 68, 68, 0.14) !important;
     color: #b91c1c !important;
-    color: color-mix(in srgb, var(--order-red) 72%, #000000) !important;
 }
 .order-status--unknown { border-color: #6b7280 !important; background: rgba(107, 114, 128, 0.14) !important; color: #374151 !important; }
 
@@ -558,41 +559,35 @@ input[type="number"] {
 }
 .order-action--details:hover { border-color: #9ca3af !important; background: #f9fafb !important; }
 
-.order-action--approve { border-color: var(--order-violet) !important; background: var(--order-violet) !important; color: #ffffff !important; }
-.order-action--approve:hover { border-color: #7c3aed !important; background: #7c3aed !important; color: #ffffff !important; }
+.order-action--approve { border-color: var(--status-purple-strong) !important; background: var(--status-purple-strong) !important; color: var(--status-purple-strong-foreground) !important; }
+.order-action--approve:hover { filter: brightness(0.92); }
 
 /* Sending advances the slip to Ordered, so it shares the Ordered badge's blue hue. */
-.order-action--send { border-color: var(--order-blue) !important; background: var(--order-blue) !important; color: #ffffff !important; }
-.order-action--send:hover { border-color: var(--order-blue) !important; background: color-mix(in srgb, var(--order-blue) 88%, #000000) !important; color: #ffffff !important; }
+.order-action--send { border-color: var(--status-success-strong) !important; background: var(--status-success-strong) !important; color: var(--status-success-strong-foreground) !important; }
+.order-action--send:hover { filter: brightness(0.92); }
 
 /* Receiving advances toward completion and uses the same success green. */
-.order-action--receive { border-color: var(--order-green) !important; background: var(--order-green) !important; color: #ffffff !important; }
-.order-action--receive:hover { border-color: var(--order-green) !important; background: color-mix(in srgb, var(--order-green) 88%, #000000) !important; color: #ffffff !important; }
+.order-action--receive { border-color: var(--status-success-strong) !important; background: var(--status-success-strong) !important; color: var(--status-success-strong-foreground) !important; }
+.order-action--receive:hover { filter: brightness(0.92); }
 
-.order-action--warning { border-color: var(--order-amber) !important; background: var(--order-amber) !important; color: #111827 !important; }
-.order-action--warning:hover { border-color: var(--order-amber) !important; background: color-mix(in srgb, var(--order-amber) 88%, #000000) !important; color: #111827 !important; }
+.order-action--warning { border-color: var(--status-warning-strong) !important; background: var(--status-warning-strong) !important; color: var(--status-warning-strong-foreground) !important; }
+.order-action--warning:hover { filter: brightness(0.92); }
 
 .order-action:focus-visible,
 .order-action-menu-trigger:focus-visible {
-    outline: 2px solid var(--order-blue) !important;
+    outline: 2px solid var(--foreground) !important;
     outline-offset: 2px !important;
 }
 
 .order-action--approve:focus-visible { outline-color: #7c3aed !important; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.30) !important; }
 .order-action--receive:focus-visible { outline-color: var(--order-green) !important; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.28) !important; }
-.order-action--send:focus-visible { outline-color: var(--order-blue) !important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.28) !important; }
+.order-action--send:focus-visible { outline-color: var(--status-success-strong) !important; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.28) !important; }
 .order-action--warning:focus-visible { outline-color: var(--order-amber) !important; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.30) !important; }
 
 .order-action:disabled { cursor: not-allowed !important; opacity: 0.5 !important; }
 
 .dark .order-action--details { border-color: #4b5563 !important; background: #111827 !important; color: #f3f4f6 !important; }
 .dark .order-action--details:hover { border-color: #6b7280 !important; background: #1f2937 !important; }
-.dark .order-action--approve { border-color: var(--order-violet) !important; background: var(--order-violet) !important; color: #ffffff !important; }
-.dark .order-action--approve:hover { border-color: #7c3aed !important; background: #7c3aed !important; color: #ffffff !important; }
-.dark .order-action--receive { border-color: var(--order-green) !important; background: var(--order-green) !important; color: #ffffff !important; }
-.dark .order-action--receive:hover { border-color: var(--order-green) !important; background: color-mix(in srgb, var(--order-green) 84%, #000000) !important; color: #ffffff !important; }
-.dark .order-action--send { border-color: var(--order-blue) !important; background: var(--order-blue) !important; color: #ffffff !important; }
-.dark .order-action--send:hover { border-color: var(--order-blue) !important; background: color-mix(in srgb, var(--order-blue) 84%, #000000) !important; color: #ffffff !important; }
 
 .order-action-menu-trigger {
     width: 2rem !important;
@@ -662,16 +657,11 @@ input[type="number"] {
     background: currentColor;
     content: "";
 }
-.appointment-status--pending { border-color: #f59e0b !important; background: rgba(245, 158, 11, 0.14) !important; color: #92400e !important; }
-.appointment-status--confirmed { border-color: #3b82f6 !important; background: rgba(59, 130, 246, 0.14) !important; color: #1d4ed8 !important; }
-.appointment-status--completed { border-color: #10b981 !important; background: rgba(16, 185, 129, 0.14) !important; color: #047857 !important; }
-.appointment-status--cancelled { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.14) !important; color: #b91c1c !important; }
-.appointment-status--unknown { border-color: #6b7280 !important; background: rgba(107, 114, 128, 0.14) !important; color: #374151 !important; }
-.dark .appointment-status--pending { background: rgba(245, 158, 11, 0.20) !important; color: #fbbf24 !important; }
-.dark .appointment-status--confirmed { background: rgba(59, 130, 246, 0.20) !important; color: #93c5fd !important; }
-.dark .appointment-status--completed { background: rgba(16, 185, 129, 0.20) !important; color: #34d399 !important; }
-.dark .appointment-status--cancelled { background: rgba(239, 68, 68, 0.20) !important; color: #fca5a5 !important; }
-.dark .appointment-status--unknown { background: rgba(156, 163, 175, 0.16) !important; color: #d1d5db !important; }
+.appointment-status--pending { border-color: var(--warning) !important; background: var(--warning-muted) !important; color: var(--warning-muted-foreground) !important; }
+.appointment-status--confirmed { border-color: var(--info) !important; background: var(--info-muted) !important; color: var(--info-muted-foreground) !important; }
+.appointment-status--completed { border-color: var(--success) !important; background: var(--success-muted) !important; color: var(--success-muted-foreground) !important; }
+.appointment-status--cancelled { border-color: var(--destructive) !important; background: var(--destructive-muted) !important; color: var(--destructive-muted-foreground) !important; }
+.appointment-status--unknown { border-color: var(--border) !important; background: var(--muted) !important; color: var(--muted-foreground) !important; }
 
 .appointment-action {
     border: 1px solid !important;
@@ -679,40 +669,34 @@ input[type="number"] {
     font-weight: 600 !important;
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
-.appointment-action--positive { border-color: #10b981 !important; background: #10b981 !important; }
-.appointment-action--positive:hover { border-color: #059669 !important; background: #059669 !important; }
-.appointment-action--primary { border-color: #3b82f6 !important; background: #3b82f6 !important; }
-.appointment-action--primary:hover { border-color: #2563eb !important; background: #2563eb !important; }
+.appointment-action--positive { border-color: var(--status-success-strong) !important; background: var(--status-success-strong) !important; color: var(--status-success-strong-foreground) !important; }
+.appointment-action--positive:hover { filter: brightness(0.92); }
+.appointment-action--primary { border-color: var(--status-info-strong) !important; background: var(--status-info-strong) !important; color: var(--status-info-strong-foreground) !important; }
+.appointment-action--primary:hover { filter: brightness(0.92); }
 .appointment-action--warning {
-    border-color: #f59e0b !important;
-    background: #f59e0b !important;
-    color: #ffffff !important;
+    border-color: var(--status-warning-strong) !important;
+    background: var(--status-warning-strong) !important;
+    color: var(--status-warning-strong-foreground) !important;
 }
 .appointment-action--warning:hover:not(:disabled) {
-    border-color: #d97706 !important;
-    background: #d97706 !important;
-    color: #ffffff !important;
+    filter: brightness(0.92);
+    color: var(--status-warning-strong-foreground) !important;
 }
-.appointment-action--danger { border-color: #ef4444 !important; background: #ef4444 !important; }
-.appointment-action--danger:hover { border-color: #dc2626 !important; background: #dc2626 !important; }
+.appointment-action--danger { border-color: var(--status-danger-strong) !important; background: var(--status-danger-strong) !important; color: var(--status-danger-strong-foreground) !important; }
+.appointment-action--danger:hover { filter: brightness(0.92); }
 .appointment-action:focus-visible { outline: 2px solid currentColor !important; outline-offset: 2px !important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important; }
 .appointment-action--positive:focus-visible { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.28) !important; }
 .appointment-action--warning:focus-visible {
-    color: #ffffff !important;
-    outline-color: #b45309 !important;
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.30) !important;
+    color: var(--status-warning-strong-foreground) !important;
+    outline-color: var(--status-warning-strong-foreground) !important;
+    box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.30) !important;
 }
 .appointment-action--warning:disabled {
-    border-color: #f59e0b !important;
-    background: #f59e0b !important;
-    color: #ffffff !important;
+    border-color: var(--status-warning-strong) !important;
+    background: var(--status-warning-strong) !important;
+    color: var(--status-warning-strong-foreground) !important;
 }
-.dark .appointment-action--warning,
-.dark .appointment-action--warning:hover:not(:disabled),
-.dark .appointment-action--warning:focus-visible,
-.dark .appointment-action--warning:disabled {
-    color: #ffffff !important;
-}
+
 .appointment-action--danger:focus-visible { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.28) !important; }
 .appointment-action:disabled { cursor: not-allowed !important; opacity: 0.5 !important; }
 

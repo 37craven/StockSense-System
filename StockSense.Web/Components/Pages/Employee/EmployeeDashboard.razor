@@ -34,7 +34,7 @@
     else if (!string.IsNullOrWhiteSpace(errorMessage))
     {
         <div role="alert" style="padding: var(--space-6); border-radius: var(--radius); border: 1px solid var(--destructive); background: color-mix(in oklch, var(--destructive) 8%, transparent); text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-3);">
-            <LucideIcon Name="circle-alert" Size="24" style="color: var(--destructive);" />
+            <LucideIcon Name="circle-alert" Size="24" style="color: var(--destructive-muted-foreground);" />
             <div>
                 <div style="font-weight: var(--font-semibold); color: var(--foreground);">Dashboard data could not be loaded</div>
                 <div style="font-size: var(--text-sm); color: var(--muted-foreground); margin-top: var(--space-1);">@errorMessage</div>
@@ -58,21 +58,21 @@
                 <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">@onHandUnits.ToString("N0") units on hand</div>
             </div>
 
-            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid @(atRiskCount > 0 ? "#f59e0b" : "var(--border)"); background: var(--card);">
+            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid @(atRiskCount > 0 ? "var(--warning)" : "var(--border)"); background: var(--card);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground);">At Reorder Risk</div>
-                    <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: color-mix(in oklch, #f59e0b 15%, transparent); color: #f59e0b;">
+                    <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: var(--warning-muted); color: var(--warning-muted-foreground);">
                         <LucideIcon Name="triangle-alert" Size="18" />
                     </div>
                 </div>
-                <div style="font-size: var(--text-2xl); font-weight: 900; color: @(atRiskCount > 0 ? "#f59e0b" : "var(--foreground)"); margin-top: var(--space-2);">@atRiskCount.ToString("N0")</div>
+                <div style="font-size: var(--text-2xl); font-weight: 900; color: @(atRiskCount > 0 ? "var(--warning-muted-foreground)" : "var(--foreground)"); margin-top: var(--space-2);">@atRiskCount.ToString("N0")</div>
                 <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">SKUs at or below reorder point</div>
             </div>
 
             <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground);">Confirmed Incoming</div>
-                    <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: color-mix(in oklch, #3b82f6 15%, transparent); color: #3b82f6;">
+                    <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: var(--info-muted); color: var(--info-muted-foreground);">
                         <LucideIcon Name="truck" Size="18" />
                     </div>
                 </div>
@@ -136,17 +136,17 @@
                         <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Latest Activity</div>
                         <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Recent Sales</h2>
                     </div>
-                    <a href="/admin/transactions" style="font-size: var(--text-xs); color: var(--primary); text-decoration: none; font-weight: var(--font-medium);">All transactions →</a>
+                    <a href="/admin/transactions" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">All transactions →</a>
                 </div>
                 <div class="dashboard-table-view">
                     <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
                         <thead>
                             <tr style="border-bottom: 1px solid var(--border); background: var(--muted);">
-                                <th style="text-align: left; padding: 6px 10px; color: var(--muted-foreground);">Invoice</th>
-                                <th style="text-align: left; padding: 6px 10px; color: var(--muted-foreground);">Date</th>
-                                <th style="text-align: center; padding: 6px 10px; color: var(--muted-foreground);">Items</th>
-                                <th style="text-align: right; padding: 6px 10px; color: var(--muted-foreground);">Payment</th>
-                                <th style="text-align: right; padding: 6px 10px; color: var(--muted-foreground);">Amount</th>
+                                <th style="text-align: left; padding: 6px 10px; color: var(--foreground);">Invoice</th>
+                                <th style="text-align: left; padding: 6px 10px; color: var(--foreground);">Date</th>
+                                <th style="text-align: center; padding: 6px 10px; color: var(--foreground);">Items</th>
+                                <th style="text-align: right; padding: 6px 10px; color: var(--foreground);">Payment</th>
+                                <th style="text-align: right; padding: 6px 10px; color: var(--foreground);">Amount</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -157,7 +157,7 @@
                                     <td style="padding: 8px 10px; color: var(--muted-foreground); white-space: nowrap;">@txn.TransactionDate.ToLocalTime().ToString("MMM d, h:mm tt")</td>
                                     <td style="padding: 8px 10px; text-align: center; color: var(--foreground);">@txn.Items.Count</td>
                                     <td style="padding: 8px 10px; text-align: right; color: var(--muted-foreground);">@txn.PaymentMethod</td>
-                                    <td style="padding: 8px 10px; text-align: right; font-weight: var(--font-semibold); color: var(--primary);">₱@txn.TotalAmount.ToString("F0")</td>
+                                    <td style="padding: 8px 10px; text-align: right; font-weight: var(--font-semibold); color: var(--accent-link);">₱@txn.TotalAmount.ToString("F0")</td>
                                 </tr>
                             }
                         </tbody>
@@ -204,27 +204,27 @@
                             <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Inventory Health</div>
                             <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Stock Position Overview</h2>
                         </div>
-                        <span style="font-size: var(--text-2xl); font-weight: 900; color: @(healthyPercent >= 80 ? "#10b981" : healthyPercent >= 50 ? "#f59e0b" : "#ef4444");">@healthyPercent%</span>
+                        <span style="font-size: var(--text-2xl); font-weight: 900; color: @(healthyPercent >= 80 ? "var(--success-muted-foreground)" : healthyPercent >= 50 ? "var(--warning-muted-foreground)" : "var(--destructive-muted-foreground)");">@healthyPercent%</span>
                     </div>
                     <div style="width: 100%; height: 8px; border-radius: 4px; background: var(--muted); overflow: hidden;">
-                        <div class="health-fill" style="width: @healthyPercent%; background: @(healthyPercent >= 80 ? "#10b981" : healthyPercent >= 50 ? "#f59e0b" : "#ef4444");"></div>
+                        <div class="health-fill" style="width: @healthyPercent%; background: @(healthyPercent >= 80 ? "var(--success)" : healthyPercent >= 50 ? "var(--warning)" : "var(--destructive)");"></div>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4);">
                         <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
                             <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; flex-shrink: 0;"></span> Above reorder point
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0;"></span> Above reorder point
                             </span>
                             <strong style="color: var(--foreground);">@healthyCount</strong>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
                             <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; flex-shrink: 0;"></span> At or below reorder point
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex-shrink: 0;"></span> At or below reorder point
                             </span>
                             <strong style="color: var(--foreground);">@atRiskCount</strong>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
                             <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; flex-shrink: 0;"></span> Protected by incoming stock
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex-shrink: 0;"></span> Protected by incoming stock
                             </span>
                             <strong style="color: var(--foreground);">@protectedByIncoming</strong>
                         </div>
@@ -238,11 +238,11 @@
                             <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Action Queue</div>
                             <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Replenishment Priorities</h2>
                         </div>
-                        <a href="/admin/orderslips" style="font-size: var(--text-xs); color: var(--primary); text-decoration: none; font-weight: var(--font-medium);">Generate orders →</a>
+                        <a href="/admin/orderslips" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">Generate orders →</a>
                     </div>
                     @if (replenishment.Count == 0)
                     {
-                        <div style="display: flex; align-items: center; gap: var(--space-2); color: #10b981; font-size: var(--text-sm);">
+                        <div style="display: flex; align-items: center; gap: var(--space-2); color: var(--success-muted-foreground); font-size: var(--text-sm);">
                             <LucideIcon Name="circle-check" Size="18" /> All stocked products are above their reorder points.
                         </div>
                     }
@@ -273,7 +273,7 @@
                                             <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.ReorderPoint</td>
                                             <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.Position</td>
                                             <td style="padding: 8px 12px; text-align: right;">
-                                                <span style="display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background: #f59e0b; color: white;">@item.Gap</span>
+                                                <span style="display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background: var(--warning); color: var(--warning-foreground);">@item.Gap</span>
                                             </td>
                                         </tr>
                                     }
@@ -309,7 +309,7 @@
                     <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Sales Performance</div>
                     <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Top Brands by Sales</h2>
                 </div>
-                <span style="display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-medium); background: var(--muted); color: var(--muted-foreground);">
+                <span style="display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-medium); background: var(--muted); color: var(--foreground);">
                     Last 30 Philippine days
                 </span>
             </div>
@@ -337,7 +337,7 @@
                                     <td style="padding: 10px 12px; color: var(--muted-foreground); font-weight: var(--font-bold);">#@(item.index + 1)</td>
                                     <td style="padding: 10px 12px; color: var(--foreground); font-weight: var(--font-semibold);">@item.value.Brand</td>
                                     <td style="padding: 10px 12px; text-align: right; color: var(--foreground);">@item.value.Units.ToString("N0")</td>
-                                    <td style="padding: 10px 12px; text-align: right; color: var(--primary); font-weight: var(--font-semibold);">₱@item.value.Revenue.ToString("N2")</td>
+                                    <td style="padding: 10px 12px; text-align: right; color: var(--accent-link); font-weight: var(--font-semibold);">₱@item.value.Revenue.ToString("N2")</td>
                                 </tr>
                             }
                         </tbody>
@@ -372,7 +372,7 @@
                         <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Service Schedule</div>
                         <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Upcoming Appointments</h2>
                     </div>
-                    <a href="/admin/appointments" style="font-size: var(--text-xs); color: var(--primary); text-decoration: none; font-weight: var(--font-medium);">Manage →</a>
+                    <a href="/admin/appointments" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">Manage →</a>
                 </div>
                 @if (upcomingAppointments.Count == 0)
                 {
@@ -393,8 +393,8 @@
                                     <div style="font-size: var(--text-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@a.ServicesRequested</div>
                                 </div>
                                 <div style="text-align: right; flex-shrink: 0;">
-                                    <div style="font-weight: var(--font-semibold); color: #3b82f6; font-size: var(--text-sm);">@FormatTimeSlot(a.TimeSlot)</div>
-                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); background: @(a.Status == "Confirmed" ? "color-mix(in oklch, #10b981 20%, transparent)" : "color-mix(in oklch, #f59e0b 20%, transparent)"); color: @(a.Status == "Confirmed" ? "#10b981" : "#f59e0b");">@a.Status</span>
+                                    <div style="font-weight: var(--font-semibold); color: var(--info-muted-foreground); font-size: var(--text-sm);">@FormatTimeSlot(a.TimeSlot)</div>
+                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); background: @(a.Status == "Confirmed" ? "var(--success-muted)" : "var(--warning-muted)"); color: @(a.Status == "Confirmed" ? "var(--success-muted-foreground)" : "var(--warning-muted-foreground)");">@a.Status</span>
                                 </div>
                             </a>
                         }
@@ -409,7 +409,7 @@
                         <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Workshop Queue</div>
                         <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Active Customer Builds</h2>
                     </div>
-                    <a href="/admin/builds" style="font-size: var(--text-xs); color: var(--primary); text-decoration: none; font-weight: var(--font-medium);">Manage →</a>
+                    <a href="/admin/builds" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">Manage →</a>
                 </div>
                 @if (activeBuilds.Count == 0)
                 {
@@ -428,7 +428,7 @@
                                     <div style="font-weight: var(--font-semibold); color: var(--foreground); font-size: var(--text-sm);">@build.BuildName</div>
                                     <div style="font-size: var(--text-xs); color: var(--muted-foreground);">@build.CustomerName · @build.CreatedAt.ToLocalTime().ToString("MMM d")</div>
                                 </div>
-                                <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); background-color: @GetBuildStatusColor(build.Status); color: white; flex-shrink: 0;">@build.Status</span>
+                                <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); @GetBuildStatusBadgeStyle(build.Status); flex-shrink: 0;">@build.Status</span>
                             </a>
                         }
                     </div>
@@ -443,7 +443,7 @@
                     <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Purchasing Activity</div>
                     <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Open Purchase Orders</h2>
                 </div>
-                <a href="/admin/order-history" style="font-size: var(--text-xs); color: var(--primary); text-decoration: none; font-weight: var(--font-medium);">View history →</a>
+                <a href="/admin/order-history" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">View history →</a>
             </div>
             @if (openSlips.Count == 0)
             {
@@ -457,7 +457,7 @@
                         <a href="/admin/order-history?orderSlip=@slip.Id" style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                 <span style="font-weight: var(--font-semibold); color: var(--foreground); font-size: var(--text-sm); font-family: monospace;">@DisplaySlipNumber(slip)</span>
-                                <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); background-color: @GetOrderStatusColor(slip.Status); color: white;">@slip.Status</span>
+                                <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); @GetOrderStatusBadgeStyle(slip.Status);">@slip.Status</span>
                             </div>
                             <div style="font-size: var(--text-sm); color: var(--muted-foreground);">@(slip.Supplier?.Name ?? "Supplier not set") · @slip.Items.Count line@(slip.Items.Count == 1 ? "" : "s")</div>
                             <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">@(slip.ExpectedDeliveryDate.HasValue ? $"ETA {slip.ExpectedDeliveryDate.Value:MMM d, yyyy}" : "No delivery date")</div>
@@ -574,8 +574,24 @@
     }
     private static string FormatTimeSlot(string value) => TimeOnly.TryParse(value, out var time) ? time.ToString("h:mm tt") : value;
     private static string DisplaySlipNumber(OrderSlip slip) => !string.IsNullOrWhiteSpace(slip.OrderSlipNumber) ? slip.OrderSlipNumber : !string.IsNullOrWhiteSpace(slip.SlipNumber) ? slip.SlipNumber : $"Slip #{slip.Id}";
-    private static string GetBuildStatusColor(string status) => status switch { "Pending" => "#f59e0b", "Confirmed" => "#3b82f6", "Completed" => "#10b981", "Cancelled" => "#ef4444", _ => "gray" };
-    private static string GetOrderStatusColor(string status) => status switch { "Draft" => "#f59e0b", "Approved" => "#2563eb", "Ordered" => "#8b5cf6", "PartiallyReceived" => "#06b6d4", "Completed" => "#10b981", "Cancelled" => "#ef4444", _ => "gray" };
+    private static string GetBuildStatusBadgeStyle(string status) => status switch
+    {
+        "Pending" => "background-color: var(--warning-muted); color: var(--warning-muted-foreground);",
+        "Confirmed" => "background-color: var(--info-muted); color: var(--info-muted-foreground);",
+        "Completed" => "background-color: var(--success-muted); color: var(--success-muted-foreground);",
+        "Cancelled" => "background-color: var(--destructive-muted); color: var(--destructive-muted-foreground);",
+        _ => "background-color: var(--muted); color: var(--foreground);"
+    };
+    private static string GetOrderStatusBadgeStyle(string status) => status switch
+    {
+        "Draft" => "background-color: var(--warning-muted); color: var(--warning-muted-foreground);",
+        "Approved" => "background-color: var(--info-muted); color: var(--info-muted-foreground);",
+        "Ordered" => "background-color: var(--color-purple-accent-bg); color: var(--color-purple-accent);",
+        "PartiallyReceived" => "background-color: var(--info-muted); color: var(--info-muted-foreground);",
+        "Completed" => "background-color: var(--success-muted); color: var(--success-muted-foreground);",
+        "Cancelled" => "background-color: var(--destructive-muted); color: var(--destructive-muted-foreground);",
+        _ => "background-color: var(--muted); color: var(--foreground);"
+    };
     private sealed record BrandSalesRow(string Brand, int Units, decimal Revenue);
     private sealed record ReplenishmentRow(string Name, string Brand, int OnHand, int Incoming, int ReorderPoint, int Position, int Gap);
 }

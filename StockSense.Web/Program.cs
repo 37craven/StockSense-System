@@ -28,6 +28,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, PersistingRevalidatingAuthenticationStateProvider>();
@@ -164,6 +165,25 @@ builder.Services.AddBlazorBlueprintComponents();
 builder.Services.AddBlazorBlueprintPrimitives();
 // ponytail: unconfigured HttpClient for prerendered layout components (PublicNav, NavBar, NavMenu)
 builder.Services.AddHttpClient();
+builder.Services.AddHttpContextAccessor();
+// ponytail: server-rendered components (e.g. AssistanceChat) call cookie-authenticated APIs.
+// This client forwards the browser cookies so server islands match WASM islands.
+// The handler only ever rewrites RELATIVE urls to the app's own origin (self-requests),
+// so the relaxed cert callback below never applies to third-party hosts.
+builder.Services.AddScoped(sp =>
+{
+    var accessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var inner = new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+    };
+    var client = new HttpClient(
+        new StockSense.Web.Helpers.CookieForwardingHandler(accessor, inner));
+    var context = accessor.HttpContext;
+    if (context is not null)
+        client.BaseAddress = new Uri($"{context.Request.Scheme}://{context.Request.Host}");
+    return client;
+});
 builder.Services.AddOptions<ChatbotOptions>()
     .Bind(builder.Configuration.GetSection(ChatbotOptions.SectionName))
     .ValidateDataAnnotations()
@@ -282,6 +302,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+app.UseResponseCompression();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();

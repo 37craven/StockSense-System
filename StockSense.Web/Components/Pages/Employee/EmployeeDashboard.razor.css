@@ -108,6 +108,10 @@
         text-transform: uppercase;
     }
 
+    .dashboard-card-metric dt {
+        color: var(--foreground);
+    }
+
     .dashboard-code {
         min-width: 0;
         overflow-wrap: anywhere;
@@ -126,7 +130,7 @@
 
     .dashboard-primary-text {
         flex-shrink: 0;
-        color: var(--primary);
+        color: var(--accent-link);
         text-align: right;
     }
 
@@ -189,8 +193,8 @@
         flex-shrink: 0;
         padding: 2px 8px;
         border-radius: 999px;
-        background: #f59e0b;
-        color: white;
+        background: var(--warning);
+        color: var(--warning-foreground);
         font-size: var(--text-xs);
         font-weight: var(--font-semibold);
     }

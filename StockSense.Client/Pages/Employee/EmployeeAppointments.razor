@@ -1,6 +1,6 @@
 @page "/admin/appointments"
 @layout AdminLayout
-@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using StockSense.Application.DTOs
 @using System.Net.Http.Json
 @using System.Text.Json
@@ -315,7 +315,7 @@
                                 </td>
                                 <td style="padding: 12px 16px; white-space: nowrap;" class="col-sched">
                                     <span style="color: var(--foreground);">@appt.AppointmentDate.ToString("MMM dd, yyyy")</span>
-                                    <span style="color: #3b82f6; font-weight: bold; margin-left: 6px;">@appt.TimeSlot</span>
+                                    <span style="color: var(--info-muted-foreground); font-weight: bold; margin-left: 6px;">@appt.TimeSlot</span>
                                     <span style="color: var(--muted-foreground); margin-left: 4px;">(@appt.DurationMinutes mins)</span>
                                 </td>
                                 <td style="padding: 12px 16px;" class="col-svc">
@@ -392,7 +392,7 @@
 
                 <article class="appt-card">
                     <button type="button" class="appt-card-summary" @onclick="() => OpenDetail(appt)"
-                            aria-label="View details for @appt.CustomerName's appointment">
+                            aria-label="@($"{appt.CustomerName}{(string.IsNullOrWhiteSpace(appt.CustomerEmail) ? "" : ", " + appt.CustomerEmail)}, status {appt.Status} — view appointment details")">
                         <span class="appt-card-customer">
                             <span class="appt-card-name">@appt.CustomerName</span>
                             @if (!string.IsNullOrWhiteSpace(appt.CustomerEmail))
@@ -502,7 +502,7 @@
                         <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Schedule</div>
                         <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: 4px;">
                             <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground);">@selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy")</span>
-                            <span style="font-size: var(--text-sm); color: #3b82f6; font-weight: bold;">@selectedAppointment.TimeSlot</span>
+                            <span style="font-size: var(--text-sm); color: var(--info-muted-foreground); font-weight: bold;">@selectedAppointment.TimeSlot</span>
                             <span style="font-size: var(--text-xs); color: var(--muted-foreground);">(~@selectedAppointment.DurationMinutes mins)</span>
                         </div>
                     </div>

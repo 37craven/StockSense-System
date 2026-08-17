@@ -1,6 +1,6 @@
 @page "/admin/management"
 @layout AdminLayout
-@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Authorization
 @using StockSense.Client.Layout
@@ -100,13 +100,13 @@
                                 <td style="padding: 12px; text-align: center; min-width: 100px;">
                                     @if (user.IsCurrentUser)
                                     {
-                                        <span style="color:@(user.IsBlocked ? "var(--destructive)" : "#4CAF50");font-size:0.7rem;font-weight:bold;text-transform:uppercase;">@(user.IsBlocked ? "Blocked" : "Active")</span>
+                                        <span style="color:@(user.IsBlocked ? "var(--destructive)" : "var(--success-muted-foreground)");font-size:0.7rem;font-weight:bold;text-transform:uppercase;">@(user.IsBlocked ? "Blocked" : "Active")</span>
                                         <div style="margin-top:3px;color:var(--muted-foreground);font-size:var(--text-xs);">You cannot change your own status.</div>
                                     }
                                     else
                                     {
                                         <button @onclick="() => OpenBlockConfirm(user)"
-                                                style="padding: 4px 8px; border: 1px solid var(--border); background: transparent; color: @(user.IsBlocked ? "var(--destructive)" : "#4CAF50"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;">
+                                                style="padding: 4px 8px; border: 1px solid var(--border); background: transparent; color: @(user.IsBlocked ? "var(--destructive)" : "var(--success-muted-foreground)"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;">
                                             @(user.IsBlocked ? "Blocked" : "Active")
                                         </button>
                                     }
@@ -118,7 +118,7 @@
                                     }
                                     else
                                     {
-                                        <button @onclick="() => ConfirmDelete(user, user.FullName)" style="padding: 6px 12px; background: rgba(244, 67, 54, 0.1); color: #f44336; border: 1px solid #f44336; border-radius: 4px; cursor: pointer;">
+                                        <button @onclick="() => ConfirmDelete(user, user.FullName)" style="padding: 6px 12px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); border: 1px solid var(--destructive-muted-foreground); border-radius: 4px; cursor: pointer;">
                                             Delete
                                         </button>
                                     }
@@ -151,12 +151,12 @@
                             <tr style="border-bottom: 1px solid var(--border);">
                                 <td style="padding: 12px; font-weight: bold; color: var(--foreground);">@mech.Name</td>
                                 <td style="padding: 12px; text-align: center; min-width: 100px;">
-                                    <button @onclick="() => ToggleMechanic(mech)" style="padding: 4px 8px; border: 1px solid var(--border); background: var(--background); color: @(mech.IsActive ? "#4CAF50" : "var(--muted-foreground)"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold;">
+                                    <button @onclick="() => ToggleMechanic(mech)" style="padding: 4px 8px; border: 1px solid var(--border); background: var(--background); color: @(mech.IsActive ? "var(--success-muted-foreground)" : "var(--muted-foreground)"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold;">
                                         @(mech.IsActive ? "ACTIVE" : "INACTIVE")
                                     </button>
                                 </td>
                                 <td style="padding: 12px; text-align: right;">
-                                    <button @onclick="() => ConfirmDelete(mech, mech.Name)" style="padding: 6px 12px; background: rgba(244, 67, 54, 0.1); color: #f44336; border: 1px solid #f44336; border-radius: 4px; cursor: pointer;">
+                                    <button @onclick="() => ConfirmDelete(mech, mech.Name)" style="padding: 6px 12px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); border: 1px solid var(--destructive-muted-foreground); border-radius: 4px; cursor: pointer;">
                                         Delete
                                     </button>
                                 </td>

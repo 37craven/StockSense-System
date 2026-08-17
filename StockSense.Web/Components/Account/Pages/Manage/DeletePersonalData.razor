@@ -35,7 +35,7 @@
         @if (requirePassword)
         {
             <div style="display: flex; flex-direction: column; gap: var(--space-2);">
-                <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Confirm your password</label>
+                <label for="delete-account-password" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Confirm your password</label>
                 <div class="relative">
                     <InputText id="delete-account-password" class="password-with-toggle" type="password" @bind-Value="Input.Password" autocomplete="current-password" aria-required="true"
                                style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />

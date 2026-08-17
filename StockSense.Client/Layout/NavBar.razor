@@ -1,4 +1,4 @@
-@rendermode InteractiveWebAssembly
+@rendermode InteractiveServer
 @implements IDisposable
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Net
@@ -42,11 +42,11 @@
             <button type="button" @onclick="ToggleTheme" class="navbar-btn" style="display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius); cursor: pointer; height: 2.25rem; width: 2.25rem; padding: 0; color: var(--foreground); background-color: transparent; border: none; flex-shrink: 0;">
                 @if (isDarkMode)
                 {
-                    <LucideIcon Name="sun" Size="18" />
+                    <LucideIcon Name="sun" Size="18" AriaLabel="Switch to light mode" />
                 }
                 else
                 {
-                    <LucideIcon Name="moon" Size="18" />
+                    <LucideIcon Name="moon" Size="18" AriaLabel="Switch to dark mode" />
                 }
             </button>
 

@@ -42,19 +42,19 @@ else
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4);">
         @foreach (var pkg in existingPackages)
         {
-            <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); opacity: @(pkg.IsActive ? "1" : "0.6"); transition: opacity 0.2s;">
+            <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2);">
 
                 @* Card Header *@
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
                     <div style="min-width: 0;">
                         <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
-                            <h3 style="font-size: var(--text-base); font-weight: bold; margin: 0; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@pkg.Name</h3>
+                            <h1 style="font-size: var(--text-base); font-weight: bold; margin: 0; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@pkg.Name</h1>
                             @if (!pkg.IsActive)
                             {
                                 <span style="font-size: 10px; background: var(--muted); color: var(--muted-foreground); padding: 2px 6px; border-radius: 4px; white-space: nowrap;">Inactive</span>
                             }
                         </div>
-                        <span style="font-size: var(--text-sm); font-weight: 900; color: var(--primary);">₱@pkg.TotalPrice.ToString("N0")</span>
+                        <span style="font-size: var(--text-sm); font-weight: 900; color: var(--accent-link);">₱@pkg.TotalPrice.ToString("N0")</span>
                     </div>
 
                     @* Action Buttons *@
@@ -64,11 +64,11 @@ else
                             <LucideIcon Name="@(pkg.IsActive ? "eye" : "eye-off")" Size="14"/>
                         </button>
                         <button @onclick="() => OpenEditModal(pkg)" title="Edit"
-                                style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--border); background: color-mix(in oklch, var(--primary) 10%, transparent); color: var(--primary); cursor: pointer;">
+                                style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--border); background: color-mix(in oklch, var(--accent-link) 10%, transparent); color: var(--accent-link); cursor: pointer;">
                             <LucideIcon Name="pencil" Size="14"/>
                         </button>
                         <button @onclick="() => OpenDeleteConfirm(pkg)" title="Delete"
-                                style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--destructive-border); background: var(--destructive-muted); color: var(--destructive); cursor: pointer;">
+                                style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--destructive-muted-foreground); background: var(--destructive-muted); color: var(--destructive-muted-foreground); cursor: pointer;">
                             <LucideIcon Name="trash-2" Size="14"/>
                         </button>
                     </div>
@@ -87,7 +87,7 @@ else
                     }
                     @if (pkg.MinAddedCC > 0)
                     {
-                        <span style="font-size: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 6px; border-radius: 4px; color: #3b82f6; font-weight: bold;">+@pkg.MinAddedCC–@pkg.MaxAddedCC CC</span>
+                        <span style="font-size: 10px; background: var(--info-muted); border: 1px solid var(--info); padding: 2px 6px; border-radius: 4px; color: var(--info-muted-foreground); font-weight: bold;">+@pkg.MinAddedCC–@pkg.MaxAddedCC CC</span>
                     }
                 </div>
 
@@ -150,7 +150,7 @@ else
                             <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@motor.Brand — @motor.Model</div>
                             <div style="font-size: 10px; color: var(--muted-foreground);">Base CC: @motor.BaseCC</div>
                         </div>
-                        <button @onclick="() => OpenMotorcycleDeleteConfirm(motor)" style="background: none; border: none; cursor: pointer; color: var(--destructive); padding: 4px; display: flex; flex-shrink: 0;" title="Delete @motor.Brand @motor.Model">
+                        <button @onclick="() => OpenMotorcycleDeleteConfirm(motor)" style="background: none; border: none; cursor: pointer; color: var(--destructive-muted-foreground); padding: 4px; display: flex; flex-shrink: 0;" title="Delete @motor.Brand @motor.Model">
                             <LucideIcon Name="trash-2" Size="14"/>
                         </button>
                     </div>
