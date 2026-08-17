@@ -3,6 +3,7 @@ using StockSense.Application.DTOs;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Infrastructure.Services;
+using StockSense.Application.Interfaces;
 
 namespace StockSense.Web.Helpers;
 
@@ -12,11 +13,11 @@ public class OrderSlipHelper
     private readonly OrderSlipRepository _repo;
     private readonly ProductRepository _productRepo;
     private readonly DocumentService _docService;
-    private readonly OrderEmailSender _orderEmailSender;
+    private readonly IOrderEmailSender _orderEmailSender;
     private readonly PinnedSlipRepository _pinnedRepo;
 
     public OrderSlipHelper(OrderSlipRepository repo, ProductRepository productRepo,
-        DocumentService docService, OrderEmailSender orderEmailSender, PinnedSlipRepository pinnedRepo)
+        DocumentService docService, IOrderEmailSender orderEmailSender, PinnedSlipRepository pinnedRepo)
     {
         _repo = repo; _productRepo = productRepo; _docService = docService;
         _orderEmailSender = orderEmailSender; _pinnedRepo = pinnedRepo;

@@ -300,8 +300,10 @@
         ? preview is not null && SelectedAutomaticItems.Any()
         : manualSupplierId > 0 || manualLines.Count > 0 || !string.IsNullOrWhiteSpace(manualReason);
 
+
     private void ShowAutomatic() { mode = CreationMode.Automatic; error = message = ""; }
     private async Task ShowManual() { mode = CreationMode.Manual; error = message = ""; if (manualCatalog == null) await LoadManualCatalog(); }
+
     private async Task LoadManualCatalog()
     {
         manualLoading = true;

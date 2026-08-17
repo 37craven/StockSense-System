@@ -537,6 +537,7 @@
     private int _lastViewportWidth;
     private int _lastViewportHeight;
     private bool _scannerRestartPending = false;
+    private bool _scannerStartAttempted = false;
 
     private string CameraClass => scannedProduct != null
         ? "border-green-500 dark:border-green-400"
@@ -605,16 +606,43 @@
             return;
         }
 
-        if (scannerEnabled && dotNetRef == null)
+        if (scannerEnabled && dotNetRef == null && !_scannerStartAttempted)
         {
+            _scannerStartAttempted = true;
             scanErrorMessage = null;
             dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("barcodeScanner.start", _scannerElementId, dotNetRef);
+
+            try
+            {
+                await JS.InvokeVoidAsync("barcodeScanner.start", _scannerElementId, dotNetRef);
+            }
+            catch (JSException ex)
+            {
+                Logger.LogWarning(ex, "Barcode scanner JavaScript could not be started.");
+                scanErrorMessage =
+                    "The barcode scanner could not load. Refresh the page, then turn the scanner on again.";
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogWarning(ex, "Barcode scanner could not start while the page was rendering.");
+                scanErrorMessage =
+                    "The barcode scanner is temporarily unavailable. Refresh the page and try again.";
+            }
         }
-        else if (!scannerEnabled && dotNetRef != null)
+        else if (!scannerEnabled && (dotNetRef != null || _scannerStartAttempted))
         {
-            await JS.InvokeVoidAsync("barcodeScanner.stop");
-            dotNetRef.Dispose();
+            _scannerStartAttempted = false;
+
+            try
+            {
+                await JS.InvokeVoidAsync("barcodeScanner.stop");
+            }
+            catch (JSException ex)
+            {
+                Logger.LogDebug(ex, "Barcode scanner JavaScript was unavailable while stopping.");
+            }
+
+            dotNetRef?.Dispose();
             dotNetRef = null;
         }
     }

@@ -147,7 +147,7 @@ builder.Services.AddScoped<StoreServiceRepository>();
 // --- INFRASTRUCTURE (concrete) ---
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<BarcodeService>();
-builder.Services.AddScoped<OrderEmailSender>();
+builder.Services.AddScoped<IOrderEmailSender, OrderEmailSender>();
 builder.Services.AddSingleton<PdfDownloadCache>();
 builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
 builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();

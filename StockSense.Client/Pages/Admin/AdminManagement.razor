@@ -296,7 +296,7 @@
 
 @* --- DESTRUCTIVE ACTION CONFIRMATIONS --- *@
 <BbDialog @bind-Open="showDeleteDialog">
-    <BbDialogContent Class="w-[min(92vw,28rem)]">
+    <BbDialogContent Class="destructive-confirmation-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Delete @pendingDeleteName?</BbDialogTitle>
             <BbDialogDescription>This permanently removes the @PendingDeleteLabel.ToLowerInvariant(). This action cannot be undone.</BbDialogDescription>

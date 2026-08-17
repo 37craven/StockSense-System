@@ -166,7 +166,7 @@ else
 
 @* ── Delete Confirmation Dialog ── *@
 <BbDialog @bind-Open="showDeleteConfirm">
-    <BbDialogContent Class="w-[min(92vw,28rem)]">
+    <BbDialogContent Class="destructive-confirmation-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Delete @packageToDelete?.Name?</BbDialogTitle>
             <BbDialogDescription>This permanently removes the package. This action cannot be undone.</BbDialogDescription>
@@ -194,7 +194,7 @@ else
 </BbDialog>
 
 <BbDialog @bind-Open="showMotorcycleDeleteConfirm">
-    <BbDialogContent Class="w-[min(92vw,28rem)]">
+    <BbDialogContent Class="destructive-confirmation-dialog">
         <BbDialogHeader>
             <BbDialogTitle>Delete @MotorcycleDeleteName?</BbDialogTitle>
             <BbDialogDescription>This permanently removes the motorcycle. This action cannot be undone.</BbDialogDescription>

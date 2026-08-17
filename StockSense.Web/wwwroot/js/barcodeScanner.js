@@ -11,9 +11,7 @@ window.barcodeScanner = (function () {
 
     const config = {
         fps: 10,
-        aspectRatio: 1.777,
-
-        }
+        aspectRatio: 1.777
     };
 
 
@@ -182,6 +180,12 @@ window.barcodeScanner = (function () {
             if (!container) {
                 throw new Error(
                     `Barcode scanner container "${elementId}" was not found.`
+                );
+            }
+
+            if (typeof window.Html5Qrcode !== "function") {
+                throw new Error(
+                    "The barcode scanner library did not load. Refresh the page and try again."
                 );
             }
 
@@ -685,7 +689,15 @@ window.barcodeScanner = (function () {
     // ============================================================
 
     async function stop() {
-        await cleanupScanner();
+        try {
+            await cleanupScanner();
+        }
+        catch (err) {
+            console.warn(
+                "Barcode scanner cleanup failed:",
+                err
+            );
+        }
 
         dotNetRef = null;
 
@@ -698,6 +710,8 @@ window.barcodeScanner = (function () {
         console.log(
             "Barcode scanner stopped."
         );
+
+        return true;
     }
 
 

@@ -23,7 +23,7 @@ public sealed class OrderSlipsController : ControllerBase
     private readonly IOrderSlipWorkflowService _workflow;
     private readonly DocumentService _docService;
     private readonly PdfDownloadCache _pdfCache;
-    private readonly OrderEmailSender _orderEmailSender;
+    private readonly IOrderEmailSender _orderEmailSender;
     private readonly ILogger<OrderSlipsController> _logger;
     private readonly IAdminPinService? _adminPinService;
     // Prevents duplicate dispatches from repeated clicks within this application instance.
@@ -31,7 +31,7 @@ public sealed class OrderSlipsController : ControllerBase
     private static readonly ConcurrentDictionary<int, SemaphoreSlim> DispatchLocks = new();
 
     public OrderSlipsController(ApplicationDbContext context, IOrderSlipWorkflowService workflow,
-        DocumentService docService, PdfDownloadCache pdfCache, OrderEmailSender orderEmailSender,
+        DocumentService docService, PdfDownloadCache pdfCache, IOrderEmailSender orderEmailSender,
         ILogger<OrderSlipsController> logger, IAdminPinService? adminPinService = null)
     {
         _context = context;

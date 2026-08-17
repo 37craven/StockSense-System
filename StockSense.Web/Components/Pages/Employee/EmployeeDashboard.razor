@@ -13,23 +13,7 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<style>
-.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
-.dash-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-.dash-grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-3); }
-.order-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
-.health-fill { height: 8px; border-radius: 4px; background: var(--primary); min-width: 2px; transition: width 0.5s ease; }
-@@media (max-width: 1024px) {
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .dash-grid-2, .dash-grid-3 { grid-template-columns: 1fr; }
-}
-@@media (max-width: 640px) {
-    .kpi-grid { grid-template-columns: 1fr; }
-    .order-grid { grid-template-columns: 1fr; }
-}
-</style>
-
-<div>
+<div class="dashboard-page">
     <PageHeader Title="Dashboard"
                 Subtitle="@(lastUpdated == null ? "Loading..." : $"Updated {lastUpdated.Value.ToLocalTime():MMM d, yyyy · h:mm tt}")">
         <BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync" Disabled="@isLoading">
@@ -154,7 +138,7 @@
                     </div>
                     <a href="/admin/transactions" style="font-size: var(--text-xs); color: var(--primary); text-decoration: none; font-weight: var(--font-medium);">All transactions →</a>
                 </div>
-                <div style="overflow-x: auto;">
+                <div class="dashboard-table-view">
                     <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
                         <thead>
                             <tr style="border-bottom: 1px solid var(--border); background: var(--muted);">
@@ -178,6 +162,33 @@
                             }
                         </tbody>
                     </table>
+                </div>
+                <div class="dashboard-card-list">
+                    @foreach (var txn in recentTransactions)
+                    {
+                        <article class="dashboard-data-card">
+                            <div class="dashboard-card-heading">
+                                <strong class="dashboard-code dashboard-transaction-code"
+                                        title="@txn.InvoiceNumber"
+                                        aria-label="Transaction @txn.InvoiceNumber">@txn.InvoiceNumber</strong>
+                                <strong class="dashboard-primary-text">₱@txn.TotalAmount.ToString("F0")</strong>
+                            </div>
+                            <dl class="dashboard-card-grid dashboard-recent-sales-metrics" aria-label="Sale details">
+                                <div class="dashboard-card-metric dashboard-date-metric">
+                                    <dt>Date</dt>
+                                    <dd>@txn.TransactionDate.ToLocalTime().ToString("MMM d, h:mm tt")</dd>
+                                </div>
+                                <div class="dashboard-card-metric">
+                                    <dt>Items</dt>
+                                    <dd>@txn.Items.Count</dd>
+                                </div>
+                                <div class="dashboard-card-metric">
+                                    <dt>Payment</dt>
+                                    <dd>@txn.PaymentMethod</dd>
+                                </div>
+                            </dl>
+                        </article>
+                    }
                 </div>
             </div>
         }
@@ -237,7 +248,7 @@
                     }
                     else
                     {
-                        <div style="overflow-x: auto;">
+                        <div class="dashboard-table-view">
                             <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
                                 <thead>
                                     <tr style="border-bottom: 1px solid var(--border);">
@@ -269,6 +280,23 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="dashboard-card-list">
+                            @foreach (var item in replenishment)
+                            {
+                                <article class="dashboard-data-card">
+                                    <div class="dashboard-card-heading">
+                                        <div><strong>@item.Name</strong><small>@item.Brand</small></div>
+                                        <span class="dashboard-gap-badge">Gap @item.Gap</span>
+                                    </div>
+                                    <dl class="dashboard-card-grid dashboard-card-grid-four" aria-label="Inventory position">
+                                        <div class="dashboard-card-metric"><dt>On hand</dt><dd>@item.OnHand</dd></div>
+                                        <div class="dashboard-card-metric"><dt>Incoming</dt><dd>@item.Incoming</dd></div>
+                                        <div class="dashboard-card-metric"><dt>Reorder</dt><dd>@item.ReorderPoint</dd></div>
+                                        <div class="dashboard-card-metric"><dt>Position</dt><dd>@item.Position</dd></div>
+                                    </dl>
+                                </article>
+                            }
+                        </div>
                     }
                 </div>
             </div>
@@ -292,7 +320,7 @@
             }
             else
             {
-                <div style="overflow-x: auto;">
+                <div class="dashboard-table-view">
                     <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
                         <thead>
                             <tr style="border-bottom: 1px solid var(--border); background: var(--muted);">
@@ -314,6 +342,23 @@
                             }
                         </tbody>
                     </table>
+                </div>
+                <div class="dashboard-card-list">
+                    @foreach (var item in topBrandSales.Select((value, index) => new { value, index }))
+                    {
+                        <article class="dashboard-data-card dashboard-brand-card">
+                            <div class="dashboard-card-heading">
+                                <div><small>Rank #@(item.index + 1)</small><strong>@item.value.Brand</strong></div>
+                                <strong class="dashboard-primary-text">₱@item.value.Revenue.ToString("N2")</strong>
+                            </div>
+                            <dl class="dashboard-card-grid dashboard-brand-metrics" aria-label="Sales totals">
+                                <div class="dashboard-card-metric">
+                                    <dt>Units sold</dt>
+                                    <dd>@item.value.Units.ToString("N0")</dd>
+                                </div>
+                            </dl>
+                        </article>
+                    }
                 </div>
             }
         </div>
