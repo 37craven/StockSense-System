@@ -189,11 +189,11 @@
                     <span style="white-space: nowrap;">Dashboard</span>
                 }
             </a>
-            <a href="/admin/pos" title="POS" style="@NavLinkStyle(IsActive("/admin/pos"), isCollapsed)">
+            <a href="/admin/checkout-terminal" title="Checkout Terminal" style="@NavLinkStyle(IsActive("/admin/checkout-terminal"), isCollapsed)">
                 <LucideIcon Name="scan-barcode" Size="16" />
                 @if (!isCollapsed)
                 {
-                    <span style="white-space: nowrap;">POS</span>
+                    <span style="white-space: nowrap;">Checkout Terminal</span>
                 }
             </a>
             <AuthorizeView Roles="Employee, Admin">

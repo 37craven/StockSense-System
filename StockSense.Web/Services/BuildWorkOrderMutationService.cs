@@ -79,16 +79,38 @@ public sealed class BuildWorkOrderMutationService(ApplicationDbContext context, 
             .Where(value => productIds.Contains(value.Id) && value.IsActive).ToListAsync(cancellationToken);
         if (products.Count != productIds.Count) return new(false, 400, "One or more products were not found or are inactive.");
 
-        build.SelectedPartsJson = JsonSerializer.Serialize(products.Select(product => new
+        var existingQuantities = TryParseQuantities(build.SelectedPartsJson);
+        var quantities = products.ToDictionary(
+            product => product.Id,
+            product => request.Quantities.TryGetValue(product.Id, out var qty) && qty > 0
+                ? qty
+                : existingQuantities.GetValueOrDefault(product.Id, 1));
+        build.SelectedPartsJson = JsonSerializer.Serialize(products.SelectMany(product => Enumerable.Repeat(new
         {
             product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, SupplierId = product.SupplierId ?? 0,
             SupplierName = product.Supplier?.Name ?? "", ImageUrl = product.ImageUrl ?? ""
-        }));
-        build.TotalPrice = products.Sum(value => value.Price);
+        }, quantities[product.Id])));
+        build.TotalPrice = products.Sum(value => value.Price * quantities[value.Id]);
         AddAudit(actor, id, "PartsChanged", null, string.Join(',', productIds), reason, approval);
         await context.SaveChangesAsync(cancellationToken);
         return new(true, 200, "Parts updated.", build.TotalPrice);
+    }
+
+    private static Dictionary<int, int> TryParseQuantities(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            return JsonSerializer.Deserialize<List<ProductDto>>(json)?
+                .Where(part => part.Id > 0)
+                .GroupBy(part => part.Id)
+                .ToDictionary(group => group.Key, group => group.Count()) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private void RestoreStock(Transaction transaction)

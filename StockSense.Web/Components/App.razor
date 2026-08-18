@@ -146,6 +146,18 @@
                         status: response.status,
                         body: await response.text()
                     };
+                },
+                observeLoadMore: function(element, dotNetRef) {
+                    if (!element || element.__ssLoadMoreObserver) return;
+                    const observer = new IntersectionObserver(function(entries) {
+                        entries.forEach(function(entry) {
+                            if (entry.isIntersecting) {
+                                dotNetRef.invokeMethodAsync('LoadMore');
+                            }
+                        });
+                    }, { rootMargin: '300px' });
+                    observer.observe(element);
+                    element.__ssLoadMoreObserver = observer;
                 }
             };
     </script>
@@ -219,7 +231,7 @@
                     '/admin/transactions': 'Transaction History',
                     '/admin/stock': 'Safety Stock',
                     '/admin/assistance': 'Assistance',
-                    '/admin/pos': 'Point of Sale',
+                    '/admin/checkout-terminal': 'Checkout Terminal',
                     '/admin/orderslips': 'Generate Orders',
                     '/admin/order-history': 'Order History',
                     '/admin/appointments': 'Manage Appointments',

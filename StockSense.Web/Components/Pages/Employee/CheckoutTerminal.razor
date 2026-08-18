@@ -1,4 +1,4 @@
-@page "/admin/pos"
+@page "/admin/checkout-terminal"
 @layout AdminLayout
 @using StockSense.Domain.Entities
 @using Microsoft.AspNetCore.Authorization
@@ -12,14 +12,14 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
-@inject ILogger<POS> Logger
+@inject ILogger<CheckoutTerminal> Logger
 @inject ToastService Toast
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
 @attribute [Authorize(Roles = "Admin, Employee")]
 
-<PageTitle>Point of Sale</PageTitle>
+<PageTitle>Checkout Terminal</PageTitle>
 
 @* ═══════════════════════════════════════════════════════════════════════
    MAIN WRAPPER — mobile-first single-column, md+: two-column
@@ -339,20 +339,8 @@
                 <p class="m-0 text-sm text-muted-foreground">
                     @(completedTransaction.PaymentMethod) · @completedTransaction.TransactionDate.ToString("MM/dd/yyyy HH:mm")
                 </p>
-                <p class="m-0 text-xs text-muted-foreground">View or download the receipt for this sale.</p>
             </div>
 
-            <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
-                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                    <BbButton Variant="ButtonVariant.Outline" OnClick="CloseCheckoutConfirmation">Close</BbButton>
-                    <BbButton Variant="ButtonVariant.Default" OnClick="ViewReceipt">
-                        <LucideIcon Name="external-link" Size="16" /> View Receipt
-                    </BbButton>
-                    <BbButton Variant="ButtonVariant.Default" OnClick="DownloadReceipt">
-                        <LucideIcon Name="download" Size="16" /> Download Receipt
-                    </BbButton>
-                </div>
-            </BbDialogFooter>
             <p class="w-full text-center text-xs text-muted-foreground m-0 px-6 pb-3">Closing in @(receiptCountdown)s…</p>
             <div class="receipt-countdown-track w-full shrink-0" aria-hidden="true">
                 <div class="receipt-countdown-bar"></div>
@@ -382,7 +370,7 @@
                             <button type="button" @onclick="() => DecrementQty(item)"
                                     aria-label="Decrease quantity"
                                     class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
-                                <LucideIcon Name="chevron-left" Size="14" />
+                                <LucideIcon Name="minus" Size="14" />
                             </button>
                             <input type="number"
                                    @bind="item.Quantity"
@@ -392,7 +380,7 @@
                             <button type="button" @onclick="() => IncrementQty(item)"
                                     aria-label="Increase quantity"
                                     class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
-                                <LucideIcon Name="chevron-right" Size="14" />
+                                <LucideIcon Name="plus" Size="14" />
                             </button>
                         </div>
                     </td>
@@ -533,8 +521,8 @@
     private Product? scannedProduct;
     private string? scanErrorMessage;
     private int scanQuantity = 1;
-    private DotNetObjectReference<POS>? dotNetRef;
-    private DotNetObjectReference<POS>? viewportDotNetRef;
+    private DotNetObjectReference<CheckoutTerminal>? dotNetRef;
+    private DotNetObjectReference<CheckoutTerminal>? viewportDotNetRef;
     private string _scannerElementId = "barcode-camera-container";
     private int _lastViewportWidth;
     private int _lastViewportHeight;
@@ -1005,19 +993,6 @@
         {
             isProcessing = false;
         }
-    }
-
-    private async Task ViewReceipt()
-    {
-        if (completedTransaction is null) return;
-        await JS.InvokeVoidAsync("open", $"api/transactions/{completedTransaction.Id}/receipt-pdf?inline=true", "_blank");
-    }
-
-    private async Task DownloadReceipt()
-    {
-        if (completedTransaction is null) return;
-        var safeName = string.Concat(completedTransaction.InvoiceNumber.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
-        await JS.InvokeVoidAsync("triggerDownload", $"api/transactions/{completedTransaction.Id}/receipt-pdf", $"Receipt_{safeName}.pdf");
     }
 
     private CancellationTokenSource? receiptCloseCts;

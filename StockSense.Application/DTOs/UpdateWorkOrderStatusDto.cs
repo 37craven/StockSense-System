@@ -20,6 +20,7 @@ public class AdminOverrideDto
 public sealed class UpdateBuildPartsDto : AdminOverrideDto
 {
     public List<int> ProductIds { get; set; } = [];
+    public Dictionary<int, int> Quantities { get; set; } = new();
 }
 
 public sealed class SetAdminPinDto

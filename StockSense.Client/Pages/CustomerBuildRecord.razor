@@ -340,11 +340,11 @@
                         {
                             <div>
                                 <div class="text-[10px] text-primary font-bold uppercase mb-1.5 border-b border-border pb-1">@group.Key</div>
-                                @foreach (var part in group)
+                                @foreach (var (part, qty) in GroupParts(group))
                                 {
                                     <div class="flex justify-between py-1.5 border-b border-white/5">
-                                        <span class="text-sm text-foreground">@part.Brand @part.Name</span>
-                                        <span class="font-bold text-sm">₱@part.Price.ToString("N2")</span>
+                                        <span class="text-sm text-foreground">@part.Brand @part.Name@(qty > 1 ? $" ×{qty}" : "")</span>
+                                        <span class="font-bold text-sm">₱@((part.Price * qty).ToString("N2"))</span>
                                     </div>
                                 }
                             </div>
@@ -545,6 +545,14 @@
             return new();
         }
     }
+
+
+    private static IEnumerable<(ProductDto Part, int Qty)> GroupParts(
+        IEnumerable<ProductDto> parts) =>
+        parts
+            .Where(p => p.Category != "SYSTEM_METADATA")
+            .GroupBy(p => p.Id)
+            .Select(g => (g.First(), g.Count()));
 
 
     private void OpenBuildDetail(BuildRequestDto build)
