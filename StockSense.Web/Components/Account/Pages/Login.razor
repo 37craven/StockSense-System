@@ -47,7 +47,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                     <label style="display: block; font-size: var(--text-sm); font-weight: 500; color: var(--foreground); margin: 0;">Password</label>
                     <p style="font-size: var(--text-xs); margin: 0;">
-                        <a href="Account/ForgotPassword" style="color: var(--primary); text-decoration: none;">Forgot password?</a>
+                        <a href="Account/ForgotPassword" class="login-action-link">Forgot password?</a>
                     </p>
                 </div>
                 <div class="relative">
@@ -85,7 +85,7 @@
 
             <div style="text-align: center; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
                 <p style="font-size: var(--text-sm); margin: 0;">
-                    <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))" style="color: var(--primary); text-decoration: none;">Register as a new user</a>
+                    <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))" class="login-action-link">Register as a new user</a>
                 </p>
             </div>
         </EditForm>

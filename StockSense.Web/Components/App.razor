@@ -51,7 +51,6 @@
     <link rel="stylesheet" href="StockSense.Web.styles.css" />
 
     <link rel="icon" type="image/png" href="favicon.png" />
-
     <HeadOutlet />
 </head>
 <body>
@@ -64,8 +63,97 @@
         <AntiforgeryToken />
     </form>
 
-    <script src="_framework/blazor.web.js"></script>
-    <script src="js/barcodeScanner.js?v=20260814-scanner-recovery-1" defer></script>
+<script>
+            window.stockSenseApi = {
+                jsonTransfers: new Map(),
+                nextJsonTransferId: 1,
+                get: async function(url) {
+                    const response = await fetch(url, {
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    return {
+                        ok: response.ok,
+                        status: response.status,
+                        body: await response.text()
+                    };
+                },
+                getJson: async function(url) {
+                    const response = await fetch(url, {
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Request failed');
+                    }
+
+                    return await response.json();
+                },
+                beginJsonTransfer: async function(url) {
+                    const response = await fetch(url, {
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Request failed');
+                    }
+
+                    const body = await response.text();
+                    const id = String(window.stockSenseApi.nextJsonTransferId++);
+                    window.stockSenseApi.jsonTransfers.set(id, body);
+                    return { id: id, length: body.length };
+                },
+                readJsonTransfer: function(id, offset, count) {
+                    const body = window.stockSenseApi.jsonTransfers.get(id);
+                    if (body === undefined) {
+                        throw new Error('JSON transfer expired');
+                    }
+
+                    return body.substring(offset, offset + count);
+                },
+                releaseJsonTransfer: function(id) {
+                    window.stockSenseApi.jsonTransfers.delete(id);
+                },
+                postJson: async function(url, value) {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(value)
+                    });
+
+                    return {
+                        ok: response.ok,
+                        status: response.status,
+                        body: await response.text()
+                    };
+                },
+                put: async function(url) {
+                    const response = await fetch(url, {
+                        method: 'PUT',
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    return {
+                        ok: response.ok,
+                        status: response.status,
+                        body: await response.text()
+                    };
+                }
+            };
+    </script>
+    @if (!IsStaticCustomerSettingsRequest)
+    {
+        <script src="_framework/blazor.web.js" defer></script>
+        <script src="js/barcodeScannerLoader.js?v=20260817-lazy-scanner-1" defer></script>
+    }
     <script src="js/passwordVisibility.js?v=20260810-password-toggle-2" defer></script>
 
     <script>
@@ -218,3 +306,12 @@
     </script>
 </body>
 </html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private bool IsStaticCustomerSettingsRequest =>
+        HttpContext?.User.IsInRole("Customer") == true &&
+        HttpContext.Request.Path.StartsWithSegments("/Account/Manage", StringComparison.OrdinalIgnoreCase);
+}

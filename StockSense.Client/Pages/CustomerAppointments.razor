@@ -1,11 +1,10 @@
 @page "/my-bookings"
 @layout PublicLayout
-@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
-@using System.Net.Http.Json
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using StockSense.Application.DTOs
 @using StockSense.Client.Layout
-@inject HttpClient Http
+@inject IJSRuntime JSRuntime
 
 @attribute [Authorize]
 
@@ -104,6 +103,8 @@
 
 </div>
 
+@if (showDetailModal)
+{
 <BbPortalHost />
 <BbDialogProvider />
 
@@ -186,6 +187,7 @@
         </div>
     </BbDialogContent>
 </BbDialog>
+}
 
 @code {
 
@@ -248,8 +250,14 @@
     }
 
 
-    protected override async Task OnInitializedAsync()
+    private bool initializationStarted;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender || initializationStarted)
+            return;
+
+        initializationStarted = true;
         if (AuthStateTask != null)
         {
             var authState =
@@ -262,10 +270,8 @@
             {
                 try
                 {
-                    myAppointments =
-                        await Http.GetFromJsonAsync<List<AppointmentDto>>(
-                            "api/appointments/my-bookings"
-                        );
+                    myAppointments = await BrowserGetAsync<List<AppointmentDto>>(
+                        "api/appointments/my-bookings");
                 }
                 catch
                 {
@@ -276,6 +282,7 @@
         }
 
         isLoading = false;
+        await InvokeAsync(StateHasChanged);
     }
 
 
@@ -325,14 +332,26 @@
 
         try
         {
-            var response = await Http.PutAsync($"api/appointments/{appt.Id}/cancel", null);
+            var response = await JSRuntime.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.put",
+                $"api/appointments/{appt.Id}/cancel");
 
-            if (response.IsSuccessStatusCode)
+            if (response.Ok)
             {
                 appt.Status = "Cancelled";
                 myAppointments = new List<AppointmentDto>(myAppointments!);
             }
         }
         catch { }
+    }
+
+    private ValueTask<T?> BrowserGetAsync<T>(string url) =>
+        JSRuntime.InvokeAsync<T?>("stockSenseApi.getJson", url);
+
+    public sealed class BrowserApiResponse
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string Body { get; set; } = "";
     }
 }

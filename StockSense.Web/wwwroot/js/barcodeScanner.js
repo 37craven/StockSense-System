@@ -1,4 +1,7 @@
 window.barcodeScanner = (function () {
+    const html5QrcodeScriptUrl =
+        "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+    let html5QrcodeLoadPromise = null;
     let html5QrCode = null;
     let dotNetRef = null;
     let allCameras = [];
@@ -14,32 +17,38 @@ window.barcodeScanner = (function () {
         aspectRatio: 1.777
     };
 
-    let libraryPromise = null;
-
-    // Loads html5-qrcode on first scanner use instead of on every page.
-    function ensureLibrary() {
+function ensureHtml5QrcodeLoaded() {
         if (typeof window.Html5Qrcode === "function") {
             return Promise.resolve();
         }
-        if (libraryPromise) {
-            return libraryPromise;
+
+        if (html5QrcodeLoadPromise) {
+            return html5QrcodeLoadPromise;
         }
-        libraryPromise = new Promise(function (resolve, reject) {
-            var script = document.createElement("script");
-            script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-            script.onload = function () {
+
+        html5QrcodeLoadPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = html5QrcodeScriptUrl;
+            script.async = true;
+            script.onload = () => {
                 if (typeof window.Html5Qrcode === "function") {
                     resolve();
-                } else {
-                    reject(new Error("Barcode scanner library failed to initialize."));
+                    return;
                 }
+
+                html5QrcodeLoadPromise = null;
+                script.remove();
+                reject(new Error("The barcode scanner library did not initialize."));
             };
-            script.onerror = function () {
-                reject(new Error("Barcode scanner library could not be downloaded."));
+            script.onerror = () => {
+                html5QrcodeLoadPromise = null;
+                script.remove();
+                reject(new Error("The barcode scanner library could not be downloaded."));
             };
             document.head.appendChild(script);
         });
-        return libraryPromise;
+
+        return html5QrcodeLoadPromise;
     }
 
 
@@ -211,7 +220,7 @@ window.barcodeScanner = (function () {
                 );
             }
 
-            await ensureLibrary();
+await ensureHtml5QrcodeLoaded();
 
             /*
              * Request / verify browser camera permission first.

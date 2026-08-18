@@ -151,6 +151,117 @@ input[type="number"] {
     display: none;
 }
 
+.settings-public-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    width: 100%;
+    border-bottom: 1px solid var(--border);
+    background: var(--background);
+}
+
+.settings-public-inner {
+    display: flex;
+    width: 100%;
+    height: 3.5rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: 0 6rem;
+    box-sizing: border-box;
+}
+
+.settings-public-brand {
+    display: inline-flex;
+    flex-shrink: 0;
+    text-decoration: none;
+}
+
+.settings-public-desktop,
+.settings-public-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.settings-public-desktop a,
+.settings-public-link,
+.settings-public-menu a,
+.settings-public-mobile-logout {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    text-decoration: none;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.settings-public-desktop a:hover,
+.settings-public-link:hover,
+.settings-public-menu a:hover,
+.settings-public-mobile-logout:hover {
+    background: var(--accent);
+    color: var(--accent-foreground);
+}
+
+.settings-theme-toggle,
+.settings-public-menu > summary {
+    display: inline-grid;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--foreground);
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.settings-public-menu {
+    display: none;
+    position: relative;
+}
+
+.settings-public-menu > summary {
+    list-style: none;
+}
+
+.settings-public-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-public-menu > nav {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    display: flex;
+    width: min(16rem, calc(100vw - 2rem));
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--background);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .16);
+}
+
+.settings-public-menu a,
+.settings-public-mobile-logout {
+    width: 100%;
+    justify-content: flex-start;
+}
+
 
 /* =============================================================================
    MEDIA QUERIES (outside @layer to avoid suppression)
@@ -175,6 +286,18 @@ input[type="number"] {
 
     .header-wrapper {
         padding: 0 1rem;
+    }
+
+    .settings-public-inner {
+        padding: 0 1rem;
+    }
+
+    .settings-public-desktop {
+        display: none;
+    }
+
+    .settings-public-menu {
+        display: block;
     }
 
     .settings-mobile-trigger {
@@ -947,3 +1070,42 @@ input[type="number"] {
 }
 .dark .account-validation-summary::before { color: #fee2e2; }
 .dark .account-validation-summary li::before { background: #f87171; }
+
+/* Keep the registration sign-in link red in light mode while meeting text
+   contrast requirements against the dark registration card. */
+.register-login-link {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 0.25rem;
+}
+.dark .register-login-link { color: var(--foreground); }
+
+/* Homepage-only target sizing. Public navigation is marked by route so these
+   dimensions do not change the shared shell on other public pages. */
+.home .homepage-touch-target,
+.home-footer a,
+.home-public-nav a {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+}
+.home-footer a,
+.home-public-nav a {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Preserve the login links' primary color in light mode and use the higher-
+   contrast foreground token against the dark login card. */
+.login-action-link {
+    color: var(--primary);
+    text-decoration: none;
+}
+.dark .login-action-link { color: var(--foreground); }
+.account-danger-action {
+    background-color: #b91c1c !important;
+    color: #ffffff !important;
+}
+
+.account-danger-action:hover {
+    background-color: #991b1b !important;
+}

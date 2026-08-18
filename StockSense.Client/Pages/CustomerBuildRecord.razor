@@ -1,14 +1,12 @@
 @page "/my-builds"
 @layout PublicLayout
-@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@rendermode InteractiveServer
 @using System.Text.Json
 @using System.Globalization
-@using System.Net.Http.Json
-@using System.Net
 @using Microsoft.AspNetCore.Authorization
 @using StockSense.Client.Layout
 @using StockSense.Application.DTOs
-@inject HttpClient Http
+@inject IJSRuntime JSRuntime
 @inject NavigationManager Nav
 
 @attribute [Authorize]
@@ -286,6 +284,8 @@
 
 </div>
 
+@if (showDetailModal)
+{
 <BbPortalHost />
 <BbDialogProvider />
 
@@ -368,6 +368,7 @@
         </div>
     </BbDialogContent>
 </BbDialog>
+}
 
 @code {
 
@@ -434,8 +435,14 @@
     }
 
 
-    protected override async Task OnInitializedAsync()
+    private bool initializationStarted;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender || initializationStarted)
+            return;
+
+        initializationStarted = true;
         if (AuthStateTask is not null)
         {
             var authState =
@@ -457,6 +464,7 @@
         }
 
         await LoadBuildsAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
 
@@ -468,14 +476,13 @@
 
         try
         {
-            using var response =
-                await Http.GetAsync(
-                    "api/builds/mine"
-                );
+            var response = await JSRuntime.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.get",
+                "api/builds/mine");
 
             if (
-                response.StatusCode ==
-                HttpStatusCode.Unauthorized
+                response.Status ==
+                (int)System.Net.HttpStatusCode.Unauthorized
             )
             {
                 Nav.NavigateTo(
@@ -486,12 +493,12 @@
                 return;
             }
 
-            response.EnsureSuccessStatusCode();
+            if (!response.Ok)
+                throw new InvalidOperationException("Build history request failed.");
 
-            myBuilds =
-                await response.Content
-                    .ReadFromJsonAsync<List<BuildRequestDto>>()
-                ?? [];
+            myBuilds = JsonSerializer.Deserialize<List<BuildRequestDto>>(
+                response.Body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
         }
         catch
         {
@@ -591,13 +598,11 @@
 
         try
         {
-            var response =
-                await Http.PutAsync(
-                    $"api/builds/{build.Id}/cancel",
-                    null
-                );
+            var response = await JSRuntime.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.put",
+                $"api/builds/{build.Id}/cancel");
 
-            if (response.IsSuccessStatusCode)
+            if (response.Ok)
             {
                 build.Status =
                     "Cancelled";
@@ -613,5 +618,12 @@
         catch
         {
         }
+    }
+
+    public sealed class BrowserApiResponse
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string Body { get; set; } = "";
     }
 }

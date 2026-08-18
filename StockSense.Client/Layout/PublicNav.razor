@@ -9,12 +9,12 @@
 <style>
     .register-btn:hover { background-color: #8B0000 !important; }
 </style>
-<header style="position: sticky; top: 0; z-index: 50; width: 100%; border-bottom: 1px solid var(--border); background-color: var(--background); backdrop-filter: blur(8px); box-sizing: border-box;">
+<header class="@(IsActive("/") ? "home-public-nav" : null)" style="position: sticky; top: 0; z-index: 50; width: 100%; border-bottom: 1px solid var(--border); background-color: var(--background); backdrop-filter: blur(8px); box-sizing: border-box;">
     <div class="header-wrapper" style="display: flex; height: 3.5rem; width: 100%; align-items: center; justify-content: space-between; box-sizing: border-box;">
 
         <div style="display: flex; align-items: center; gap: 1rem; min-width: 0;">
-            <a href="/" style="text-decoration: none; flex-shrink: 0;">
-                <div style="display: flex; flex-direction: column; line-height: 0.9;">
+            <a href="/" aria-label="SAPShop home" style="text-decoration: none; flex-shrink: 0;">
+                <div aria-hidden="true" style="display: flex; flex-direction: column; line-height: 0.9;">
                     <Logo Size="32" Color="#FF0000" />
                 </div>
             </a>
@@ -47,19 +47,21 @@
                 </AuthorizeView>
             </div>
 
-            <button type="button" @onclick="ToggleTheme" class="navbar-btn" style="display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius); cursor: pointer; height: 2.25rem; width: 2.25rem; padding: 0; color: var(--foreground); background-color: transparent; border: none; flex-shrink: 0;">
-                @if (isDarkMode)
-                {
-                    <LucideIcon Name="sun" Size="18" AriaLabel="Switch to light mode" />
-                }
-                else
-                {
-                    <LucideIcon Name="moon" Size="18" AriaLabel="Switch to dark mode" />
-                }
+<button type="button" @onclick="ToggleTheme" class="navbar-btn" aria-label="@(isDarkMode ? "Switch to light mode" : "Switch to dark mode")" title="@(isDarkMode ? "Switch to light mode" : "Switch to dark mode")" style="display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius); cursor: pointer; height: 2.25rem; width: 2.25rem; padding: 0; color: var(--foreground); background-color: transparent; border: none; flex-shrink: 0;">
+                <span aria-hidden="true">
+                    @if (isDarkMode)
+                    {
+                        <LucideIcon Name="sun" Size="18" />
+                    }
+                    else
+                    {
+                        <LucideIcon Name="moon" Size="18" />
+                    }
+                </span>
             </button>
 
-            <button type="button" @onclick="ToggleMobileMenu" class="navbar-mobile-trigger navbar-btn" style="align-items: center; justify-content: center; border-radius: var(--radius); cursor: pointer; height: 2.25rem; width: 2.25rem; padding: 0; color: var(--foreground); background-color: transparent; border: none; flex-shrink: 0;">
-                <LucideIcon Name="@(mobileMenuOpen ? "x" : "menu")" Size="20" />
+            <button type="button" @onclick="ToggleMobileMenu" class="navbar-mobile-trigger navbar-btn" aria-label="@(mobileMenuOpen ? "Close navigation menu" : "Open navigation menu")" aria-expanded="@(mobileMenuOpen ? "true" : "false")" aria-controls="public-mobile-menu" style="align-items: center; justify-content: center; border-radius: var(--radius); cursor: pointer; height: 2.25rem; width: 2.25rem; padding: 0; color: var(--foreground); background-color: transparent; border: none; flex-shrink: 0;">
+                <span aria-hidden="true"><LucideIcon Name="@(mobileMenuOpen ? "x" : "menu")" Size="20" /></span>
             </button>
 
         </div>
@@ -67,7 +69,7 @@
 
     @if (mobileMenuOpen)
     {
-        <div class="navbar-mobile-trigger" style="border-top: 1px solid var(--border); background-color: var(--background); padding: var(--space-3) var(--space-4); flex-direction: column; gap: var(--space-1);">
+        <div id="public-mobile-menu" class="navbar-mobile-trigger" style="border-top: 1px solid var(--border); background-color: var(--background); padding: var(--space-3) var(--space-4); flex-direction: column; gap: var(--space-1);">
             <a href="/" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/") ? "var(--secondary)" : "transparent");">Home</a>
             <a href="/appointment" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/appointment") ? "var(--secondary)" : "transparent");">Appointment</a>
             <a href="/build" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/build") ? "var(--secondary)" : "transparent");">Build</a>

@@ -1,14 +1,13 @@
 @page "/appointment"
 @layout PublicLayout
-@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
-@using System.Net.Http.Json
+@rendermode InteractiveServer
+@using System.Text
 @using System.Text.Json
 @using Microsoft.AspNetCore.Authorization
 @using StockSense.Application.DTOs
 @using Microsoft.AspNetCore.Components.Authorization
 @using StockSense.Client.Layout
 @using BlazorBlueprint.Primitives.Services
-@inject HttpClient Http
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @inject ToastService Toast
@@ -20,16 +19,19 @@
 
         <BbPortalHost />
         <BbDialogProvider />
-        <BbToastProvider @rendermode="InteractiveWebAssembly" Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
+        <BbToastProvider Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
         <UnsavedChangesGuard IsDirty="@HasUnsavedBooking"
                              Message="Your appointment has not been booked. If you leave now, your selected services and schedule will be lost." />
 
         @if (isLoading)
         {
-            <LoadingState FullPage="true" Description="syncing with the server..." />
+            <div class="flex items-center gap-2 border-b border-border bg-muted px-4 py-2 text-xs text-foreground" role="status" aria-live="polite">
+                <span class="h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden="true"></span>
+                Loading appointment options…
+            </div>
         }
 
-        <div class="@(isLoading ? "hidden" : "flex flex-col lg:flex-row lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden lg:pb-0")" style="animation: fadeIn 0.4s ease-in;">
+        <div class="flex flex-col lg:flex-row lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden lg:pb-0" style="animation: fadeIn 0.4s ease-in;">
 
             @* --- SIDEBAR --- *@
             <div class="w-full lg:w-[300px] lg:shrink-0 flex flex-col bg-card lg:border-r border-border overflow-hidden">
@@ -94,7 +96,7 @@
                     @if (!SelectedServices.Any())
                     {
                         <div class="flex flex-col text-center py-6 text-muted-foreground">
-                            <LucideIcon Name="shopping-cart" Size="28" class="self-center" />
+                            <span class="self-center" aria-hidden="true"><LucideIcon Name="shopping-cart" Size="28" /></span>
                             <p class="text-xs mt-2 italic">No services selected</p>
                         </div>
                     }
@@ -106,7 +108,7 @@
                                 <div>
                                     <div class="flex justify-between items-start">
                                         <span class="text-xs font-bold text-foreground flex-1 pr-2">@s.Name</span>
-                                        <span class="text-xs font-bold text-primary shrink-0">₱@s.TotalServicePrice.ToString("N0")</span>
+                                        <span class="text-xs font-bold text-foreground shrink-0">₱@s.TotalServicePrice.ToString("N0")</span>
                                     </div>
                                     @if (s.PickedProducts.Any(kv => kv.Value != null))
                                     {
@@ -141,7 +143,7 @@
 
                         <div class="flex justify-between items-center border-t border-border pt-3">
                             <span class="text-sm font-bold text-foreground">Total Amount</span>
-                            <span class="text-xl font-black text-primary tracking-tight">₱@TotalPrice.ToString("N0")</span>
+                            <span class="text-xl font-black text-foreground tracking-tight">₱@TotalPrice.ToString("N0")</span>
                         </div>
                     }
                 </div>
@@ -150,7 +152,7 @@
                 <div class="appt-nav fixed bottom-0 left-0 right-0 z-10 bg-background border-t border-border p-4 flex flex-col gap-2 lg:static lg:z-auto lg:bg-card lg:shrink-0">
 
                     <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="PrevStep" Disabled="@(currentStep == 1 || isProcessing)">
-                        <LucideIcon Name="arrow-left" Size="14" />
+                        <span aria-hidden="true"><LucideIcon Name="arrow-left" Size="14" /></span>
                         Back
                     </BbButton>
 
@@ -158,7 +160,7 @@
                     {
                         <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="NextStep" Disabled="@(!CanProceed)">
                             Next Step
-                            <LucideIcon Name="arrow-right" Size="14" />
+                            <span aria-hidden="true"><LucideIcon Name="arrow-right" Size="14" /></span>
                         </BbButton>
                     }
                     else
@@ -177,7 +179,7 @@
 
                     <div class="mt-2 pt-3 border-t border-dashed border-border">
                         <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick='() => NavigationManager.NavigateTo("/my-bookings")'>
-                            <LucideIcon Name="calendar-days" Size="16" class="mr-1.5" />
+                            <span class="mr-1.5" aria-hidden="true"><LucideIcon Name="calendar-days" Size="16" /></span>
                             View My Appointments
                         </BbButton>
                     </div>
@@ -257,21 +259,21 @@
                                         </div>
                                     }
 
-                                    <div class="p-3 mt-auto flex flex-col gap-1" style="background-color: color-mix(in oklch, var(--card) 80%, var(--muted));">
-                                        <div class="flex justify-between text-xs text-muted-foreground">
+                                    <div class="p-3 mt-auto flex flex-col gap-1 bg-muted">
+                                        <div class="flex justify-between text-xs text-foreground">
                                             <span>Labor Fee:</span>
                                             <span>₱@service.Price.ToString("N0")</span>
                                         </div>
                                         @if (service.ProductCategories.Any())
                                         {
-                                            <div class="flex justify-between text-xs text-muted-foreground">
+                                            <div class="flex justify-between text-xs text-foreground">
                                                 <span>Parts Total:</span>
                                                 <span>₱@service.TotalPartsPrice.ToString("N0")</span>
                                             </div>
                                         }
                                         <div class="flex justify-between items-center mt-1 pt-1 border-t border-dashed border-border">
                                             <span class="text-sm font-bold text-foreground">Total Cost</span>
-                                            <span class="text-lg font-black text-primary">₱@service.TotalServicePrice.ToString("N0")</span>
+                                            <span class="text-lg font-black text-foreground">₱@service.TotalServicePrice.ToString("N0")</span>
                                         </div>
                                     </div>
 
@@ -486,7 +488,7 @@
                                     }
                                     <div class="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-border">
                                         <span class="text-xs font-bold text-foreground">Subtotal</span>
-                                        <span class="text-sm font-bold text-primary">₱@s.TotalServicePrice.ToString("N0")</span>
+                                        <span class="text-sm font-bold text-foreground">₱@s.TotalServicePrice.ToString("N0")</span>
                                     </div>
                                 </div>
                             }
@@ -541,7 +543,7 @@
                                             @(isAvailable ? "In stock" : "Out of stock")
                                         </div>
                                     </div>
-                                    <span class="text-sm font-bold text-primary shrink-0">₱@prod.Price.ToString("N0")</span>
+                                    <span class="text-sm font-bold text-foreground shrink-0">₱@prod.Price.ToString("N0")</span>
                                 </label>
                             }
                         }
@@ -706,8 +708,14 @@
 
     [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    private bool initializationStarted;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender || initializationStarted)
+            return;
+
+        initializationStarted = true;
         try
         {
             isLoading = true;
@@ -715,7 +723,11 @@
             await Task.WhenAll(LoadUserProfile(), LoadServices(), LoadProducts(), LoadMechanics(), LoadMotorcycles(), FetchBookedSlots());
         }
         catch { Toast.Error("Connection error."); }
-        finally { isLoading = false; }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task LoadMotorcycles()
@@ -724,7 +736,7 @@
         motorcycleLoadError = null;
         try
         {
-            motorcycles = await Http.GetFromJsonAsync<List<MotorcycleOptionDto>>("api/motorcycles") ?? [];
+            motorcycles = await BrowserGetAsync<List<MotorcycleOptionDto>>("api/motorcycles") ?? [];
         }
         catch
         {
@@ -747,7 +759,7 @@
                 newAppt.CustomerName = authState.User.Identity.Name ?? "User";
                 try
                 {
-                    var profile = await Http.GetFromJsonAsync<UserProfile>("api/user/profile");
+                    var profile = await BrowserGetAsync<UserProfile>("api/user/profile");
                     if (profile != null) newAppt.CustomerName = $"{profile.FirstName} {profile.LastName}".Trim();
                 }
                 catch { }
@@ -774,7 +786,7 @@
     {
         try
         {
-            var dbServices = await Http.GetFromJsonAsync<List<StoreServiceDto>>("api/services");
+            var dbServices = await BrowserGetAsync<List<StoreServiceDto>>("api/services");
 
             if (dbServices != null)
             {
@@ -827,7 +839,7 @@
     {
         try
         {
-            var allProd = await Http.GetFromJsonAsync<List<ProductDto>>("api/products");
+            var allProd = await BrowserGetAsync<List<ProductDto>>("api/products");
             if (allProd != null)
             {
                 allProductList = allProd;
@@ -901,7 +913,7 @@
     {
         try
         {
-            var mechs = await Http.GetFromJsonAsync<List<MechanicDto>>("api/mechanics");
+            var mechs = await BrowserGetAsync<List<MechanicDto>>("api/mechanics");
             if (mechs != null && mechs.Any())
             {
                 availableMechanics = new List<string> { "Any Available" };
@@ -917,7 +929,7 @@
         {
             var dateStr = newAppt.AppointmentDate.ToString("yyyy-MM-dd");
             var mechanicQuery = Uri.EscapeDataString(selectedMechanic);
-            var slots = await Http.GetFromJsonAsync<List<BookedSlotDto>>($"api/appointments/booked-slots?date={dateStr}&mechanic={mechanicQuery}");
+            var slots = await BrowserGetAsync<List<BookedSlotDto>>($"api/appointments/booked-slots?date={dateStr}&mechanic={mechanicQuery}");
 
             bookedIntervals.Clear();
             if (slots != null)
@@ -1025,15 +1037,15 @@
 
         try
         {
-            var response = await Http.PostAsJsonAsync("api/appointments", newAppt);
-            if (response.IsSuccessStatusCode)
+            var response = await JSRuntime.InvokeAsync<BrowserApiResponse>("stockSenseApi.postJson", "api/appointments", newAppt);
+            if (response.Ok)
             {
                 showSuccessModal = true;
             }
             else
             {
-                var error = await ApiErrorMessage.FromResponseAsync(
-                    response,
+                var error = ApiErrorMessage.FromStatus(
+                    (System.Net.HttpStatusCode)response.Status,
                     "This appointment could not be booked. Check that the selected products are in stock, then try again.");
                 Toast.Error(ToBookingErrorDescription(error), "Booking not submitted");
             }
@@ -1052,6 +1064,42 @@
         error.Contains("stock", StringComparison.OrdinalIgnoreCase)
             ? "Insufficient stock. One or more selected products are unavailable. Please choose another product."
             : error;
+
+    private async ValueTask<T?> BrowserGetAsync<T>(string url)
+    {
+        const int chunkSize = 16 * 1024;
+        var transfer = await JSRuntime.InvokeAsync<BrowserJsonTransfer>("stockSenseApi.beginJsonTransfer", url);
+        var json = new StringBuilder(transfer.Length);
+
+        try
+        {
+            for (var offset = 0; offset < transfer.Length; offset += chunkSize)
+            {
+                var chunk = await JSRuntime.InvokeAsync<string>(
+                    "stockSenseApi.readJsonTransfer", transfer.Id, offset, Math.Min(chunkSize, transfer.Length - offset));
+                json.Append(chunk);
+            }
+
+            return JsonSerializer.Deserialize<T>(json.ToString(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        }
+        finally
+        {
+            await JSRuntime.InvokeVoidAsync("stockSenseApi.releaseJsonTransfer", transfer.Id);
+        }
+    }
+
+    public sealed class BrowserJsonTransfer
+    {
+        public string Id { get; set; } = "";
+        public int Length { get; set; }
+    }
+
+    public sealed class BrowserApiResponse
+    {
+        public bool Ok { get; set; }
+        public int Status { get; set; }
+        public string Body { get; set; } = "";
+    }
 
     private void CloseSuccessModal()
     {
