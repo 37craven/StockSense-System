@@ -402,7 +402,7 @@
                     <div>
                         <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Date</label>
                         <div style="display: flex; gap: var(--space-2);">
-                            <input type="date" @bind-value="bookingDate" @bind-value:format="yyyy-MM-dd" min="@DateTime.Today.ToString("yyyy-MM-dd")" style="flex: 1; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;" />
+                            <input type="date" @bind-value="bookingDate" @bind-value:format="yyyy-MM-dd" @bind-value:after="FetchBookedSlots" min="@DateTime.Today.ToString("yyyy-MM-dd")" style="flex: 1; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;" />
                             <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="FetchBookedSlots" Disabled="@isLoadingSlots"><LucideIcon Name="refresh-cw" Size="14" aria-hidden="true" /></BbButton>
                         </div>
                     </div>
@@ -517,6 +517,24 @@
     private List<string> mechanics = new() { "Any Available" };
     private List<(TimeSpan Start, TimeSpan End)> bookedIntervals = [];
     private bool isLoadingSlots;
+
+    private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+    private static DateTime PhNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
+    private static DateTime PhToday => PhNow.Date;
+
+    private static readonly TimeSpan WeekdayOpeningTime = new(8, 30, 0);
+    private static readonly TimeSpan WeekdayClosingTime = new(18, 0, 0);
+    private static readonly TimeSpan SundayOpeningTime = new(8, 30, 0);
+    private static readonly TimeSpan SundayClosingTime = new(12, 0, 0);
+    private const int SlotInterval = 30;
+    private const int BuildInstallationMinutes = 120;
+    private const int MinimumBookedDuration = 30;
+    private const int AdvanceBookingLead = 1;
+
+    private static (TimeSpan Opening, TimeSpan Closing) GetBusinessHours(DateTime date) =>
+        date.DayOfWeek == DayOfWeek.Sunday
+            ? (SundayOpeningTime, SundayClosingTime)
+            : (WeekdayOpeningTime, WeekdayClosingTime);
 
     private int? bookingMotorcycleId;
     private bool isScheduling;
@@ -809,7 +827,7 @@
                 .Select(s =>
                 {
                     TimeSpan.TryParse(s.TimeSlot, out var start);
-                    return (Start: start, End: start.Add(TimeSpan.FromMinutes(s.EstimatedMinutes)));
+                    return (Start: start, End: start.Add(TimeSpan.FromMinutes(Math.Max(s.EstimatedMinutes, MinimumBookedDuration))));
                 })
                 .ToList();
         }
@@ -823,13 +841,15 @@
         await FetchBookedSlots();
     }
 
-    private static List<string> GenerateAllTimeSlots()
+    private List<string> GenerateAllTimeSlots()
     {
+        var (opening, closing) = GetBusinessHours(bookingDate.Date);
         var slots = new List<string>();
-        for (var h = 8; h < 17; h++)
+        var current = opening;
+        while (current < closing)
         {
-            slots.Add($"{h:D2}:00");
-            slots.Add($"{h:D2}:30");
+            slots.Add(current.ToString(@"hh\:mm"));
+            current = current.Add(TimeSpan.FromMinutes(SlotInterval));
         }
         return slots;
     }
@@ -837,7 +857,14 @@
     private bool IsTimeSlotAvailable(string time)
     {
         if (!TimeSpan.TryParse(time, out var start)) return false;
-        var end = start.Add(TimeSpan.FromMinutes(120));
+
+        if (bookingDate.Date == PhToday && start < PhNow.TimeOfDay.Add(TimeSpan.FromHours(AdvanceBookingLead)))
+            return false;
+
+        var (_, closing) = GetBusinessHours(bookingDate.Date);
+        var end = start.Add(TimeSpan.FromMinutes(BuildInstallationMinutes));
+        if (end > closing) return false;
+
         return !bookedIntervals.Any(b => start < b.End && end > b.Start);
     }
 

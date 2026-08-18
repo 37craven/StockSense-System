@@ -210,7 +210,7 @@
 <PageTitle>Order History</PageTitle>
 
 <div class="order-page">
-    <PageHeader Title="Order Slips"
+    <PageHeader Title="Order History"
                 Subtitle="Review purchase orders and track receipt progress."
                 Badge="@(slips?.Count(s => s.Status is OrderSlipStatuses.Draft or OrderSlipStatuses.Approved or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived).ToString() + " Active")"
                 Badge2="@(slips?.Count(s => s.Status == OrderSlipStatuses.Completed).ToString() + " Completed")">

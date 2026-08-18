@@ -57,7 +57,7 @@ public class AppointmentRepository
 
         if (!string.IsNullOrEmpty(mechanic) && mechanic != "Any Available")
         {
-            query = query.Where(a => a.MechanicName == mechanic);
+            query = query.Where(a => a.MechanicName == mechanic || a.MechanicName == "Any Available");
         }
 
         return await query.ToListAsync();

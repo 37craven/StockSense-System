@@ -57,11 +57,11 @@
         --color-green-accent-bg: oklch(0.95 0.02 150);
         /* --- Strong status colors (solid buttons, both modes) --- */
         --status-success-strong: oklch(0.52 0.20 150);
-        --status-warning-strong: oklch(0.72 0.20 85);
+        --status-warning-strong: oklch(0.58 0.21 60);
         --status-danger-strong: oklch(0.56 0.24 27);
         --status-info-strong: oklch(0.52 0.20 252);
         --status-success-strong-foreground: oklch(1 0 0);
-        --status-warning-strong-foreground: oklch(0.25 0.07 80);
+        --status-warning-strong-foreground: oklch(1 0 0);
         --status-danger-strong-foreground: oklch(1 0 0);
         --status-info-strong-foreground: oklch(1 0 0);
         --status-purple-strong: oklch(0.55 0.16 280);
@@ -199,11 +199,11 @@
         --color-green-accent-bg: oklch(0.25 0.03 150);
         /* --- Strong status colors (solid buttons, both modes) --- */
         --status-success-strong: oklch(0.52 0.17 150);
-        --status-warning-strong: oklch(0.78 0.19 85);
+        --status-warning-strong: oklch(0.58 0.20 60);
         --status-danger-strong: oklch(0.56 0.22 27);
         --status-info-strong: oklch(0.52 0.17 252);
         --status-success-strong-foreground: oklch(1 0 0);
-        --status-warning-strong-foreground: oklch(0.15 0.04 80);
+        --status-warning-strong-foreground: oklch(1 0 0);
         --status-danger-strong-foreground: oklch(1 0 0);
         --status-info-strong-foreground: oklch(1 0 0);
         /* --- Charts --- */

@@ -109,7 +109,7 @@ public class AppointmentsController : ControllerBase
                 var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
                 var conflict = existing.Any(a =>
                     TimeSpan.TryParse(a.TimeSlot, out var existingStart) &&
-                    (requestedStart < existingStart.Add(TimeSpan.FromMinutes(a.DurationMinutes))) &&
+                    (requestedStart < existingStart.Add(TimeSpan.FromMinutes(Math.Max(a.DurationMinutes, 15)))) &&
                     (requestedEnd > existingStart));
                 if (conflict)
                     return Conflict(ApiResponse.Error("The selected time slot overlaps with an existing booking."));

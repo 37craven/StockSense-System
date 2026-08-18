@@ -19,9 +19,10 @@ public sealed class CustomerBookingAppointmentAccessibilityTests
         var component = ReadBookingComponent();
 
         Assert.Contains("text-xl font-black text-foreground tracking-tight", component, StringComparison.Ordinal);
-        Assert.Contains("text-lg font-black text-foreground", component, StringComparison.Ordinal);
-        Assert.Contains("p-3 mt-auto flex flex-col gap-1 bg-muted", component, StringComparison.Ordinal);
-        Assert.Contains("flex justify-between text-xs text-foreground", component, StringComparison.Ordinal);
+        Assert.Contains("service-management-card__footer", component, StringComparison.Ordinal);
+        Assert.Contains("service-management-card__title", component, StringComparison.Ordinal);
+        Assert.Contains("service-management-card__category", component, StringComparison.Ordinal);
+        Assert.Contains("₱@service.TotalServicePrice.ToString(\"N0\")", component, StringComparison.Ordinal);
         Assert.DoesNotContain("background-color: color-mix(in oklch, var(--card) 80%, var(--muted))", component, StringComparison.Ordinal);
     }
 
