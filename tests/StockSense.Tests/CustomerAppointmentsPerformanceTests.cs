@@ -16,7 +16,7 @@ public sealed class CustomerAppointmentsPerformanceTests
         Assert.DoesNotContain("@inject HttpClient Http", page, StringComparison.Ordinal);
         Assert.Contains("stockSenseApi.getJson", page, StringComparison.Ordinal);
         Assert.Contains("stockSenseApi.put", page, StringComparison.Ordinal);
-        Assert.Contains("put: async function(url)", app, StringComparison.Ordinal);
+        Assert.Contains("js/stockSenseApi.js", app, StringComparison.Ordinal);
         Assert.Contains("@if (showDetailModal)", page, StringComparison.Ordinal);
     }
 

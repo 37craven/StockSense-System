@@ -336,6 +336,16 @@ app.Use(async (context, next) =>
 
     await next(context);
 });
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        SecurityHeaderPolicy.Apply(context.Response);
+        return Task.CompletedTask;
+    });
+
+    await next(context);
+});
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = context =>
