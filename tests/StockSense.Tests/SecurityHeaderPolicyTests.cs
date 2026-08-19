@@ -56,6 +56,7 @@ public sealed class SecurityHeaderPolicyTests
         var permissions = response.Headers["Permissions-Policy"].ToString();
         Assert.Contains("camera=(self)", permissions);
         Assert.Contains("geolocation=()", permissions);
+        Assert.Contains("unload=(self)", permissions);
         Assert.DoesNotContain("camera=*", permissions);
     }
 }

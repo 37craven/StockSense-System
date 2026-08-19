@@ -17,9 +17,10 @@ public static class SecurityHeaderPolicy
         " form-action 'self'";
 
     // ponytail: camera=(self) keeps the POS barcode scanner (getUserMedia) working;
-    // everything else is denied to third-party origins.
+    // unload=(self) is required by Blazor's beforeunload handler (SignalR connection
+    // cleanup); everything else is denied to third-party origins.
     private const string PermissionsPolicyValue =
-        "camera=(self), geolocation=(), microphone=(), payment=(), usb=()";
+        "camera=(self), geolocation=(), microphone=(), payment=(), usb=(), unload=(self)";
 
     public static void Apply(HttpResponse response)
     {

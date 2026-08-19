@@ -274,6 +274,21 @@ input[type="number"] {
     }
 }
 
+/* ≤749px: narrow portrait tablets get the mobile customer nav */
+@media (max-width: 749px) {
+    .navbar-desktop-nav {
+        display: none !important;
+    }
+
+    .navbar-mobile-trigger {
+        display: flex !important;
+    }
+
+    .header-wrapper {
+        padding: 0 1rem;
+    }
+}
+
 /* ≤640px: mobile navbar & settings */
 @media (max-width: 640px) {
     .navbar-desktop-nav {

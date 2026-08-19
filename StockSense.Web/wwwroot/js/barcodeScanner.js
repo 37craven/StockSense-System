@@ -1,6 +1,6 @@
 window.barcodeScanner = (function () {
     const html5QrcodeScriptUrl =
-        "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+        "js/vendor/html5-qrcode.min.js";
     let html5QrcodeLoadPromise = null;
     let html5QrCode = null;
     let dotNetRef = null;
@@ -1007,6 +1007,24 @@ await ensureHtml5QrcodeLoaded();
 
 
     // ============================================================
+    // VIEWPORT QUERIES (CSP-safe replacements for eval)
+    // ============================================================
+
+    function getViewportSize() {
+        return {
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+    }
+
+    function isDesktopScanner() {
+        return window.matchMedia(
+            "(min-width: 1280px) and (hover: hover) and (pointer: fine)"
+        ).matches;
+    }
+
+
+    // ============================================================
     // PUBLIC API USED BY BLAZOR
     // ============================================================
 
@@ -1016,6 +1034,8 @@ await ensureHtml5QrcodeLoaded();
         stop,
         restartAfterViewportChange,
         watchViewport,
-        unwatchViewport
+        unwatchViewport,
+        getViewportSize,
+        isDesktopScanner
     };
 })();

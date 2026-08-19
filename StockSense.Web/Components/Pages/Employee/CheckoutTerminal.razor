@@ -500,6 +500,7 @@
     </div>;
 
     private ProductCatalog? catalog;
+    private sealed record ViewportSize(int Width, int Height);
     private List<Product> catalogProducts = [];
     private List<CartItemDto> cart = new();
     private bool isProcessing = false;
@@ -537,12 +538,21 @@
     {
         if (firstRender)
         {
-            _lastViewportWidth = await JS.InvokeAsync<int>("eval", "window.innerWidth");
-            _lastViewportHeight = await JS.InvokeAsync<int>("eval", "window.innerHeight");
+            _lastViewportWidth = 0;
+            _lastViewportHeight = 0;
 
-            var useDesktopScanner = await JS.InvokeAsync<bool>(
-                "eval",
-                "window.matchMedia('(min-width: 1280px) and (hover: hover) and (pointer: fine)').matches");
+            try
+            {
+                var viewport = await JS.InvokeAsync<ViewportSize>("barcodeScanner.getViewportSize");
+                _lastViewportWidth = viewport.Width;
+                _lastViewportHeight = viewport.Height;
+            }
+            catch (JSException)
+            {
+                // barcodeScanner is lazy-loaded; fall back to the watchViewport callback.
+            }
+
+            var useDesktopScanner = await JS.InvokeAsync<bool>("barcodeScanner.isDesktopScanner");
 
             _scannerElementId = useDesktopScanner
                 ? "barcode-camera-container"
@@ -1099,6 +1109,7 @@
         right: 1rem;
         bottom: auto;
         transition: none;
+        z-index: 40;
     }
 
     .pos-wrapper.scanner-open .pos-mobile-cart-btn {
@@ -1108,6 +1119,7 @@
 
     .pos-scanner-mobile {
         display: block;
+        z-index: 30;
     }
 
     .pos-camera-preview {

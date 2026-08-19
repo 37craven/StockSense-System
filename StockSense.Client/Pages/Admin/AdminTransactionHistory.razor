@@ -270,6 +270,7 @@
 
     .txn-mobile-card:last-child { border-bottom: 0; }
     .txn-mobile-card:hover { background: color-mix(in srgb, #3b82f6 5%, transparent); }
+    .row-clickable:hover { background-color: color-mix(in oklch, var(--primary) 5%, transparent); }
     .txn-row-voided td { color: var(--muted-foreground) !important; }
     .txn-mobile-card-voided .txn-mobile-invoice,
     .txn-mobile-card-voided .txn-mobile-total,
@@ -423,10 +424,8 @@
                         @foreach (var txn in DisplayTransactions)
                         {
                             <tr @onclick="() => OpenDetail(txn)"
-                                class="@(txn.IsVoided ? "txn-row-voided" : "")"
-                                style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;"
-                                onmouseover="this.style.backgroundColor='color-mix(in oklch, var(--primary) 5%, transparent)'"
-                                onmouseout="this.style.backgroundColor='transparent'">
+                                class="@(txn.IsVoided ? "txn-row-voided row-clickable" : "row-clickable")"
+                                style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;">
                                 <td style="padding: 12px 16px; color: var(--foreground); font-weight: 500;" class="col-inv">
                                     @txn.InvoiceNumber
                                     @if (txn.IsVoided)

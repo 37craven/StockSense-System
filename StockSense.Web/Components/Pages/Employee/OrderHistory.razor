@@ -931,8 +931,7 @@
                 RowVersion = closingSlip.RowVersion
             };
             var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command)));
-            var script = $"(async()=>{{const r=await fetch('/api/order-slips/{closingSlip.Id}/close-remaining',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:atob('{payload}')}});return JSON.stringify({{ok:r.ok,status:r.status,body:await r.text()}});}})()";
-            var raw = await JS.InvokeAsync<string>("eval", script);
+            var raw = await JS.InvokeAsync<string>("stockSenseApi.postJsonBase64", $"/api/order-slips/{closingSlip.Id}/close-remaining", payload);
             var response = JsonSerializer.Deserialize<ApiTransitionResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (response?.Ok != true)
             {
@@ -1015,8 +1014,7 @@
                 ExpectedDeliveryDate = expectedDate
             };
             var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command)));
-            var script = $"(async()=>{{const r=await fetch('/api/order-slips/{transitioningSlip.Id}/{route}',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:atob('{payload}')}});return JSON.stringify({{ok:r.ok,status:r.status,body:await r.text()}});}})()";
-            var raw = await JS.InvokeAsync<string>("eval", script);
+            var raw = await JS.InvokeAsync<string>("stockSenseApi.postJsonBase64", $"/api/order-slips/{transitioningSlip.Id}/{route}", payload);
             var response = JsonSerializer.Deserialize<ApiTransitionResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (response?.Ok != true)
             {

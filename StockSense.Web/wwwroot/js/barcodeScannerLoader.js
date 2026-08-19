@@ -1,6 +1,6 @@
 (function () {
     const scannerScriptUrl =
-        "js/barcodeScanner.js?v=20260817-lazy-scanner-1";
+        "js/barcodeScanner.js?v=20260819-local-html5qrcode-1";
     let scannerLoadPromise = null;
 
     function ensureScannerLoaded() {
@@ -44,7 +44,9 @@
         restartAfterViewportChange: (...args) =>
             invoke("restartAfterViewportChange", args),
         watchViewport: (...args) => invoke("watchViewport", args),
-        unwatchViewport: (...args) => invoke("unwatchViewport", args)
+        unwatchViewport: (...args) => invoke("unwatchViewport", args),
+        getViewportSize: (...args) => invoke("getViewportSize", args),
+        isDesktopScanner: (...args) => invoke("isDesktopScanner", args)
     };
 
     window.barcodeScanner = facade;

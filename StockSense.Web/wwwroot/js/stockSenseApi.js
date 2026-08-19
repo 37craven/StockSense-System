@@ -68,6 +68,23 @@ window.stockSenseApi = {
             body: await response.text()
         };
     },
+    postJsonBase64: async function(url, payloadBase64) {
+        const response = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: atob(payloadBase64)
+        });
+
+        return JSON.stringify({
+            ok: response.ok,
+            status: response.status,
+            body: await response.text()
+        });
+    },
     put: async function(url) {
         const response = await fetch(url, {
             method: 'PUT',
