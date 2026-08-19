@@ -164,28 +164,21 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("{id}/barcode-pdf")]
-    public async Task<IActionResult> GetBarcodePdf(int id, [FromQuery] string format = "both")
+    public async Task<IActionResult> GetBarcodePdf(int id)
     {
-        format = format.Trim().ToLowerInvariant();
-        if (format is not ("barcode" or "qr" or "both"))
-            return BadRequest(ApiResponse.Error("Format must be barcode, qr, or both."));
-
         var product = await _productRepo.GetByIdAsync(id);
         if (product == null) return NotFound(ApiResponse.NotFound("Product"));
 
-        var needsBarcode = format is "barcode" or "both";
-        if (needsBarcode && !BarcodeService.IsValidEan13(product.Barcode))
+        if (!BarcodeService.IsValidEan13(product.Barcode))
         {
             product.Barcode = BarcodeService.GenerateBarcodeValue(product.Id);
             await _productRepo.SaveChangesAsync();
         }
 
-        var barcodePng = needsBarcode ? _barcodeService.GenerateBarcodeImage(product.Barcode!) : null;
-        var qrPng = format is "qr" or "both" ? _barcodeService.GenerateQrCodeImage(product) : null;
-        var pdfBytes = _barcodeService.GenerateBarcodeLabelPdf(product, barcodePng, qrPng, format);
+        var barcodePng = _barcodeService.GenerateBarcodeImage(product.Barcode!);
+        var pdfBytes = _barcodeService.GenerateBarcodeLabelPdf(product, barcodePng);
         var safeName = string.Concat(product.Name.Split(Path.GetInvalidFileNameChars()));
-        var prefix = format == "qr" ? "QR_" : "Barcode_";
-        return File(pdfBytes, "application/pdf", $"{prefix}{safeName}.pdf");
+        return File(pdfBytes, "application/pdf", $"Barcode_{safeName}.pdf");
     }
 
     [HttpPut("{id}")]

@@ -396,7 +396,7 @@
                     }
                 </div>
             </div>
-            <div class="detail-footer flex-wrap gap-2"><BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateDetail" Disabled="ModalOperationLocked"><LucideIcon Name="refresh-cw" Size="14" /> Recalculate</BbButton><span class="footer-spacer"></span><BbButton Variant="ButtonVariant.Ghost" OnClick="() => DownloadBarcodePdf(selectedRow.ProductId, selectedRow.ProductName)" aria-label="Download barcode"><LucideIcon Name="barcode" Size="14" /></BbButton><BbButton Variant="ButtonVariant.Ghost" OnClick="() => DownloadQrPdf(selectedRow.ProductId, selectedRow.ProductName)" aria-label="Download QR"><LucideIcon Name="qr-code" Size="14" /></BbButton><BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDetails" Disabled="ModalOperationLocked">Close</BbButton></div>
+            <div class="detail-footer flex-wrap gap-2"><BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateDetail" Disabled="ModalOperationLocked"><LucideIcon Name="refresh-cw" Size="14" /> Recalculate</BbButton><span class="footer-spacer"></span><BbButton Variant="ButtonVariant.Ghost" OnClick="() => DownloadBarcodePdf(selectedRow.ProductId, selectedRow.ProductName)" aria-label="Download barcode"><LucideIcon Name="barcode" Size="14" /></BbButton><BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDetails" Disabled="ModalOperationLocked">Close</BbButton></div>
         }
     </BbDialogContent>
 </BbDialog>
@@ -755,12 +755,7 @@
     private async Task DownloadBarcodePdf(int productId, string productName)
     {
         var safeName = string.Concat(productName.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
-        await JS.InvokeVoidAsync("triggerDownload", $"api/products/{productId}/barcode-pdf?format=barcode", $"Barcode_{safeName}.pdf");
-    }
-    private async Task DownloadQrPdf(int productId, string productName)
-    {
-        var safeName = string.Concat(productName.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
-        await JS.InvokeVoidAsync("triggerDownload", $"api/products/{productId}/barcode-pdf?format=qr", $"QR_{safeName}.pdf");
+        await JS.InvokeVoidAsync("triggerDownload", $"api/products/{productId}/barcode-pdf", $"Barcode_{safeName}.pdf");
     }
     private async Task OpenDetails(InventoryDashboardRowDto row)
     {

@@ -302,10 +302,14 @@
                     }
                 </div>
                 <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                    <dt class="text-muted-foreground">Items</dt><dd class="m-0 text-right font-medium">@cart.Sum(item => item.Quantity)</dd>
-                    <dt class="text-muted-foreground">Payment</dt><dd class="m-0 text-right font-medium">@paymentMethod</dd>
-                    <dt class="text-muted-foreground">Reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(referenceNumber) ? "None" : referenceNumber)</dd>
-                    <dt class="text-base font-semibold">Total</dt><dd class="m-0 text-right text-lg font-bold text-primary">₱@TotalAmount.ToString("N2")</dd>
+                    <dt class="text-muted-foreground">Items</dt>
+                    <dd class="m-0 text-right font-medium">@cart.Sum(item => item.Quantity)</dd>
+                    <dt class="text-muted-foreground">Payment</dt>
+                    <dd class="m-0 text-right font-medium">@paymentMethod</dd>
+                    <dt class="text-muted-foreground">Reference</dt>
+                    <dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(referenceNumber) ? "None" : referenceNumber)</dd>
+                    <dt class="text-base font-semibold">Total</dt>
+                    <dd class="m-0 text-right text-lg font-bold text-primary">₱@TotalAmount.ToString("N2")</dd>
                 </dl>
             </div>
 
@@ -435,12 +439,12 @@
     </div>;
 
     private RenderFragment ScannerHeader() =>
-    @<div class="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
-        <div class="flex items-center gap-2">
+    @<div class="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
             <LucideIcon Name="scan-line" Size="16" />
-            <span class="text-sm font-semibold text-foreground">Barcode Scanner</span>
+            <span class="text-sm font-semibold text-foreground truncate">Barcode Scanner</span>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 shrink-0">
             <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleCamera" title="Flip camera">
                 <LucideIcon Name="switch-camera" Size="16" />
             </BbButton>
@@ -458,9 +462,15 @@
 
         @if (!string.IsNullOrEmpty(scanErrorMessage))
         {
-            <div class="flex items-center gap-2 py-2 px-3 rounded-md text-xs bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
-                <LucideIcon Name="camera-off" Size="14" />
-                <span>@scanErrorMessage</span>
+            <div class="flex flex-col gap-1 py-2 px-3 rounded-md text-xs bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+                <div class="flex items-center gap-2">
+                    <LucideIcon Name="camera-off" Size="14" />
+                    <span>@scanErrorMessage</span>
+                </div>
+                @if (!string.IsNullOrEmpty(scanErrorDetail))
+                {
+                    <span class="opacity-70 break-all">@scanErrorDetail</span>
+                }
             </div>
         }
         else if (scannedProduct != null)
@@ -521,7 +531,11 @@
     private bool scannerEnabled = false;
     private Product? scannedProduct;
     private string? scanErrorMessage;
+    private string? scanErrorDetail;
     private int scanQuantity = 1;
+    private CancellationTokenSource? _scanMessageCts;
+    private string? _lastHandledBarcode;
+    private DateTimeOffset _lastHandledAt;
     private DotNetObjectReference<CheckoutTerminal>? dotNetRef;
     private DotNetObjectReference<CheckoutTerminal>? viewportDotNetRef;
     private string _scannerElementId = "barcode-camera-container";
@@ -562,6 +576,24 @@
 
             try
             {
+                /*
+                 * Mobile browsers only show the camera permission prompt
+                 * inside a real tap. Blazor's @bind goes through a server
+                 * round-trip first, so request the permission from a
+                 * native click listener on the toggle instead.
+                 */
+                await JS.InvokeVoidAsync(
+                    "barcodeScanner.requestPermissionOnToggle",
+                    "scanner-toggle");
+            }
+            catch (JSException)
+            {
+                // Old cached barcodeScanner.js without the function;
+                // the scanner will still request permission on start().
+            }
+
+            try
+            {
                 await JS.InvokeVoidAsync(
                     "barcodeScanner.watchViewport",
                     viewportDotNetRef);
@@ -582,6 +614,7 @@
         {
             _scannerRestartPending = false;
             scanErrorMessage = null;
+            scanErrorDetail = null;
 
             dotNetRef?.Dispose();
             dotNetRef = DotNetObjectReference.Create(this);
@@ -610,6 +643,7 @@
         {
             _scannerStartAttempted = true;
             scanErrorMessage = null;
+            scanErrorDetail = null;
             dotNetRef = DotNetObjectReference.Create(this);
 
             try
@@ -720,18 +754,147 @@
         }
     }
 
-    // Called from barcodeScanner.js every time a barcode is recognized in frame.
+    // Called from barcodeScanner.js for non-error notices (e.g., no other camera available).
+    [JSInvokable]
+    public async Task OnScannerInfo(string message)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            scanErrorMessage = message;
+            scanErrorDetail = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // Called from barcodeScanner.js whenever a barcode is decoded.
     [JSInvokable]
     public async Task OnBarcodeScanned(string barcode)
     {
-        if (scannedProduct != null && scannedProduct.Barcode == barcode)
-            return;
+        try
+        {
+            Console.WriteLine(
+                $"[BarcodeScanner] Decoded value received: '{barcode}'");
 
-        var product = await ProductRepo.GetActiveByBarcodeAsync(barcode);
-        scanErrorMessage = product == null ? $"No product found for barcode \"{barcode}\"." : null;
-        scannedProduct = product;
-        scanQuantity = 1;
-        await InvokeAsync(StateHasChanged);
+            if (string.IsNullOrWhiteSpace(barcode))
+            {
+                scanErrorMessage = "The scanner returned an empty value.";
+                scanErrorDetail = null;
+                scannedProduct = null;
+
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            barcode = barcode.Trim();
+
+            // Ignore repeated decodes of the same code within the
+            // cooldown window regardless of the outcome (found, not
+            // found, inactive, out of stock). Without this, a
+            // "not found" code re-fires on every JS decode window and
+            // keeps resetting the auto-dismiss timer for the error
+            // banner, so the error would never go away.
+            var now = DateTimeOffset.UtcNow;
+
+            if (
+                string.Equals(
+                    _lastHandledBarcode,
+                    barcode,
+                    StringComparison.OrdinalIgnoreCase) &&
+                now - _lastHandledAt < TimeSpan.FromSeconds(2.5))
+            {
+                return;
+            }
+
+            _lastHandledBarcode = barcode;
+            _lastHandledAt = now;
+
+            // Prevent the same code from reopening the same product
+            // repeatedly while the camera is still pointed at it.
+            if (
+                scannedProduct != null &&
+                string.Equals(
+                    scannedProduct.Barcode,
+                    barcode,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var product =
+                await ProductRepo.GetActiveByBarcodeAsync(barcode);
+
+            if (product == null)
+            {
+                Console.WriteLine(
+                    $"[BarcodeScanner] No product found for: '{barcode}'");
+
+                scanErrorMessage =
+                    $"No product found for barcode \"{barcode}\".";
+
+                scanErrorDetail =
+                    $"Decoded value: {barcode}";
+
+                // Keep the currently displayed product (if any) so a
+                // stray miss does not wipe the card mid-scan. The
+                // error banner auto-dismisses.
+                await InvokeAsync(StateHasChanged);
+
+                _ = AutoDismissScanMessageAsync(scanErrorMessage!, 4000);
+                return;
+            }
+
+            Console.WriteLine(
+                $"[BarcodeScanner] Product found: {product.Name}");
+
+            if (!product.IsActive)
+            {
+                scanErrorMessage =
+                    $"Product \"{product.Name}\" is inactive.";
+
+                scanErrorDetail = null;
+                scannedProduct = null;
+
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (product.CurrentStock <= 0)
+            {
+                scanErrorMessage =
+                    $"Product \"{product.Name}\" is out of stock.";
+
+                scanErrorDetail = null;
+                scannedProduct = product;
+                scanQuantity = 1;
+
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            scannedProduct = product;
+            scanQuantity = 1;
+            scanErrorMessage = null;
+            scanErrorDetail = null;
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(
+                ex,
+                "Error processing scanned barcode/QR value.");
+
+            scanErrorMessage =
+                "The scanned code could not be processed.";
+
+            scanErrorDetail =
+                ex.Message;
+
+            scannedProduct = null;
+            scanQuantity = 1;
+
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     // Called from barcodeScanner.js when the camera/scanner starts successfully.
@@ -739,7 +902,33 @@
     public async Task OnScannerStarted()
     {
         scanErrorMessage = null;
+        scanErrorDetail = null;
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AutoDismissScanMessageAsync(string message, int delayMs)
+    {
+        _scanMessageCts?.Cancel();
+        _scanMessageCts?.Dispose();
+
+        var cts = new CancellationTokenSource();
+        _scanMessageCts = cts;
+
+        try
+        {
+            await Task.Delay(delayMs, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (scanErrorMessage == message)
+        {
+            scanErrorMessage = null;
+            scanErrorDetail = null;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     // Called from barcodeScanner.js if the camera fails to start.
@@ -747,6 +936,8 @@
     public async Task OnScannerError(string message)
     {
         Logger.LogWarning("Barcode scanner could not start: {ScannerMessage}", message);
+
+        scanErrorDetail = null;
 
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -765,9 +956,10 @@
             scanErrorMessage = "No camera was found on this device.";
         }
         else if (message.Contains("NotReadable", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("being used", StringComparison.OrdinalIgnoreCase))
+                 message.Contains("being used", StringComparison.OrdinalIgnoreCase) ||
+                 message.Contains("busy", StringComparison.OrdinalIgnoreCase))
         {
-            scanErrorMessage = "The camera is unavailable or is being used by another application.";
+            scanErrorMessage = "The camera is busy or being used by another application. Wait a moment and try switching cameras again.";
         }
         else if (message.Contains("HTTPS", StringComparison.OrdinalIgnoreCase) ||
                  message.Contains("secure", StringComparison.OrdinalIgnoreCase))
@@ -784,22 +976,48 @@
 
     private void ConfirmScannedItem()
     {
-        if (scannedProduct == null || !scannedProduct.IsActive || scannedProduct.CurrentStock <= 0) return;
-        for (var i = 0; i < scanQuantity; i++)
+        if (
+            scannedProduct == null ||
+            !scannedProduct.IsActive ||
+            scannedProduct.CurrentStock <= 0)
+        {
+            return;
+        }
+
+        var quantity =
+            Math.Clamp(
+                scanQuantity,
+                1,
+                scannedProduct.CurrentStock);
+
+        for (var i = 0; i < quantity; i++)
+        {
             AddToCart(scannedProduct);
+        }
+
+        statusMessage =
+            $"{scannedProduct.Name} added to the order.";
+
         scannedProduct = null;
         scanQuantity = 1;
+        scanErrorMessage = null;
+        scanErrorDetail = null;
     }
 
     private void DiscardScannedItem()
     {
         scannedProduct = null;
         scanErrorMessage = null;
+        scanErrorDetail = null;
         scanQuantity = 1;
     }
 
     public async ValueTask DisposeAsync()
     {
+        _scanMessageCts?.Cancel();
+        _scanMessageCts?.Dispose();
+        _scanMessageCts = null;
+
         receiptCloseCts?.Cancel();
         receiptCloseCts?.Dispose();
         receiptCloseCts = null;
@@ -926,7 +1144,24 @@
 
     private void IncrementQty(CartItemDto item)
     {
-        item.Quantity++;
+        var product =
+            catalogProducts.FirstOrDefault(
+                p => p.Id == item.ProductId);
+
+        if (product == null)
+        {
+            return;
+        }
+
+        if (item.Quantity < product.CurrentStock)
+        {
+            item.Quantity++;
+        }
+        else
+        {
+            statusMessage =
+                $"Limit reached: Only {product.CurrentStock} of {product.Name} in stock.";
+        }
     }
 
     private bool checkoutConfirmationOpen;
@@ -1083,8 +1318,13 @@
     }
 
     @@keyframes receipt-countdown-shrink {
-        from { width: 100%; }
-        to { width: 0%; }
+        from {
+            width: 100%;
+        }
+
+        to {
+            width: 0%;
+        }
     }
 
     .pos-wrapper {
@@ -1125,18 +1365,32 @@
     .pos-camera-preview {
         display: block;
         width: 100%;
-        height: 180px;
-        min-height: 180px;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        min-height: 0;
         position: relative;
         background: #000;
     }
 
-        .pos-camera-preview video,
-        .pos-camera-preview canvas {
+    .pos-camera-preview {
+        overflow: hidden !important;
+    }
+
+        .pos-camera-preview video {
             width: 100% !important;
             height: 100% !important;
+            min-width: 100% !important;
+            min-height: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
             display: block !important;
-            object-fit: cover;
+            object-fit: cover !important;
+            object-position: center center !important;
+            background: transparent !important;
+        }
+
+        .pos-camera-preview canvas {
+            opacity: 0 !important;
         }
 
     @@media (max-width: 767px) {
@@ -1163,8 +1417,11 @@
         }
 
         .pos-camera-preview {
-            height: 170px;
-            min-height: 170px;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            min-height: 0;
+            max-height: 55dvh;
         }
     }
 
@@ -1215,8 +1472,13 @@
             }
 
         .pos-camera-preview {
-            height: 190px;
-            min-height: 190px;
+            width: min(100%, 520px);
+            height: auto;
+            aspect-ratio: 16 / 9;
+            min-height: 0;
+            max-height: 55dvh;
+            margin-left: auto;
+            margin-right: auto;
         }
     }
 
@@ -1229,17 +1491,28 @@
 
         .pos-camera-preview {
             width: min(100%, 520px);
-            height: 220px;
-            min-height: 220px;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            min-height: 0;
+            max-height: 55dvh;
             margin-left: auto;
             margin-right: auto;
         }
 
-            .pos-camera-preview video,
-            .pos-camera-preview canvas {
+            .pos-camera-preview video {
                 width: 100% !important;
                 height: 100% !important;
-                object-fit: cover;
+                min-width: 100% !important;
+                min-height: 100% !important;
+                max-width: none !important;
+                max-height: none !important;
+                object-fit: cover !important;
+                object-position: center center !important;
+                background: transparent !important;
+            }
+
+            .pos-camera-preview canvas {
+                opacity: 0 !important;
                 background: transparent;
             }
 
@@ -1303,17 +1576,28 @@
 
         .pos-camera-preview {
             width: min(100%, 520px);
-            height: 220px;
-            min-height: 220px;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            min-height: 0;
+            max-height: 55dvh;
             margin-left: auto;
             margin-right: auto;
         }
 
-            .pos-camera-preview video,
-            .pos-camera-preview canvas {
+            .pos-camera-preview video {
                 width: 100% !important;
                 height: 100% !important;
-                object-fit: cover;
+                min-width: 100% !important;
+                min-height: 100% !important;
+                max-width: none !important;
+                max-height: none !important;
+                object-fit: cover !important;
+                object-position: center center !important;
+                background: transparent !important;
+            }
+
+            .pos-camera-preview canvas {
+                opacity: 0 !important;
                 background: transparent;
             }
 

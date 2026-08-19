@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script src="js/themeInit.js?v=20260818-security-headers"></script>
+    <script src="/js/themeInit.js?v=20260818-security-headers"></script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="styles/tailwind.css" />
-    <link rel="stylesheet" href="styles/app.css?v=20260819-nav-breakpoint-2" />
+    <link rel="stylesheet" href="/styles/tailwind.css" />
+    <link rel="stylesheet" href="/styles/app.css?v=20260820-canvas-hidden-1" />
 
     <link href="_content/BlazorBlueprint.Components/blazorblueprint.css" rel="stylesheet" />
-    <link rel="stylesheet" href="styles/theme.css?v=20260817-a11y-tokens" />
-    <link rel="stylesheet" href="StockSense.Web.styles.css" />
+    <link rel="stylesheet" href="/styles/theme.css?v=20260817-a11y-tokens" />
+    <link rel="stylesheet" href="/StockSense.Web.styles.css" />
 
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <HeadOutlet />
 </head>
 <body>
@@ -25,19 +25,19 @@
         <AntiforgeryToken />
     </form>
 
-<script src="js/stockSenseApi.js?v=20260819-no-eval-1"></script>
+<script src="/js/stockSenseApi.js?v=20260819-no-eval-1"></script>
     @if (!IsStaticCustomerSettingsRequest)
     {
         <script src="_framework/blazor.web.js" defer></script>
-        <script src="js/barcodeScannerLoader.js?v=20260819-local-html5qrcode-1" defer></script>
+        <script src="/js/barcodeScannerLoader.js?v=20260820-barcode-only-8" defer></script>
     }
-    <script src="js/passwordVisibility.js?v=20260810-password-toggle-2" defer></script>
+    <script src="/js/passwordVisibility.js?v=20260810-password-toggle-2" defer></script>
 
-    <script src="js/iconAccessibility.js?v=20260818-security-headers"></script>
+    <script src="/js/iconAccessibility.js?v=20260818-security-headers"></script>
 
-    <script src="js/titleEnforcer.js?v=20260818-security-headers"></script>
+    <script src="/js/titleEnforcer.js?v=20260818-security-headers"></script>
 
-    <script src="js/downloadHelpers.js?v=20260818-security-headers"></script>
+    <script src="/js/downloadHelpers.js?v=20260818-security-headers"></script>
 </body>
 </html>
 

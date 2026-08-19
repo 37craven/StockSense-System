@@ -68,35 +68,11 @@ public class BarcodeService
         return data.ToArray();
     }
 
-    /// <summary>Renders a QR code as a PNG image (bytes) — encodes the product's URL or barcode as fallback content.</summary>
-    public byte[] GenerateQrCodeImage(Product product)
+    /// <summary>Builds a printable one-page PDF label for a product with its barcode.</summary>
+    public byte[] GenerateBarcodeLabelPdf(Product product, byte[] barcodeImagePng)
     {
-        var writer = new BarcodeWriter
-        {
-            Format = BarcodeFormat.QR_CODE,
-            Options = new EncodingOptions
-            {
-                Width = 200,
-                Height = 200,
-                Margin = 10
-            }
-        };
-
-        using SKBitmap bitmap = writer.Write(product.Barcode ?? $"Sap Shop-{product.Id}");
-        using SKImage image = SKImage.FromBitmap(bitmap);
-        using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return data.ToArray();
-    }
-
-    /// <summary>Builds a printable one-page PDF label for a product with barcode and/or QR code.</summary>
-    public byte[] GenerateBarcodeLabelPdf(Product product, byte[]? barcodeImagePng, byte[]? qrCodeImagePng, string format = "both")
-    {
-        if (format is not ("barcode" or "qr" or "both"))
-            throw new ArgumentOutOfRangeException(nameof(format), "Format must be barcode, qr, or both.");
-        if (format is "barcode" or "both" && barcodeImagePng is null)
+        if (barcodeImagePng is null)
             throw new ArgumentNullException(nameof(barcodeImagePng));
-        if (format is "qr" or "both" && qrCodeImagePng is null)
-            throw new ArgumentNullException(nameof(qrCodeImagePng));
 
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -118,14 +94,7 @@ public class BarcodeService
                     .PaddingTop(10)
                     .Row(row =>
                     {
-                        if (format == "barcode" || format == "both")
-                        {
-                            row.RelativeItem(3).AlignCenter().AlignMiddle().Image(barcodeImagePng!).FitArea();
-                        }
-                        if (format == "qr" || format == "both")
-                        {
-                            row.RelativeItem(format == "both" ? 2 : 1).AlignCenter().AlignMiddle().Image(qrCodeImagePng!).FitArea();
-                        }
+                        row.RelativeItem(3).AlignCenter().AlignMiddle().Image(barcodeImagePng).FitArea();
                     });
             });
         }).GeneratePdf();

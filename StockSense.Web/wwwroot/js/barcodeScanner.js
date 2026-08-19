@@ -1,23 +1,101 @@
 window.barcodeScanner = (function () {
     const html5QrcodeScriptUrl =
-        "js/vendor/html5-qrcode.min.js";
+        "js/vendor/html5-qrcode.min.js?v=20260819-clean-qr-5";
     let html5QrcodeLoadPromise = null;
     let html5QrCode = null;
     let dotNetRef = null;
     let allCameras = [];
     let currentIndex = 0;
     let currentElementId = null;
+    let cameraPermission = null;
 
     let viewportDotNetRef = null;
     let viewportTimer = null;
     let viewportHandler = null;
 
     const config = {
-        fps: 10,
-        aspectRatio: 1.777
+        fps: 15,
+        /*
+         * Cap the camera stream at 720p.
+         *
+         * Phones default to 1080p+; decoding full-resolution frames is
+         * slow and unreliable on mobile. 720p is more than enough for
+         * barcodes and decodes fast.
+         *
+         * NOTE: this is the only valid place for width/height — the
+         * cameraIdOrConfig passed to start() must have exactly 1 key.
+         */
+        videoConstraints: {
+            facingMode: "environment",
+            width: { ideal: 1280, max: 1280 },
+            height: { ideal: 720, max: 720 }
+        }
     };
 
-function ensureHtml5QrcodeLoaded() {
+    /*
+     * The viewfinder is a wide horizontal strip: 1D barcodes are wide
+     * and short; a square crop slices the ends off and they never
+     * decode. The library decodes ONLY this region, so the strip must
+     * match how the user naturally holds the code.
+     */
+    function createQrbox() {
+        return (videoWidth, videoHeight) => {
+            const width = Math.max(160, videoWidth - 48);
+            const height = Math.max(
+                90,
+                Math.min(
+                    140,
+                    Math.round(videoHeight * 0.5)
+                )
+            );
+            return { width, height };
+        };
+    }
+
+    function scannerFormatsConfig() {
+        /*
+         * Restrict decoding to the 1D barcode formats supported by the
+         * scanner.
+         *
+         * useBarCodeDetectorIfSupported: false forces the built-in
+         * ZXing engine instead of the browser's native BarcodeDetector.
+         * The native detector on many Android devices only decodes QR
+         * codes (getSupportedFormats() returns just ["qr_code"]), which
+         * silently kills all 1D barcode scanning. ZXing handles every
+         * format in the list consistently, and with the restricted
+         * format set + qrbox crop it is fast enough.
+         *
+         * NOTE: formatsToSupport is only honored when passed to the
+         * Html5Qrcode CONSTRUCTOR, not to start(). The enum global only
+         * exists after the library script loads, so this is built
+         * lazily (the first constructor call happens after loading).
+         */
+        const barcodeFormats = [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.CODABAR
+        ];
+
+        return {
+            /*
+             * Force the built-in ZXing engine. The browser's native
+             * BarcodeDetector behaves inconsistently across devices: on
+             * many Android phones it only supports QR (silently killing
+             * 1D barcode scanning), and its detection quality varies.
+             * ZXing handles every format in the list consistently.
+             */
+            useBarCodeDetectorIfSupported: false,
+            formatsToSupport: barcodeFormats
+        };
+    }
+
+    function ensureHtml5QrcodeLoaded() {
         if (typeof window.Html5Qrcode === "function") {
             return Promise.resolve();
         }
@@ -59,7 +137,7 @@ function ensureHtml5QrcodeLoaded() {
     async function requestCameraPermission() {
         if (!window.isSecureContext) {
             throw new Error(
-                "Camera access requires HTTPS."
+                "Camera access requires HTTPS. Open this site with https:// (not http://), especially from phones and tablets."
             );
         }
 
@@ -69,6 +147,16 @@ function ensureHtml5QrcodeLoaded() {
         ) {
             throw new Error(
                 "Camera access is not supported by this browser."
+            );
+        }
+
+        if (cameraPermission === true) {
+            return true;
+        }
+
+        if (cameraPermission === false) {
+            throw new Error(
+                "Camera permission was denied or blocked."
             );
         }
 
@@ -90,6 +178,8 @@ function ensureHtml5QrcodeLoaded() {
                     audio: false
                 });
 
+            cameraPermission = true;
+
             /*
              * We only requested this temporary stream to obtain/check
              * camera permission.
@@ -107,6 +197,13 @@ function ensureHtml5QrcodeLoaded() {
                 "Camera permission request failed:",
                 err
             );
+
+            if (
+                err?.name === "NotAllowedError" ||
+                err?.name === "PermissionDeniedError"
+            ) {
+                cameraPermission = false;
+            }
 
             switch (err?.name) {
                 case "NotAllowedError":
@@ -180,6 +277,46 @@ function ensureHtml5QrcodeLoaded() {
     // NOTIFY BLAZOR ABOUT ERROR
     // ============================================================
 
+    function isTransientCameraError(err) {
+        const name = err?.name || "";
+        const message = err?.message || "";
+        return (
+            /NotReadable|TrackStart/i.test(name) ||
+            /device in use|being used|in use/i.test(message)
+        );
+    }
+
+    function friendlyErrorText(err) {
+        const name = err?.name || "";
+        const message = err?.message || String(err);
+
+        if (
+            /NotAllowed|PermissionDenied/i.test(name) ||
+            /permission|denied|blocked/i.test(message)
+        ) {
+            return "Camera permission is blocked. Allow camera access in your browser settings and try again.";
+        }
+        if (
+            /NotFound|DevicesNotFound/i.test(name) ||
+            /no camera/i.test(message)
+        ) {
+            return "No camera was found on this device.";
+        }
+        if (isTransientCameraError(err)) {
+            return "The camera is busy or being used by another application. Wait a moment and try switching cameras again.";
+        }
+        if (/Overconstrained|ConstraintNotSatisfied/i.test(name)) {
+            return "The requested camera is not available.";
+        }
+        if (/SecurityError/i.test(name)) {
+            return "The browser blocked camera access for security reasons.";
+        }
+        if (/AbortError/i.test(name)) {
+            return "Camera access was interrupted.";
+        }
+        return "The camera could not be started. Turn the scanner off and on, then try again.";
+    }
+
     async function notifyScannerError(err) {
         if (!dotNetRef) {
             return;
@@ -188,12 +325,36 @@ function ensureHtml5QrcodeLoaded() {
         try {
             await dotNetRef.invokeMethodAsync(
                 "OnScannerError",
-                err?.message || String(err)
+                friendlyErrorText(err)
             );
         }
         catch (callbackError) {
             console.warn(
                 "Unable to send scanner error to Blazor:",
+                callbackError
+            );
+        }
+    }
+
+
+    // ============================================================
+    // NOTIFY BLAZOR ABOUT A NON-ERROR SCANNER MESSAGE
+    // ============================================================
+
+    async function notifyScannerInfo(message) {
+        if (!dotNetRef) {
+            return;
+        }
+
+        try {
+            await dotNetRef.invokeMethodAsync(
+                "OnScannerInfo",
+                message
+            );
+        }
+        catch (callbackError) {
+            console.warn(
+                "Unable to send scanner info to Blazor:",
                 callbackError
             );
         }
@@ -211,6 +372,8 @@ function ensureHtml5QrcodeLoaded() {
             currentElementId = elementId;
             dotNetRef = dotNetHelper;
 
+            config.qrbox = createQrbox();
+
             const container =
                 document.getElementById(elementId);
 
@@ -220,7 +383,7 @@ function ensureHtml5QrcodeLoaded() {
                 );
             }
 
-await ensureHtml5QrcodeLoaded();
+            await ensureHtml5QrcodeLoaded();
 
             /*
              * Request / verify browser camera permission first.
@@ -229,8 +392,10 @@ await ensureHtml5QrcodeLoaded();
 
             container.innerHTML = "";
 
-            html5QrCode =
-                new Html5Qrcode(elementId);
+            html5QrCode = new Html5Qrcode(
+                elementId,
+                scannerFormatsConfig()
+            );
 
             /*
              * IMPORTANT:
@@ -244,6 +409,10 @@ await ensureHtml5QrcodeLoaded();
              * }
              *
              * because Html5Qrcode rejects that format.
+             *
+             * IMPORTANT: the cameraIdOrConfig object must have EXACTLY
+             * one key ("facingMode" or "deviceId"). width/height are NOT
+             * allowed here â€” they go in config.videoConstraints instead.
              */
             await html5QrCode.start(
                 {
@@ -275,9 +444,7 @@ await ensureHtml5QrcodeLoaded();
              */
             await notifyScannerStarted();
 
-            console.log(
-                "Barcode scanner started successfully."
-            );
+
 
             return true;
         }
@@ -396,10 +563,7 @@ await ensureHtml5QrcodeLoaded();
                         device.kind === "videoinput"
                 );
 
-            console.log(
-                "Available cameras:",
-                allCameras.length
-            );
+
         }
         catch (err) {
             console.warn(
@@ -473,30 +637,105 @@ await ensureHtml5QrcodeLoaded();
     // FLIP / CYCLE CAMERA
     // ============================================================
 
+    function currentCameraDeviceId() {
+        if (!currentElementId) {
+            return null;
+        }
+
+        try {
+            const video =
+                document
+                    .getElementById(currentElementId)
+                    ?.querySelector("video");
+
+            return (
+                video
+                    ?.srcObject
+                    ?.getVideoTracks?.()
+                    ?.[0]
+                    ?.getSettings?.()
+                    ?.deviceId || null
+            );
+        }
+        catch {
+            return null;
+        }
+    }
+
     async function cycleCamera(elementId) {
         try {
+            const previousDeviceId =
+                currentCameraDeviceId();
+
             if (allCameras.length === 0) {
                 await refreshCameraList();
             }
 
-            if (allCameras.length <= 1) {
-                console.log(
-                    "Only one camera is available."
+            if (allCameras.length === 0) {
+                await notifyScannerInfo(
+                    "No camera was found on this device. Turn the scanner off and on, then try again."
                 );
 
                 return;
             }
 
-            currentIndex =
-                (currentIndex + 1) %
-                allCameras.length;
+            if (allCameras.length === 1) {
+                await notifyScannerInfo(
+                    "No other camera is available. Turn the scanner off and on, then try again."
+                );
 
-            const camera =
-                allCameras[currentIndex];
+                return;
+            }
 
-            await switchToCamera(
-                camera.deviceId,
-                elementId || currentElementId
+            const targetElementId =
+                elementId || currentElementId;
+
+            /*
+             * Try every other camera before giving up. A listed
+             * camera can fail to start (e.g. an IR/webcam that the
+             * browser cannot grab), so skip it and try the next one.
+             */
+            const candidates =
+                allCameras.filter(
+                    camera =>
+                        camera.deviceId !==
+                        previousDeviceId
+                );
+
+            for (const camera of candidates) {
+                const switched =
+                    await switchToCamera(
+                        camera.deviceId,
+                        targetElementId
+                    );
+
+                if (switched) {
+                    return;
+                }
+            }
+
+            /*
+             * Nothing else worked — restart the camera that was
+             * working before, so the scanner is not left dead.
+             */
+            if (previousDeviceId) {
+                const restored =
+                    await switchToCamera(
+                        previousDeviceId,
+                        targetElementId
+                    );
+
+                if (restored) {
+                    await notifyScannerInfo(
+                        "The camera could not be switched, so the previous camera was restarted."
+                    );
+
+                    return;
+                }
+            }
+
+            await notifyScannerInfo(
+                "No other camera is available. Turn the scanner off and on, then try again."
             );
         }
         catch (err) {
@@ -521,7 +760,7 @@ await ensureHtml5QrcodeLoaded();
         elementId
     ) {
         if (!dotNetRef) {
-            return;
+            return false;
         }
 
         const savedDotNetRef =
@@ -540,7 +779,7 @@ await ensureHtml5QrcodeLoaded();
              */
             await new Promise(
                 resolve =>
-                    setTimeout(resolve, 350)
+                    setTimeout(resolve, 500)
             );
 
             const container =
@@ -549,12 +788,10 @@ await ensureHtml5QrcodeLoaded();
                 );
 
             if (!container) {
-                throw new Error(
-                    `Barcode scanner container "${targetElementId}" was not found.`
-                );
+                return false;
             }
 
-            container.innerHTML = "";
+            container.replaceChildren();
 
             currentElementId =
                 targetElementId;
@@ -562,27 +799,83 @@ await ensureHtml5QrcodeLoaded();
             dotNetRef =
                 savedDotNetRef;
 
-            html5QrCode =
-                new Html5Qrcode(
-                    targetElementId
+            /*
+             * IMPORTANT: the library IGNORES cameraIdOrConfig when
+             * config.videoConstraints is set (it prefers the config's
+             * constraints for getUserMedia). So the target deviceId
+             * must be carried inside videoConstraints, otherwise the
+             * switch silently restarts the SAME camera. Keep the 720p
+             * cap here too, or the switch would revert to full
+             * resolution and slow decoding back down.
+             */
+            const switchConfig = {
+                ...config,
+                videoConstraints: {
+                    deviceId: { exact: deviceId },
+                    width: { ideal: 1280, max: 1280 },
+                    height: { ideal: 720, max: 720 }
+                }
+            };
+
+            /*
+             * The previous camera stream can still hold the device
+             * for a moment (NotReadableError: "Device in use"),
+             * especially on mobile. Retry a few times before giving
+             * up on this camera.
+             */
+            let started = false;
+            let lastError = null;
+
+            for (let attempt = 0; attempt < 5 && !started; attempt++) {
+                html5QrCode =
+                    new Html5Qrcode(
+                        targetElementId,
+                        scannerFormatsConfig()
+                    );
+
+                try {
+                    await html5QrCode.start(
+                        {
+                            deviceId: {
+                                exact: deviceId
+                            }
+                        },
+                        switchConfig,
+
+                        decodedText => {
+                            onDecoded(decodedText);
+                        },
+
+                        () => {
+                            // No barcode detected in this frame.
+                        }
+                    );
+                    started = true;
+                }
+                catch (err) {
+                    lastError = err;
+                    await cleanupScanner();
+
+                    if (attempt < 4 && isTransientCameraError(err)) {
+                        await new Promise(
+                            resolve =>
+                                setTimeout(resolve, 1000)
+                        );
+                        container.replaceChildren();
+                        continue;
+                    }
+                }
+            }
+
+            if (!started) {
+                console.warn(
+                    "Camera switch failed for device:",
+                    deviceId,
+                    lastError
                 );
 
-            await html5QrCode.start(
-                {
-                    deviceId: {
-                        exact: deviceId
-                    }
-                },
-                config,
-
-                decodedText => {
-                    onDecoded(decodedText);
-                },
-
-                () => {
-                    // No barcode detected in this frame.
-                }
-            );
+                return false;
+            }
 
             await prepareVideoElement(
                 container
@@ -595,12 +888,10 @@ await ensureHtml5QrcodeLoaded();
              */
             await notifyScannerStarted();
 
-            console.log(
-                "Camera switched successfully."
-            );
+            return true;
         }
         catch (err) {
-            console.error(
+            console.warn(
                 "Camera switch failed:",
                 err
             );
@@ -608,9 +899,7 @@ await ensureHtml5QrcodeLoaded();
             dotNetRef =
                 savedDotNetRef;
 
-            await notifyScannerError(
-                err
-            );
+            return false;
         }
     }
 
@@ -618,6 +907,9 @@ await ensureHtml5QrcodeLoaded();
     // ============================================================
     // BARCODE DETECTED
     // ============================================================
+
+    let lastDecodedText = "";
+    let lastDecodedAt = 0;
 
     function onDecoded(decodedText) {
         if (!dotNetRef) {
@@ -631,10 +923,28 @@ await ensureHtml5QrcodeLoaded();
             return;
         }
 
+        const value = decodedText.trim();
+
+        if (!value) {
+            return;
+        }
+
+        const now = Date.now();
+
+        if (
+            value === lastDecodedText &&
+            now - lastDecodedAt < 2500
+        ) {
+            return;
+        }
+
+        lastDecodedText = value;
+        lastDecodedAt = now;
+
         dotNetRef
             .invokeMethodAsync(
                 "OnBarcodeScanned",
-                decodedText
+                value
             )
             .catch(err => {
                 console.error(
@@ -740,9 +1050,7 @@ await ensureHtml5QrcodeLoaded();
 
         currentIndex = 0;
 
-        console.log(
-            "Barcode scanner stopped."
-        );
+
 
         return true;
     }
@@ -823,7 +1131,8 @@ await ensureHtml5QrcodeLoaded();
 
             html5QrCode =
                 new Html5Qrcode(
-                    elementId
+                    elementId,
+                    scannerFormatsConfig()
                 );
 
             /*
@@ -854,15 +1163,12 @@ await ensureHtml5QrcodeLoaded();
             matchCurrentCamera();
 
             /*
-             * Restart succeeded — remove any previous error
+             * Restart succeeded â€” remove any previous error
              * from the POS interface.
              */
             await notifyScannerStarted();
 
-            console.log(
-                "Barcode scanner restarted after viewport/orientation change:",
-                elementId
-            );
+
 
             return true;
         }
@@ -1025,6 +1331,71 @@ await ensureHtml5QrcodeLoaded();
 
 
     // ============================================================
+    // CAMERA PERMISSION WITHIN USER GESTURE
+    // ============================================================
+
+    /*
+     * Mobile browsers (especially iOS Safari) only show the camera
+     * permission prompt when getUserMedia is called synchronously
+     * inside a real user gesture (tap/click).
+     *
+     * Blazor's @bind checkbox goes through a server round-trip
+     * before OnAfterRenderAsync starts the scanner, so the gesture
+     * is already consumed by then and the prompt never appears.
+     *
+     * This attaches a native click listener to the toggle so the
+     * permission is requested at the exact moment of the tap. The
+     * result is cached and reused by requestCameraPermission() when
+     * the scanner actually starts.
+     */
+    function requestPermissionOnToggle(checkboxId) {
+        const toggle = document.getElementById(checkboxId);
+
+        if (!toggle || toggle.__bbCameraPermissionAttached) {
+            return;
+        }
+
+        toggle.__bbCameraPermissionAttached = true;
+
+        toggle.addEventListener("click", () => {
+            if (!toggle.checked || cameraPermission !== null) {
+                return;
+            }
+
+            if (
+                !window.isSecureContext ||
+                !navigator.mediaDevices ||
+                !navigator.mediaDevices.getUserMedia
+            ) {
+                return;
+            }
+
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: {
+                        ideal: "environment"
+                    }
+                },
+                audio: false
+            })
+                .then(stream => {
+                    cameraPermission = true;
+                    stream
+                        .getTracks()
+                        .forEach(track => track.stop());
+                })
+                .catch(err => {
+                    cameraPermission = false;
+                    console.warn(
+                        "Camera permission was not granted on toggle:",
+                        err?.name || err
+                    );
+                });
+        });
+    }
+
+
+    // ============================================================
     // PUBLIC API USED BY BLAZOR
     // ============================================================
 
@@ -1036,6 +1407,7 @@ await ensureHtml5QrcodeLoaded();
         watchViewport,
         unwatchViewport,
         getViewportSize,
-        isDesktopScanner
+        isDesktopScanner,
+        requestPermissionOnToggle
     };
 })();

@@ -130,7 +130,7 @@ public class AppointmentsController : ControllerBase
                 CreatedAt = phNow,
                 TotalAmount = serviceTotal + productTotal,
                 DurationMinutes = totalDuration,
-                MechanicName = "Any Available",
+                MechanicName = string.IsNullOrWhiteSpace(dto.MechanicName) ? "Any Available" : dto.MechanicName.Trim(),
                 MotorcycleId = motorcycle?.Id
             };
 

@@ -443,8 +443,9 @@ input[type="number"] {
     cursor: pointer;
     inset: 0;
     background-color: var(--muted);
+    border: 1px solid var(--muted-foreground);
     border-radius: 24px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s;
 }
 
 .slider::before {
@@ -461,10 +462,16 @@ input[type="number"] {
 
 .switch input:checked + .slider {
     background-color: var(--primary);
+    border-color: var(--primary);
 }
 
 .switch input:checked + .slider::before {
     transform: translateX(20px);
+}
+
+.switch input:focus-visible + .slider {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
 }
 
 

@@ -28,7 +28,7 @@
             <LoadingState FullPage="true" Description="syncing with the server..." />
         }
 
-        <div class="@(isLoading ? "hidden" : "flex") flex-col lg:flex-row lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden lg:pb-0" style="animation: fadeIn 0.4s ease-in;">
+        <div class="flex flex-col lg:flex-row lg:h-[calc(100vh-3.5rem)] lg:overflow-hidden lg:pb-0" style="animation: fadeIn 0.4s ease-in;">
 
             @* --- SIDEBAR --- *@
             <div class="w-full lg:w-[300px] lg:shrink-0 flex flex-col bg-card lg:border-r border-border overflow-hidden">
@@ -72,23 +72,6 @@
                 @* Order Summary *@
                 <div class="flex-1 overflow-y-auto p-3 lg:p-4">
                     <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider m-0 mb-3">Order Summary</p>
-
-                    <div class="mb-4 pb-4 border-b border-border">
-                        <div class="flex flex-col gap-1">
-                            <label for="appointment-motorcycle" class="text-sm font-medium">Motorcycle</label>
-                            <select id="appointment-motorcycle" @bind="newAppt.MotorcycleId" class="w-full text-sm" disabled="@isLoadingMotorcycles">
-                                <option value="">No motorcycle</option>
-                                @foreach (var m in motorcycles)
-                                {
-                                    <option value="@m.Id">@m.DisplayName</option>
-                                }
-                            </select>
-                            @if (!string.IsNullOrWhiteSpace(motorcycleLoadError))
-                            {
-                                <p class="text-xs text-destructive m-0">@motorcycleLoadError</p>
-                            }
-                        </div>
-                    </div>
 
                     @if (!SelectedServices.Any())
                     {
@@ -460,6 +443,22 @@
                                 <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Contact Number</span>
                                 <input type="tel" @bind="newAppt.ContactNumber" placeholder="e.g., 09171234567"
                                        class="w-full mt-1 p-2 rounded-md border border-border bg-background text-foreground text-sm box-border" />
+                            </div>
+                            <div class="p-4 rounded-lg bg-card border border-border lg:col-span-2">
+                                <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Motorcycle</span>
+                                <select id="appointment-motorcycle" @bind="newAppt.MotorcycleId"
+                                        class="w-full mt-1 p-2 rounded-md border border-border bg-background text-foreground text-sm box-border"
+                                        disabled="@isLoadingMotorcycles">
+                                    <option value="">No motorcycle</option>
+                                    @foreach (var m in motorcycles)
+                                    {
+                                        <option value="@m.Id">@m.DisplayName</option>
+                                    }
+                                </select>
+                                @if (!string.IsNullOrWhiteSpace(motorcycleLoadError))
+                                {
+                                    <p class="text-xs text-destructive m-0 mt-1">@motorcycleLoadError</p>
+                                }
                             </div>
                         </div>
 
@@ -1040,6 +1039,10 @@
 
         newAppt.SelectedServices = SelectedServices.Select(s => s.Name).ToList();
         newAppt.Category = SelectedServices.FirstOrDefault()?.Category ?? "General";
+        newAppt.MechanicName =
+            string.Equals(selectedMechanic, "Any Available", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : selectedMechanic;
         newAppt.SelectedProductsJson = JsonSerializer.Serialize(SelectedServices.Select(s => new
         {
             serviceName = s.Name,

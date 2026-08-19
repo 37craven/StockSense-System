@@ -83,9 +83,32 @@ public class ProductRepository
 
     public async Task<Product?> GetActiveByBarcodeAsync(string barcode)
     {
+        var normalized = (barcode ?? string.Empty).Trim();
+
+        // UPC-A (12 digits) and EAN-13 (13 digits) encode the same
+        // product: an EAN-13 of a UPC-A symbol is the 12 UPC digits
+        // prefixed with a leading "0". ZXing reports the scanned
+        // label as either form depending on the frame, so match both.
+        if (normalized.Length == 12 && normalized.All(char.IsDigit))
+        {
+            return await FindActiveByBarcodeAsync(normalized)
+                ?? await FindActiveByBarcodeAsync("0" + normalized);
+        }
+
+        if (normalized.Length == 13 && normalized[0] == '0' && normalized.All(char.IsDigit))
+        {
+            return await FindActiveByBarcodeAsync(normalized)
+                ?? await FindActiveByBarcodeAsync(normalized[1..]);
+        }
+
+        return await FindActiveByBarcodeAsync(normalized);
+    }
+
+    private async Task<Product?> FindActiveByBarcodeAsync(string barcode)
+    {
         return await _context.Products
             .AsNoTracking()
             .Include(p => p.Supplier)
-            .FirstOrDefaultAsync(p => p.IsActive && p.Barcode == barcode);
+            .FirstOrDefaultAsync(p => p.IsActive && p.Barcode != null && p.Barcode.Trim() == barcode);
     }
 }

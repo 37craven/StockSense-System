@@ -48,6 +48,9 @@ public partial class CreateAppointmentDto
     [StringLength(100)]
     public string Category { get; set; } = "General";
 
+    [StringLength(100)]
+    public string? MechanicName { get; set; }
+
     public string? SelectedProductsJson { get; set; }
 
     public int? MotorcycleId { get; set; }
