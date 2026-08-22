@@ -266,7 +266,7 @@ else
                 <div>
                     <label class="text-xs font-semibold mb-1 block text-foreground">Description</label>
                     <textarea @bind="newPackage.Description" rows="3" placeholder="Describe who this build is for..."
-                              class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm resize-y box-border outline-none"></textarea>
+                              class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm resize-none box-border outline-none"></textarea>
                 </div>
 
                 <div>
@@ -317,7 +317,7 @@ else
             @* ── Right Panel: Product Catalog ── *@
             <div class="apb-right-panel flex-1 min-w-0 flex flex-col">
                 <label class="text-xs font-semibold mb-1 block text-foreground shrink-0">Select Products <span class="font-normal text-muted-foreground">(@newPackage.SelectedProductIds.Count selected)</span></label>
-                <div class="overflow-hidden border border-border rounded-md flex flex-col" style="height: 50vh">
+                <div class="overflow-hidden border border-border rounded-md flex flex-col">
                     <ProductCatalog Columns="3"
                                     Products="allProducts"
                                     OnProductClick="p => ToggleProductSelection(p.Id)"
@@ -331,9 +331,9 @@ else
 
         @* ── Footer ── *@
         <div class="shrink-0 border-t border-border p-4 px-5 flex justify-between items-center gap-3 flex-wrap">
-            <div>
+            <div class="flex items-center">
                 <span class="text-xs text-muted-foreground">Total Price</span>
-                <span class="text-lg font-black text-primary ml-2">₱@CalculateCurrentTotal().ToString("N0")</span>
+                <span class="text-lg font-bold text-primary ml-2">₱@CalculateCurrentTotal().ToString("N0")</span>
             </div>
             <div class="flex gap-2">
                 <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestClosePackageEditor">Cancel</BbButton>

@@ -8,8 +8,6 @@
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
-<BbPortalHost />
-<BbDialogProvider />
 <UnsavedChangesGuard IsDirty="@HasUnsavedChanges"
                      Message="Your service changes have not been saved. If you leave now, they will be lost." />
 
@@ -128,7 +126,7 @@
                 <BbDialogDescription Class="text-sm text-muted-foreground mt-1">Define generic items and link them to inventory products.</BbDialogDescription>
             </BbDialogHeader>
 
-            <div class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-6">
+            <div class="flex-1 overflow-y-auto px-6 pb-5 flex flex-col gap-6">
                 @* Add generic item input *@
                 <div>
                     <p style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-2) 0;">Generic Items Needed</p>
@@ -253,7 +251,7 @@
 
 @* Create Service Modal *@
 <BbDialog @bind-Open="createOpen">
-    <BbDialogContent Class="w-[min(96vw,480px)] p-0 overflow-hidden flex flex-col">
+    <BbDialogContent Class="w-[min(96vw,480px)] p-0 overflow-hidden flex flex-col" style="min-width: 400px">
         <BbDialogHeader Class="px-6 py-5 border-b border-border">
             <BbDialogTitle Class="text-lg font-semibold text-foreground m-0">Create Service</BbDialogTitle>
             <BbDialogDescription Class="text-sm text-muted-foreground mt-1">Add a new service to the catalog.</BbDialogDescription>
@@ -277,9 +275,15 @@
                            style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
                 </div>
                 <div class="flex-1">
-                    <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Est. Minutes</label>
-                    <input type="number" @bind="newServiceMinutes" placeholder="e.g. 30"
-                           style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                    <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Est. Duration &lpar;dd/hh/mm&rpar; </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <input type="number" min="0" @bind="newServiceDays" aria-label="Estimated days" placeholder="Days"
+                               style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                        <input type="number" min="0" @bind="newServiceHours" aria-label="Estimated hours" placeholder="Hours"
+                               style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                        <input type="number" min="0" @bind="newServiceMins" aria-label="Estimated minutes" placeholder="Mins"
+                               style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); box-sizing: border-box;" />
+                    </div>
                 </div>
             </div>
             <div>
@@ -363,7 +367,8 @@
     private string newServiceName = "";
     private string newServiceCategory = "General";
     private decimal newServicePrice = 0;
-    private int newServiceMinutes = 0;
+    private int newServiceDays, newServiceHours, newServiceMins;
+    private int NewServiceTotalMinutes => Math.Max(newServiceDays, 0) * 1440 + Math.Max(newServiceHours, 0) * 60 + Math.Max(newServiceMins, 0);
     private string serviceSearch = "";
     private string selectedCategory = "";
     private decimal editPrice;
@@ -372,7 +377,7 @@
     private bool showDiscardCreateModal;
     private bool HasUnsavedChanges => (manageOpen && IsEditDirty) || (createOpen && IsCreateDirty);
     private bool IsCreateDirty => !string.IsNullOrWhiteSpace(newServiceName) ||
-        !string.Equals(newServiceCategory, "General", StringComparison.Ordinal) || newServicePrice != 0 || newServiceMinutes != 0;
+        !string.Equals(newServiceCategory, "General", StringComparison.Ordinal) || newServicePrice != 0 || NewServiceTotalMinutes != 0;
     private bool IsEditDirty => !string.Equals(editBaseline, EditorFingerprint(), StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(newItemName);
 
     private IReadOnlyList<string> ServiceCategories => services?
@@ -433,7 +438,7 @@
         newServiceName = "";
         newServiceCategory = "General";
         newServicePrice = 0;
-        newServiceMinutes = 0;
+        newServiceDays = newServiceHours = newServiceMins = 0;
         createServiceError = "";
         createOpen = true;
     }
@@ -450,7 +455,7 @@
                 Name = newServiceName.Trim(),
                 Category = newServiceCategory.Trim(),
                 Price = newServicePrice,
-                EstimatedMinutes = newServiceMinutes
+                EstimatedMinutes = NewServiceTotalMinutes
             };
             var response = await Http.PostAsJsonAsync("api/services", dto);
             if (response.IsSuccessStatusCode)
@@ -459,7 +464,7 @@
                 newServiceName = "";
                 newServiceCategory = "General";
                 newServicePrice = 0;
-                newServiceMinutes = 0;
+                newServiceDays = newServiceHours = newServiceMins = 0;
                 createOpen = false;
             }
             else
@@ -581,7 +586,7 @@
         newServiceName = "";
         newServiceCategory = "General";
         newServicePrice = 0;
-        newServiceMinutes = 0;
+        newServiceDays = newServiceHours = newServiceMins = 0;
         createOpen = false;
     }
 

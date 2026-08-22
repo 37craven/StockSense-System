@@ -24,16 +24,16 @@
 <style>
 .order-page { display:flex; flex-direction:column; min-height:100%; }
 .order-list-shell {
-    overflow:hidden;
-    border:1px solid rgba(120,120,120,.28);
-    border-radius:.85rem;
-    background:hsl(var(--card));
-    box-shadow:0 1px 2px rgba(0,0,0,.03);
+overflow:hidden;
+border:1px solid rgba(120,120,120,.28);
+border-radius:.85rem;
+background:hsl(var(--card));
+box-shadow:0 1px 2px rgba(0,0,0,.03);
 }
 .order-table-wrap {
-    width:100%;
-    overflow-x:auto;
-    background:hsl(var(--card));
+width:100%;
+overflow-x:auto;
+background:hsl(var(--card));
 }
 .order-table { width:100%; min-width:760px; border-collapse:collapse; table-layout:fixed; font-size:.875rem; }
 .order-table col.col-order { width:28%; }
@@ -42,45 +42,45 @@
 .order-table col.col-generated { width:13%; }
 .order-table col.col-actions { width:26%; }
 .order-table {
-    border-collapse:separate;
-    border-spacing:0;
+border-collapse:separate;
+border-spacing:0;
 }
 .order-table thead {
-    background:hsl(var(--muted) / .20);
+background:hsl(var(--muted) / .20);
 }
 .order-table th {
-    padding:.8rem 1rem;
-    text-align:left;
-    color:hsl(var(--muted-foreground));
-    font-size:.72rem;
-    font-weight:700;
-    white-space:nowrap;
-    text-transform:uppercase;
-    letter-spacing:.035em;
-    border-bottom:1px solid rgba(120,120,120,.20);
-    background:hsl(var(--card));
+padding:.8rem 1rem;
+text-align:left;
+color:hsl(var(--muted-foreground));
+font-size:.72rem;
+font-weight:700;
+white-space:nowrap;
+text-transform:uppercase;
+letter-spacing:.035em;
+border-bottom:1px solid rgba(120,120,120,.20);
+background:hsl(var(--card));
 }
 .order-table th:last-child { text-align:right; }
 .order-table td {
-    padding:.95rem 1rem;
-    vertical-align:middle;
-    background:hsl(var(--card));
-    border-bottom:1px solid rgba(120,120,120,.20);
-    transition:background-color .15s ease;
+padding:.95rem 1rem;
+vertical-align:middle;
+background:hsl(var(--card));
+border-bottom:1px solid rgba(120,120,120,.20);
+transition:background-color .15s ease;
 }
 
 .order-table tbody tr:not(:last-child) td {
-    border-bottom:1px solid rgba(120,120,120,.20) !important;
+border-bottom:1px solid rgba(120,120,120,.20) !important;
 }
 
 .order-table tbody tr:last-child td {
-    border-bottom:0;
+border-bottom:0;
 }
 
 .dark .order-table td,
 .dark .order-table tbody tr:not(:last-child) td,
 .dark .order-table th {
-    border-bottom-color:rgba(255,255,255,.12) !important;
+border-bottom-color:rgba(255,255,255,.12) !important;
 }
 .order-row { cursor:pointer; }
 .order-row:hover td { background:hsl(var(--muted) / .28); }
@@ -91,23 +91,23 @@
 .notice { border-radius:.55rem; border:1px solid hsl(var(--border)); padding:.75rem; font-size:.875rem; background:hsl(var(--muted) / .3); color:hsl(var(--foreground)); }
 .notice.error { border-color:hsl(var(--destructive)); color:hsl(var(--destructive)); background:hsl(var(--destructive) / .08); }
 .detail-body {
-    flex:1;
-    min-height:0;
-    max-height:calc(82vh - 130px);
-    overflow-y:auto;
-    padding:.85rem 1rem;
-    display:flex;
-    flex-direction:column;
-    gap:.8rem;
+flex:1;
+min-height:0;
+max-height:calc(82vh - 130px);
+overflow-y:auto;
+padding:.85rem 1rem;
+display:flex;
+flex-direction:column;
+gap:.8rem;
 }
 .detail-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
 .detail-metric {
-    min-width:0;
-    padding:.75rem .85rem;
-    border:1px solid rgba(120,120,120,.45);
-    border-radius:.65rem;
-    background:hsl(var(--card));
-    box-shadow:0 1px 2px rgba(0,0,0,.03);
+min-width:0;
+padding:.75rem .85rem;
+border:1px solid rgba(120,120,120,.45);
+border-radius:.65rem;
+background:hsl(var(--card));
+box-shadow:0 1px 2px rgba(0,0,0,.03);
 }
 .detail-metric span { display:block; margin-bottom:.35rem; color:hsl(var(--muted-foreground)); font-size:.65rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
 .detail-metric strong { display:block; color:hsl(var(--foreground)); font-size:.875rem; overflow-wrap:anywhere; }
@@ -134,552 +134,552 @@
 .receive-table th { background:hsl(var(--muted) / .3); color:hsl(var(--muted-foreground)); font-weight:600; }
 .receive-table th:not(:first-child),.receive-table td:not(:first-child) { text-align:right; }
 @@media (max-width: 1024px) {
-    .detail-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .order-table { min-width:560px; }
-    .hide-tablet { display:none; }
+.detail-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.order-table { min-width:560px; }
+.hide-tablet { display:none; }
 }
 
 @@media (min-width: 768px) and (max-width: 1024px) {
-    .hide-ipad { display:none !important; }
-    .order-table-wrap { overflow:visible; padding:.75rem; background:transparent; }
-    .order-table { min-width:0; display:block; border-spacing:0; }
-    .order-table thead { display:none; }
-    .order-table tbody { display:flex; flex-direction:column; gap:.75rem; }
-    .order-table tr.order-row {
-        display:grid;
-        grid-template-columns:minmax(0,1fr) auto;
-        gap:.75rem 1rem;
-        padding:1rem;
-        border:1px solid rgba(127,127,127,.34);
-        border-radius:.7rem;
-        background:hsl(var(--background));
-        box-shadow:0 1px 3px rgba(0,0,0,.05);
-    }
-    .order-table td {
-        display:block;
-        min-width:0;
-        padding:0;
-        border:0 !important;
-        border-radius:0 !important;
-        background:transparent;
-        box-shadow:none !important;
-    }
-    .order-table td[data-label="Order"] { grid-column:1; grid-row:1; }
-    .order-table td[data-label="Status"] { grid-column:2; grid-row:1; align-self:start; }
-    .order-table td[data-label="Actions"] {
-        grid-column:1 / -1;
-        grid-row:2;
-        padding-top:.75rem;
-        border-top:1px solid hsl(var(--border)) !important;
-    }
-    .order-actions { justify-content:flex-start; flex-wrap:wrap; white-space:normal; }
-    .order-actions button { min-height:2.5rem; }
+.hide-ipad { display:none !important; }
+.order-table-wrap { overflow:visible; padding:.75rem; background:transparent; }
+.order-table { min-width:0; display:block; border-spacing:0; }
+.order-table thead { display:none; }
+.order-table tbody { display:flex; flex-direction:column; gap:.75rem; }
+.order-table tr.order-row {
+display:grid;
+grid-template-columns:minmax(0,1fr) auto;
+gap:.75rem 1rem;
+padding:1rem;
+border:1px solid rgba(127,127,127,.34);
+border-radius:.7rem;
+background:hsl(var(--background));
+box-shadow:0 1px 3px rgba(0,0,0,.05);
+}
+.order-table td {
+display:block;
+min-width:0;
+padding:0;
+border:0 !important;
+border-radius:0 !important;
+background:transparent;
+box-shadow:none !important;
+}
+.order-table td[data-label="Order"] { grid-column:1; grid-row:1; }
+.order-table td[data-label="Status"] { grid-column:2; grid-row:1; align-self:start; }
+.order-table td[data-label="Actions"] {
+grid-column:1 / -1;
+grid-row:2;
+padding-top:.75rem;
+border-top:1px solid hsl(var(--border)) !important;
+}
+.order-actions { justify-content:flex-start; flex-wrap:wrap; white-space:normal; }
+.order-actions button { min-height:2.5rem; }
 }
 
 @@media (max-width: 767px) {
-    .order-table-wrap { overflow:visible; padding:.65rem; background:transparent; }
-    .order-table { min-width:0; display:block; border-spacing:0; }
-    .order-table thead { display:none; }
-    .order-table tbody { display:flex; flex-direction:column; gap:.65rem; }
-    .order-table tr.order-row { display:grid; grid-template-columns:1fr auto; gap:.7rem 1rem; padding:.85rem; border:1px solid rgba(127,127,127,.34); border-radius:.65rem; background:var(--background, transparent); box-shadow:0 1px 3px rgba(0,0,0,.05); }
-    .order-table td { display:block; padding:0; border:0; min-width:0; background:transparent; border-radius:0 !important; box-shadow:none !important; }
-    .order-table td[data-label="Order"] { grid-column:1; grid-row:1; }
-    .order-table td[data-label="Status"] { grid-column:2; grid-row:1; align-self:start; }
-    .order-table td[data-label="Actions"] { grid-column:1 / -1; padding-top:.65rem; border-top:1px solid hsl(var(--border)); }
-    .order-actions { justify-content:flex-start; }
-    .detail-summary-grid { grid-template-columns:1fr 1fr; }
-    .detail-footer { align-items:stretch; flex-direction:column-reverse; }
-    .detail-footer-group { width:100%; }
-    .receive-fields { grid-template-columns:1fr; }
-    .receive-table thead { display:none; }
-    .receive-table,.receive-table tbody { display:block; }
-    .receive-table tr { display:grid; grid-template-columns:1fr auto; gap:.45rem .8rem; padding:.8rem; border-bottom:1px solid hsl(var(--border)); }
-    .receive-table td { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:0; border:0; text-align:right !important; }
-    .receive-table td:first-child { grid-column:1 / -1; font-weight:700; text-align:left !important; }
-    .receive-table td:not(:first-child)::before { content:attr(data-label); color:hsl(var(--muted-foreground)); font-size:.7rem; font-weight:600; text-align:left; }
-    .receive-table td[data-label="Receive Now"] { grid-column:1 / -1; padding-top:.35rem; }
+.order-table-wrap { overflow:visible; padding:.65rem; background:transparent; }
+.order-table { min-width:0; display:block; border-spacing:0; }
+.order-table thead { display:none; }
+.order-table tbody { display:flex; flex-direction:column; gap:.65rem; }
+.order-table tr.order-row { display:grid; grid-template-columns:1fr auto; gap:.7rem 1rem; padding:.85rem; border:1px solid rgba(127,127,127,.34); border-radius:.65rem; background:var(--background, transparent); box-shadow:0 1px 3px rgba(0,0,0,.05); }
+.order-table td { display:block; padding:0; border:0; min-width:0; background:transparent; border-radius:0 !important; box-shadow:none !important; }
+.order-table td[data-label="Order"] { grid-column:1; grid-row:1; }
+.order-table td[data-label="Status"] { grid-column:2; grid-row:1; align-self:start; }
+.order-table td[data-label="Actions"] { grid-column:1 / -1; padding-top:.65rem; border-top:1px solid hsl(var(--border)); }
+.order-actions { justify-content:flex-start; }
+.detail-summary-grid { grid-template-columns:1fr 1fr; }
+.detail-footer { align-items:stretch; flex-direction:column-reverse; }
+.detail-footer-group { width:100%; }
+.receive-fields { grid-template-columns:1fr; }
+.receive-table thead { display:none; }
+.receive-table,.receive-table tbody { display:block; }
+.receive-table tr { display:grid; grid-template-columns:1fr auto; gap:.45rem .8rem; padding:.8rem; border-bottom:1px solid hsl(var(--border)); }
+.receive-table td { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:0; border:0; text-align:right !important; }
+.receive-table td:first-child { grid-column:1 / -1; font-weight:700; text-align:left !important; }
+.receive-table td:not(:first-child)::before { content:attr(data-label); color:hsl(var(--muted-foreground)); font-size:.7rem; font-weight:600; text-align:left; }
+.receive-table td[data-label="Receive Now"] { grid-column:1 / -1; padding-top:.35rem; }
 }
 
 @@media (max-width: 480px) {
-    .detail-summary-grid { grid-template-columns:1fr; }
-    .detail-body { padding:.7rem; max-height:calc(88vh - 120px); }
-    .detail-footer { padding:.65rem .7rem; }
+.detail-summary-grid { grid-template-columns:1fr; }
+.detail-body { padding:.7rem; max-height:calc(88vh - 120px); }
+.detail-footer { padding:.65rem .7rem; }
 }
 </style>
 
 <PageTitle>Order History</PageTitle>
 
 <div class="order-page">
-    <PageHeader Title="Order Slips"
-                Subtitle="Review purchase orders and track receipt progress."
-                Badge="@(slips?.Count(s => s.Status is OrderSlipStatuses.Draft or OrderSlipStatuses.Approved or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived).ToString() + " Active")"
-                Badge2="@(slips?.Count(s => s.Status == OrderSlipStatuses.Completed).ToString() + " Completed")">
-        <BbButton Variant="ButtonVariant.Default" OnClick='() => Navigation.NavigateTo("/admin/orderslips")'>
-            <LucideIcon Name="plus" Size="16" /> Generate Order
-        </BbButton>
-    </PageHeader>
+<PageHeader Title="Order Slips"
+Subtitle="Review purchase orders and track receipt progress."
+Badge="@(slips?.Count(s => s.Status is OrderSlipStatuses.Draft or OrderSlipStatuses.Approved or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived).ToString() + " Active")"
+Badge2="@(slips?.Count(s => s.Status == OrderSlipStatuses.Completed).ToString() + " Completed")">
+<BbButton Variant="ButtonVariant.Default" OnClick='() => Navigation.NavigateTo("/admin/orderslips")'>
+<LucideIcon Name="plus" Size="16" /> Generate Order
+</BbButton>
+</PageHeader>
 
-    @if (!string.IsNullOrEmpty(message))
-    {
-        <div role="status" class="notice mb-4">@message</div>
-    }
-    @if (!string.IsNullOrEmpty(error))
-    {
-        <div role="alert" class="notice error mb-4">@error</div>
-    }
+@if (!string.IsNullOrEmpty(message))
+{
+<div role="status" class="notice mb-4">@message</div>
+}
+@if (!string.IsNullOrEmpty(error))
+{
+<div role="alert" class="notice error mb-4">@error</div>
+}
 
-    @if (slips == null)
+@if (slips == null)
+{
+<LoadingState Description="Loading order slips…" />
+}
+else
     {
-        <LoadingState Description="Loading order slips…" />
-    }
-    else
+    <div class="rounded-lg border border-border bg-card p-4 mb-5 flex flex-col gap-3" role="search" aria-label="Filter order slips">
+    <div class="flex flex-wrap items-end gap-3">
+    <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1">
+    Order slips
+    <input id="history-search"
+    @bind="searchTerm"
+    @bind:event="oninput"
+    @bind:after="ApplyFilter"
+    placeholder="Search order number or supplier..."
+    autocomplete="off"
+    class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground min-w-56 w-full" />
+    </label>
+    <div class="relative">
+    <select @bind="statusFilter" @bind:after="ApplyFilter" aria-label="Filter order slips by status"
+    class="h-9 w-40 appearance-none rounded-md border border-input bg-background px-4 pr-9 text-sm text-foreground">
+    <option value="">All statuses</option>
+    @foreach (var value in Statuses)
     {
-        <div class="rounded-lg border border-border bg-card p-4 mb-5 flex flex-col gap-3" role="search" aria-label="Filter order slips">
-            <div class="flex flex-wrap items-end gap-3">
-                <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1">
-                    Order slips
-                    <input id="history-search"
-                           @bind="searchTerm"
-                           @bind:event="oninput"
-                           @bind:after="ApplyFilter"
-                           placeholder="Search order number or supplier..."
-                           autocomplete="off"
-                           class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground min-w-56 w-full" />
-                </label>
-                <div class="relative">
-                    <select @bind="statusFilter" @bind:after="ApplyFilter" aria-label="Filter order slips by status"
-                            class="h-9 w-40 appearance-none rounded-md border border-input bg-background px-4 pr-9 text-sm text-foreground">
-                        <option value="">All statuses</option>
-                        @foreach (var value in Statuses)
-                        {
-                            <option value="@value">@ShortStatus(value)</option>
-                        }
-                    </select>
-                    <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                </div>
-            </div>
-        </div>
-
-        @if (filteredSlips.Count == 0)
-        {
-            <EmptyState Icon="clipboard-list" Description="Try changing the search or status filter, or generate a new order." Title="No order slips found" />
-        }
-        else
-        {
-            <div class="order-list-shell">
-                <div class="flex items-center justify-between gap-4 border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
-                    <span>Select an order to view receipt and inventory details</span>
-                    <span class="shrink-0">Showing <strong class="text-primary">@filteredSlips.Count</strong> order slip@(filteredSlips.Count == 1 ? "" : "s")</span>
-                </div>
-                <div class="order-table-wrap">
-                    <table class="order-table">
-                        <colgroup>
-                            <col class="col-order" />
-                            <col class="col-supplier hide-ipad" />
-                            <col class="col-status" />
-                            <col class="col-generated hide-ipad" />
-                            <col class="col-actions" />
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th @onclick='@(() => ToggleSort("number"))' class="cursor-pointer select-none">
-                                    Order Slip @SortArrow("number")
-                                </th>
-                                <th @onclick='@(() => ToggleSort("supplier"))' class="cursor-pointer select-none hide-ipad">
-                                    Supplier @SortArrow("supplier")
-                                </th>
-                                <th @onclick='@(() => ToggleSort("status"))' class="cursor-pointer select-none">
-                                    Status @SortArrow("status")
-                                </th>
-                                <th @onclick='@(() => ToggleSort("generated"))' class="cursor-pointer select-none hide-ipad">
-                                    Generated @SortArrow("generated")
-                                </th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var slip in filteredSlips)
-                            {
-                                <tr class="order-row" @onclick="() => OpenDetail(slip)">
-                                    <td data-label="Order">
-                                        <div class="order-primary">
-                                            <strong>@DisplayNumber(slip)</strong>
-                                            <small>@(slip.Supplier?.Name ?? "Unknown supplier")</small>
-                                        </div>
-                                    </td>
-                                    <td data-label="Supplier" class="hide-ipad text-foreground">
-                                        @(slip.Supplier?.Name ?? "Unknown supplier")
-                                    </td>
-                                    <td data-label="Status">
-                                        <OrderSlipStatusBadge Status="@slip.Status" />
-                                    </td>
-                                    <td data-label="Generated" class="hide-ipad text-muted-foreground">
-                                        @GeneratedDate(slip).ToString("MMM dd, yyyy")
-                                    </td>
-                                    <td data-label="Actions" @onclick:stopPropagation>
-                                        <div class="order-actions">
-                                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="@OrderSlipPresentation.DetailsActionClass" OnClick="() => OpenDetail(slip)">Details</BbButton>
-                                            <AuthorizeView Roles="Admin">
-                                                @if (slip.Status == OrderSlipStatuses.Draft)
-                                                {
-                                                    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.ApproveActionClass" OnClick="() => OpenApprove(slip)">Approve</BbButton>
-                                                }
-                                            </AuthorizeView>
-                                            @if (slip.Status == OrderSlipStatuses.Approved)
-                                            {
-                                                <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.SendActionClass" OnClick="() => OpenMarkOrdered(slip)" Disabled="@string.IsNullOrWhiteSpace(slip.Supplier?.Email)" title="@(string.IsNullOrWhiteSpace(slip.Supplier?.Email) ? "Add a supplier email before sending this order" : "Email this order and its PDF to the supplier")">Send to supplier</BbButton>
-                                            }
-                                            @if (slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
-                                            {
-                                                <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="() => OpenDetailForReceive(slip)">Receive</BbButton>
-                                            }
-                                            @if (HasSecondaryActions(slip))
-                                            {
-                                                <OrderSlipActionMenu Label="@MoreOptionsLabel(slip)"
-                                                                     ShowCloseRemaining="@(slip.Status == OrderSlipStatuses.PartiallyReceived)"
-                                                                     ShowCancel="@(isAdmin && CanCancel(slip))"
-                                                                     OnCloseRemaining="() => OpenCloseRemaining(slip)"
-                                                                     OnCancel="() => OpenCancel(slip)" />
-                                            }
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        }
+    <option value="@value">@ShortStatus(value)</option>
     }
-</div>
+    </select>
+    <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+    </div>
+    </div>
+    </div>
 
-@* DETAIL MODAL *@
-<BbDialog @bind-Open="detailOpen" @bind-Open:after="OnDetailOpenChanged">
+    @if (filteredSlips.Count == 0)
+    {
+    <EmptyState Icon="clipboard-list" Description="Try changing the search or status filter, or generate a new order." Title="No order slips found" />
+    }
+else
+    {
+    <div class="order-list-shell">
+    <div class="flex items-center justify-between gap-4 border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
+    <span>Select an order to view receipt and inventory details</span>
+    <span class="shrink-0">Showing <strong class="text-primary">@filteredSlips.Count</strong> order slip@(filteredSlips.Count == 1 ? "" : "s")</span>
+    </div>
+    <div class="order-table-wrap">
+    <table class="order-table">
+    <colgroup>
+    <col class="col-order" />
+    <col class="col-supplier hide-ipad" />
+    <col class="col-status" />
+    <col class="col-generated hide-ipad" />
+    <col class="col-actions" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th @onclick='@(() => ToggleSort("number"))' class="cursor-pointer select-none">
+    Order Slip @SortArrow("number")
+    </th>
+    <th @onclick='@(() => ToggleSort("supplier"))' class="cursor-pointer select-none hide-ipad">
+    Supplier @SortArrow("supplier")
+    </th>
+    <th @onclick='@(() => ToggleSort("status"))' class="cursor-pointer select-none">
+    Status @SortArrow("status")
+    </th>
+    <th @onclick='@(() => ToggleSort("generated"))' class="cursor-pointer select-none hide-ipad">
+    Generated @SortArrow("generated")
+    </th>
+    <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var slip in filteredSlips)
+    {
+    <tr class="order-row" @onclick="() => OpenDetail(slip)">
+    <td data-label="Order">
+    <div class="order-primary">
+    <strong>@DisplayNumber(slip)</strong>
+    <small>@(slip.Supplier?.Name ?? "Unknown supplier")</small>
+    </div>
+    </td>
+    <td data-label="Supplier" class="hide-ipad text-foreground">
+    @(slip.Supplier?.Name ?? "Unknown supplier")
+    </td>
+    <td data-label="Status">
+    <OrderSlipStatusBadge Status="@slip.Status" />
+    </td>
+    <td data-label="Generated" class="hide-ipad text-muted-foreground">
+    @GeneratedDate(slip).ToString("MMM dd, yyyy")
+    </td>
+    <td data-label="Actions" @onclick:stopPropagation>
+    <div class="order-actions">
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="@OrderSlipPresentation.DetailsActionClass" OnClick="() => OpenDetail(slip)">Details</BbButton>
+    <AuthorizeView Roles="Admin">
+    @if (slip.Status == OrderSlipStatuses.Draft)
+    {
+    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.ApproveActionClass" OnClick="() => OpenApprove(slip)">Approve</BbButton>
+    }
+    </AuthorizeView>
+    @if (slip.Status == OrderSlipStatuses.Approved)
+    {
+    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.SendActionClass" OnClick="() => OpenMarkOrdered(slip)" Disabled="@string.IsNullOrWhiteSpace(slip.Supplier?.Email)" title="@(string.IsNullOrWhiteSpace(slip.Supplier?.Email) ? "Add a supplier email before sending this order" : "Email this order and its PDF to the supplier")">Send to supplier</BbButton>
+    }
+    @if (slip.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
+    {
+    <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="() => OpenDetailForReceive(slip)">Receive</BbButton>
+    }
+    @if (HasSecondaryActions(slip))
+    {
+    <OrderSlipActionMenu Label="@MoreOptionsLabel(slip)"
+    ShowCloseRemaining="@(slip.Status == OrderSlipStatuses.PartiallyReceived)"
+    ShowCancel="@(isAdmin && CanCancel(slip))"
+    OnCloseRemaining="() => OpenCloseRemaining(slip)"
+    OnCancel="() => OpenCancel(slip)" />
+    }
+    </div>
+    </td>
+    </tr>
+    }
+    </tbody>
+    </table>
+    </div>
+    </div>
+    }
+    }
+    </div>
+
+    @* DETAIL MODAL *@
+    <BbDialog @bind-Open="detailOpen" @bind-Open:after="OnDetailOpenChanged">
     <BbDialogContent class="flex max-h-[82dvh] w-[min(94vw,61.25rem)] flex-col overflow-hidden p-0">
-        <div class="px-4 pt-4 shrink-0">
-            <BbDialogHeader>
-                <div class="flex flex-wrap items-center gap-2">
-                    <BbDialogTitle>@(selectedSlip == null ? "Order details" : DisplayNumber(selectedSlip))</BbDialogTitle>
-                    @if (selectedSlip != null)
-                    {
-                        <OrderSlipStatusBadge Status="@selectedSlip.Status" />
-                    }
-                </div>
-                <BbDialogDescription>@(selectedSlip?.Supplier.Name) · @(selectedSlip != null ? GeneratedDate(selectedSlip).ToString("MMM dd, yyyy") : "")</BbDialogDescription>
-            </BbDialogHeader>
-        </div>
+    <div class="px-4 pt-4 shrink-0">
+    <BbDialogHeader>
+    <div class="flex flex-wrap items-center gap-2">
+    <BbDialogTitle>@(selectedSlip == null ? "Order details" : DisplayNumber(selectedSlip))</BbDialogTitle>
+    @if (selectedSlip != null)
+    {
+    <OrderSlipStatusBadge Status="@selectedSlip.Status" />
+    }
+    </div>
+    <BbDialogDescription>@(selectedSlip?.Supplier.Name) · @(selectedSlip != null ? GeneratedDate(selectedSlip).ToString("MMM dd, yyyy") : "")</BbDialogDescription>
+    </BbDialogHeader>
+    </div>
 
-        <div class="detail-body">
-            @if (selectedSlip != null)
-            {
-                <div class="detail-summary-grid">
-                    <div class="detail-metric"><span>Generated</span><strong>@GeneratedDate(selectedSlip).ToString("MMM dd, yyyy h:mm tt")</strong></div>
-                    <div class="detail-metric"><span>Expected delivery</span><strong>@(selectedSlip.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "—")</strong></div>
-                    <div class="detail-metric"><span>Location</span><strong>@selectedSlip.LocationId</strong></div>
-                </div>
+    <div class="detail-body">
+    @if (selectedSlip != null)
+    {
+    <div class="detail-summary-grid">
+    <div class="detail-metric"><span>Generated</span><strong>@GeneratedDate(selectedSlip).ToString("MMM dd, yyyy h:mm tt")</strong></div>
+    <div class="detail-metric"><span>Expected delivery</span><strong>@(selectedSlip.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "—")</strong></div>
+    <div class="detail-metric"><span>Location</span><strong>@selectedSlip.LocationId</strong></div>
+    </div>
 
-                @if (selectedSlip.Items.Count > 0)
-                {
-                    <section class="items-shell">
-                        <div class="items-heading"><strong>Order items</strong><span>@selectedSlip.Items.Count item@(selectedSlip.Items.Count == 1 ? "" : "s")</span></div>
-                        <div class="items-table-wrap">
-                            <table class="items-table">
-                                <thead><tr><th>Product</th><th>Current</th><th>Incoming</th><th>Reserved</th><th>Position</th><th>Demand/Day</th><th>Lead Days</th><th>Safety</th><th>Reorder</th><th>Target</th><th>Suggested</th><th>Ordered</th><th>Received</th></tr></thead>
-                                <tbody>
-                                    @foreach (var item in selectedSlip.Items)
-                                    {
-                                        <tr>
-                                            <td class="product-cell"><strong>@item.ProductName</strong>@if (!string.IsNullOrWhiteSpace(item.Brand)) { <small>@item.Brand</small> }</td>
-                                            <td>@item.CurrentStockSnapshot</td><td>@item.IncomingStockSnapshot</td><td>@item.ReservedStockSnapshot</td><td>@item.InventoryPositionSnapshot</td>
-                                            <td>@item.AverageDailyDemandSnapshot.ToString("0.##")</td><td>@item.LeadTimeDaysSnapshot.ToString("0.##")</td><td>@item.SafetyStockSnapshot</td><td>@item.ReorderPointSnapshot</td><td>@item.TargetStockSnapshot</td>
-                                            <td class="text-primary font-semibold">@item.SuggestedQuantity</td><td class="font-semibold">@(item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity)</td><td class="@(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                }
+    @if (selectedSlip.Items.Count > 0)
+    {
+    <section class="items-shell">
+    <div class="items-heading"><strong>Order items</strong><span>@selectedSlip.Items.Count item@(selectedSlip.Items.Count == 1 ? "" : "s")</span></div>
+    <div class="items-table-wrap">
+    <table class="items-table">
+    <thead><tr><th>Product</th><th>Current</th><th>Incoming</th><th>Reserved</th><th>Position</th><th>Demand/Day</th><th>Lead Days</th><th>Safety</th><th>Reorder</th><th>Target</th><th>Suggested</th><th>Ordered</th><th>Received</th></tr></thead>
+    <tbody>
+    @foreach (var item in selectedSlip.Items)
+    {
+    <tr>
+    <td class="product-cell"><strong>@item.ProductName</strong>@if (!string.IsNullOrWhiteSpace(item.Brand)) { <small>@item.Brand</small> }</td>
+    <td>@item.CurrentStockSnapshot</td><td>@item.IncomingStockSnapshot</td><td>@item.ReservedStockSnapshot</td><td>@item.InventoryPositionSnapshot</td>
+    <td>@item.AverageDailyDemandSnapshot.ToString("0.##")</td><td>@item.LeadTimeDaysSnapshot.ToString("0.##")</td><td>@item.SafetyStockSnapshot</td><td>@item.ReorderPointSnapshot</td><td>@item.TargetStockSnapshot</td>
+    <td class="text-primary font-semibold">@item.SuggestedQuantity</td><td class="font-semibold">@(item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity)</td><td class="@(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
+    </tr>
+    }
+    </tbody>
+    </table>
+    </div>
+    </section>
+    }
 
-                @if (!string.IsNullOrWhiteSpace(selectedSlip.Remarks))
-                {
-                    <div class="detail-metric"><span>Remarks</span><strong class="font-normal">@selectedSlip.Remarks</strong></div>
-                }
-            }
-        </div>
+    @if (!string.IsNullOrWhiteSpace(selectedSlip.Remarks))
+    {
+    <div class="detail-metric"><span>Remarks</span><strong class="font-normal">@selectedSlip.Remarks</strong></div>
+    }
+    }
+    </div>
 
-        <div class="detail-footer">
-            <div class="detail-footer-group">
-                <BbButton Variant="ButtonVariant.Outline" Class="@OrderSlipPresentation.DetailsActionClass" OnClick="CloseDetail">Close</BbButton>
-                @if (selectedSlip != null)
-                {
-                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PrintSlip" title="Print this order slip" aria-label="Print this order slip"><LucideIcon Name="printer" Size="14" aria-hidden="true" /> Print</BbButton>
-                }
-            </div>
-            <div class="detail-footer-group">
-                <AuthorizeView Roles="Admin">
-                    @if (selectedSlip?.Status == OrderSlipStatuses.Draft)
-                    {
-                        <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.ApproveActionClass" OnClick="() => OpenApprove(selectedSlip)">Approve Order</BbButton>
-                    }
-                </AuthorizeView>
-                @if (selectedSlip?.Status == OrderSlipStatuses.Approved)
-                {
-                    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.SendActionClass" OnClick="() => OpenMarkOrdered(selectedSlip)" Disabled="@string.IsNullOrWhiteSpace(selectedSlip.Supplier?.Email)" title="@(string.IsNullOrWhiteSpace(selectedSlip.Supplier?.Email) ? "Add a supplier email before sending this order" : "Email this order and its PDF to the supplier")">Send to supplier</BbButton>
-                    @if (string.IsNullOrWhiteSpace(selectedSlip.Supplier?.Email))
-                    {
-                        <span class="self-center text-xs text-destructive">Supplier email required</span>
-                    }
-                }
-                @if (selectedSlip?.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
-                {
-                    <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="OpenReceiveModal">Record receipt</BbButton>
-                }
-                @if (selectedSlip?.Status == OrderSlipStatuses.PartiallyReceived)
-                {
-                    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.WarningActionClass" OnClick="() => OpenCloseRemaining(selectedSlip)">Close remaining</BbButton>
-                }
-            </div>
-        </div>
+    <div class="detail-footer">
+    <div class="detail-footer-group">
+    <BbButton Variant="ButtonVariant.Outline" Class="@OrderSlipPresentation.DetailsActionClass" OnClick="CloseDetail">Close</BbButton>
+    @if (selectedSlip != null)
+    {
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PrintSlip" title="Print this order slip" aria-label="Print this order slip"><LucideIcon Name="printer" Size="14" aria-hidden="true" /> Print</BbButton>
+    }
+    </div>
+    <div class="detail-footer-group">
+    <AuthorizeView Roles="Admin">
+    @if (selectedSlip?.Status == OrderSlipStatuses.Draft)
+    {
+    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.ApproveActionClass" OnClick="() => OpenApprove(selectedSlip)">Approve Order</BbButton>
+    }
+    </AuthorizeView>
+    @if (selectedSlip?.Status == OrderSlipStatuses.Approved)
+    {
+    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.SendActionClass" OnClick="() => OpenMarkOrdered(selectedSlip)" Disabled="@string.IsNullOrWhiteSpace(selectedSlip.Supplier?.Email)" title="@(string.IsNullOrWhiteSpace(selectedSlip.Supplier?.Email) ? "Add a supplier email before sending this order" : "Email this order and its PDF to the supplier")">Send to supplier</BbButton>
+    @if (string.IsNullOrWhiteSpace(selectedSlip.Supplier?.Email))
+    {
+    <span class="self-center text-xs text-destructive">Supplier email required</span>
+    }
+    }
+    @if (selectedSlip?.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
+    {
+    <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="OpenReceiveModal">Record receipt</BbButton>
+    }
+    @if (selectedSlip?.Status == OrderSlipStatuses.PartiallyReceived)
+    {
+    <BbButton Size="ButtonSize.Small" Class="@OrderSlipPresentation.WarningActionClass" OnClick="() => OpenCloseRemaining(selectedSlip)">Close remaining</BbButton>
+    }
+    </div>
+    </div>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-<BbDialog @bind-Open="approveOpen">
+    <BbDialog @bind-Open="approveOpen">
     <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
-            <BbDialogTitle>Approve draft order?</BbDialogTitle>
-            <BbDialogDescription>Confirm that this draft has been reviewed. Approval does not send the order to the supplier.</BbDialogDescription>
-        </BbDialogHeader>
-        @if (transitioningSlip != null)
-        {
-            <div class="min-h-0 space-y-4 overflow-y-auto py-1">
-                @TransitionSummary(transitioningSlip)
-                @TransitionError()
-            </div>
-        }
-        <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="CloseTransitionDialogs" Disabled="transitionBusy">Cancel</BbButton>
-            <BbButton Class="@OrderSlipPresentation.ApproveActionClass" OnClick="Approve" Disabled="transitionBusy">
-                @if (transitionBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                @(transitionBusy ? "Approving..." : "Approve draft")
-            </BbButton>
-        </BbDialogFooter>
+    <BbDialogHeader>
+    <BbDialogTitle>Approve draft order?</BbDialogTitle>
+    <BbDialogDescription>Confirm that this draft has been reviewed. Approval does not send the order to the supplier.</BbDialogDescription>
+    </BbDialogHeader>
+    @if (transitioningSlip != null)
+    {
+    <div class="min-h-0 space-y-4 overflow-y-auto py-1">
+    @TransitionSummary(transitioningSlip)
+    @TransitionError()
+    </div>
+    }
+    <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+    <BbButton Variant="ButtonVariant.Outline" OnClick="CloseTransitionDialogs" Disabled="transitionBusy">Cancel</BbButton>
+    <BbButton Class="@OrderSlipPresentation.ApproveActionClass" OnClick="Approve" Disabled="transitionBusy">
+    @if (transitionBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
+    @(transitionBusy ? "Approving..." : "Approve draft")
+    </BbButton>
+    </BbDialogFooter>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-<BbDialog @bind-Open="markOrderedOpen">
+    <BbDialog @bind-Open="markOrderedOpen">
     <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
-            <BbDialogTitle>Send order to supplier?</BbDialogTitle>
-            <BbDialogDescription>The supplier will receive the order summary and a PDF copy by email. The order changes to Ordered only after the email is sent successfully.</BbDialogDescription>
-        </BbDialogHeader>
-        @if (transitioningSlip != null)
-        {
-            <div class="min-h-0 space-y-4 overflow-y-auto">
-                @TransitionSummary(transitioningSlip)
-                <div class="rounded-lg border border-border bg-muted/20 p-4 text-sm">
-                    <div class="flex items-start gap-3">
-                        <LucideIcon Name="mail" Size="18" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-                        <div class="min-w-0">
-                            <p class="m-0 font-medium">Email recipient</p>
-                            <p class="mb-0 mt-1 break-all text-muted-foreground">@(transitioningSlip?.Supplier?.Email ?? "No supplier email")</p>
-                            <p class="mb-0 mt-2 text-xs text-muted-foreground">A PDF order slip will be attached automatically.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="rounded-lg border border-border bg-muted/20 p-4">
-                    <label for="history-expected-delivery" class="text-sm font-medium">Expected delivery date <span class="font-normal text-muted-foreground">(optional)</span></label>
-                    <p id="history-expected-delivery-help" class="mb-3 mt-1 text-xs text-muted-foreground">Add the estimated arrival date if it is known.</p>
-                    <input id="history-expected-delivery" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="expectedDeliveryDate" @bind:format="yyyy-MM-dd" aria-describedby="history-expected-delivery-help"
-                           class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground" />
-                </div>
-                @TransitionError()
-            </div>
-        }
-        <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="CloseTransitionDialogs" Disabled="transitionBusy">Cancel</BbButton>
-            <BbButton Class="@OrderSlipPresentation.SendActionClass" OnClick="MarkOrdered" Disabled="@(transitionBusy || string.IsNullOrWhiteSpace(transitioningSlip?.Supplier?.Email))">
-                @if (transitionBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                @(transitionBusy ? "Sending..." : "Send order")
-            </BbButton>
-        </BbDialogFooter>
+    <BbDialogHeader>
+    <BbDialogTitle>Send order to supplier?</BbDialogTitle>
+    <BbDialogDescription>The supplier will receive the order summary and a PDF copy by email. The order changes to Ordered only after the email is sent successfully.</BbDialogDescription>
+    </BbDialogHeader>
+    @if (transitioningSlip != null)
+    {
+    <div class="min-h-0 space-y-4 overflow-y-auto">
+    @TransitionSummary(transitioningSlip)
+    <div class="rounded-lg border border-border bg-muted/20 p-4 text-sm">
+    <div class="flex items-start gap-3">
+    <LucideIcon Name="mail" Size="18" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+    <div class="min-w-0">
+    <p class="m-0 font-medium">Email recipient</p>
+    <p class="mb-0 mt-1 break-all text-muted-foreground">@(transitioningSlip?.Supplier?.Email ?? "No supplier email")</p>
+    <p class="mb-0 mt-2 text-xs text-muted-foreground">A PDF order slip will be attached automatically.</p>
+    </div>
+    </div>
+    </div>
+    <div class="rounded-lg border border-border bg-muted/20 p-4">
+    <label for="history-expected-delivery" class="text-sm font-medium">Expected delivery date <span class="font-normal text-muted-foreground">(optional)</span></label>
+    <p id="history-expected-delivery-help" class="mb-3 mt-1 text-xs text-muted-foreground">Add the estimated arrival date if it is known.</p>
+    <input id="history-expected-delivery" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="expectedDeliveryDate" @bind:format="yyyy-MM-dd" aria-describedby="history-expected-delivery-help"
+    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground" />
+    </div>
+    @TransitionError()
+    </div>
+    }
+    <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+    <BbButton Variant="ButtonVariant.Outline" OnClick="CloseTransitionDialogs" Disabled="transitionBusy">Cancel</BbButton>
+    <BbButton Class="@OrderSlipPresentation.SendActionClass" OnClick="MarkOrdered" Disabled="@(transitionBusy || string.IsNullOrWhiteSpace(transitioningSlip?.Supplier?.Email))">
+    @if (transitionBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
+    @(transitionBusy ? "Sending..." : "Send order")
+    </BbButton>
+    </BbDialogFooter>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-<BbDialog @bind-Open="closeRemainingOpen" @bind-Open:after="OnCloseRemainingOpenChanged">
+    <BbDialog @bind-Open="closeRemainingOpen" @bind-Open:after="OnCloseRemainingOpenChanged">
     <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
-            <BbDialogTitle>Close the remaining order?</BbDialogTitle>
-            <BbDialogDescription>The quantities below will no longer count as incoming stock. Items already received will remain in inventory.</BbDialogDescription>
-        </BbDialogHeader>
-        <div class="min-h-0 space-y-4 overflow-y-auto py-1">
-            @if (closingSlip != null)
-            {
-                <div class="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-                    <p class="m-0 text-sm font-semibold">Items that will not arrive</p>
-                    <ul class="mb-0 mt-3 space-y-2 pl-5 text-sm">
-                        @foreach (var item in RemainingItems(closingSlip))
-                        {
-                            <li><span class="font-medium">@item.ProductName</span> — @Remaining(item) remaining</li>
-                        }
-                    </ul>
-                </div>
-                <label for="close-remaining-reason" class="block text-sm font-medium">Reason <span class="text-destructive" aria-hidden="true">*</span></label>
-                <textarea id="close-remaining-reason" @bind="closeRemainingReason" rows="3" maxlength="500" required aria-required="true" aria-describedby="close-remaining-help" class="min-h-24 w-full resize-y rounded-md border border-input bg-background p-3 text-sm text-foreground" placeholder="Why will the remaining items not arrive?"></textarea>
-                <p id="close-remaining-help" class="m-0 text-xs text-muted-foreground">This reason is kept with the order history.</p>
-                @if (!isAdmin)
-                {
-                    <div class="space-y-2 border-t border-border pt-4">
-                        <label for="close-remaining-admin" class="block text-sm font-medium">Approving admin</label>
-                        <select id="close-remaining-admin" @bind="closeRemainingAdminUserId" disabled="@isLoadingAdminOptions"
-                                class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                                aria-required="true" aria-describedby="close-remaining-admin-help">
-                            <option value="">@(isLoadingAdminOptions ? "Loading admins..." : "Select an admin")</option>
-                            @foreach (var admin in adminOptions)
-                            {
-                                <option value="@admin.Id">@admin.DisplayName</option>
-                            }
-                        </select>
-                        <p id="close-remaining-admin-help" class="m-0 text-xs @(adminOptions.Count == 0 && !isLoadingAdminOptions ? "text-destructive" : "text-muted-foreground")">
-                            @(adminOptions.Count == 0 && !isLoadingAdminOptions ? "No active admins are available." : "Choose the admin approving this one action.")
-                        </p>
+    <BbDialogHeader>
+    <BbDialogTitle>Close the remaining order?</BbDialogTitle>
+    <BbDialogDescription>The quantities below will no longer count as incoming stock. Items already received will remain in inventory.</BbDialogDescription>
+    </BbDialogHeader>
+    <div class="min-h-0 space-y-4 overflow-y-auto py-1">
+    @if (closingSlip != null)
+    {
+    <div class="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+    <p class="m-0 text-sm font-semibold">Items that will not arrive</p>
+    <ul class="mb-0 mt-3 space-y-2 pl-5 text-sm">
+    @foreach (var item in RemainingItems(closingSlip))
+    {
+    <li><span class="font-medium">@item.ProductName</span> — @Remaining(item) remaining</li>
+    }
+    </ul>
+    </div>
+    <label for="close-remaining-reason" class="block text-sm font-medium">Reason <span class="text-destructive" aria-hidden="true">*</span></label>
+    <textarea id="close-remaining-reason" @bind="closeRemainingReason" rows="3" maxlength="500" required aria-required="true" aria-describedby="close-remaining-help" class="min-h-24 w-full resize-none rounded-md border border-input bg-background p-3 text-sm text-foreground" placeholder="Why will the remaining items not arrive?"></textarea>
+    <p id="close-remaining-help" class="m-0 text-xs text-muted-foreground">This reason is kept with the order history.</p>
+    @if (!isAdmin)
+    {
+    <div class="space-y-2 border-t border-border pt-4">
+    <label for="close-remaining-admin" class="block text-sm font-medium">Approving admin</label>
+    <select id="close-remaining-admin" @bind="closeRemainingAdminUserId" disabled="@isLoadingAdminOptions"
+    class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+    aria-required="true" aria-describedby="close-remaining-admin-help">
+    <option value="">@(isLoadingAdminOptions ? "Loading admins..." : "Select an admin")</option>
+    @foreach (var admin in adminOptions)
+    {
+    <option value="@admin.Id">@admin.DisplayName</option>
+    }
+    </select>
+    <p id="close-remaining-admin-help" class="m-0 text-xs @(adminOptions.Count == 0 && !isLoadingAdminOptions ? "text-destructive" : "text-muted-foreground")">
+    @(adminOptions.Count == 0 && !isLoadingAdminOptions ? "No active admins are available." : "Choose the admin approving this one action.")
+    </p>
 
-                        <label for="close-remaining-admin-pin" class="block text-sm font-medium">Admin PIN</label>
-                        <div class="relative">
-                            <input id="close-remaining-admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-                                   autocomplete="one-time-code" @bind="closeRemainingAdminPin"
-                                   class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm text-foreground"
-                                   aria-required="true" aria-describedby="close-remaining-pin-help" />
-                            <button type="button" class="password-toggle-button" data-password-toggle data-password-target="close-remaining-admin-pin"
-                                    data-password-label="Admin PIN" aria-controls="close-remaining-admin-pin" aria-label="Show Admin PIN" aria-pressed="false">
-                                <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
-                                <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
-                            </button>
-                        </div>
-                        <p id="close-remaining-pin-help" class="m-0 text-xs text-muted-foreground">Ask the selected admin to enter their 6-digit PIN.</p>
-                    </div>
-                }
-            }
-            @if (!string.IsNullOrWhiteSpace(closeRemainingError))
-            {
-                <p role="alert" class="m-0 text-sm text-destructive">@closeRemainingError</p>
-            }
-        </div>
-        <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="CloseRemainingDialog" Disabled="closeRemainingBusy">Cancel</BbButton>
-            <BbButton Class="@OrderSlipPresentation.WarningActionClass" OnClick="CloseRemaining" Disabled="closeRemainingBusy">
-                @if (closeRemainingBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                @(closeRemainingBusy ? "Closing..." : "Close remaining")
-            </BbButton>
-        </BbDialogFooter>
+    <label for="close-remaining-admin-pin" class="block text-sm font-medium">Admin PIN</label>
+    <div class="relative">
+    <input id="close-remaining-admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+    autocomplete="one-time-code" @bind="closeRemainingAdminPin"
+    class="password-with-toggle h-10 w-full rounded-md border border-input bg-background px-3 pr-12 text-sm text-foreground"
+    aria-required="true" aria-describedby="close-remaining-pin-help" />
+    <button type="button" class="password-toggle-button" data-password-toggle data-password-target="close-remaining-admin-pin"
+    data-password-label="Admin PIN" aria-controls="close-remaining-admin-pin" aria-label="Show Admin PIN" aria-pressed="false">
+    <span data-password-icon-show aria-hidden="true"><LucideIcon Name="eye-off" Size="18" /></span>
+    <span class="hidden" data-password-icon-hide aria-hidden="true"><LucideIcon Name="eye" Size="18" /></span>
+    </button>
+    </div>
+    <p id="close-remaining-pin-help" class="m-0 text-xs text-muted-foreground">Ask the selected admin to enter their 6-digit PIN.</p>
+    </div>
+    }
+    }
+    @if (!string.IsNullOrWhiteSpace(closeRemainingError))
+    {
+    <p role="alert" class="m-0 text-sm text-destructive">@closeRemainingError</p>
+    }
+    </div>
+    <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+    <BbButton Variant="ButtonVariant.Outline" OnClick="CloseRemainingDialog" Disabled="closeRemainingBusy">Cancel</BbButton>
+    <BbButton Class="@OrderSlipPresentation.WarningActionClass" OnClick="CloseRemaining" Disabled="closeRemainingBusy">
+    @if (closeRemainingBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
+    @(closeRemainingBusy ? "Closing..." : "Close remaining")
+    </BbButton>
+    </BbDialogFooter>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-@* RECEIVE MODAL *@
-<BbDialog @bind-Open="receiveOpen">
+    @* RECEIVE MODAL *@
+    <BbDialog @bind-Open="receiveOpen">
     <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,45rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
-            <BbDialogTitle>Record Receipt</BbDialogTitle>
-            <BbDialogDescription>Enter quantities received in this delivery. Partial receipts remain open.</BbDialogDescription>
-        </BbDialogHeader>
-        @if (selectedSlip != null)
-        {
-            <div class="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-3">
-                <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-received-date">
-                    Received date
-                    <input id="history-received-date" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" type="date" @bind="receiveDate" @bind:format="yyyy-MM-dd" />
-                </label>
-                <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-supplier-reference">
-                    Supplier reference
-                    <input id="history-supplier-reference" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" @bind="receiveRef" maxlength="100" placeholder="Optional" />
-                </label>
-                <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-receipt-remarks">
-                    Remarks
-                    <input id="history-receipt-remarks" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" @bind="receiveRemarks" maxlength="500" placeholder="Optional" />
-                </label>
-            </div>
-            @if (!string.IsNullOrWhiteSpace(receiveError)) { <div role="alert" class="notice error">@receiveError</div> }
-            <div class="min-h-0 overflow-y-auto rounded-lg border border-border">
-                    <table class="receive-table">
-                        <thead><tr><th>Product</th><th>Ordered</th><th>Previously Received</th><th>Receive Now</th></tr></thead>
-                        <tbody>
-                            @foreach (var item in selectedSlip.Items)
-                            {
-                                var ordered = item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity;
-                                var remaining = ordered - item.ReceivedQuantity;
-                                <tr>
-                                    <td>@item.ProductName</td>
-                                    <td data-label="Ordered">@ordered</td>
-                                    <td data-label="Prev Received" class="@(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
-                                    <td data-label="Receive Now">
-                                        <div class="flex items-center justify-end gap-2">
-                                            <label class="sr-only" for="history-receive-@item.Id">Quantity received for @item.ProductName</label>
-                                            <input id="history-receive-@item.Id" class="order-receipt-quantity" type="number" min="0" max="@remaining" inputmode="numeric" title="Enter quantity received" @bind="receiveQtys[item.Id]" />
-                                            <span class="text-[10px] text-muted-foreground whitespace-nowrap">@(receiveQtys.GetValueOrDefault(item.Id) >= remaining && remaining > 0 ? "full" : $"{remaining - receiveQtys.GetValueOrDefault(item.Id)} left")</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-            </div>
-        }
-        <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="() => receiveOpen = false">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="RequestReceiptConfirmation" Disabled="@(receiveBusy || receiveConfirmationOpen)">Save Receipt</BbButton>
-        </BbDialogFooter>
+    <BbDialogHeader>
+    <BbDialogTitle>Record Receipt</BbDialogTitle>
+    <BbDialogDescription>Enter quantities received in this delivery. Partial receipts remain open.</BbDialogDescription>
+    </BbDialogHeader>
+    @if (selectedSlip != null)
+    {
+    <div class="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-3">
+    <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-received-date">
+    Received date
+    <input id="history-received-date" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" type="date" @bind="receiveDate" @bind:format="yyyy-MM-dd" />
+    </label>
+    <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-supplier-reference">
+    Supplier reference
+    <input id="history-supplier-reference" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" @bind="receiveRef" maxlength="100" placeholder="Optional" />
+    </label>
+    <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-receipt-remarks">
+    Remarks
+    <input id="history-receipt-remarks" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" @bind="receiveRemarks" maxlength="500" placeholder="Optional" />
+    </label>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(receiveError)) { <div role="alert" class="notice error">@receiveError</div> }
+    <div class="min-h-0 overflow-y-auto rounded-lg border border-border">
+    <table class="receive-table">
+    <thead><tr><th>Product</th><th>Ordered</th><th>Previously Received</th><th>Receive Now</th></tr></thead>
+    <tbody>
+    @foreach (var item in selectedSlip.Items)
+    {
+    var ordered = item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity;
+    var remaining = ordered - item.ReceivedQuantity;
+    <tr>
+    <td>@item.ProductName</td>
+    <td data-label="Ordered">@ordered</td>
+    <td data-label="Prev Received" class="@(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
+    <td data-label="Receive Now">
+    <div class="flex items-center justify-end gap-2">
+    <label class="sr-only" for="history-receive-@item.Id">Quantity received for @item.ProductName</label>
+    <input id="history-receive-@item.Id" class="order-receipt-quantity" type="number" min="0" max="@remaining" inputmode="numeric" title="Enter quantity received" @bind="receiveQtys[item.Id]" />
+    <span class="text-[10px] text-muted-foreground whitespace-nowrap">@(receiveQtys.GetValueOrDefault(item.Id) >= remaining && remaining > 0 ? "full" : $"{remaining - receiveQtys.GetValueOrDefault(item.Id)} left")</span>
+    </div>
+    </td>
+    </tr>
+    }
+    </tbody>
+    </table>
+    </div>
+    }
+    <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+    <BbButton Variant="ButtonVariant.Outline" OnClick="() => receiveOpen = false">Cancel</BbButton>
+    <BbButton Variant="ButtonVariant.Default" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="RequestReceiptConfirmation" Disabled="@(receiveBusy || receiveConfirmationOpen)">Save Receipt</BbButton>
+    </BbDialogFooter>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-<BbDialog @bind-Open="receiveConfirmationOpen">
+    <BbDialog @bind-Open="receiveConfirmationOpen">
     <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,32rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
-            <BbDialogTitle>Record this stock receipt?</BbDialogTitle>
-            <BbDialogDescription>Confirm the delivered quantities. Product stock will increase immediately.</BbDialogDescription>
-        </BbDialogHeader>
-        <div class="min-h-0 space-y-4 overflow-y-auto">
-            <div class="rounded-lg border border-border bg-muted/30">
-                @foreach (var line in ReceiptLines)
-                {
-                    <div class="flex items-center justify-between gap-4 border-b border-border px-3 py-2 text-sm last:border-b-0">
-                        <span class="min-w-0 truncate font-medium">@line.Name</span>
-                        <span class="shrink-0 font-semibold">+@line.Quantity unit@(line.Quantity == 1 ? "" : "s")</span>
-                    </div>
-                }
-            </div>
-            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <dt class="text-muted-foreground">Affected SKUs</dt><dd class="m-0 text-right font-medium">@ReceiptLines.Count</dd>
-                <dt class="text-muted-foreground">Total units</dt><dd class="m-0 text-right font-medium">@ReceiptLines.Sum(line => line.Quantity)</dd>
-                <dt class="text-muted-foreground">Received date</dt><dd class="m-0 text-right font-medium">@receiveDate.ToString("MMM dd, yyyy")</dd>
-                <dt class="text-muted-foreground">Supplier reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(receiveRef) ? "None" : receiveRef)</dd>
-            </dl>
-            @if (!string.IsNullOrWhiteSpace(receiveError)) { <p role="alert" class="text-sm text-destructive">@receiveError</p> }
-        </div>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="() => receiveConfirmationOpen = false" Disabled="receiveBusy">Go back</BbButton>
-            <BbButton Variant="ButtonVariant.Default" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="SaveReceipt" Disabled="receiveBusy">
-                @if (receiveBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
-                @(receiveBusy ? "Recording..." : "Record receipt")
-            </BbButton>
-        </BbDialogFooter>
+    <BbDialogHeader>
+    <BbDialogTitle>Record this stock receipt?</BbDialogTitle>
+    <BbDialogDescription>Confirm the delivered quantities. Product stock will increase immediately.</BbDialogDescription>
+    </BbDialogHeader>
+    <div class="min-h-0 space-y-4 overflow-y-auto">
+    <div class="rounded-lg border border-border bg-muted/30">
+    @foreach (var line in ReceiptLines)
+    {
+    <div class="flex items-center justify-between gap-4 border-b border-border px-3 py-2 text-sm last:border-b-0">
+    <span class="min-w-0 truncate font-medium">@line.Name</span>
+    <span class="shrink-0 font-semibold">+@line.Quantity unit@(line.Quantity == 1 ? "" : "s")</span>
+    </div>
+    }
+    </div>
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+    <dt class="text-muted-foreground">Affected SKUs</dt><dd class="m-0 text-right font-medium">@ReceiptLines.Count</dd>
+    <dt class="text-muted-foreground">Total units</dt><dd class="m-0 text-right font-medium">@ReceiptLines.Sum(line => line.Quantity)</dd>
+    <dt class="text-muted-foreground">Received date</dt><dd class="m-0 text-right font-medium">@receiveDate.ToString("MMM dd, yyyy")</dd>
+    <dt class="text-muted-foreground">Supplier reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(receiveRef) ? "None" : receiveRef)</dd>
+    </dl>
+    @if (!string.IsNullOrWhiteSpace(receiveError)) { <p role="alert" class="text-sm text-destructive">@receiveError</p> }
+    </div>
+    <BbDialogFooter>
+    <BbButton Variant="ButtonVariant.Outline" OnClick="() => receiveConfirmationOpen = false" Disabled="receiveBusy">Go back</BbButton>
+    <BbButton Variant="ButtonVariant.Default" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="SaveReceipt" Disabled="receiveBusy">
+    @if (receiveBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
+    @(receiveBusy ? "Recording..." : "Record receipt")
+    </BbButton>
+    </BbDialogFooter>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-@* CANCEL DIALOG *@
-<BbDialog @bind-Open="cancelOpen">
+    @* CANCEL DIALOG *@
+    <BbDialog @bind-Open="cancelOpen">
     <BbDialogContent class="flex flex-col" Style="width:min(96vw,440px);">
-        <BbDialogHeader><BbDialogTitle>Cancel Order Slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription></BbDialogHeader>
-        <div class="py-2 flex flex-col gap-3">
-            <label class="flex flex-col gap-1 text-sm font-medium">Reason<textarea @bind="cancelReason" rows="3" maxlength="500" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
-        </div>
-        <div class="flex justify-end gap-2 pt-3 border-t border-border">
-            <BbButton Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Back</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel">Cancel Order</BbButton>
-        </div>
+    <BbDialogHeader><BbDialogTitle>Cancel Order Slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription></BbDialogHeader>
+    <div class="py-2 flex flex-col gap-3">
+    <label class="flex flex-col gap-1 text-sm font-medium">Reason<textarea @bind="cancelReason" rows="3" maxlength="500" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-none min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
+    </div>
+    <div class="flex justify-end gap-2 pt-3 border-t border-border">
+    <BbButton Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Back</BbButton>
+    <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel">Cancel Order</BbButton>
+    </div>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-@code {
+    @code {
     private static readonly string[] Statuses = [OrderSlipStatuses.Draft, OrderSlipStatuses.Approved, OrderSlipStatuses.Ordered, OrderSlipStatuses.PartiallyReceived, OrderSlipStatuses.Completed, OrderSlipStatuses.ClosedShort, OrderSlipStatuses.Cancelled];
     private List<OrderSlip>? slips;
     private List<OrderSlip> filteredSlips = new();
@@ -715,544 +715,544 @@
 
     private void ToggleSort(string column)
     {
-        if (sortColumn == column) sortAsc = !sortAsc;
-        else { sortColumn = column; sortAsc = true; }
+    if (sortColumn == column) sortAsc = !sortAsc;
+    else { sortColumn = column; sortAsc = true; }
         ApplySort();
-    }
+        }
 
-    private string SortArrow(string column)
-    {
+        private string SortArrow(string column)
+        {
         if (sortColumn != column) return "";
-        return sortAsc ? " ▲" : " ▼";
-    }
+            return sortAsc ? " ▲" : " ▼";
+            }
 
-    private void ApplyFilter()
-    {
-        filteredSlips = (slips ?? new())
+            private void ApplyFilter()
+            {
+            filteredSlips = (slips ?? new())
             .Where(s => (string.IsNullOrEmpty(statusFilter) || s.Status == statusFilter) && MatchesSearch(s))
             .ToList();
-        ApplySort();
-    }
+            ApplySort();
+            }
 
-    private bool MatchesSearch(OrderSlip s)
-    {
-        if (string.IsNullOrWhiteSpace(searchTerm)) return true;
-        var search = searchTerm.Trim();
-        return DisplayNumber(s).Contains(search, StringComparison.OrdinalIgnoreCase) ||
-               (s.Supplier?.Name ?? "").Contains(search, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void ApplySort()
-    {
-        filteredSlips = (sortColumn, sortAsc) switch
-        {
-            ("number", true) => filteredSlips.OrderBy(s => DisplayNumber(s)).ToList(),
-            ("number", false) => filteredSlips.OrderByDescending(s => DisplayNumber(s)).ToList(),
-            ("supplier", true) => filteredSlips.OrderBy(s => s.Supplier?.Name ?? string.Empty).ToList(),
-            ("supplier", false) => filteredSlips.OrderByDescending(s => s.Supplier?.Name ?? string.Empty).ToList(),
-            ("status", true) => filteredSlips.OrderBy(s => s.Status).ToList(),
-            ("status", false) => filteredSlips.OrderByDescending(s => s.Status).ToList(),
-            ("generated", true) => filteredSlips.OrderBy(s => GeneratedDate(s)).ToList(),
-            ("generated", false) => filteredSlips.OrderByDescending(s => GeneratedDate(s)).ToList(),
-            ("expected", true) => filteredSlips.OrderBy(s => s.ExpectedDeliveryDate ?? DateTime.MaxValue).ToList(),
-            ("expected", false) => filteredSlips.OrderByDescending(s => s.ExpectedDeliveryDate ?? DateTime.MinValue).ToList(),
-            _ => filteredSlips
-        };
-    }
-
-    protected override async Task OnInitializedAsync()
-    {
-        var authState = await AuthenticationState.GetAuthenticationStateAsync();
-        isAdmin = authState.User.IsInRole("Admin");
-        if (!isAdmin) await LoadAdminOptions();
-        await Load();
-        if (RequestedOrderSlipId is int requestedId)
-        {
-            await OpenDetailById(requestedId);
-        }
-    }
-
-    private async Task Load()
-    {
-        var q = Db.OrderSlips.AsNoTracking().Include(x => x.Supplier).AsQueryable();
-        slips = await q.OrderByDescending(x => x.GeneratedAt).ThenByDescending(x => x.Id).ToListAsync();
-        ApplyFilter();
-    }
-
-    private static string DisplayNumber(OrderSlip x) =>
-        string.IsNullOrWhiteSpace(x.OrderSlipNumber) ? x.SlipNumber : x.OrderSlipNumber;
-
-    private static DateTime GeneratedDate(OrderSlip x) =>
-        x.GeneratedAt == default ? x.DateGenerated : x.GeneratedAt;
-
-    private async Task OpenDetail(OrderSlip slip)
-        => await OpenDetailById(slip.Id);
-
-    private async Task OpenDetailById(int id)
-    {
-        selectedSlip = await Db.OrderSlips.AsNoTracking()
-            .Include(x => x.Supplier)
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == id);
-        detailOpen = selectedSlip != null;
-        if (selectedSlip == null)
-        {
-            error = "That order slip could not be found.";
-        }
-    }
-
-    private async Task<OrderSlip?> LoadSlip(int id) => await Db.OrderSlips.AsNoTracking()
-        .Include(x => x.Supplier).Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id);
-
-    private async Task OpenApprove(OrderSlip? slip)
-    {
-        if (slip == null || transitionBusy) return;
-        transitioningSlip = await LoadSlip(slip.Id);
-        if (transitioningSlip?.Status != OrderSlipStatuses.Draft)
-        {
-            Toast.Warning("This order slip has already changed. The list has been refreshed.", "Order updated");
-            await Load();
-            return;
-        }
-        transitionError = "";
-        approveOpen = true;
-    }
-
-    private async Task OpenMarkOrdered(OrderSlip? slip)
-    {
-        if (slip == null || transitionBusy) return;
-        transitioningSlip = await LoadSlip(slip.Id);
-        if (transitioningSlip?.Status != OrderSlipStatuses.Approved)
-        {
-            Toast.Warning("This order slip has already changed. The list has been refreshed.", "Order updated");
-            await Load();
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(transitioningSlip.Supplier?.Email))
-        {
-            Toast.Warning("Add an email address to this supplier before sending the order.", "Supplier email missing");
-            transitioningSlip = null;
-            return;
-        }
-        expectedDeliveryDate = transitioningSlip.ExpectedDeliveryDate?.Date;
-        transitionError = "";
-        markOrderedOpen = true;
-    }
-
-    private void CloseTransitionDialogs()
-    {
-        if (transitionBusy) return;
-        approveOpen = false;
-        markOrderedOpen = false;
-        transitioningSlip = null;
-        transitionError = "";
-    }
-
-    private Task Approve() => SubmitTransition("approve", "Order approved", "The order slip is now ready to be placed with the supplier.", null);
-
-    private Task MarkOrdered()
-    {
-        if (expectedDeliveryDate.HasValue && expectedDeliveryDate.Value.Date < DateTime.Today)
-        {
-            transitionError = "Choose today or a future date for the expected delivery.";
-            return Task.CompletedTask;
-        }
-        return SubmitTransition("send-to-supplier", "Order sent", "The supplier received the order email and attached PDF. You can now record deliveries.", expectedDeliveryDate);
-    }
-
-    private async Task OpenCloseRemaining(OrderSlip? slip)
-    {
-        if (slip == null || closeRemainingBusy) return;
-        closingSlip = await LoadSlip(slip.Id);
-        if (closingSlip?.Status != OrderSlipStatuses.PartiallyReceived)
-        {
-            Toast.Warning("This order is no longer partially received. The list has been refreshed.", "Order updated");
-            await Load();
-            closingSlip = null;
-            return;
-        }
-        closeRemainingReason = "";
-        closeRemainingAdminUserId = "";
-        closeRemainingAdminPin = "";
-        closeRemainingError = "";
-        closeRemainingOpen = true;
-    }
-
-    private void CloseRemainingDialog()
-    {
-        if (closeRemainingBusy) return;
-        closeRemainingOpen = false;
-        closingSlip = null;
-        closeRemainingReason = "";
-        closeRemainingAdminUserId = "";
-        closeRemainingAdminPin = "";
-        closeRemainingError = "";
-    }
-
-    private void OnCloseRemainingOpenChanged()
-    {
-        if (!closeRemainingOpen && !closeRemainingBusy)
-        {
-            closingSlip = null;
-            closeRemainingReason = "";
-            closeRemainingAdminUserId = "";
-            closeRemainingAdminPin = "";
-            closeRemainingError = "";
-        }
-    }
-
-    private async Task CloseRemaining()
-    {
-        if (closingSlip == null || closeRemainingBusy) return;
-        if (string.IsNullOrWhiteSpace(closeRemainingReason))
-        {
-            Toast.Error("Enter a reason before closing the remaining order.", "Reason required");
-            return;
-        }
-        if (!isAdmin && (string.IsNullOrWhiteSpace(closeRemainingAdminUserId)
-            || closeRemainingAdminPin.Length != 6 || !closeRemainingAdminPin.All(char.IsDigit)))
-        {
-            Toast.Error("Select the approving admin and enter their 6-digit PIN.", "Approval required");
-            return;
-        }
-
-        closeRemainingBusy = true;
-        closeRemainingError = "";
-        var changedId = closingSlip.Id;
-        try
-        {
-            var command = new CloseOrderSlipShortCommand
+            private bool MatchesSearch(OrderSlip s)
             {
-                OrderSlipId = closingSlip.Id,
-                ActingUserId = await UserId(),
-                AdminUserId = isAdmin ? null : closeRemainingAdminUserId,
-                AdminPin = isAdmin ? null : closeRemainingAdminPin,
-                Reason = closeRemainingReason.Trim(),
-                RowVersion = closingSlip.RowVersion
-            };
-            var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command)));
-            var raw = await JS.InvokeAsync<string>("stockSenseApi.postJsonBase64", $"/api/order-slips/{closingSlip.Id}/close-remaining", payload);
-            var response = JsonSerializer.Deserialize<ApiTransitionResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (response?.Ok != true)
-            {
-                if (response?.Status == 409 && ResponseCode(response) != "EMAIL_SENT_STATUS_CONFLICT")
-                {
-                    closeRemainingOpen = false;
-                    await Load();
-                    if (detailOpen) selectedSlip = await LoadSlip(changedId);
-                    closingSlip = null;
-                    Toast.Warning("Someone else updated this order. The latest information is now displayed.", "Order updated");
-                    return;
+            if (string.IsNullOrWhiteSpace(searchTerm)) return true;
+                var search = searchTerm.Trim();
+                return DisplayNumber(s).Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                (s.Supplier?.Name ?? "").Contains(search, StringComparison.OrdinalIgnoreCase);
                 }
-                closeRemainingError = FriendlyTransitionError(response);
-                return;
-            }
 
-            closeRemainingOpen = false;
-            closingSlip = null;
-            closeRemainingAdminPin = "";
-            await Load();
-            if (detailOpen) selectedSlip = await LoadSlip(changedId);
-            Toast.Success("The unreceived quantities no longer count as incoming stock.", "Remaining order closed");
-        }
-        catch
-        {
-            closeRemainingError = "The remaining order could not be closed. Check your connection and try again.";
-        }
-        finally
-        {
-            closeRemainingBusy = false;
-            closeRemainingAdminPin = "";
-        }
-    }
-
-    private bool HasSecondaryActions(OrderSlip slip) =>
-        slip.Status == OrderSlipStatuses.PartiallyReceived || (isAdmin && CanCancel(slip));
-
-    private static string MoreOptionsLabel(OrderSlip slip) =>
-        $"More options for order {DisplayNumber(slip)}";
-
-    private static bool CanCancel(OrderSlip slip) =>
-        slip.Status is not (OrderSlipStatuses.Completed or OrderSlipStatuses.ClosedShort or OrderSlipStatuses.Cancelled);
-
-    private async Task LoadAdminOptions()
-    {
-        isLoadingAdminOptions = true;
-        try
-        {
-            var now = DateTimeOffset.UtcNow;
-            adminOptions = await (
-                from user in Db.Users.AsNoTracking()
-                join userRole in Db.UserRoles.AsNoTracking() on user.Id equals userRole.UserId
-                join role in Db.Roles.AsNoTracking() on userRole.RoleId equals role.Id
-                where role.NormalizedName == "ADMIN" && (!user.LockoutEnd.HasValue || user.LockoutEnd <= now)
-                let fullName = (user.FirstName + " " + user.LastName).Trim()
-                orderby fullName, user.Id
-                select new AdminOption(user.Id, fullName == "" ? "Administrator" : fullName))
-                .ToListAsync();
-        }
-        catch { adminOptions = []; }
-        finally { isLoadingAdminOptions = false; }
-    }
-
-    private static int Remaining(OrderSlipItem item) =>
-        Math.Max(0, (item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity) - item.ReceivedQuantity);
-
-    private static IEnumerable<OrderSlipItem> RemainingItems(OrderSlip order) =>
-        order.Items.Where(item => Remaining(item) > 0);
-
-    private async Task SubmitTransition(string route, string successTitle, string successMessage, DateTime? expectedDate)
-    {
-        if (transitioningSlip == null || transitionBusy) return;
-        transitionBusy = true;
-        transitionError = "";
-        try
-        {
-            var command = new OrderSlipTransitionCommand
-            {
-                RowVersion = transitioningSlip.RowVersion,
-                ExpectedDeliveryDate = expectedDate
-            };
-            var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command)));
-            var raw = await JS.InvokeAsync<string>("stockSenseApi.postJsonBase64", $"/api/order-slips/{transitioningSlip.Id}/{route}", payload);
-            var response = JsonSerializer.Deserialize<ApiTransitionResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (response?.Ok != true)
-            {
-                if (response?.Status == 409 && ResponseCode(response) != "EMAIL_SENT_STATUS_CONFLICT")
+                private void ApplySort()
                 {
-                    var conflictedId = transitioningSlip.Id;
-                    approveOpen = false;
-                    markOrderedOpen = false;
-                    await Load();
-                    if (detailOpen) selectedSlip = await LoadSlip(conflictedId);
-                    transitioningSlip = null;
-                    Toast.Warning("Someone else updated this order slip. The latest information is now displayed.", "Order updated");
-                    return;
+                filteredSlips = (sortColumn, sortAsc) switch
+                {
+                ("number", true) => filteredSlips.OrderBy(s => DisplayNumber(s)).ToList(),
+                ("number", false) => filteredSlips.OrderByDescending(s => DisplayNumber(s)).ToList(),
+                ("supplier", true) => filteredSlips.OrderBy(s => s.Supplier?.Name ?? string.Empty).ToList(),
+                ("supplier", false) => filteredSlips.OrderByDescending(s => s.Supplier?.Name ?? string.Empty).ToList(),
+                ("status", true) => filteredSlips.OrderBy(s => s.Status).ToList(),
+                ("status", false) => filteredSlips.OrderByDescending(s => s.Status).ToList(),
+                ("generated", true) => filteredSlips.OrderBy(s => GeneratedDate(s)).ToList(),
+                ("generated", false) => filteredSlips.OrderByDescending(s => GeneratedDate(s)).ToList(),
+                ("expected", true) => filteredSlips.OrderBy(s => s.ExpectedDeliveryDate ?? DateTime.MaxValue).ToList(),
+                ("expected", false) => filteredSlips.OrderByDescending(s => s.ExpectedDeliveryDate ?? DateTime.MinValue).ToList(),
+                _ => filteredSlips
+                };
                 }
-                transitionError = FriendlyTransitionError(response);
-                return;
-            }
 
-            var changedId = transitioningSlip.Id;
-            approveOpen = false;
-            markOrderedOpen = false;
-            await Load();
-            if (detailOpen) selectedSlip = await LoadSlip(changedId);
-            transitioningSlip = null;
-            Toast.Success(successMessage, successTitle);
-        }
-        catch
-        {
-            transitionError = "The order slip could not be updated. Check your connection and try again.";
-        }
-        finally { transitionBusy = false; }
-    }
+                protected override async Task OnInitializedAsync()
+                {
+                var authState = await AuthenticationState.GetAuthenticationStateAsync();
+                isAdmin = authState.User.IsInRole("Admin");
+                if (!isAdmin) await LoadAdminOptions();
+                    await Load();
+                    if (RequestedOrderSlipId is int requestedId)
+                        {
+                        await OpenDetailById(requestedId);
+                        }
+                        }
 
-    private static string FriendlyTransitionError(ApiTransitionResponse? response)
-    {
-        if (response?.Status == 403) return "You do not have permission to perform this action.";
-        if (!string.IsNullOrWhiteSpace(response?.Body))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(response.Body);
-                if (document.RootElement.TryGetProperty("error", out var errorValue) && !string.IsNullOrWhiteSpace(errorValue.GetString()))
-                    return errorValue.GetString()!;
-            }
-            catch (JsonException) { }
-        }
-        return "The order slip could not be updated. Please refresh the page and try again.";
-    }
+                        private async Task Load()
+                        {
+                        var q = Db.OrderSlips.AsNoTracking().Include(x => x.Supplier).AsQueryable();
+                        slips = await q.OrderByDescending(x => x.GeneratedAt).ThenByDescending(x => x.Id).ToListAsync();
+                        ApplyFilter();
+                        }
 
-    private static string? ResponseCode(ApiTransitionResponse? response)
-    {
-        if (string.IsNullOrWhiteSpace(response?.Body)) return null;
-        try
-        {
-            using var document = JsonDocument.Parse(response.Body);
-            return document.RootElement.TryGetProperty("code", out var value) ? value.GetString() : null;
-        }
-        catch (JsonException) { return null; }
-    }
+                        private static string DisplayNumber(OrderSlip x) =>
+                        string.IsNullOrWhiteSpace(x.OrderSlipNumber) ? x.SlipNumber : x.OrderSlipNumber;
 
-    private RenderFragment TransitionSummary(OrderSlip order) => @<section aria-label="Order summary" class="space-y-3">
-        <div class="rounded-lg border border-border p-4">
-            <dl class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 text-sm">
-                <dt class="text-muted-foreground">Order reference</dt>
-                <dd class="m-0 max-w-52 truncate text-right font-mono text-xs font-medium" title="@DisplayNumber(order)" aria-label="Order reference: @DisplayNumber(order)">@CompactReference(DisplayNumber(order))</dd>
-                <dt class="text-muted-foreground">Supplier</dt><dd class="m-0 max-w-52 break-words text-right font-medium">@(order.Supplier?.Name ?? "Unknown supplier")</dd>
-                <dt class="text-muted-foreground">Items</dt><dd class="m-0 text-right font-medium">@order.Items.Count</dd>
-            </dl>
-            <div class="mt-4 flex items-end justify-between gap-4 border-t border-border pt-4">
-                <span class="text-sm text-muted-foreground">Estimated total</span>
-                <strong class="text-xl text-foreground">@($"₱{order.TotalEstimatedCost:N2}")</strong>
-            </div>
-        </div>
-    </section>;
+                        private static DateTime GeneratedDate(OrderSlip x) =>
+                        x.GeneratedAt == default ? x.DateGenerated : x.GeneratedAt;
 
-    private RenderFragment TransitionError() => @<text>@if (!string.IsNullOrWhiteSpace(transitionError)) { <p role="alert" class="m-0 text-sm text-destructive">@transitionError</p> }</text>;
+                        private async Task OpenDetail(OrderSlip slip)
+                        => await OpenDetailById(slip.Id);
 
-    private static string CompactReference(string value) =>
-        value.Length <= 24 ? value : $"{value[..12]}…{value[^8..]}";
+                        private async Task OpenDetailById(int id)
+                        {
+                        selectedSlip = await Db.OrderSlips.AsNoTracking()
+                        .Include(x => x.Supplier)
+                        .Include(x => x.Items)
+                        .FirstOrDefaultAsync(x => x.Id == id);
+                        detailOpen = selectedSlip != null;
+                        if (selectedSlip == null)
+                            {
+                            error = "That order slip could not be found.";
+                            }
+                            }
 
-    private sealed class ApiTransitionResponse
-    {
-        public bool Ok { get; set; }
-        public int Status { get; set; }
-        public string Body { get; set; } = "";
-    }
-    private void CloseDetail() => detailOpen = false;
+                            private async Task<OrderSlip?> LoadSlip(int id) => await Db.OrderSlips.AsNoTracking()
+                            .Include(x => x.Supplier).Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id);
 
-    private void OnDetailOpenChanged()
-    {
-        if (detailOpen) return;
-        selectedSlip = null;
-        if (RequestedOrderSlipId.HasValue)
-        {
-            Navigation.NavigateTo("/admin/order-history", replace: true);
-        }
-    }
+                            private async Task OpenApprove(OrderSlip? slip)
+                            {
+                            if (slip == null || transitionBusy) return;
+                                transitioningSlip = await LoadSlip(slip.Id);
+                                if (transitioningSlip?.Status != OrderSlipStatuses.Draft)
+                                    {
+                                    Toast.Warning("This order slip has already changed. The list has been refreshed.", "Order updated");
+                                    await Load();
+                                    return;
+                                    }
+                                    transitionError = "";
+                                    approveOpen = true;
+                                    }
 
-    private async Task PrintSlip()
-    {
-        if (selectedSlip == null) return;
-        await JS.InvokeVoidAsync("print");
-    }
+                                    private async Task OpenMarkOrdered(OrderSlip? slip)
+                                    {
+                                    if (slip == null || transitionBusy) return;
+                                        transitioningSlip = await LoadSlip(slip.Id);
+                                        if (transitioningSlip?.Status != OrderSlipStatuses.Approved)
+                                            {
+                                            Toast.Warning("This order slip has already changed. The list has been refreshed.", "Order updated");
+                                            await Load();
+                                            return;
+                                            }
+                                            if (string.IsNullOrWhiteSpace(transitioningSlip.Supplier?.Email))
+                                                {
+                                                Toast.Warning("Add an email address to this supplier before sending the order.", "Supplier email missing");
+                                                transitioningSlip = null;
+                                                return;
+                                                }
+                                                expectedDeliveryDate = transitioningSlip.ExpectedDeliveryDate?.Date;
+                                                transitionError = "";
+                                                markOrderedOpen = true;
+                                                }
 
-    private async Task OpenDetailForReceive(OrderSlip slip)
-    {
-        selectedSlip = await Db.OrderSlips.AsNoTracking()
-            .Include(x => x.Supplier)
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == slip.Id);
-        OpenReceiveModal();
-    }
+                                                private void CloseTransitionDialogs()
+                                                {
+                                                if (transitionBusy) return;
+                                                    approveOpen = false;
+                                                    markOrderedOpen = false;
+                                                    transitioningSlip = null;
+                                                    transitionError = "";
+                                                    }
 
-    private void OpenReceiveModal()
-    {
-        if (selectedSlip == null) return;
-        receiveQtys = selectedSlip.Items.ToDictionary(x => x.Id,
-            x => Math.Max(0, (x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity) - x.ReceivedQuantity));
-        receiveDate = DateTime.Today;
-        receiveRef = "";
-        receiveRemarks = "";
-        receiveError = "";
-        receiveOpen = true;
-    }
+                                                    private Task Approve() => SubmitTransition("approve", "Order approved", "The order slip is now ready to be placed with the supplier.", null);
 
-    private List<ReceiptLine> ReceiptLines => selectedSlip?.Items
-        .Select(item => new ReceiptLine(item.ProductName, receiveQtys.GetValueOrDefault(item.Id)))
-        .Where(item => item.Quantity > 0)
-        .ToList() ?? [];
+                                                    private Task MarkOrdered()
+                                                    {
+                                                    if (expectedDeliveryDate.HasValue && expectedDeliveryDate.Value.Date < DateTime.Today)
+                                                        {
+                                                        transitionError = "Choose today or a future date for the expected delivery.";
+                                                        return Task.CompletedTask;
+                                                        }
+                                                        return SubmitTransition("send-to-supplier", "Order sent", "The supplier received the order email and attached PDF. You can now record deliveries.", expectedDeliveryDate);
+                                                        }
 
-    private void RequestReceiptConfirmation()
-    {
-        if (receiveBusy || selectedSlip == null) return;
-        if (!ValidateReceipt()) return;
-        receiveConfirmationOpen = true;
-    }
+                                                        private async Task OpenCloseRemaining(OrderSlip? slip)
+                                                        {
+                                                        if (slip == null || closeRemainingBusy) return;
+                                                            closingSlip = await LoadSlip(slip.Id);
+                                                            if (closingSlip?.Status != OrderSlipStatuses.PartiallyReceived)
+                                                                {
+                                                                Toast.Warning("This order is no longer partially received. The list has been refreshed.", "Order updated");
+                                                                await Load();
+                                                                closingSlip = null;
+                                                                return;
+                                                                }
+                                                                closeRemainingReason = "";
+                                                                closeRemainingAdminUserId = "";
+                                                                closeRemainingAdminPin = "";
+                                                                closeRemainingError = "";
+                                                                closeRemainingOpen = true;
+                                                                }
 
-    private bool ValidateReceipt()
-    {
-        if (selectedSlip == null) return false;
-        receiveError = "";
-        foreach (var item in selectedSlip.Items)
-        {
-            var ordered = item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity;
-            var remaining = ordered - item.ReceivedQuantity;
-            var qty = receiveQtys.GetValueOrDefault(item.Id);
-            if (qty < 0 || qty > remaining)
-            {
-                receiveError = $"Invalid quantity for {item.ProductName}.";
-                return false;
-            }
-        }
-        if (ReceiptLines.Count == 0)
-        {
-            receiveError = "Enter at least one received quantity.";
-            return false;
-        }
-        return true;
-    }
+                                                                private void CloseRemainingDialog()
+                                                                {
+                                                                if (closeRemainingBusy) return;
+                                                                    closeRemainingOpen = false;
+                                                                    closingSlip = null;
+                                                                    closeRemainingReason = "";
+                                                                    closeRemainingAdminUserId = "";
+                                                                    closeRemainingAdminPin = "";
+                                                                    closeRemainingError = "";
+                                                                    }
 
-    private async Task SaveReceipt()
-    {
-        if (receiveBusy || selectedSlip == null || !ValidateReceipt()) return;
-        var received = receiveQtys.Where(x => x.Value > 0).ToList();
-        receiveBusy = true;
-        try
-        {
-            var result = await Workflow.ReceiveAsync(new ReceiveOrderSlipCommand
-            {
-                OrderSlipId = selectedSlip.Id,
-                LocationId = "MAIN",
-                ReceivedAt = receiveDate,
-                ReferenceNumber = receiveRef,
-                Remarks = receiveRemarks,
-                ReceivedByUserId = await UserId(),
-                RowVersion = selectedSlip.RowVersion,
-                Items = received.Select(x => new ReceiveOrderSlipItemCommand { OrderSlipItemId = x.Key, QuantityReceived = x.Value }).ToList()
-            });
-            if (!result.IsSuccess || result.Value == null)
-            {
-                receiveError = result.ErrorMessage ?? "The receipt could not be saved.";
-                return;
-            }
-            receiveConfirmationOpen = false;
-            receiveOpen = false;
-            await Load();
-            selectedSlip = await Db.OrderSlips.AsNoTracking()
-                .Include(x => x.Supplier).Include(x => x.Items)
-                .FirstOrDefaultAsync(x => x.Id == selectedSlip.Id);
-        }
-        catch (Exception ex)
-        {
-            receiveError = $"The receipt could not be saved: {ex.Message}";
-        }
-        finally { receiveBusy = false; }
-    }
+                                                                    private void OnCloseRemainingOpenChanged()
+                                                                    {
+                                                                    if (!closeRemainingOpen && !closeRemainingBusy)
+                                                                        {
+                                                                        closingSlip = null;
+                                                                        closeRemainingReason = "";
+                                                                        closeRemainingAdminUserId = "";
+                                                                        closeRemainingAdminPin = "";
+                                                                        closeRemainingError = "";
+                                                                        }
+                                                                        }
 
-    private sealed record ReceiptLine(string Name, int Quantity);
+                                                                        private async Task CloseRemaining()
+                                                                        {
+                                                                        if (closingSlip == null || closeRemainingBusy) return;
+                                                                            if (string.IsNullOrWhiteSpace(closeRemainingReason))
+                                                                                {
+                                                                                Toast.Error("Enter a reason before closing the remaining order.", "Reason required");
+                                                                                return;
+                                                                                }
+                                                                                if (!isAdmin && (string.IsNullOrWhiteSpace(closeRemainingAdminUserId)
+                                                                                    || closeRemainingAdminPin.Length != 6 || !closeRemainingAdminPin.All(char.IsDigit)))
+                                                                                    {
+                                                                                    Toast.Error("Select the approving admin and enter their 6-digit PIN.", "Approval required");
+                                                                                    return;
+                                                                                    }
 
-    private async Task<string?> UserId() =>
-        (await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier);
+                                                                                    closeRemainingBusy = true;
+                                                                                    closeRemainingError = "";
+                                                                                    var changedId = closingSlip.Id;
+                                                                                    try
+                                                                                    {
+                                                                                    var command = new CloseOrderSlipShortCommand
+                                                                                    {
+                                                                                    OrderSlipId = closingSlip.Id,
+                                                                                    ActingUserId = await UserId(),
+                                                                                    AdminUserId = isAdmin ? null : closeRemainingAdminUserId,
+                                                                                    AdminPin = isAdmin ? null : closeRemainingAdminPin,
+                                                                                    Reason = closeRemainingReason.Trim(),
+                                                                                    RowVersion = closingSlip.RowVersion
+                                                                                    };
+                                                                                    var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command)));
+                                                                                    var raw = await JS.InvokeAsync<string>("stockSenseApi.postJsonBase64", $"/api/order-slips/{closingSlip.Id}/close-remaining", payload);
+                                                                                    var response = JsonSerializer.Deserialize<ApiTransitionResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                                                                                    if (response?.Ok != true)
+                                                                                        {
+                                                                                        if (response?.Status == 409 && ResponseCode(response) != "EMAIL_SENT_STATUS_CONFLICT")
+                                                                                            {
+                                                                                            closeRemainingOpen = false;
+                                                                                            await Load();
+                                                                                            if (detailOpen) selectedSlip = await LoadSlip(changedId);
+                                                                                                closingSlip = null;
+                                                                                                Toast.Warning("Someone else updated this order. The latest information is now displayed.", "Order updated");
+                                                                                                return;
+                                                                                                }
+                                                                                                closeRemainingError = FriendlyTransitionError(response);
+                                                                                                return;
+                                                                                                }
 
-    private void OpenCancel(OrderSlip s) { cancelling = s; cancelReason = ""; cancelOpen = true; }
+                                                                                                closeRemainingOpen = false;
+                                                                                                closingSlip = null;
+                                                                                                closeRemainingAdminPin = "";
+                                                                                                await Load();
+                                                                                                if (detailOpen) selectedSlip = await LoadSlip(changedId);
+                                                                                                    Toast.Success("The unreceived quantities no longer count as incoming stock.", "Remaining order closed");
+                                                                                                    }
+                                                                                                    catch
+                                                                                                    {
+                                                                                                    closeRemainingError = "The remaining order could not be closed. Check your connection and try again.";
+                                                                                                    }
+                                                                                                    finally
+                                                                                                    {
+                                                                                                    closeRemainingBusy = false;
+                                                                                                    closeRemainingAdminPin = "";
+                                                                                                    }
+                                                                                                    }
 
-    private async Task Cancel()
-    {
-        if (cancelling == null) return;
-        if (string.IsNullOrWhiteSpace(cancelReason))
-        {
-            Toast.Error("Enter a reason before cancelling this order.", "Reason required");
-            return;
-        }
-        var s = cancelling;
-        cancelOpen = false;
-        await Act(async () => await Workflow.CancelAsync(new() { OrderSlipId = s.Id, ActingUserId = await UserId(), Reason = cancelReason, RowVersion = s.RowVersion }), "Order cancelled.");
-    }
+                                                                                                    private bool HasSecondaryActions(OrderSlip slip) =>
+                                                                                                    slip.Status == OrderSlipStatuses.PartiallyReceived || (isAdmin && CanCancel(slip));
 
-    private async Task Act(Func<Task<OperationResult<OrderSlipDto>>> action, string success)
-    {
-        message = ""; error = "";
-        try
-        {
-            var result = await action();
-            if (!result.IsSuccess)
-            {
-                error = result.ErrorMessage ?? "Action failed.";
-                return;
-            }
-            message = success;
-            await Load();
-        }
-        catch (Exception ex)
-        {
-            error = $"An unexpected error occurred: {ex.Message}";
-        }
-    }
+                                                                                                    private static string MoreOptionsLabel(OrderSlip slip) =>
+                                                                                                    $"More options for order {DisplayNumber(slip)}";
 
-    private static string ShortStatus(string status) => OrderSlipPresentation.Label(status);
+                                                                                                    private static bool CanCancel(OrderSlip slip) =>
+                                                                                                    slip.Status is not (OrderSlipStatuses.Completed or OrderSlipStatuses.ClosedShort or OrderSlipStatuses.Cancelled);
 
-    private sealed record AdminOption(string Id, string DisplayName);
-}
+                                                                                                    private async Task LoadAdminOptions()
+                                                                                                    {
+                                                                                                    isLoadingAdminOptions = true;
+                                                                                                    try
+                                                                                                    {
+                                                                                                    var now = DateTimeOffset.UtcNow;
+                                                                                                    adminOptions = await (
+                                                                                                    from user in Db.Users.AsNoTracking()
+                                                                                                    join userRole in Db.UserRoles.AsNoTracking() on user.Id equals userRole.UserId
+                                                                                                    join role in Db.Roles.AsNoTracking() on userRole.RoleId equals role.Id
+                                                                                                    where role.NormalizedName == "ADMIN" && (!user.LockoutEnd.HasValue || user.LockoutEnd <= now)
+                                                                                                    let fullName = (user.FirstName + " " + user.LastName).Trim()
+                                                                                                    orderby fullName, user.Id
+                                                                                                    select new AdminOption(user.Id, fullName == "" ? "Administrator" : fullName))
+                                                                                                    .ToListAsync();
+                                                                                                    }
+                                                                                                    catch { adminOptions = []; }
+                                                                                                    finally { isLoadingAdminOptions = false; }
+                                                                                                    }
+
+                                                                                                    private static int Remaining(OrderSlipItem item) =>
+                                                                                                    Math.Max(0, (item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity) - item.ReceivedQuantity);
+
+                                                                                                    private static IEnumerable<OrderSlipItem> RemainingItems(OrderSlip order) =>
+                                                                                                    order.Items.Where(item => Remaining(item) > 0);
+
+                                                                                                    private async Task SubmitTransition(string route, string successTitle, string successMessage, DateTime? expectedDate)
+                                                                                                    {
+                                                                                                    if (transitioningSlip == null || transitionBusy) return;
+                                                                                                        transitionBusy = true;
+                                                                                                        transitionError = "";
+                                                                                                        try
+                                                                                                        {
+                                                                                                        var command = new OrderSlipTransitionCommand
+                                                                                                        {
+                                                                                                        RowVersion = transitioningSlip.RowVersion,
+                                                                                                        ExpectedDeliveryDate = expectedDate
+                                                                                                        };
+                                                                                                        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command)));
+                                                                                                        var raw = await JS.InvokeAsync<string>("stockSenseApi.postJsonBase64", $"/api/order-slips/{transitioningSlip.Id}/{route}", payload);
+                                                                                                        var response = JsonSerializer.Deserialize<ApiTransitionResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                                                                                                        if (response?.Ok != true)
+                                                                                                            {
+                                                                                                            if (response?.Status == 409 && ResponseCode(response) != "EMAIL_SENT_STATUS_CONFLICT")
+                                                                                                                {
+                                                                                                                var conflictedId = transitioningSlip.Id;
+                                                                                                                approveOpen = false;
+                                                                                                                markOrderedOpen = false;
+                                                                                                                await Load();
+                                                                                                                if (detailOpen) selectedSlip = await LoadSlip(conflictedId);
+                                                                                                                    transitioningSlip = null;
+                                                                                                                    Toast.Warning("Someone else updated this order slip. The latest information is now displayed.", "Order updated");
+                                                                                                                    return;
+                                                                                                                    }
+                                                                                                                    transitionError = FriendlyTransitionError(response);
+                                                                                                                    return;
+                                                                                                                    }
+
+                                                                                                                    var changedId = transitioningSlip.Id;
+                                                                                                                    approveOpen = false;
+                                                                                                                    markOrderedOpen = false;
+                                                                                                                    await Load();
+                                                                                                                    if (detailOpen) selectedSlip = await LoadSlip(changedId);
+                                                                                                                        transitioningSlip = null;
+                                                                                                                        Toast.Success(successMessage, successTitle);
+                                                                                                                        }
+                                                                                                                        catch
+                                                                                                                        {
+                                                                                                                        transitionError = "The order slip could not be updated. Check your connection and try again.";
+                                                                                                                        }
+                                                                                                                        finally { transitionBusy = false; }
+                                                                                                                        }
+
+                                                                                                                        private static string FriendlyTransitionError(ApiTransitionResponse? response)
+                                                                                                                        {
+                                                                                                                        if (response?.Status == 403) return "You do not have permission to perform this action.";
+                                                                                                                            if (!string.IsNullOrWhiteSpace(response?.Body))
+                                                                                                                                {
+                                                                                                                                try
+                                                                                                                                {
+                                                                                                                                using var document = JsonDocument.Parse(response.Body);
+                                                                                                                                if (document.RootElement.TryGetProperty("error", out var errorValue) && !string.IsNullOrWhiteSpace(errorValue.GetString()))
+                                                                                                                                    return errorValue.GetString()!;
+                                                                                                                                    }
+                                                                                                                                    catch (JsonException) { }
+                                                                                                                                    }
+                                                                                                                                    return "The order slip could not be updated. Please refresh the page and try again.";
+                                                                                                                                    }
+
+                                                                                                                                    private static string? ResponseCode(ApiTransitionResponse? response)
+                                                                                                                                    {
+                                                                                                                                    if (string.IsNullOrWhiteSpace(response?.Body)) return null;
+                                                                                                                                        try
+                                                                                                                                        {
+                                                                                                                                        using var document = JsonDocument.Parse(response.Body);
+                                                                                                                                        return document.RootElement.TryGetProperty("code", out var value) ? value.GetString() : null;
+                                                                                                                                        }
+                                                                                                                                        catch (JsonException) { return null; }
+                                                                                                                                        }
+
+                                                                                                                                        private RenderFragment TransitionSummary(OrderSlip order) => @<section aria-label="Order summary" class="space-y-3">
+                                                                                                                                        <div class="rounded-lg border border-border p-4">
+                                                                                                                                        <dl class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 text-sm">
+                                                                                                                                        <dt class="text-muted-foreground">Order reference</dt>
+                                                                                                                                        <dd class="m-0 max-w-52 truncate text-right font-mono text-xs font-medium" title="@DisplayNumber(order)" aria-label="Order reference: @DisplayNumber(order)">@CompactReference(DisplayNumber(order))</dd>
+                                                                                                                                        <dt class="text-muted-foreground">Supplier</dt><dd class="m-0 max-w-52 break-words text-right font-medium">@(order.Supplier?.Name ?? "Unknown supplier")</dd>
+                                                                                                                                        <dt class="text-muted-foreground">Items</dt><dd class="m-0 text-right font-medium">@order.Items.Count</dd>
+                                                                                                                                        </dl>
+                                                                                                                                        <div class="mt-4 flex items-end justify-between gap-4 border-t border-border pt-4">
+                                                                                                                                        <span class="text-sm text-muted-foreground">Estimated total</span>
+                                                                                                                                        <strong class="text-xl text-foreground">@($"₱{order.TotalEstimatedCost:N2}")</strong>
+                                                                                                                                        </div>
+                                                                                                                                        </div>
+                                                                                                                                        </section>;
+
+                                                                                                                                        private RenderFragment TransitionError() => @<text>@if (!string.IsNullOrWhiteSpace(transitionError)) { <p role="alert" class="m-0 text-sm text-destructive">@transitionError</p> }</text>;
+
+                                                                                                                                        private static string CompactReference(string value) =>
+                                                                                                                                        value.Length <= 24 ? value : $"{value[..12]}…{value[^8..]}";
+
+                                                                                                                                        private sealed class ApiTransitionResponse
+                                                                                                                                        {
+                                                                                                                                        public bool Ok { get; set; }
+                                                                                                                                        public int Status { get; set; }
+                                                                                                                                        public string Body { get; set; } = "";
+                                                                                                                                        }
+                                                                                                                                        private void CloseDetail() => detailOpen = false;
+
+                                                                                                                                        private void OnDetailOpenChanged()
+                                                                                                                                        {
+                                                                                                                                        if (detailOpen) return;
+                                                                                                                                            selectedSlip = null;
+                                                                                                                                            if (RequestedOrderSlipId.HasValue)
+                                                                                                                                                {
+                                                                                                                                                Navigation.NavigateTo("/admin/order-history", replace: true);
+                                                                                                                                                }
+                                                                                                                                                }
+
+                                                                                                                                                private async Task PrintSlip()
+                                                                                                                                                {
+                                                                                                                                                if (selectedSlip == null) return;
+                                                                                                                                                    await JS.InvokeVoidAsync("print");
+                                                                                                                                                    }
+
+                                                                                                                                                    private async Task OpenDetailForReceive(OrderSlip slip)
+                                                                                                                                                    {
+                                                                                                                                                    selectedSlip = await Db.OrderSlips.AsNoTracking()
+                                                                                                                                                    .Include(x => x.Supplier)
+                                                                                                                                                    .Include(x => x.Items)
+                                                                                                                                                    .FirstOrDefaultAsync(x => x.Id == slip.Id);
+                                                                                                                                                    OpenReceiveModal();
+                                                                                                                                                    }
+
+                                                                                                                                                    private void OpenReceiveModal()
+                                                                                                                                                    {
+                                                                                                                                                    if (selectedSlip == null) return;
+                                                                                                                                                        receiveQtys = selectedSlip.Items.ToDictionary(x => x.Id,
+                                                                                                                                                        x => Math.Max(0, (x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity) - x.ReceivedQuantity));
+                                                                                                                                                        receiveDate = DateTime.Today;
+                                                                                                                                                        receiveRef = "";
+                                                                                                                                                        receiveRemarks = "";
+                                                                                                                                                        receiveError = "";
+                                                                                                                                                        receiveOpen = true;
+                                                                                                                                                        }
+
+                                                                                                                                                        private List<ReceiptLine> ReceiptLines => selectedSlip?.Items
+                                                                                                                                                        .Select(item => new ReceiptLine(item.ProductName, receiveQtys.GetValueOrDefault(item.Id)))
+                                                                                                                                                        .Where(item => item.Quantity > 0)
+                                                                                                                                                        .ToList() ?? [];
+
+                                                                                                                                                        private void RequestReceiptConfirmation()
+                                                                                                                                                        {
+                                                                                                                                                        if (receiveBusy || selectedSlip == null) return;
+                                                                                                                                                            if (!ValidateReceipt()) return;
+                                                                                                                                                                receiveConfirmationOpen = true;
+                                                                                                                                                                }
+
+                                                                                                                                                                private bool ValidateReceipt()
+                                                                                                                                                                {
+                                                                                                                                                                if (selectedSlip == null) return false;
+                                                                                                                                                                    receiveError = "";
+                                                                                                                                                                    foreach (var item in selectedSlip.Items)
+                                                                                                                                                                        {
+                                                                                                                                                                        var ordered = item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity;
+                                                                                                                                                                        var remaining = ordered - item.ReceivedQuantity;
+                                                                                                                                                                        var qty = receiveQtys.GetValueOrDefault(item.Id);
+                                                                                                                                                                        if (qty < 0 || qty > remaining)
+                                                                                                                                                                            {
+                                                                                                                                                                            receiveError = $"Invalid quantity for {item.ProductName}.";
+                                                                                                                                                                            return false;
+                                                                                                                                                                            }
+                                                                                                                                                                            }
+                                                                                                                                                                            if (ReceiptLines.Count == 0)
+                                                                                                                                                                                {
+                                                                                                                                                                                receiveError = "Enter at least one received quantity.";
+                                                                                                                                                                                return false;
+                                                                                                                                                                                }
+                                                                                                                                                                                return true;
+                                                                                                                                                                                }
+
+                                                                                                                                                                                private async Task SaveReceipt()
+                                                                                                                                                                                {
+                                                                                                                                                                                if (receiveBusy || selectedSlip == null || !ValidateReceipt()) return;
+                                                                                                                                                                                    var received = receiveQtys.Where(x => x.Value > 0).ToList();
+                                                                                                                                                                                    receiveBusy = true;
+                                                                                                                                                                                    try
+                                                                                                                                                                                    {
+                                                                                                                                                                                    var result = await Workflow.ReceiveAsync(new ReceiveOrderSlipCommand
+                                                                                                                                                                                    {
+                                                                                                                                                                                    OrderSlipId = selectedSlip.Id,
+                                                                                                                                                                                    LocationId = "MAIN",
+                                                                                                                                                                                    ReceivedAt = receiveDate,
+                                                                                                                                                                                    ReferenceNumber = receiveRef,
+                                                                                                                                                                                    Remarks = receiveRemarks,
+                                                                                                                                                                                    ReceivedByUserId = await UserId(),
+                                                                                                                                                                                    RowVersion = selectedSlip.RowVersion,
+                                                                                                                                                                                    Items = received.Select(x => new ReceiveOrderSlipItemCommand { OrderSlipItemId = x.Key, QuantityReceived = x.Value }).ToList()
+                                                                                                                                                                                    });
+                                                                                                                                                                                    if (!result.IsSuccess || result.Value == null)
+                                                                                                                                                                                        {
+                                                                                                                                                                                        receiveError = result.ErrorMessage ?? "The receipt could not be saved.";
+                                                                                                                                                                                        return;
+                                                                                                                                                                                        }
+                                                                                                                                                                                        receiveConfirmationOpen = false;
+                                                                                                                                                                                        receiveOpen = false;
+                                                                                                                                                                                        await Load();
+                                                                                                                                                                                        selectedSlip = await Db.OrderSlips.AsNoTracking()
+                                                                                                                                                                                        .Include(x => x.Supplier).Include(x => x.Items)
+                                                                                                                                                                                        .FirstOrDefaultAsync(x => x.Id == selectedSlip.Id);
+                                                                                                                                                                                        }
+                                                                                                                                                                                        catch (Exception ex)
+                                                                                                                                                                                        {
+                                                                                                                                                                                        receiveError = $"The receipt could not be saved: {ex.Message}";
+                                                                                                                                                                                        }
+                                                                                                                                                                                        finally { receiveBusy = false; }
+                                                                                                                                                                                        }
+
+                                                                                                                                                                                        private sealed record ReceiptLine(string Name, int Quantity);
+
+                                                                                                                                                                                        private async Task<string?> UserId() =>
+                                                                                                                                                                                        (await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                                                                                                                                                                                        private void OpenCancel(OrderSlip s) { cancelling = s; cancelReason = ""; cancelOpen = true; }
+
+                                                                                                                                                                                        private async Task Cancel()
+                                                                                                                                                                                        {
+                                                                                                                                                                                        if (cancelling == null) return;
+                                                                                                                                                                                            if (string.IsNullOrWhiteSpace(cancelReason))
+                                                                                                                                                                                                {
+                                                                                                                                                                                                Toast.Error("Enter a reason before cancelling this order.", "Reason required");
+                                                                                                                                                                                                return;
+                                                                                                                                                                                                }
+                                                                                                                                                                                                var s = cancelling;
+                                                                                                                                                                                                cancelOpen = false;
+                                                                                                                                                                                                await Act(async () => await Workflow.CancelAsync(new() { OrderSlipId = s.Id, ActingUserId = await UserId(), Reason = cancelReason, RowVersion = s.RowVersion }), "Order cancelled.");
+                                                                                                                                                                                                }
+
+                                                                                                                                                                                                private async Task Act(Func<Task<OperationResult<OrderSlipDto>>> action, string success)
+                                                                                                                                                                                                {
+                                                                                                                                                                                                message = ""; error = "";
+                                                                                                                                                                                                try
+                                                                                                                                                                                                {
+                                                                                                                                                                                                var result = await action();
+                                                                                                                                                                                                if (!result.IsSuccess)
+                                                                                                                                                                                                    {
+                                                                                                                                                                                                    error = result.ErrorMessage ?? "Action failed.";
+                                                                                                                                                                                                    return;
+                                                                                                                                                                                                    }
+                                                                                                                                                                                                    message = success;
+                                                                                                                                                                                                    await Load();
+                                                                                                                                                                                                    }
+                                                                                                                                                                                                    catch (Exception ex)
+                                                                                                                                                                                                    {
+                                                                                                                                                                                                    error = $"An unexpected error occurred: {ex.Message}";
+                                                                                                                                                                                                    }
+                                                                                                                                                                                                    }
+
+                                                                                                                                                                                                    private static string ShortStatus(string status) => OrderSlipPresentation.Label(status);
+
+                                                                                                                                                                                                    private sealed record AdminOption(string Id, string DisplayName);
+                                                                                                                                                                                                    }

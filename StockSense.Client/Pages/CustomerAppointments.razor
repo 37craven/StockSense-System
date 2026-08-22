@@ -82,7 +82,7 @@
                                 ? "Any mechanic"
                                 : appt.MechanicName.Split(' ').LastOrDefault()
                                   ?? appt.MechanicName)
-                            · @appt.DurationMinutes min
+                            · @DurationFormatting.Format(appt.DurationMinutes)
                         </span>
 
                         <div class="flex items-center gap-2">
@@ -90,7 +90,7 @@
                             <span class="text-sm font-bold text-primary whitespace-nowrap">
                                 ₱@appt.TotalAmount.ToString("N0")
                             </span>
-
+    
                         </div>
 
                     </div>
@@ -152,7 +152,7 @@
                     <div class="flex items-center gap-3 mt-1">
                         <span class="text-sm font-semibold text-foreground">@selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy")</span>
                         <span class="text-sm text-blue-500 font-bold">@selectedAppointment.TimeSlot</span>
-                        <span class="text-xs text-muted-foreground">(~@selectedAppointment.DurationMinutes mins)</span>
+                        <span class="text-xs text-muted-foreground">(~@DurationFormatting.Format(selectedAppointment.DurationMinutes))</span>
                     </div>
                 </div>
 
@@ -173,7 +173,7 @@
 
                 <div class="p-3 rounded-lg bg-muted">
                     <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
-                    <span class="text-xl font-black text-primary">₱@selectedAppointment.TotalAmount.ToString("N2")</span>
+                    <span class="text-xl font-bold text-primary">₱@selectedAppointment.TotalAmount.ToString("N2")</span>
                 </div>
             }
         </div>
