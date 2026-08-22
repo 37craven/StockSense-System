@@ -37,14 +37,14 @@ public sealed class BarcodePdfTests
     }
 
     [Fact]
-    public async Task GetBarcodePdf_QrOnly_SucceedsWithInvalidLegacyBarcode()
+    public async Task GetBarcodePdf_RegeneratesInvalidLegacyBarcode()
     {
         await using var context = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
         var product = new Product
         {
-            Name = "Legacy QR product",
+            Name = "Legacy product",
             Category = "Test",
             Barcode = "INVALID-CODE!"
         };
@@ -52,12 +52,12 @@ public sealed class BarcodePdfTests
         await context.SaveChangesAsync();
         var controller = CreateController(context);
 
-        var result = await controller.GetBarcodePdf(product.Id, "qr");
+        var result = await controller.GetBarcodePdf(product.Id);
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("application/pdf", file.ContentType);
         Assert.NotEmpty(file.FileContents);
-        Assert.Equal("INVALID-CODE!", product.Barcode);
+        Assert.True(BarcodeService.IsValidEan13(product.Barcode));
     }
 
     private static ProductsController CreateController(ApplicationDbContext context)
@@ -99,28 +99,24 @@ public sealed class BarcodePdfTests
     }
 
     [Fact]
-    public void GenerateBarcodeAndQrImages_ReturnPngPayloads()
+    public void GenerateBarcodeImage_ReturnsPngPayload()
     {
         var service = new BarcodeService();
         var product = new Product { Id = 7, Name = "Filter", Barcode = BarcodeService.GenerateBarcodeValue(7) };
 
         var barcode = service.GenerateBarcodeImage(product.Barcode);
-        var qr = service.GenerateQrCodeImage(product);
 
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, barcode[..4]);
-        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, qr[..4]);
     }
 
-    [Theory]
-    [InlineData("invalid")]
-    [InlineData("")]
-    public void GenerateBarcodeLabelPdf_RejectsUnsupportedFormat(string format)
+    [Fact]
+    public void GenerateBarcodeLabelPdf_RejectsNullBarcodeImage()
     {
         var service = new BarcodeService();
         var product = new Product { Name = "Filter", Category = "Test" };
 
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => service.GenerateBarcodeLabelPdf(product, null, null, format));
+        Assert.Throws<ArgumentNullException>(
+            () => service.GenerateBarcodeLabelPdf(product, null!));
     }
 
     [Fact]

@@ -59,6 +59,24 @@ public class MotorcycleRepository
             cancellationToken);
     }
 
+    public async Task<bool> HasActiveUsageAsync(int motorcycleId, CancellationToken cancellationToken = default)
+    {
+        // Active = PreBuiltPackage.IsActive OR BuildRequest/Appointment Pending/Confirmed
+        var activePackage = await _context.PreBuiltPackages
+            .AnyAsync(p => p.IsActive && p.CompatibleMotors.Any(m => m.MotorcycleId == motorcycleId), cancellationToken);
+        if (activePackage) return true;
+
+        var activeBuild = await _context.BuildRequests
+            .AnyAsync(b => b.MotorcycleId == motorcycleId
+                && (b.Status == "Pending" || b.Status == "Confirmed"), cancellationToken);
+        if (activeBuild) return true;
+
+        var activeAppointment = await _context.Appointments
+            .AnyAsync(a => a.MotorcycleId == motorcycleId
+                && (a.Status == "Pending" || a.Status == "Confirmed"), cancellationToken);
+        return activeAppointment;
+    }
+
     public async Task DeleteAsync(int id)
     {
         var motorcycle = await _context.Motorcycles.FindAsync(id);

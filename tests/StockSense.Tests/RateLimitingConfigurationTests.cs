@@ -33,8 +33,8 @@ public sealed class RateLimitingConfigurationTests
         Assert.DoesNotContain(
             "app.MapRazorComponents<App>().RequireRateLimiting",
             ProgramSource);
-        Assert.DoesNotContain(
-            "app.MapAdditionalIdentityEndpoints().RequireRateLimiting",
+        Assert.Contains(
+            "app.MapAdditionalIdentityEndpoints().RequireRateLimiting(\"login-policy\")",
             ProgramSource);
     }
 

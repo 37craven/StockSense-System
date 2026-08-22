@@ -128,7 +128,7 @@
                     <tbody>
                         @foreach (var row in FilteredRows)
                         {
-                            <tr class="inventory-row" @onclick="() => OpenDetails(row)">
+                            <tr class="inventory-row" role="button" tabindex="0" @onclick="() => OpenDetails(row)" @onkeydown='(e) => { if(e.Key=="Enter"||e.Key==" ") OpenDetails(row); }'>
                                 <td @onclick:stopPropagation><input type="checkbox" aria-label="Select @row.ProductName for recalculation" checked="@selectedIds.Contains(row.ProductId)" @onchange="e => Toggle(row.ProductId, e)" /></td>
                                 <td data-label="Product"><strong>@row.ProductName</strong><small>@row.Brand · @row.Category</small></td>
                                 <td data-label="Status"><span class="product-status-badge ss-product-status @(row.IsActive ? "ss-status-active" : "ss-status-inactive")">@(row.IsActive ? "Active" : "Inactive")</span></td>
@@ -189,8 +189,9 @@
                             <dl class="metric-grid">
                                 <div><dt>On hand</dt><dd>@selectedRow.CurrentStock</dd></div><div><dt>Confirmed incoming</dt><dd>@selectedRow.IncomingStock</dd></div><div><dt>Inventory position</dt><dd>@selectedRow.InventoryPosition</dd></div>
                                 <div><dt>Safety stock</dt><dd>@selectedRow.SafetyStock</dd></div><div><dt>Reorder point</dt><dd>@selectedRow.ReorderPoint</dd></div><div><dt>Target stock</dt><dd>@selectedRow.TargetStock</dd></div>
-                                <div><dt>Average demand / day</dt><dd>@selectedRow.AverageDailyDemand.ToString("0.####")</dd></div><div><dt>Demand variability</dt><dd>@selectedRow.DemandStandardDeviation.ToString("0.####")</dd></div><div><dt>Supplier</dt><dd>@(string.IsNullOrWhiteSpace(selectedRow.SupplierName) ? "Missing" : selectedRow.SupplierName)</dd></div>
-                                <div><dt>Selling price</dt><dd>₱@selectedRow.Price.ToString("N2")</dd></div><div><dt>Order policy</dt><dd>@(selectedRow.IsAutomaticOrderEnabled ? "Automatic" : "Manual review")</dd></div>
+                                <div><dt>Average demand / day</dt><dd>@selectedRow.AverageDailyDemand.ToString("0.####")</dd></div><div><dt>Demand variability</dt><dd>@selectedRow.DemandStandardDeviation.ToString("0.####")</dd></div><div><dt>Average lead time</dt><dd>@selectedRow.AverageLeadTimeDays.ToString("0.####") days</dd></div>
+                                <div><dt>Lead time variability</dt><dd>@selectedRow.LeadTimeStandardDeviation.ToString("0.####")</dd></div><div><dt>Supplier</dt><dd>@(string.IsNullOrWhiteSpace(selectedRow.SupplierName) ? "Missing" : selectedRow.SupplierName)</dd></div><div><dt>Selling price</dt><dd>₱@selectedRow.Price.ToString("N2")</dd></div>
+                                <div><dt>Order policy</dt><dd>@(selectedRow.IsAutomaticOrderEnabled ? "Automatic" : "Manual review")</dd></div>
                             </dl>
                             <div class="calculation-note" aria-labelledby="calculation-summary-heading">
                                 <strong id="calculation-summary-heading">@CalculationStatusLabel(selectedRow)</strong>
@@ -362,7 +363,8 @@
                                         <label>Calculation mode<select @bind="settings.CalculationMode" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2"><option>Auto</option><option>Manual</option></select></label><label>Weekly demand estimate<input type="number" min="0" step="0.0001" @bind="settings.InitialEstimatedWeeklyDemand" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
                                         <label>Supplier lead time (days)<input type="number" min="1" @bind="settings.DefaultLeadTimeDays" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Review period (days)<input type="number" min="1" @bind="settings.ReviewPeriodDays" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
                                         <label>Buffer days<input type="number" min="0" @bind="settings.BufferDays" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Service level<input type="number" min="0.5" max="0.999" step="0.0001" @bind="settings.ServiceLevel" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
-                                        <label>Minimum safety stock<input type="number" min="0" @bind="settings.MinimumSafetyStock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Maximum safety stock<input type="number" min="0" @bind="settings.MaximumSafetyStock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
+                                        @* Minimum/Maximum safety stock hidden — kept in model as no-op (0/NULL) *@
+                                        <span class="hidden" aria-hidden="true"></span><span class="hidden" aria-hidden="true"></span>
                                         <label>Minimum order quantity<input type="number" min="1" @bind="settings.MinimumOrderQuantity" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Package size<input type="number" min="1" @bind="settings.PackageSize" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
                                         <label>Maximum stock level<input type="number" min="1" @bind="settings.MaximumStockLevel" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Tracking start date<input type="date" @bind="settings.InventoryTrackingStartDate" @bind:format="yyyy-MM-dd" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label>
                                         @if (settings.CalculationMode == "Manual") { <label>Manual safety stock<input type="number" min="0" @bind="settings.ManualSafetyStock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Manual reorder point<input type="number" min="0" @bind="settings.ManualReorderPoint" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label> }
@@ -385,7 +387,8 @@
                                     <dl class="metric-grid">
                                         <div><dt>Calculation mode</dt><dd>@settings.CalculationMode</dd></div><div><dt>Weekly demand estimate</dt><dd>@settings.InitialEstimatedWeeklyDemand.ToString("0.####")</dd></div><div><dt>Lead time</dt><dd>@settings.DefaultLeadTimeDays days</dd></div>
                                         <div><dt>Review period</dt><dd>@settings.ReviewPeriodDays days</dd></div><div><dt>Buffer</dt><dd>@settings.BufferDays days</dd></div><div><dt>Service level</dt><dd>@settings.ServiceLevel.ToString("P2")</dd></div>
-                                        <div><dt>Minimum safety</dt><dd>@settings.MinimumSafetyStock</dd></div><div><dt>Maximum safety</dt><dd>@(settings.MaximumSafetyStock?.ToString() ?? "None")</dd></div><div><dt>Minimum order</dt><dd>@settings.MinimumOrderQuantity</dd></div>
+                                        @* Minimum/Maximum safety hidden — kept as no-op *@
+                                        <div><dt>Minimum order</dt><dd>@settings.MinimumOrderQuantity</dd></div>
                                         <div><dt>Package size</dt><dd>@settings.PackageSize</dd></div><div><dt>Maximum stock</dt><dd>@(settings.MaximumStockLevel?.ToString() ?? "None")</dd></div><div><dt>Tracking since</dt><dd>@settings.InventoryTrackingStartDate.ToString("MMM d, yyyy")</dd></div>
                                     </dl>
                                 }

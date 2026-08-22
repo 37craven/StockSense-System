@@ -13,6 +13,8 @@
 @inject ToastService Toast
 @attribute [Authorize(Roles = "Admin, Employee")]
 
+<BbPortalHost />
+
 <PageTitle>Generate Orders</PageTitle>
 <UnsavedChangesGuard IsDirty="@HasUnsavedDraft"
                      Message="Your order-slip draft has not been created. If you leave now, the selected products and quantities will be lost." />

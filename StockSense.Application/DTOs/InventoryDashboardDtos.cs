@@ -17,6 +17,8 @@ public sealed class InventoryDashboardRowDto
     public int InventoryPosition { get; set; }
     public decimal AverageDailyDemand { get; set; }
     public decimal DemandStandardDeviation { get; set; }
+    public decimal AverageLeadTimeDays { get; set; }
+    public decimal LeadTimeStandardDeviation { get; set; }
     public int SafetyStock { get; set; }
     public int ReorderPoint { get; set; }
     public int TargetStock { get; set; }

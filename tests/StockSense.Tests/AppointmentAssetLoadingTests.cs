@@ -17,7 +17,8 @@ public sealed class AppointmentAssetLoadingTests
 
         Assert.DoesNotContain("<script src=\"https://unpkg.com/html5-qrcode", app, StringComparison.Ordinal);
         Assert.DoesNotContain("<script src=\"js/barcodeScanner.js", app, StringComparison.Ordinal);
-        Assert.Contains("<script src=\"js/barcodeScannerLoader.js", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("<script src=\"/js/barcodeScanner.js", app, StringComparison.Ordinal);
+        Assert.Contains("<script src=\"/js/barcodeScannerLoader.js", app, StringComparison.Ordinal);
         Assert.Contains("document.createElement(\"script\")", loader, StringComparison.Ordinal);
         Assert.Contains("html5QrcodeScriptUrl", scanner, StringComparison.Ordinal);
         Assert.Contains("await ensureHtml5QrcodeLoaded();", scanner, StringComparison.Ordinal);

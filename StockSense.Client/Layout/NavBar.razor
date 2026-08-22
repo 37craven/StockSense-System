@@ -85,6 +85,7 @@
     private bool isDarkMode = false;
     private bool mobileMenuOpen = false;
     private System.Threading.Timer? sessionCheckTimer;
+    private int _sessionCheckInProgress;
 
     protected override void OnInitialized()
     {
@@ -94,16 +95,50 @@
         // HEARTBEAT: Checks every 10 seconds (Matches Sidebar logic)
         sessionCheckTimer = new System.Threading.Timer(async _ =>
         {
-            await CheckSession();
+            var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            var trimmed = path.TrimStart('/');
+
+            // Exempt auth pages - anonymous hits on api/auth/status => 401 must not kick
+            bool isAuthPage = path.Contains("Account/Login", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/Login", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/Register", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/Register", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/RegisterConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/RegisterConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ForgotPassword", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/ForgotPassword", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ResetPassword", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/ResetPassword", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ResendEmailConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/ResendEmailConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ConfirmEmail", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/ConfirmEmail", StringComparison.OrdinalIgnoreCase) ||
+                             string.IsNullOrEmpty(trimmed);
+
+            if (!isAuthPage)
+            {
+                await InvokeAsync(CheckSession);
+            }
         }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
     }
 
     private async Task CheckSession()
     {
+        if (Interlocked.Exchange(ref _sessionCheckInProgress, 1) == 1)
+        {
+            return;
+        }
+
         try
         {
-            // Ping an authorized endpoint
-            var response = await Http.GetAsync("api/auth/check");
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated != true)
+            {
+                return;
+            }
+
+            // Ping authorized endpoint (AuthController only exposes status)
+            var response = await Http.GetAsync("api/auth/status");
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
@@ -114,11 +149,15 @@
         {
             // Fail silently if server is down or unreachable
         }
+        finally
+        {
+            Interlocked.Exchange(ref _sessionCheckInProgress, 0);
+        }
     }
 
     private async Task HandleAutoLogout()
     {
-        sessionCheckTimer?.Dispose();
+        Interlocked.Exchange(ref sessionCheckTimer, null)?.Dispose();
 
         // 1. Manually notify the provider to flip UI buttons immediately
         if (AuthStateProvider is PersistentAuthenticationStateProvider clientProvider)
@@ -190,6 +229,6 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
-        sessionCheckTimer?.Dispose();
+        Interlocked.Exchange(ref sessionCheckTimer, null)?.Dispose();
     }
 }

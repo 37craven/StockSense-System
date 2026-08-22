@@ -45,21 +45,37 @@ public class ProductsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<ProductDto>>> GetProducts()
     {
-        var products = await _productRepo.GetAllAsync();
-        var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode, p.UnitCost, p.RowVersion, p.IsActive, p.ReservedStock)).ToList();
-        return Ok(dtos);
+        try
+        {
+            var products = await _productRepo.GetAllAsync();
+            var dtos = products.Select(p => new ProductDto(p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock, p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "", p.Barcode, p.UnitCost, p.RowVersion, p.IsActive)).ToList();
+            return Ok(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve products.");
+            return StatusCode(500, ApiResponse.Error("Could not retrieve products. Please try again."));
+        }
     }
 
     [HttpGet("barcode/{barcode}")]
     public async Task<ActionResult<ProductDto>> GetProductByBarcode(string barcode)
     {
-        var product = await _productRepo.GetByBarcodeAsync(barcode);
-        if (product == null) return NotFound(ApiResponse.NotFound("Product"));
+        try
+        {
+            var product = await _productRepo.GetByBarcodeAsync(barcode);
+            if (product == null) return NotFound(ApiResponse.NotFound("Product"));
 
-        var dto = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
-            product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive, product.ReservedStock);
-        return Ok(dto);
+            var dto = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
+                product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
+                product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive);
+            return Ok(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve product by barcode {Barcode}.", barcode);
+            return StatusCode(500, ApiResponse.Error("Could not retrieve product. Please try again."));
+        }
     }
 
     [HttpPost("send-quote")]
@@ -129,8 +145,7 @@ public class ProductsController : ControllerBase
 
         var dtoResult = new ProductDto(product.Id, product.Name, product.Category, product.Brand, product.Price,
             product.CurrentStock, product.ReorderTarget, product.SupplierId ?? 0, product.Supplier?.Name ?? "",
-            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive,
-            product.ReservedStock);
+            product.ImageUrl ?? "", product.Barcode, product.UnitCost, product.RowVersion, product.IsActive);
         return Ok(dtoResult);
     }
 
@@ -257,23 +272,33 @@ public class ProductsController : ControllerBase
 
         if (!changesStock) return NoContent();
 
-        try
+        const int maxAttempts = 3;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            await _calculationService.RecalculateProductAsync(product.Id, InventoryDefaults.LocationId, HttpContext.RequestAborted);
-            return NoContent();
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Stock correction for product {ProductId} committed, but safety-stock recalculation did not complete.",
-                product.Id);
-            return Ok(new
+            try
             {
-                message = "Product updated.",
-                warning = "Safety-stock metrics could not be refreshed. Run recalculation again from inventory management."
-            });
+                await _calculationService.RecalculateProductAsync(product.Id, InventoryDefaults.LocationId, HttpContext.RequestAborted);
+                return NoContent();
+            }
+            catch (Exception exception) when (attempt < maxAttempts)
+            {
+                _logger.LogWarning(exception, "Product {ProductId} recalc attempt {Attempt}/{Max} failed, retrying.", product.Id, attempt, maxAttempts);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), HttpContext.RequestAborted);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Stock correction for product {ProductId} committed, but safety-stock recalculation failed after {Max} attempts.",
+                    product.Id, maxAttempts);
+                return Ok(new
+                {
+                    message = "Product updated.",
+                    warning = "Safety-stock metrics could not be refreshed after 3 attempts. Run recalculation again from inventory management."
+                });
+            }
         }
+        return NoContent();
     }
 
     [HttpPut("{id:int}/inventory-values")]
@@ -362,17 +387,28 @@ public class ProductsController : ControllerBase
         string? warning = null;
         if (dto.StockAdjustment != 0)
         {
-            try
+            const int maxAttempts = 3;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                await _calculationService.RecalculateProductAsync(
-                    product.Id, InventoryDefaults.LocationId, cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                _logger.LogWarning(exception,
-                    "Stock correction for product {ProductId} committed, but safety-stock recalculation did not complete.",
-                    product.Id);
-                warning = "Stock and price were saved, but safety-stock metrics could not be refreshed. Run recalculation again.";
+                try
+                {
+                    await _calculationService.RecalculateProductAsync(
+                        product.Id, InventoryDefaults.LocationId, cancellationToken);
+                    break;
+                }
+                catch (Exception exception) when (attempt < maxAttempts)
+                {
+                    _logger.LogWarning(exception, "Product {ProductId} recalc attempt {Attempt}/{Max} failed, retrying.", product.Id, attempt, maxAttempts);
+                    await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception,
+                        "Stock correction for product {ProductId} committed, but safety-stock recalculation failed after {Max} attempts.",
+                        product.Id, maxAttempts);
+                    warning = "Stock and price were saved, but safety-stock metrics could not be refreshed after 3 attempts. Run recalculation again.";
+                    break;
+                }
             }
         }
 
@@ -497,15 +533,31 @@ public class ProductsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteProduct(int id, [FromServices] IWebHostEnvironment environment)
     {
-        var product = await _productRepo.GetByIdAsync(id);
-        if (product == null) return NotFound(ApiResponse.NotFound("Product"));
+        try
+        {
+            var product = await _productRepo.GetByIdAsync(id);
+            if (product == null) return NotFound(ApiResponse.NotFound("Product"));
 
-        var previousImageUrl = product.ImageUrl;
-        await _productRepo.DeleteAsync(product);
-        await _productRepo.SaveChangesAsync();
-        var webRoot = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
-        DeleteOwnedProductImage(previousImageUrl, Path.Combine(webRoot, "uploads", "products"), product.Id);
-        return Ok();
+            var previousImageUrl = product.ImageUrl;
+            await _productRepo.DeleteAsync(product);
+            try
+            {
+                await _productRepo.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                _logger.LogWarning(ex, "Product {ProductId} delete conflicted with another change.", id);
+                return Conflict(ApiResponse.Error("The product was changed by another user. Reload the latest data and try again."));
+            }
+            var webRoot = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+            DeleteOwnedProductImage(previousImageUrl, Path.Combine(webRoot, "uploads", "products"), product.Id);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Deleting product {ProductId} failed.", id);
+            return StatusCode(500, ApiResponse.Error("The product could not be deleted. Please try again."));
+        }
     }
 
     public class EmailQuoteRequest

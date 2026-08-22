@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 namespace StockSense.Domain.Entities;
 
@@ -19,4 +20,6 @@ public class BuildRequest
     public Appointment? Appointment { get; set; }
     public int? MotorcycleId { get; set; }
     public Motorcycle? Motorcycle { get; set; }
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = [];
 }

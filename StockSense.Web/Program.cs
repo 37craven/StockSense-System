@@ -25,6 +25,11 @@ using StockSense.Web.Utility.Performance;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.AddServerHeader = false;
+});
+
 // --- 1. CORE SERVICES ---
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
@@ -70,7 +75,10 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
     options.SlidingExpiration = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.IsEssential = true;
 
     options.Events.OnRedirectToLogin = context =>
     {
@@ -99,6 +107,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     {
         sqlOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
     }));
+builder.Services.AddMemoryCache();
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -113,7 +122,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
 builder.Services.Configure<IdentityOptions>(options =>
 {
     options.Lockout.MaxFailedAccessAttempts = 5;
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(1);
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
     options.Lockout.AllowedForNewUsers = true;
 });
 
@@ -127,6 +136,10 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddFixedWindowLimiter(policyName: "login-policy", opt =>
+    {
+        opt.PermitLimit = 5; opt.Window = TimeSpan.FromSeconds(30); opt.QueueLimit = 0;
+    });
+    options.AddFixedWindowLimiter(policyName: "forgot-password-policy", opt =>
     {
         opt.PermitLimit = 5; opt.Window = TimeSpan.FromSeconds(30); opt.QueueLimit = 0;
     });
@@ -151,7 +164,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-XSRF-TOKEN";
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
 // --- CONCRETE REPOSITORIES ---
@@ -194,10 +207,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped(sp =>
 {
     var accessor = sp.GetRequiredService<IHttpContextAccessor>();
-    var inner = new HttpClientHandler
-    {
-        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-    };
+
+    var inner = new HttpClientHandler();
     var client = new HttpClient(
         new StockSense.Web.Helpers.CookieForwardingHandler(accessor, inner));
     var context = accessor.HttpContext;
@@ -427,7 +438,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(StockSense.Client._Imports).Assembly);
 
-app.MapAdditionalIdentityEndpoints();
+app.MapAdditionalIdentityEndpoints().RequireRateLimiting("login-policy");
 app.MapControllers().RequireRateLimiting("api-policy");
 
 app.MapGet("/api/download/{token}", (string token, PdfDownloadCache cache) =>

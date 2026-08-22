@@ -37,6 +37,10 @@ public class TransactionHelper
             throw new InvalidOperationException("The checkout must contain at least one product.");
         if (request.Lines.Any(line => line.ProductId <= 0 || line.Quantity <= 0 || line.DiscountAmount < 0))
             throw new InvalidOperationException("Checkout lines contain an invalid product, quantity, or discount.");
+        if (request.Lines.Any(line => line.LostSalesQuantity < 0))
+            throw new InvalidOperationException("Lost sales quantity cannot be negative.");
+        if (request.Lines.Any(line => line.RequestedQuantity.HasValue && line.RequestedQuantity.Value < line.Quantity))
+            throw new InvalidOperationException("Requested quantity cannot be less than sold quantity.");
         if (request.Lines.Select(line => line.ProductId).Distinct().Count() != request.Lines.Count)
             throw new InvalidOperationException("A product can only appear once in a checkout.");
 
@@ -83,7 +87,7 @@ public class TransactionHelper
                     if (line.DiscountAmount > grossAmount)
                         throw new InvalidOperationException($"Discount cannot exceed the line amount for {product.Name}.");
 
-                    return new PreparedSaleLine(product, line.Quantity, line.DiscountAmount, grossAmount - line.DiscountAmount);
+                    return new PreparedSaleLine(product, line.Quantity, line.DiscountAmount, grossAmount - line.DiscountAmount, line);
                 }).ToArray();
 
                 var sale = new Transaction
@@ -107,6 +111,12 @@ public class TransactionHelper
                     line.Product.DeductStock(line.Quantity);
                     await _repo.UpdateAsync(line.Product);
 
+                    var req = line.Source.RequestedQuantity ?? line.Quantity;
+                    var lost = line.Source.LostSalesQuantity;
+                    // Auto-derive if caller sent only RequestedQuantity
+                    if (lost == 0 && req > line.Quantity)
+                        lost = req - line.Quantity;
+
                     sale.Items.Add(new TransactionItem
                     {
                         ProductId = line.Product.Id,
@@ -117,7 +127,10 @@ public class TransactionHelper
                         DiscountAmount = line.DiscountAmount,
                         LineTotal = line.LineTotal,
                         StockBefore = stockBefore,
-                        StockAfter = line.Product.CurrentStock
+                        StockAfter = line.Product.CurrentStock,
+                        RequestedQuantity = req,
+                        LostSalesQuantity = lost,
+                        StockoutOccurred = lost > 0
                     });
                 }
 
@@ -192,5 +205,6 @@ public class TransactionHelper
         Product Product,
         int Quantity,
         decimal DiscountAmount,
-        decimal LineTotal);
+        decimal LineTotal,
+        CheckoutLineDto Source);
 }

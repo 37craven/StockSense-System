@@ -38,7 +38,7 @@ public class DashboardController : ControllerBase
                 .Select(p => new ProductDto(
                     p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock,
                     p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "",
-                    IsActive: p.IsActive, ReservedStock: p.ReservedStock))
+                    IsActive: p.IsActive))
                 .ToList()
         };
 

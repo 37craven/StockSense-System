@@ -32,72 +32,90 @@ public sealed class InventoryController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<InventoryDashboardRowDto>>> GetDashboard(
         CancellationToken cancellationToken)
     {
-        var incoming = await (
-                from item in _context.OrderSlipItems.AsNoTracking()
-                join slip in _context.OrderSlips.AsNoTracking() on item.OrderSlipId equals slip.Id
-                where slip.LocationId == LocationId
-                       && (slip.Status == OrderSlipStatuses.Ordered || slip.Status == OrderSlipStatuses.PartiallyReceived)
-                group item by item.ProductId into productItems
-                select new
-                {
-                    ProductId = productItems.Key,
-                    Quantity = productItems.Sum(item => item.OrderedQuantity - item.ReceivedQuantity)
-                })
-            .ToDictionaryAsync(row => row.ProductId, row => row.Quantity, cancellationToken);
-
-        var rows = await (
-                from product in _context.Products.AsNoTracking()
-                join supplier in _context.Suppliers.AsNoTracking() on product.SupplierId equals supplier.Id into suppliers
-                from supplier in suppliers.DefaultIfEmpty()
-                join metric in _context.ProductInventoryMetrics.AsNoTracking().Where(x => x.LocationId == LocationId)
-                    on product.Id equals metric.ProductId into metrics
-                from metric in metrics.DefaultIfEmpty()
-                join setting in _context.ProductInventorySettings.AsNoTracking().Where(x => x.LocationId == LocationId)
-                    on product.Id equals setting.ProductId into settings
-                from setting in settings.DefaultIfEmpty()
-                orderby product.Name
-                select new InventoryDashboardRowDto
-                {
-                    ProductId = product.Id,
-                    ProductName = product.Name,
-                    Category = product.Category,
-                    Brand = product.Brand,
-                    SupplierId = product.SupplierId,
-                    SupplierName = supplier == null ? string.Empty : supplier.Name,
-                    CurrentStock = product.CurrentStock,
-                    Price = product.Price,
-                    ImageUrl = product.ImageUrl,
-                    ProductRowVersion = product.RowVersion,
-                    IsActive = product.IsActive,
-                    AverageDailyDemand = metric == null ? 0 : metric.AverageDailyDemand,
-                    DemandStandardDeviation = metric == null ? 0 : metric.DemandStandardDeviation,
-                    SafetyStock = metric == null ? 0 : metric.SafetyStock,
-                    ReorderPoint = product.ReorderTarget,
-                    TargetStock = metric == null ? 0 : metric.TargetStock,
-                    CalculationStage = metric == null ? "Not calculated" : metric.CalculationStage,
-                    ConfidenceLevel = metric == null ? "Low" : metric.ConfidenceLevel,
-                    LastCalculatedAt = metric == null ? null : metric.LastCalculatedAt,
-                    CalculationExplanation = metric == null ? "Run a calculation to create inventory metrics." : metric.CalculationReason ?? string.Empty,
-                    IsAutomaticOrderEnabled = setting == null || setting.IsAutomaticOrderEnabled,
-                    CalculationMode = setting == null ? InventoryCalculationModes.Auto : setting.CalculationMode
-                })
-            .ToListAsync(cancellationToken);
-
-        foreach (var row in rows)
+        try
         {
-            row.IncomingStock = incoming.GetValueOrDefault(row.ProductId);
-            row.InventoryPosition = checked(row.CurrentStock + row.IncomingStock);
+            var incoming = await (
+                    from item in _context.OrderSlipItems.AsNoTracking()
+                    join slip in _context.OrderSlips.AsNoTracking() on item.OrderSlipId equals slip.Id
+                    where slip.LocationId == LocationId
+                           && (slip.Status == OrderSlipStatuses.Ordered || slip.Status == OrderSlipStatuses.PartiallyReceived)
+                    group item by item.ProductId into productItems
+                    select new
+                    {
+                        ProductId = productItems.Key,
+                        Quantity = productItems.Sum(item => item.OrderedQuantity - item.ReceivedQuantity)
+                    })
+                .ToDictionaryAsync(row => row.ProductId, row => row.Quantity, cancellationToken);
+
+            var rows = await (
+                    from product in _context.Products.AsNoTracking()
+                    join supplier in _context.Suppliers.AsNoTracking() on product.SupplierId equals supplier.Id into suppliers
+                    from supplier in suppliers.DefaultIfEmpty()
+                    join metric in _context.ProductInventoryMetrics.AsNoTracking().Where(x => x.LocationId == LocationId)
+                        on product.Id equals metric.ProductId into metrics
+                    from metric in metrics.DefaultIfEmpty()
+                    join setting in _context.ProductInventorySettings.AsNoTracking().Where(x => x.LocationId == LocationId)
+                        on product.Id equals setting.ProductId into settings
+                    from setting in settings.DefaultIfEmpty()
+                    orderby product.Name
+                    select new InventoryDashboardRowDto
+                    {
+                        ProductId = product.Id,
+                        ProductName = product.Name,
+                        Category = product.Category,
+                        Brand = product.Brand,
+                        SupplierId = product.SupplierId,
+                        SupplierName = supplier == null ? string.Empty : supplier.Name,
+                        CurrentStock = product.CurrentStock,
+                        Price = product.Price,
+                        ImageUrl = product.ImageUrl,
+                        ProductRowVersion = product.RowVersion,
+                        IsActive = product.IsActive,
+                        AverageDailyDemand = metric == null ? 0 : metric.AverageDailyDemand,
+                        DemandStandardDeviation = metric == null ? 0 : metric.DemandStandardDeviation,
+                        AverageLeadTimeDays = metric == null ? 0 : metric.AverageLeadTimeDays,
+                        LeadTimeStandardDeviation = metric == null ? 0 : metric.LeadTimeStandardDeviation,
+                        SafetyStock = metric == null ? 0 : metric.SafetyStock,
+                        ReorderPoint = product.ReorderTarget,
+                        TargetStock = metric == null ? 0 : metric.TargetStock,
+                        CalculationStage = metric == null ? "Not calculated" : metric.CalculationStage,
+                        ConfidenceLevel = metric == null ? "Low" : metric.ConfidenceLevel,
+                        LastCalculatedAt = metric == null ? null : metric.LastCalculatedAt,
+                        CalculationExplanation = metric == null ? "Run a calculation to create inventory metrics." : metric.CalculationReason ?? string.Empty,
+                        IsAutomaticOrderEnabled = setting == null || setting.IsAutomaticOrderEnabled,
+                        CalculationMode = setting == null ? InventoryCalculationModes.Auto : setting.CalculationMode
+                    })
+                .ToListAsync(cancellationToken);
+
+            foreach (var row in rows)
+            {
+                row.IncomingStock = incoming.GetValueOrDefault(row.ProductId);
+                row.InventoryPosition = checked(row.CurrentStock + row.IncomingStock);
+            }
+            return Ok(rows);
         }
-        return Ok(rows);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve inventory dashboard.");
+            return StatusCode(500, new { error = "Could not retrieve inventory dashboard. Please try again." });
+        }
     }
 
     [HttpGet("products/{productId:int}/settings")]
     public async Task<ActionResult<ProductInventorySettingDto>> GetSettings(int productId, CancellationToken cancellationToken)
     {
-        var setting = await _context.ProductInventorySettings.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.ProductId == productId && x.LocationId == LocationId, cancellationToken);
-        if (setting == null) return NotFound(new { error = "Inventory settings have not been initialized. Recalculate the product first." });
-        return Ok(ToDto(setting));
+        try
+        {
+            var setting = await _context.ProductInventorySettings.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.ProductId == productId && x.LocationId == LocationId, cancellationToken);
+            if (setting == null) return NotFound(new { error = "Inventory settings have not been initialized. Recalculate the product first." });
+            return Ok(ToDto(setting));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve inventory settings for product {ProductId}.", productId);
+            return StatusCode(500, new { error = "Could not retrieve inventory settings. Please try again." });
+        }
     }
 
     [HttpPut("products/{productId:int}/settings")]
@@ -149,24 +167,50 @@ public sealed class InventoryController : ControllerBase
     }
 
     [HttpPost("recalculate/{productId:int}")]
-    public async Task<ActionResult<SafetyStockCalculationResult>> RecalculateProduct(int productId, CancellationToken cancellationToken) =>
-        Ok(await _calculationService.RecalculateProductAsync(productId, LocationId, cancellationToken));
+    public async Task<ActionResult<SafetyStockCalculationResult>> RecalculateProduct(int productId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _calculationService.RecalculateProductAsync(productId, LocationId, cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Recalculation for product {ProductId} failed.", productId);
+            return StatusCode(500, new { error = "Recalculation failed. Please try again." });
+        }
+    }
 
     [HttpPost("recalculate-selected")]
     public async Task<ActionResult<InventoryRecalculationSummaryDto>> RecalculateSelected(
         [FromBody] IReadOnlyCollection<int> productIds,
         CancellationToken cancellationToken)
     {
-        var ids = productIds.Where(id => id > 0).Distinct().ToArray();
-        var results = await _calculationService.RecalculateProductsAsync(ids, LocationId, cancellationToken);
-        return Ok(new InventoryRecalculationSummaryDto(ids.Length, results.Count, results));
+        try
+        {
+            var ids = productIds.Where(id => id > 0).Distinct().ToArray();
+            var results = await _calculationService.RecalculateProductsAsync(ids, LocationId, cancellationToken);
+            return Ok(new InventoryRecalculationSummaryDto(ids.Length, results.Count, results));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Recalculation for selected products failed.");
+            return StatusCode(500, new { error = "Recalculation failed. Please try again." });
+        }
     }
 
     [HttpPost("recalculate-all")]
     public async Task<ActionResult<InventoryRecalculationSummaryDto>> RecalculateAll(CancellationToken cancellationToken)
     {
-        var results = await _calculationService.RecalculateAllAsync(LocationId, cancellationToken);
-        return Ok(new InventoryRecalculationSummaryDto(results.Count, results.Count, results));
+        try
+        {
+            var results = await _calculationService.RecalculateAllAsync(LocationId, cancellationToken);
+            return Ok(new InventoryRecalculationSummaryDto(results.Count, results.Count, results));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Recalculation for all products failed.");
+            return StatusCode(500, new { error = "Recalculation failed. Please try again." });
+        }
     }
 
     private static ProductInventorySettingDto ToDto(ProductInventorySetting value) => new()

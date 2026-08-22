@@ -16,6 +16,7 @@ public class TransactionRepository
     public async Task<List<Transaction>> GetFilteredAsync(string? typeFilter = null, int take = 500)
     {
         var query = _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Items)
             .AsQueryable();
 
@@ -32,6 +33,7 @@ public class TransactionRepository
     public async Task<Transaction?> GetByIdWithItemsAsync(int id)
     {
         return await _context.Transactions
+            .AsNoTracking()
             .Include(t => t.Items)
             .FirstOrDefaultAsync(t => t.Id == id);
     }

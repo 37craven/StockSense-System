@@ -131,7 +131,7 @@ public sealed class WorkOrderPermissionTests
         var unavailable = new Product
         {
             Name = "Engine Oil", Category = "Parts", Brand = "Test", IsActive = true,
-            CurrentStock = 1, ReservedStock = 1
+            CurrentStock = 0
         };
         db.Products.Add(unavailable);
         await db.SaveChangesAsync();
@@ -151,7 +151,6 @@ public sealed class WorkOrderPermissionTests
         Assert.Contains("Engine Oil", responseText);
         Assert.DoesNotContain("available", responseText, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(WorkOrderStatuses.Pending, appointment.Status);
-        Assert.Equal(1, unavailable.ReservedStock);
         Assert.Empty(db.WorkOrderAudits);
     }
 
@@ -181,8 +180,6 @@ public sealed class WorkOrderPermissionTests
             appointment.Id, Status(WorkOrderStatuses.Confirmed));
 
         Assert.IsType<ConflictObjectResult>(result);
-        Assert.Equal(0, available.ReservedStock);
-        Assert.Equal(0, unavailable.ReservedStock);
         Assert.Equal(WorkOrderStatuses.Pending, appointment.Status);
     }
 

@@ -27,4 +27,10 @@ public sealed class CheckoutLineDto
 
     [Range(typeof(decimal), "0", "9999999999999999")]
     public decimal DiscountAmount { get; set; }
+
+    // Denied-attempt logger — optional, revert by restoring original file
+    public int? RequestedQuantity { get; set; }
+
+    [Range(0, 999_999)]
+    public int LostSalesQuantity { get; set; }
 }

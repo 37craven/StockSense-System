@@ -15,6 +15,7 @@ public class BuildRequestRepository
     public async Task<List<BuildRequest>> GetAllAsync()
     {
         return await _context.BuildRequests
+            .AsNoTracking()
             .Include(b => b.Transaction)
             .Include(b => b.Motorcycle)
             .OrderByDescending(b => b.CreatedAt)
@@ -23,12 +24,16 @@ public class BuildRequestRepository
 
     public async Task<BuildRequest?> GetByIdAsync(int id)
     {
-        return await _context.BuildRequests.FindAsync(id);
+        return await _context.BuildRequests
+            .Include(b => b.Motorcycle)
+            .Include(b => b.Transaction)
+            .FirstOrDefaultAsync(b => b.Id == id);
     }
 
     public async Task<List<BuildRequest>> GetByCustomerNameAsync(string customerName)
     {
         return await _context.BuildRequests
+            .AsNoTracking()
             .Include(b => b.Transaction)
             .Include(b => b.Motorcycle)
             .Where(b => b.CustomerName == customerName)
@@ -42,6 +47,7 @@ public class BuildRequestRepository
     {
         var normalizedEmail = email.Trim().ToUpper();
         return await _context.BuildRequests
+            .AsNoTracking()
             .Include(b => b.Transaction)
             .Include(b => b.Motorcycle)
             .Where(b => b.CustomerUserId == userId

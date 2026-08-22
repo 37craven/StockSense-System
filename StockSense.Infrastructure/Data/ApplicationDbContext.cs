@@ -41,19 +41,19 @@ namespace StockSense.Infrastructure.Data
                 .HasOne(m => m.Motorcycle)
                 .WithMany()
                 .HasForeignKey(m => m.MotorcycleId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<Appointment>()
                 .HasOne(a => a.Motorcycle)
                 .WithMany()
                 .HasForeignKey(a => a.MotorcycleId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<BuildRequest>()
                 .HasOne(b => b.Motorcycle)
                 .WithMany()
                 .HasForeignKey(b => b.MotorcycleId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<WorkOrderAudit>(audit =>
             {
@@ -71,10 +71,19 @@ namespace StockSense.Infrastructure.Data
         }
 
 
+        private static TimeZoneInfo? _cachedPhZone;
+        private static TimeZoneInfo CachedPhZone => _cachedPhZone ??= ResolvePhZone();
+        private static TimeZoneInfo ResolvePhZone()
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch (TimeZoneNotFoundException) { try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); } catch { return TimeZoneInfo.Utc; } }
+            catch (InvalidTimeZoneException) { return TimeZoneInfo.Utc; }
+        }
+
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            // 1. Define Philippine Time globally for the database
-            var phZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+            // 1. Define Philippine Time globally for the database (cached)
+            var phZone = CachedPhZone;
             var phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, phZone);
 
             // 2. Look at every single row that is about to be Added or Updated
