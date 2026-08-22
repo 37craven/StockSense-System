@@ -116,7 +116,7 @@
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-xs text-muted-foreground">Time</span>
-                                    <span class="text-xs font-bold text-foreground">@newAppt.TimeSlot</span>
+                                    <span class="text-xs font-bold text-foreground">@FormatTimeSlot(newAppt.TimeSlot)</span>
                                 </div>
                             }
                         </div>
@@ -340,9 +340,9 @@
                                                     {
                                                         var date = days[row * 7 + col];
                                                         bool isCurrentMonth = date.Month == calendarMonth.Month;
-                                                        bool isPast = date.Date < DateTime.Today;
+                                                        bool isPast = date.Date < PhToday;
                                                         bool isSelected = newAppt.AppointmentDate.Date == date.Date;
-                                                        bool isToday = date.Date == DateTime.Today;
+                                                        bool isToday = date.Date == PhToday;
                                                         bool isDisabled = isPast || !isCurrentMonth;
 
                                                         string bg = isSelected ? "var(--primary)" : "transparent";
@@ -401,7 +401,10 @@
                                                 var displayTime = $"{displayHour}:{ts.Minutes:D2}";
 
                                                 <button @onclick="@(() => { if (isAvailable) { newAppt.TimeSlot = time; } })"
-                                                        class="h-9 px-3 min-h-[36px] rounded-lg text-sm text-center flex items-center justify-center gap-0.5 transition-all duration-150"
+                                                        disabled="@(!isAvailable)"
+                                                        aria-disabled="@(!isAvailable ? "true" : "false")"
+                                                        aria-label="@($"{displayTime} {ampm} {(isAvailable ? "available" : "unavailable")}")"
+                                                        class="h-9 px-3 min-h-[36px] rounded-lg text-sm text-center flex items-center justify-center gap-0.5 transition-all duration-150 disabled:cursor-not-allowed"
                                                         style="cursor: @(isAvailable ? "pointer" : "not-allowed"); border: 1px solid @(isSlotSelected ? "var(--primary)" : "var(--border)"); background-color: @(isSlotSelected ? "var(--primary)" : "var(--muted)"); color: @(isSlotSelected ? "var(--primary-foreground)" : isAvailable ? "var(--foreground)" : "var(--muted-foreground)"); opacity: @(isAvailable ? "1" : "0.35"); text-decoration: @(isAvailable ? "none" : "line-through");">
                                                     <span class="text-sm">@displayTime</span>
                                                     <span class="text-xs" style="color: @(isSlotSelected ? "var(--primary-foreground)" : "var(--muted-foreground)");">@ampm</span>
@@ -435,7 +438,7 @@
                             <div class="p-4 rounded-lg bg-card border border-border lg:col-span-2">
                                 <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Schedule</span>
                                 <div class="flex items-center justify-between mt-1 flex-wrap gap-2">
-                                    <p class="text-sm font-medium text-foreground m-0">@newAppt.AppointmentDate.ToString("MMMM dd, yyyy") at @newAppt.TimeSlot</p>
+                                    <p class="text-sm font-medium text-foreground m-0">@newAppt.AppointmentDate.ToString("MMMM dd, yyyy") at @FormatTimeSlot(newAppt.TimeSlot)</p>
                                     <span class="text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">~@TotalDurationMinutes mins</span>
                                 </div>
                             </div>
@@ -612,7 +615,7 @@
 
 @code {
     private bool isLoading = true;
-    private CreateAppointmentDto newAppt = new() { AppointmentDate = DateTime.Today, TimeSlot = "" };
+    private CreateAppointmentDto newAppt = new() { AppointmentDate = PhToday, TimeSlot = "" };
     private bool showSuccessModal = false;
     private bool isProcessing = false;
     private bool showProductModal = false;
@@ -635,8 +638,8 @@
     private bool CanProceed => currentStep switch
     {
         1 => SelectedServices.Any(),
-        2 => !string.IsNullOrEmpty(selectedMechanic),
-        3 => !string.IsNullOrEmpty(newAppt.TimeSlot),
+        2 => !string.IsNullOrWhiteSpace(selectedMechanic),
+        3 => !string.IsNullOrWhiteSpace(newAppt.TimeSlot),
         _ => true
     };
 
@@ -1010,7 +1013,8 @@
     private async Task SelectMechanic(string mechanic)
     {
         selectedMechanic = mechanic;
-        newAppt.TimeSlot = "";
+        if (!string.IsNullOrWhiteSpace(newAppt.TimeSlot) && !IsTimeSlotAvailable(newAppt.TimeSlot))
+            newAppt.TimeSlot = "";
         await FetchBookedSlots();
     }
 
@@ -1025,7 +1029,7 @@
     {
         if (isProcessing) return;
 
-        if (string.IsNullOrEmpty(newAppt.TimeSlot)) { Toast.Warning("Select a time slot."); return; }
+        if (string.IsNullOrWhiteSpace(newAppt.TimeSlot)) { Toast.Warning("Select a time slot."); return; }
 
         if (HasUnavailableSelectedProduct())
         {
@@ -1034,8 +1038,15 @@
             return;
         }
         isProcessing = true;
-
+        newAppt.TimeSlot = newAppt.TimeSlot?.Trim() ?? string.Empty;
         newAppt.AppointmentDate = DateTime.SpecifyKind(newAppt.AppointmentDate.Date, DateTimeKind.Unspecified);
+        await FetchBookedSlots();
+        if (!IsTimeSlotAvailable(newAppt.TimeSlot))
+        {
+            Toast.Error("The selected time slot is no longer available. Please choose another.", "Slot taken");
+            isProcessing = false;
+            return;
+        }
 
         newAppt.SelectedServices = SelectedServices.Select(s => s.Name).ToList();
         newAppt.Category = SelectedServices.FirstOrDefault()?.Category ?? "General";
@@ -1129,7 +1140,7 @@
         currentStep = 1;
 
         string savedName = newAppt.CustomerName;
-        newAppt = new CreateAppointmentDto { AppointmentDate = DateTime.Today, CustomerName = savedName, TimeSlot = "" };
+        newAppt = new CreateAppointmentDto { AppointmentDate = PhToday, CustomerName = savedName, TimeSlot = "" };
 
         foreach (var s in availableServices)
         {
@@ -1149,13 +1160,14 @@
         ResetBookingState();
     }
 
-    private DateTime calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private static string FormatTimeSlot(string? value) => TimeOnly.TryParseExact(value?.Trim() ?? "", "HH:mm", out var t) ? t.ToString("h:mm tt") : (TimeOnly.TryParse(value, out var t2) ? t2.ToString("h:mm tt") : value ?? "");
+    private DateTime calendarMonth = new DateTime(PhToday.Year, PhToday.Month, 1);
     private void PrevMonth() => calendarMonth = calendarMonth.AddMonths(-1);
     private void NextMonth() => calendarMonth = calendarMonth.AddMonths(1);
 
     private async Task SelectDate(DateTime date)
     {
-        if (date.Date < DateTime.Today || date.Month != calendarMonth.Month) return;
+        if (date.Date < PhToday || date.Month != calendarMonth.Month) return;
 
         newAppt.AppointmentDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
 

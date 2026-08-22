@@ -21,6 +21,8 @@
 @inject ToastService Toast
 @attribute [Authorize(Roles = "Admin, Employee")]
 
+<BbPortalHost />
+
 <style>
 .order-page { display:flex; flex-direction:column; min-height:100%; }
 .order-list-shell {
@@ -93,14 +95,15 @@
 .detail-body {
     flex:1;
     min-height:0;
-    max-height:calc(82vh - 130px);
-    overflow-y:auto;
+    max-height:calc(92dvh - 130px);
+    overflow:hidden;
     padding:.85rem 1rem;
     display:flex;
     flex-direction:column;
     gap:.8rem;
 }
 .detail-summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
+.detail-summary-grid.cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .detail-metric {
     min-width:0;
     padding:.75rem .85rem;
@@ -111,12 +114,14 @@
 }
 .detail-metric span { display:block; margin-bottom:.35rem; color:hsl(var(--muted-foreground)); font-size:.65rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
 .detail-metric strong { display:block; color:hsl(var(--foreground)); font-size:.875rem; overflow-wrap:anywhere; }
-.items-shell { overflow:hidden; border:1px solid hsl(var(--border)); border-radius:.7rem; }
-.items-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.6rem .85rem; border-bottom:1px solid hsl(var(--border)); background:hsl(var(--muted) / .25); }
-.items-heading strong { font-size:.875rem; }
-.items-heading span { color:hsl(var(--muted-foreground)); font-size:.72rem; }
+.items-shell { display:flex; flex-direction:column; flex:1 1 0; min-height:160px; overflow:hidden; border:1px solid hsl(var(--border)); border-radius:.7rem; }
+.items-scroll-body .items-mobile-cards > div { min-height:0; }
+.items-heading { display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.6rem .85rem; border-bottom:1px solid hsl(var(--border)); background:hsl(var(--card)); flex-shrink:0; flex-wrap:nowrap; }
+.items-scroll-body { flex:1 1 0; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+.items-heading strong { font-size:.875rem; flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.items-heading span { color:hsl(var(--muted-foreground)); font-size:.72rem; white-space:nowrap; flex-shrink:0; }
 .items-table-wrap { overflow-x:auto; }
-.items-table { width:100%; min-width:1120px; border-collapse:collapse; font-size:.75rem; }
+.items-table { width:100%; min-width:1040px; border-collapse:collapse; font-size:.75rem; }
 .items-table th,.items-table td { padding:.65rem .7rem; border-bottom:1px solid hsl(var(--border)); white-space:nowrap; }
 .items-table th { color:hsl(var(--muted-foreground)); text-align:right; font-weight:600; background:hsl(var(--muted) / .2); }
 .items-table th:first-child,.items-table td:first-child { text-align:left; }
@@ -124,8 +129,10 @@
 .items-table tbody tr:last-child td { border-bottom:0; }
 .product-cell strong { display:block; font-size:.78rem; }
 .product-cell small { color:hsl(var(--muted-foreground)); font-size:.66rem; }
+.items-mobile-cards { display:none; }
 .detail-footer { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.6rem .85rem; border-top:1px solid hsl(var(--border)); flex-shrink:0; }
-.detail-footer-group { display:flex; gap:.5rem; flex-wrap:wrap; }
+.detail-footer-group { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+.detail-footer-group:last-child { justify-content:flex-end; margin-left:auto; }
 .receive-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; }
 .receive-fields label { display:flex; flex-direction:column; gap:.35rem; color:hsl(var(--foreground)); font-size:.8rem; font-weight:600; }
 .receive-fields input { min-width:0; width:100%; height:2.5rem; border:1px solid hsl(var(--input)); border-radius:.5rem; background:hsl(var(--background)); color:hsl(var(--foreground)); padding:0 .7rem; font-size:.875rem; }
@@ -188,8 +195,13 @@
     .order-table td[data-label="Actions"] { grid-column:1 / -1; padding-top:.65rem; border-top:1px solid hsl(var(--border)); }
     .order-actions { justify-content:flex-start; }
     .detail-summary-grid { grid-template-columns:1fr 1fr; }
-    .detail-footer { align-items:stretch; flex-direction:column-reverse; }
-    .detail-footer-group { width:100%; }
+    .detail-footer { align-items:center; flex-direction:row; flex-wrap:wrap; gap:.75rem; }
+    .detail-footer-group { width:auto; flex:0 1 auto; justify-content:flex-start; }
+    .detail-footer-group:last-child { justify-content:flex-end; flex:1 1 auto; }
+    .items-table-wrap { display:none; }
+    .items-mobile-cards { display:flex; flex-direction:column; gap:.6rem; }
+    .items-shell { min-height:340px; height:56vh; max-height:56vh; }
+    .items-scroll-body { max-height:calc(56vh - 42px); }
     .receive-fields { grid-template-columns:1fr; }
     .receive-table thead { display:none; }
     .receive-table,.receive-table tbody { display:block; }
@@ -300,7 +312,7 @@
                         <tbody>
                             @foreach (var slip in filteredSlips)
                             {
-                                <tr class="order-row" @onclick="() => OpenDetail(slip)">
+                                <tr class="order-row" role="button" tabindex="0" @onclick="() => OpenDetail(slip)" @onkeydown='(e) => { if(e.Key=="Enter"||e.Key==" ") OpenDetail(slip); }'>
                                     <td data-label="Order">
                                         <div class="order-primary">
                                             <strong>@DisplayNumber(slip)</strong>
@@ -355,8 +367,8 @@
 
 @* DETAIL MODAL *@
 <BbDialog @bind-Open="detailOpen" @bind-Open:after="OnDetailOpenChanged">
-    <BbDialogContent class="flex max-h-[82dvh] w-[min(94vw,61.25rem)] flex-col overflow-hidden p-0">
-        <div class="px-4 pt-4 shrink-0">
+    <BbDialogContent Style="width:min(99vw,68rem); max-height:92dvh; min-height:0; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden p-0 sm:max-h-[88dvh] min-h-0">
+        <div class="px-4 sm:px-6 pt-4 sm:pt-5 shrink-0">
             <BbDialogHeader>
                 <div class="flex flex-wrap items-center gap-2">
                     <BbDialogTitle>@(selectedSlip == null ? "Order details" : DisplayNumber(selectedSlip))</BbDialogTitle>
@@ -369,12 +381,15 @@
             </BbDialogHeader>
         </div>
 
-        <div class="detail-body">
+        <div class="detail-body flex-1 min-h-0 overflow-hidden">
             @if (selectedSlip != null)
             {
-                <div class="detail-summary-grid">
+                <div class="detail-summary-grid @(selectedSlip.ExpectedDeliveryDate.HasValue ? "" : "cols-2")">
                     <div class="detail-metric"><span>Generated</span><strong>@GeneratedDate(selectedSlip).ToString("MMM dd, yyyy h:mm tt")</strong></div>
-                    <div class="detail-metric"><span>Expected delivery</span><strong>@(selectedSlip.ExpectedDeliveryDate?.ToString("MMM dd, yyyy") ?? "—")</strong></div>
+                    @if (selectedSlip.ExpectedDeliveryDate.HasValue)
+                    {
+                        <div class="detail-metric"><span>Expected delivery</span><strong>@selectedSlip.ExpectedDeliveryDate.Value.ToString("MMM dd, yyyy")</strong></div>
+                    }
                     <div class="detail-metric"><span>Location</span><strong>@selectedSlip.LocationId</strong></div>
                 </div>
 
@@ -382,21 +397,52 @@
                 {
                     <section class="items-shell">
                         <div class="items-heading"><strong>Order items</strong><span>@selectedSlip.Items.Count item@(selectedSlip.Items.Count == 1 ? "" : "s")</span></div>
+                        <div class="items-scroll-body">
                         <div class="items-table-wrap">
                             <table class="items-table">
-                                <thead><tr><th>Product</th><th>Current</th><th>Incoming</th><th>Reserved</th><th>Position</th><th>Demand/Day</th><th>Lead Days</th><th>Safety</th><th>Reorder</th><th>Target</th><th>Suggested</th><th>Ordered</th><th>Received</th></tr></thead>
+                                <thead><tr><th>Product</th><th>Current</th><th>Incoming</th><th>Position</th><th>Demand/Day</th><th>Lead Days</th><th>Safety</th><th>Reorder</th><th>Target</th><th>Suggested</th><th>Ordered</th><th>Received</th></tr></thead>
                                 <tbody>
                                     @foreach (var item in selectedSlip.Items)
                                     {
                                         <tr>
                                             <td class="product-cell"><strong>@item.ProductName</strong>@if (!string.IsNullOrWhiteSpace(item.Brand)) { <small>@item.Brand</small> }</td>
-                                            <td>@item.CurrentStockSnapshot</td><td>@item.IncomingStockSnapshot</td><td>@item.ReservedStockSnapshot</td><td>@item.InventoryPositionSnapshot</td>
+                                            <td>@item.CurrentStockSnapshot</td><td>@item.IncomingStockSnapshot</td><td>@item.InventoryPositionSnapshot</td>
                                             <td>@item.AverageDailyDemandSnapshot.ToString("0.##")</td><td>@item.LeadTimeDaysSnapshot.ToString("0.##")</td><td>@item.SafetyStockSnapshot</td><td>@item.ReorderPointSnapshot</td><td>@item.TargetStockSnapshot</td>
                                             <td class="text-primary font-semibold">@item.SuggestedQuantity</td><td class="font-semibold">@(item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity)</td><td class="@(item.ReceivedQuantity > 0 ? "text-emerald-500" : "text-muted-foreground")">@item.ReceivedQuantity</td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="items-mobile-cards p-2">
+                            @foreach (var item in selectedSlip.Items)
+                            {
+                                <div class="rounded-lg border border-border bg-card p-3 flex flex-col gap-2">
+                                    <div class="flex justify-between items-start gap-2">
+                                        <div class="min-w-0">
+                                            <div class="font-semibold text-sm leading-tight">@item.ProductName</div>
+                                            @if (!string.IsNullOrWhiteSpace(item.Brand)) { <div class="text-xs text-muted-foreground">@item.Brand</div> }
+                                        </div>
+                                        <span class="shrink-0 text-xs font-semibold text-primary">@item.SuggestedQuantity suggested</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Current</span><span class="font-medium text-left">@item.CurrentStockSnapshot</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Incoming</span><span class="font-medium text-left">@item.IncomingStockSnapshot</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Position</span><span class="font-medium text-left">@item.InventoryPositionSnapshot</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Demand/day</span><span class="font-medium text-left">@item.AverageDailyDemandSnapshot.ToString("0.##")</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Lead days</span><span class="font-medium text-left">@item.LeadTimeDaysSnapshot.ToString("0.##")</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Safety</span><span class="font-medium text-left">@item.SafetyStockSnapshot</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Reorder</span><span class="font-medium text-left">@item.ReorderPointSnapshot</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Target</span><span class="font-medium text-left">@item.TargetStockSnapshot</span></div>
+                                        <div class="grid grid-cols-[72px_1fr] items-center gap-1.5"><span class="text-muted-foreground">Ordered</span><span class="font-semibold text-left">@(item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity)</span></div>
+                                    </div>
+                                    <div class="flex justify-between items-center pt-2 border-t border-border text-xs">
+                                        <span class="text-muted-foreground">Received</span>
+                                        <span class="font-semibold @(item.ReceivedQuantity > 0 ? "text-emerald-600" : "text-muted-foreground")">@item.ReceivedQuantity</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
                         </div>
                     </section>
                 }
@@ -445,14 +491,14 @@
 </BbDialog>
 
 <BbDialog @bind-Open="approveOpen">
-    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
+    <BbDialogContent Style="width:min(99vw,42rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden">
+        <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
             <BbDialogTitle>Approve draft order?</BbDialogTitle>
             <BbDialogDescription>Confirm that this draft has been reviewed. Approval does not send the order to the supplier.</BbDialogDescription>
         </BbDialogHeader>
         @if (transitioningSlip != null)
         {
-            <div class="min-h-0 space-y-4 overflow-y-auto py-1">
+            <div class="flex-1 min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3" style="-webkit-overflow-scrolling:touch;">
                 @TransitionSummary(transitioningSlip)
                 @TransitionError()
             </div>
@@ -468,14 +514,14 @@
 </BbDialog>
 
 <BbDialog @bind-Open="markOrderedOpen">
-    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
+    <BbDialogContent Style="width:min(99vw,42rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden">
+        <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
             <BbDialogTitle>Send order to supplier?</BbDialogTitle>
             <BbDialogDescription>The supplier will receive the order summary and a PDF copy by email. The order changes to Ordered only after the email is sent successfully.</BbDialogDescription>
         </BbDialogHeader>
         @if (transitioningSlip != null)
         {
-            <div class="min-h-0 space-y-4 overflow-y-auto">
+            <div class="flex-1 min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3" style="-webkit-overflow-scrolling:touch;">
                 @TransitionSummary(transitioningSlip)
                 <div class="rounded-lg border border-border bg-muted/20 p-4 text-sm">
                     <div class="flex items-start gap-3">
@@ -507,12 +553,12 @@
 </BbDialog>
 
 <BbDialog @bind-Open="closeRemainingOpen" @bind-Open:after="OnCloseRemainingOpenChanged">
-    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
+    <BbDialogContent Style="width:min(99vw,42rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden">
+        <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
             <BbDialogTitle>Close the remaining order?</BbDialogTitle>
             <BbDialogDescription>The quantities below will no longer count as incoming stock. Items already received will remain in inventory.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="min-h-0 space-y-4 overflow-y-auto py-1">
+        <div class="flex-1 min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3" style="-webkit-overflow-scrolling:touch;">
             @if (closingSlip != null)
             {
                 <div class="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
@@ -577,14 +623,14 @@
 
 @* RECEIVE MODAL *@
 <BbDialog @bind-Open="receiveOpen">
-    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,45rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
+    <BbDialogContent Style="width:min(99vw,52rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden">
+        <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
             <BbDialogTitle>Record Receipt</BbDialogTitle>
             <BbDialogDescription>Enter quantities received in this delivery. Partial receipts remain open.</BbDialogDescription>
         </BbDialogHeader>
         @if (selectedSlip != null)
         {
-            <div class="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-3">
+            <div class="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-3 px-4 sm:px-6">
                 <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-received-date">
                     Received date
                     <input id="history-received-date" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" type="date" @bind="receiveDate" @bind:format="yyyy-MM-dd" />
@@ -598,8 +644,8 @@
                     <input id="history-receipt-remarks" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" @bind="receiveRemarks" maxlength="500" placeholder="Optional" />
                 </label>
             </div>
-            @if (!string.IsNullOrWhiteSpace(receiveError)) { <div role="alert" class="notice error">@receiveError</div> }
-            <div class="min-h-0 overflow-y-auto rounded-lg border border-border">
+            @if (!string.IsNullOrWhiteSpace(receiveError)) { <div role="alert" class="notice error mx-4 sm:mx-6 shrink-0">@receiveError</div> }
+            <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-border mx-4 sm:mx-6" style="-webkit-overflow-scrolling:touch;">
                     <table class="receive-table">
                         <thead><tr><th>Product</th><th>Ordered</th><th>Previously Received</th><th>Receive Now</th></tr></thead>
                         <tbody>
@@ -632,12 +678,12 @@
 </BbDialog>
 
 <BbDialog @bind-Open="receiveConfirmationOpen">
-    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,32rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
+    <BbDialogContent Style="width:min(99vw,38rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden">
+        <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
             <BbDialogTitle>Record this stock receipt?</BbDialogTitle>
             <BbDialogDescription>Confirm the delivered quantities. Product stock will increase immediately.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="min-h-0 space-y-4 overflow-y-auto">
+        <div class="flex-1 min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3" style="-webkit-overflow-scrolling:touch;">
             <div class="rounded-lg border border-border bg-muted/30">
                 @foreach (var line in ReceiptLines)
                 {
@@ -655,7 +701,7 @@
             </dl>
             @if (!string.IsNullOrWhiteSpace(receiveError)) { <p role="alert" class="text-sm text-destructive">@receiveError</p> }
         </div>
-        <BbDialogFooter>
+        <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="() => receiveConfirmationOpen = false" Disabled="receiveBusy">Go back</BbButton>
             <BbButton Variant="ButtonVariant.Default" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="SaveReceipt" Disabled="receiveBusy">
                 @if (receiveBusy) { <BbSpinner Size="SpinnerSize.Small" /> }
@@ -667,15 +713,15 @@
 
 @* CANCEL DIALOG *@
 <BbDialog @bind-Open="cancelOpen">
-    <BbDialogContent class="flex flex-col" Style="width:min(96vw,440px);">
-        <BbDialogHeader><BbDialogTitle>Cancel Order Slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription></BbDialogHeader>
-        <div class="py-2 flex flex-col gap-3">
+    <BbDialogContent Style="width:min(99vw,34rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden p-0">
+        <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6"><BbDialogTitle>Cancel Order Slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription></BbDialogHeader>
+        <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3 flex flex-col gap-3" style="-webkit-overflow-scrolling:touch;">
             <label class="flex flex-col gap-1 text-sm font-medium">Reason<textarea @bind="cancelReason" rows="3" maxlength="500" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
         </div>
-        <div class="flex justify-end gap-2 pt-3 border-t border-border">
+        <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Back</BbButton>
             <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel">Cancel Order</BbButton>
-        </div>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 

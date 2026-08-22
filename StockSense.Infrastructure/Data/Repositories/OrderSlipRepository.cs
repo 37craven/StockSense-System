@@ -15,6 +15,7 @@ public class OrderSlipRepository
     public async Task<List<OrderSlip>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.OrderSlips
+            .AsNoTracking()
             .Include(s => s.Supplier)
             .Include(s => s.Items)
             .OrderByDescending(s => s.DateGenerated)

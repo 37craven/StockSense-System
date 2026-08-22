@@ -682,7 +682,7 @@
 </BbDialog>
 
 <BbDialog @bind-Open="showCompletionConfirmation">
-    <BbDialogContent class="w-[min(96vw,30rem)]">
+    <BbDialogContent class="flex max-h-[90dvh] w-[calc(100vw-1rem)] sm:w-[34rem] max-w-[calc(100vw-1rem)] sm:max-w-[34rem] flex-col overflow-hidden">
         <BbDialogHeader>
             <BbDialogTitle>Complete appointment?</BbDialogTitle>
             <BbDialogDescription>This will finalize checkout, create the transaction, and mark the appointment as completed.</BbDialogDescription>
@@ -711,7 +711,7 @@
 </BbDialog>
 
 <BbDialog @bind-Open="showPendingCancellationConfirmation">
-    <BbDialogContent class="w-[min(96vw,28rem)]">
+    <BbDialogContent class="flex max-h-[90dvh] w-[calc(100vw-1rem)] sm:w-[34rem] max-w-[calc(100vw-1rem)] sm:max-w-[34rem] flex-col overflow-hidden">
         <BbDialogHeader>
             <BbDialogTitle>Cancel pending appointment?</BbDialogTitle>
             <BbDialogDescription>The appointment will move to history. An admin can reopen it later if needed.</BbDialogDescription>
@@ -734,7 +734,7 @@
 </BbDialog>
 
 <BbDialog @bind-Open="showReasonDialog" @bind-Open:after="OnReasonDialogOpenChanged">
-    <BbDialogContent>
+    <BbDialogContent class="flex max-h-[90dvh] w-[calc(100vw-1rem)] sm:w-[34rem] max-w-[calc(100vw-1rem)] sm:max-w-[34rem] flex-col overflow-hidden">
         <BbDialogHeader>
             <BbDialogTitle>@restrictedActionTitle</BbDialogTitle>
             <BbDialogDescription>@(isAdmin ? "Provide a reason for the audit log." : "Select the approving admin, then ask them to enter their 6-digit PIN for this one action.")</BbDialogDescription>

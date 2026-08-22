@@ -115,9 +115,15 @@
             var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
 
             // 2. Define pages that should be EXEMPT from the kick-out logic
+            // NOTE: ForgotPassword/ResetPassword must be exempt - anonymous users hit api/auth/status => 401
+            // which previously caused an immediate redirect to "/" after 10s.
             bool isAuthPage = path.Contains("Account/Login", StringComparison.OrdinalIgnoreCase) ||
                              path.Contains("Account/Register", StringComparison.OrdinalIgnoreCase) ||
-                             path.Contains("/Account/RegisterConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/RegisterConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ForgotPassword", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ResetPassword", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ResendEmailConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("Account/ConfirmEmail", StringComparison.OrdinalIgnoreCase) ||
                              string.IsNullOrEmpty(path); // This is usually the landing/home page
 
             // 3. Only check the session if we are NOT on an auth page
@@ -132,6 +138,14 @@
     {
         try
         {
+            // Anonymous users (e.g. on /Account/ForgotPassword) will always get 401 from
+            // [Authorize] api/auth/status - do not treat that as "session expired".
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated != true)
+            {
+                return;
+            }
+
             // Ping an authorized endpoint
             var response = await Http.GetAsync("api/auth/status");
 

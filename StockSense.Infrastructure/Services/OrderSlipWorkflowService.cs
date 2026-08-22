@@ -88,7 +88,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             }
 
             var currentIncoming = incoming.GetValueOrDefault(product.Id);
-            var inventoryPosition = checked(product.CurrentStock + currentIncoming - product.ReservedStock);
+            var inventoryPosition = checked(product.CurrentStock + currentIncoming);
             if (openProducts.Contains(product.Id))
             {
                 preview.Warnings.Add(new(product.Id, product.Name, "OPEN_ORDER_EXISTS",
@@ -128,7 +128,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                 ProductId = product.Id, ProductName = product.Name,
                 Category = product.Category, Brand = product.Brand,
                 CurrentStock = product.CurrentStock, IncomingStock = currentIncoming,
-                ReservedStock = product.ReservedStock, InventoryPosition = inventoryPosition,
+                ReservedStock = 0, InventoryPosition = inventoryPosition,
                 AverageDailyDemand = metric.AverageDailyDemand,
                 LeadTimeDays = metric.AverageLeadTimeDays,
                 SafetyStock = metric.SafetyStock, ReorderPoint = product.ReorderTarget,
@@ -237,7 +237,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                         continue;
                     }
                     var currentIncoming = incoming.GetValueOrDefault(product.Id);
-                    var inventoryPosition = checked(product.CurrentStock + currentIncoming - product.ReservedStock);
+                    var inventoryPosition = checked(product.CurrentStock + currentIncoming);
                     var validation = OrderSlipMath.ValidateOrderedQuantity(requested.OrderedQuantity,
                         setting.MinimumOrderQuantity, setting.PackageSize, inventoryPosition, setting.MaximumStockLevel);
                     if (validation is not null)
@@ -267,7 +267,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                         ReorderTarget = product.ReorderTarget, Quantity = requested.OrderedQuantity,
                         OrderedQuantity = requested.OrderedQuantity, ReceivedQuantity = 0,
                         CurrentStockSnapshot = product.CurrentStock, IncomingStockSnapshot = currentIncoming,
-                        ReservedStockSnapshot = product.ReservedStock,
+                        ReservedStockSnapshot = 0,
                         InventoryPositionSnapshot = inventoryPosition,
                         AverageDailyDemandSnapshot = metric.AverageDailyDemand,
                         LeadTimeDaysSnapshot = metric.AverageLeadTimeDays,
@@ -369,6 +369,14 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
             if (existingProductIds.Length > 0)
                 return OperationResult<OrderSlipDto>.Failure("OPEN_ORDER_EXISTS", "A selected product already has an open order slip.");
 
+            var incomingByProduct = await _context.OrderSlipItems.AsNoTracking()
+                .Where(item => productIds.Contains(item.ProductId)
+                               && item.OrderSlip.LocationId == locationId
+                               && IncomingStatuses.Contains(item.OrderSlip.Status))
+                .GroupBy(item => item.ProductId)
+                .ToDictionaryAsync(group => group.Key,
+                    group => group.Sum(item => (item.OrderedQuantity > 0 ? item.OrderedQuantity : item.Quantity) - item.ReceivedQuantity), ct);
+
             var settings = await _context.ProductInventorySettings.AsNoTracking()
                 .Where(setting => productIds.Contains(setting.ProductId) && setting.LocationId == locationId)
                 .ToDictionaryAsync(setting => setting.ProductId, ct);
@@ -381,9 +389,11 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                 if (!settings.TryGetValue(requested.ProductId, out var setting)) continue;
                 if (setting.MinimumOrderQuantity <= 0 || setting.PackageSize <= 0)
                     return OperationResult<OrderSlipDto>.Failure("INVALID_SETTINGS", "A selected product has invalid order quantity settings.");
+                var currentIncoming = incomingByProduct.GetValueOrDefault(requested.ProductId);
+                var inventoryPosition = checked(products[requested.ProductId].CurrentStock + currentIncoming);
                 var validation = OrderSlipMath.ValidateOrderedQuantity(
                     requested.OrderedQuantity, setting.MinimumOrderQuantity, setting.PackageSize,
-                    products[requested.ProductId].CurrentStock, setting.MaximumStockLevel);
+                    inventoryPosition, setting.MaximumStockLevel);
                 if (validation is not null)
                     return OperationResult<OrderSlipDto>.Failure("INVALID_QUANTITY", $"{products[requested.ProductId].Name}: {validation}");
             }
@@ -409,6 +419,23 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                 var product = products[requested.ProductId];
                 settings.TryGetValue(product.Id, out var setting);
                 metrics.TryGetValue(product.Id, out var metric);
+                var currentIncoming = incomingByProduct.GetValueOrDefault(product.Id);
+                var inventoryPosition = checked(product.CurrentStock + currentIncoming);
+                int computedSuggested = 0;
+                if (metric != null && setting != null)
+                {
+                    try
+                    {
+                        computedSuggested = OrderSlipMath.CalculateSuggestedQuantity(
+                            metric.TargetStock,
+                            product.ReorderTarget,
+                            inventoryPosition,
+                            setting.MinimumOrderQuantity,
+                            setting.PackageSize,
+                            setting.MaximumStockLevel);
+                    }
+                    catch { computedSuggested = 0; }
+                }
                 var lineTotal = checked(product.UnitCost * requested.OrderedQuantity);
                 slip.Items.Add(new OrderSlipItem
                 {
@@ -421,14 +448,15 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                     Quantity = requested.OrderedQuantity,
                     OrderedQuantity = requested.OrderedQuantity,
                     CurrentStockSnapshot = product.CurrentStock,
-                    InventoryPositionSnapshot = product.CurrentStock,
-                    ReservedStockSnapshot = product.ReservedStock,
+                    IncomingStockSnapshot = currentIncoming,
+                    InventoryPositionSnapshot = inventoryPosition,
+                    ReservedStockSnapshot = 0,
                     AverageDailyDemandSnapshot = metric?.AverageDailyDemand ?? 0,
                     LeadTimeDaysSnapshot = metric?.AverageLeadTimeDays ?? 0,
                     SafetyStockSnapshot = metric?.SafetyStock ?? 0,
                     ReorderPointSnapshot = product.ReorderTarget,
                     TargetStockSnapshot = metric?.TargetStock ?? product.ReorderTarget,
-                    SuggestedQuantity = requested.OrderedQuantity,
+                    SuggestedQuantity = computedSuggested,
                     PackageSizeSnapshot = setting?.PackageSize ?? 1,
                     MinimumOrderQuantitySnapshot = setting?.MinimumOrderQuantity ?? 1,
                     UnitCostSnapshot = product.UnitCost,
@@ -656,34 +684,48 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
 
     private async Task TryRecalculateAfterReceiptAsync(OrderSlipReceiptResult receipt)
     {
-        try
+        const int maxAttempts = 3;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var slip = await _context.OrderSlips.AsNoTracking()
-                .Where(value => value.Id == receipt.OrderSlipId)
-                .Select(value => new { value.SupplierId, value.LocationId })
-                .SingleAsync(CancellationToken.None);
-            int[] supplierProductIds = [];
-            if (receipt.OrderSlipStatus == OrderSlipStatuses.Completed)
+            try
             {
-                supplierProductIds = await _context.Products.AsNoTracking()
-                    .Where(product => product.SupplierId == slip.SupplierId)
-                    .Select(product => product.Id)
-                    .ToArrayAsync(CancellationToken.None);
-            }
-            var productIds = OrderSlipMath.ResolveReceiptRecalculationProductIds(
-                receipt.AffectedProductIds,
-                supplierProductIds,
-                receipt.OrderSlipStatus == OrderSlipStatuses.Completed);
+                var slip = await _context.OrderSlips.AsNoTracking()
+                    .Where(value => value.Id == receipt.OrderSlipId)
+                    .Select(value => new { value.SupplierId, value.LocationId })
+                    .SingleAsync(CancellationToken.None);
+                int[] supplierProductIds = [];
+                if (receipt.OrderSlipStatus == OrderSlipStatuses.Completed)
+                {
+                    supplierProductIds = await _context.Products.AsNoTracking()
+                        .Where(product => product.SupplierId == slip.SupplierId)
+                        .Select(product => product.Id)
+                        .ToArrayAsync(CancellationToken.None);
+                }
+                var productIds = OrderSlipMath.ResolveReceiptRecalculationProductIds(
+                    receipt.AffectedProductIds,
+                    supplierProductIds,
+                    receipt.OrderSlipStatus == OrderSlipStatuses.Completed);
 
-            await _calculationService.RecalculateProductsAsync(
-                productIds, slip.LocationId, CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Order slip {OrderSlipId} was received successfully, but post-commit inventory recalculation failed.",
-                receipt.OrderSlipId);
+                await _calculationService.RecalculateProductsAsync(
+                    productIds, slip.LocationId, CancellationToken.None);
+                return;
+            }
+            catch (Exception exception) when (attempt < maxAttempts)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Order slip {OrderSlipId} post-commit recalc attempt {Attempt}/{Max} failed, retrying.",
+                    receipt.OrderSlipId, attempt, maxAttempts);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Order slip {OrderSlipId} was received successfully, but post-commit inventory recalculation failed after {Max} attempts. Run recalculation from inventory management.",
+                    receipt.OrderSlipId, maxAttempts);
+                return;
+            }
         }
     }
 
@@ -692,18 +734,32 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
         string locationId,
         string trigger)
     {
-        try
+        const int maxAttempts = 3;
+        var ids = productIds.Distinct().ToArray();
+        if (ids.Length == 0) return;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var ids = productIds.Distinct().ToArray();
-            if (ids.Length == 0) return;
-            await _calculationService.RecalculateProductsAsync(ids, locationId, CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "The {Trigger} committed successfully, but post-commit inventory recalculation failed.",
-                trigger);
+            try
+            {
+                await _calculationService.RecalculateProductsAsync(ids, locationId, CancellationToken.None);
+                return;
+            }
+            catch (Exception exception) when (attempt < maxAttempts)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "The {Trigger} post-commit recalc attempt {Attempt}/{Max} failed, retrying.",
+                    trigger, attempt, maxAttempts);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "The {Trigger} committed successfully, but post-commit inventory recalculation failed after {Max} attempts. Run recalculation from inventory management.",
+                    trigger, maxAttempts);
+                return;
+            }
         }
     }
 

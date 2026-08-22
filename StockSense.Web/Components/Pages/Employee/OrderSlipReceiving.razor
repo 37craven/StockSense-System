@@ -16,6 +16,8 @@
 @inject NavigationManager Navigation
 @attribute [Authorize(Roles = "Admin, Employee")]
 
+<BbPortalHost />
+
 <PageTitle>Receive Order Slip</PageTitle>
 <UnsavedChangesGuard IsDirty="@ReceiptIsDirty"
                      Message="This stock receipt has not been recorded. If you leave now, the entered quantities and notes will be lost." />
@@ -67,12 +69,12 @@ else
 }
 
 <BbDialog @bind-Open="confirmationOpen">
-    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,32rem)] flex-col overflow-hidden">
-        <BbDialogHeader>
+    <BbDialogContent Style="width:min(99vw,38rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden">
+        <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
             <BbDialogTitle>Record this stock receipt?</BbDialogTitle>
             <BbDialogDescription>Confirm the delivered quantities. Product stock will increase immediately.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="min-h-0 space-y-4 overflow-y-auto">
+        <div class="flex-1 min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3" style="-webkit-overflow-scrolling:touch;">
             <div class="rounded-lg border border-border bg-muted/30">
                 @foreach (var line in ReceiptLines)
                 {
@@ -90,7 +92,7 @@ else
             </dl>
             @if (!string.IsNullOrWhiteSpace(error)) { <p role="alert" class="text-sm text-destructive">@error</p> }
         </div>
-        <BbDialogFooter>
+        <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Ghost" OnClick="() => confirmationOpen = false" Disabled="busy">Go back</BbButton>
             <BbButton Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="Save" Disabled="busy">
                 @if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }

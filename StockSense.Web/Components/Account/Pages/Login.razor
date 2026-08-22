@@ -137,7 +137,7 @@
             }
             else
             {
-                RedirectManager.RedirectTo(ReturnUrl ?? "/");
+                RedirectManager.RedirectTo(AccountReturnUrl.Normalize(ReturnUrl));
             }
         }
         else if (result.IsLockedOut)
@@ -147,7 +147,7 @@
         }
         else if (result.RequiresTwoFactor)
         {
-            RedirectManager.RedirectTo("Account/LoginWith2fa", new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
+            RedirectManager.RedirectTo("Account/LoginWith2fa", new() { ["returnUrl"] = AccountReturnUrl.Normalize(ReturnUrl), ["rememberMe"] = Input.RememberMe });
         }
         else
         {

@@ -97,8 +97,7 @@ public class BuildsController : ControllerBase
             product.Barcode,
             product.UnitCost,
             product.RowVersion,
-            product.IsActive,
-            product.ReservedStock)).ToList();
+            product.IsActive)).ToList();
 
         // Preserve the UI's non-product build metadata, but never trust submitted product details or prices.
         canonicalParts.AddRange(submittedParts.Where(part => part.Id <= 0));
@@ -121,7 +120,8 @@ public class BuildsController : ControllerBase
             TotalPrice = selectedProductIds.Sum(id => productsById[id].Price),
             CreatedAt = DateTime.Now,
             Status = WorkOrderStatuses.Pending,
-            MotorcycleId = motorcycle?.Id
+            MotorcycleId = motorcycle?.Id,
+            Motorcycle = motorcycle
         };
 
         await _buildRepo.AddAsync(request);

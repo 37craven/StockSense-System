@@ -3,20 +3,22 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using StockSense.Domain.Entities
+@using Microsoft.Extensions.Caching.Memory
 @using StockSense.Infrastructure.Data
 @using StockSense.Client.Layout
-@inject ApplicationDbContext Db
+@inject IServiceScopeFactory ScopeFactory
+@inject IMemoryCache Cache
 @inject NavigationManager Navigation
 @inject ILogger<EmployeeDashboard> Logger
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize(Roles = "Employee, Admin")]
 
 <PageTitle>Dashboard</PageTitle>
 
 <div class="dashboard-page">
     <PageHeader Title="Dashboard"
-                Subtitle="@(lastUpdated == null ? "Loading..." : $"Updated {lastUpdated.Value.ToLocalTime():MMM d, yyyy · h:mm tt}")">
-        <BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync" Disabled="@isLoading">
+                Subtitle="@(lastUpdated == null ? "Loading..." : $"{(isCached ? "Cached · " : "")}Updated {lastUpdated.Value.ToLocalTime():MMM d, yyyy · h:mm tt}")">
+        <BbButton Variant="ButtonVariant.Outline" OnClick="() => LoadAsync(bypassCache: true)" Disabled="@isLoading">
             <LucideIcon Name="refresh-cw" Size="14" /> Refresh
         </BbButton>
         <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/stock")'>
@@ -39,7 +41,7 @@
                 <div style="font-weight: var(--font-semibold); color: var(--foreground);">Dashboard data could not be loaded</div>
                 <div style="font-size: var(--text-sm); color: var(--muted-foreground); margin-top: var(--space-1);">@errorMessage</div>
             </div>
-            <BbButton Variant="ButtonVariant.Outline" OnClick="LoadAsync" Size="ButtonSize.Small">Try again</BbButton>
+            <BbButton Variant="ButtonVariant.Outline" OnClick="() => LoadAsync()" Size="ButtonSize.Small">Try again</BbButton>
         </div>
     }
     else
@@ -471,6 +473,8 @@
 
 @code {
     private bool isLoading = true;
+    private bool isCached;
+    private bool productsLoaded, slipsLoaded, salesLoaded, appointmentsLoaded, buildsLoaded, txLoaded;
     private string? errorMessage;
     private DateTime? lastUpdated;
     private List<Product> products = [];
@@ -486,82 +490,174 @@
     private int todayConfirmedAppointments, todayPendingAppointments, pendingBuildCount;
     private DateTime dashboardToday, salesPeriodStart, salesPeriodEnd;
 
+    private const string CacheKey = "dashboard:MAIN";
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
+    private sealed record DashboardSnapshot(
+        List<Product> Products,
+        List<OrderSlip> OpenSlips,
+        List<BrandSalesRow> TopBrandSales,
+        List<Appointment> Appointments,
+        List<BuildRequest> Builds,
+        List<Transaction> Transactions,
+        Dictionary<int,int> IncomingByProduct,
+        DateTime DashboardToday,
+        DateTime SalesPeriodStart,
+        DateTime SalesPeriodEnd,
+        DateTime FetchedAt);
+
     protected override Task OnInitializedAsync() => LoadAsync();
 
-    private async Task LoadAsync()
+    private async Task LoadAsync(bool bypassCache = false)
     {
         isLoading = true;
+        isCached = false;
+        productsLoaded = slipsLoaded = salesLoaded = appointmentsLoaded = buildsLoaded = txLoaded = false;
         errorMessage = null;
         try
         {
-            products = await Db.Products.AsNoTracking().Include(p => p.Supplier)
-                .Where(p => p.CurrentStock > 0).OrderBy(p => p.Name).ToListAsync();
-            var ids = products.Select(p => p.Id).ToList();
-            openSlips = await Db.OrderSlips.AsNoTracking().Include(s => s.Supplier).Include(s => s.Items)
-                .Where(s => s.Status != OrderSlipStatuses.Completed && s.Status != OrderSlipStatuses.Cancelled)
-                .OrderBy(s => s.ExpectedDeliveryDate ?? DateTime.MaxValue).ThenByDescending(s => s.DateGenerated).ToListAsync();
+            if (!bypassCache && Cache.TryGetValue(CacheKey, out DashboardSnapshot? cached) && cached is not null)
+            {
+                RestoreSnapshot(cached, fromCache: true);
+                return;
+            }
+
             dashboardToday = PhilippineToday();
             salesPeriodStart = dashboardToday.AddDays(-29);
             salesPeriodEnd = dashboardToday.AddDays(1);
-            topBrandSales = await (
-                    from transaction in Db.Transactions.AsNoTracking()
-                    join item in Db.TransactionItems.AsNoTracking() on transaction.Id equals item.TransactionId
-                    join product in Db.Products.AsNoTracking() on item.ProductId equals product.Id
-                    where transaction.TransactionType == TransactionTypes.Sale
-                          && transaction.LocationId == InventoryDefaults.LocationId
-                          && transaction.TransactionDate >= salesPeriodStart
-                          && transaction.TransactionDate < salesPeriodEnd
-                    group item by (product.Brand == null || product.Brand.Trim() == "" ? "Unbranded" : product.Brand.Trim()) into brand
-                    orderby brand.Sum(value => value.LineTotal) descending, brand.Key
-                    select new BrandSalesRow(
-                        brand.Key,
-                        brand.Sum(value => value.Quantity),
-                        brand.Sum(value => value.LineTotal)))
-                .Take(5)
-                .ToListAsync();
-            upcomingAppointments = await Db.Appointments.AsNoTracking()
-                .Where(a => a.AppointmentDate >= dashboardToday
-                    && (a.Status == WorkOrderStatuses.Pending || a.Status == WorkOrderStatuses.Confirmed))
-                .OrderBy(a => a.AppointmentDate).ThenBy(a => a.TimeSlot).ToListAsync();
-            activeBuilds = await Db.BuildRequests.AsNoTracking()
-                .Where(b => b.Status == WorkOrderStatuses.Pending || b.Status == WorkOrderStatuses.Confirmed)
-                .OrderBy(b => b.CreatedAt).ToListAsync();
 
-            recentTransactions = await Db.Transactions.AsNoTracking().Include(t => t.Items)
-                .Where(t => t.TransactionType == TransactionTypes.Sale && !t.IsVoided)
-                .OrderByDescending(t => t.TransactionDate).Take(5).ToListAsync();
+            // Wave 1: products needed for ids
+            using (var scope = ScopeFactory.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                products = await db.Products.AsNoTracking().Include(p => p.Supplier)
+                    .Where(p => p.CurrentStock > 0).OrderBy(p => p.Name).ToListAsync();
+            }
+            productsLoaded = true;
+            await InvokeAsync(StateHasChanged);
+            var idSet = new HashSet<int>(products.Select(p => p.Id));
+
+            // Wave 2: parallel fan-out with separate contexts via factory
+            var openSlipsTask = LoadOpenSlipsAsync();
+            var brandSalesTask = LoadBrandSalesAsync(salesPeriodStart, salesPeriodEnd);
+            var appointmentsTask = LoadAppointmentsAsync(dashboardToday);
+            var buildsTask = LoadBuildsAsync();
+            var txTask = LoadRecentTransactionsAsync();
+
+            await Task.WhenAll(openSlipsTask, brandSalesTask, appointmentsTask, buildsTask, txTask);
+            openSlips = await openSlipsTask; slipsLoaded = true;
+            topBrandSales = await brandSalesTask; salesLoaded = true;
+            upcomingAppointments = await appointmentsTask; appointmentsLoaded = true;
+            activeBuilds = await buildsTask; buildsLoaded = true;
+            recentTransactions = await txTask; txLoaded = true;
+            await InvokeAsync(StateHasChanged);
 
             incomingByProduct = openSlips
                 .Where(s => s.Status is OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived)
-                .SelectMany(s => s.Items).Where(i => ids.Contains(i.ProductId))
+                .SelectMany(s => s.Items).Where(i => idSet.Contains(i.ProductId))
                 .GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(i => Math.Max(0, (i.OrderedQuantity > 0 ? i.OrderedQuantity : i.Quantity) - i.ReceivedQuantity)));
             Calculate();
             lastUpdated = DateTime.UtcNow;
+            isCached = false;
+
+            var snapshot = new DashboardSnapshot(products, openSlips, topBrandSales, upcomingAppointments, activeBuilds, recentTransactions, incomingByProduct, dashboardToday, salesPeriodStart, salesPeriodEnd, lastUpdated.Value);
+            Cache.Set(CacheKey, snapshot, CacheTtl);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Employee inventory dashboard loading failed.");
             errorMessage = "The inventory dashboard could not be loaded. Please try again.";
         }
-        finally { isLoading = false; }
+        finally { isLoading = false; await InvokeAsync(StateHasChanged); }
+    }
+
+    private void RestoreSnapshot(DashboardSnapshot snap, bool fromCache)
+    {
+        products = snap.Products; openSlips = snap.OpenSlips; topBrandSales = snap.TopBrandSales;
+        upcomingAppointments = snap.Appointments; activeBuilds = snap.Builds; recentTransactions = snap.Transactions;
+        incomingByProduct = snap.IncomingByProduct; dashboardToday = snap.DashboardToday;
+        salesPeriodStart = snap.SalesPeriodStart; salesPeriodEnd = snap.SalesPeriodEnd;
+        lastUpdated = snap.FetchedAt; isCached = fromCache;
+        productsLoaded = slipsLoaded = salesLoaded = appointmentsLoaded = buildsLoaded = txLoaded = true;
+        Calculate();
+    }
+
+    private async Task<List<OrderSlip>> LoadOpenSlipsAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.OrderSlips.AsNoTracking().Include(s => s.Supplier).Include(s => s.Items)
+            .Where(s => s.Status != OrderSlipStatuses.Completed && s.Status != OrderSlipStatuses.Cancelled)
+            .OrderBy(s => s.ExpectedDeliveryDate ?? DateTime.MaxValue).ThenByDescending(s => s.DateGenerated).Take(50).ToListAsync();
+    }
+    private async Task<List<BrandSalesRow>> LoadBrandSalesAsync(DateTime start, DateTime end)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await (
+                from transaction in db.Transactions.AsNoTracking()
+                join item in db.TransactionItems.AsNoTracking() on transaction.Id equals item.TransactionId
+                join product in db.Products.AsNoTracking() on item.ProductId equals product.Id
+                where transaction.TransactionType == TransactionTypes.Sale
+                      && transaction.LocationId == InventoryDefaults.LocationId
+                      && transaction.TransactionDate >= start
+                      && transaction.TransactionDate < end
+                group item by (product.Brand == null || product.Brand.Trim() == "" ? "Unbranded" : product.Brand.Trim()) into brand
+                orderby brand.Sum(value => value.LineTotal) descending, brand.Key
+                select new BrandSalesRow(brand.Key, brand.Sum(value => value.Quantity), brand.Sum(value => value.LineTotal)))
+            .Take(5).ToListAsync();
+    }
+    private async Task<List<Appointment>> LoadAppointmentsAsync(DateTime today)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Appointments.AsNoTracking()
+            .Where(a => a.AppointmentDate >= today && (a.Status == WorkOrderStatuses.Pending || a.Status == WorkOrderStatuses.Confirmed))
+            .OrderBy(a => a.AppointmentDate).ThenBy(a => a.TimeSlot).Take(20).ToListAsync();
+    }
+    private async Task<List<BuildRequest>> LoadBuildsAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.BuildRequests.AsNoTracking()
+            .Where(b => b.Status == WorkOrderStatuses.Pending || b.Status == WorkOrderStatuses.Confirmed)
+            .OrderBy(b => b.CreatedAt).Take(20).ToListAsync();
+    }
+    private async Task<List<Transaction>> LoadRecentTransactionsAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await db.Transactions.AsNoTracking().Include(t => t.Items)
+            .Where(t => t.TransactionType == TransactionTypes.Sale && !t.IsVoided)
+            .OrderByDescending(t => t.TransactionDate).Take(5).ToListAsync();
     }
 
     private void Calculate()
     {
-        onHandUnits = products.Sum(p => p.CurrentStock);
-        incomingUnits = incomingByProduct.Values.Sum();
-        atRiskCount = products.Count(p => p.CurrentStock <= p.ReorderTarget);
+        // Single-pass over products for all counts
+        var idSet = incomingByProduct;
+        onHandUnits = 0; atRiskCount = 0; protectedByIncoming = 0;
+        var replenishTemp = new List<ReplenishmentRow>(products.Count);
+        foreach (var p in products)
+        {
+            onHandUnits += p.CurrentStock;
+            var atRisk = p.CurrentStock <= p.ReorderTarget;
+            if (atRisk) atRiskCount++;
+            var inc = idSet.GetValueOrDefault(p.Id);
+            if (atRisk && p.CurrentStock + inc > p.ReorderTarget) protectedByIncoming++;
+            if (atRisk)
+            {
+                var pos = p.CurrentStock + inc;
+                replenishTemp.Add(new ReplenishmentRow(p.Name, p.Brand ?? "Unbranded", p.CurrentStock, inc, p.ReorderTarget, pos, Math.Max(0, p.ReorderTarget - pos)));
+            }
+        }
+        incomingUnits = idSet.Values.Sum();
         healthyCount = products.Count - atRiskCount;
-        protectedByIncoming = products.Count(p => p.CurrentStock <= p.ReorderTarget && p.CurrentStock + Incoming(p.Id) > p.ReorderTarget);
         healthyPercent = products.Count == 0 ? 0 : (int)Math.Round(healthyCount * 100m / products.Count);
         draftCount = openSlips.Count(s => s.Status == OrderSlipStatuses.Draft);
         todayConfirmedAppointments = upcomingAppointments.Count(a => a.AppointmentDate.Date == dashboardToday && a.Status == WorkOrderStatuses.Confirmed);
         todayPendingAppointments = upcomingAppointments.Count(a => a.AppointmentDate.Date == dashboardToday && a.Status == WorkOrderStatuses.Pending);
         pendingBuildCount = activeBuilds.Count(b => b.Status == WorkOrderStatuses.Pending);
-        replenishment = products.Where(p => p.CurrentStock <= p.ReorderTarget)
-            .Select(p => new ReplenishmentRow(p.Name, p.Brand ?? "Unbranded", p.CurrentStock, Incoming(p.Id), p.ReorderTarget,
-                p.CurrentStock + Incoming(p.Id), Math.Max(0, p.ReorderTarget - (p.CurrentStock + Incoming(p.Id)))))
-            .OrderByDescending(x => x.Gap).ThenBy(x => x.Name).Take(8).ToList();
+        replenishment = replenishTemp.OrderByDescending(x => x.Gap).ThenBy(x => x.Name).Take(8).ToList();
     }
 
     private int Incoming(int productId) => incomingByProduct.GetValueOrDefault(productId);

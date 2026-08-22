@@ -31,7 +31,7 @@ public class ServicesController : ControllerBase
             RequiredProducts = s.RequiredProducts.Select(p => new ProductDto(
                 p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock,
                 p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "",
-                IsActive: p.IsActive, ReservedStock: p.ReservedStock
+                IsActive: p.IsActive
             )).ToList()
         }).ToList();
         return Ok(dtos);
@@ -44,11 +44,12 @@ public class ServicesController : ControllerBase
         var dtos = products.Select(p => new ProductDto(
             p.Id, p.Name, p.Category, p.Brand, p.Price, p.CurrentStock,
             p.ReorderTarget, p.SupplierId ?? 0, p.Supplier?.Name ?? "", p.ImageUrl ?? "",
-            IsActive: p.IsActive, ReservedStock: p.ReservedStock)).ToList();
+            IsActive: p.IsActive)).ToList();
         return Ok(dtos);
     }
 
     [HttpPost]
+    [Authorize(Roles = "Employee,Admin")]
     public async Task<IActionResult> CreateService([FromBody] CreateStoreServiceDto dto)
     {
         var normalizedName = dto.Name?.Trim() ?? string.Empty;
@@ -70,6 +71,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpPost("update-products")]
+    [Authorize(Roles = "Employee,Admin")]
     public async Task<IActionResult> UpdateServiceProducts([FromBody] UpdateServiceProductsDto dto)
     {
         var service = await _serviceRepo.GetByIdWithProductsAsync(dto.ServiceId);

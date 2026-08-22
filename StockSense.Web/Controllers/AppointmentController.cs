@@ -27,7 +27,14 @@ public class AppointmentsController : ControllerBase
     private readonly MotorcycleRepository _motorcycleRepository;
     private readonly ILogger<AppointmentsController> _logger;
     private readonly IAdminPinService? _adminPinService;
-    private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+    private static TimeZoneInfo PhZone
+    {
+        get
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); }
+        }
+    }
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     public AppointmentsController(
@@ -100,20 +107,24 @@ public class AppointmentsController : ControllerBase
             if (stockError is not null)
                 return Conflict(ApiResponse.Error(stockError));
 
-            int totalDuration = matchedServices.Sum(s => s.EstimatedMinutes);
-            DateTime phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
+            dto.TimeSlot = dto.TimeSlot?.Trim() ?? string.Empty;
+            if (!TimeSpan.TryParseExact(dto.TimeSlot, @"hh\:mm", null, out var requestedStart) && !TimeSpan.TryParse(dto.TimeSlot, out requestedStart))
+                return BadRequest(ApiResponse.Error("Time slot must be in HH:mm format (00:00-23:59)."));
 
-            if (TimeSpan.TryParse(dto.TimeSlot, out var requestedStart))
-            {
-                var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(totalDuration));
-                var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
-                var conflict = existing.Any(a =>
-                    TimeSpan.TryParse(a.TimeSlot, out var existingStart) &&
-                    (requestedStart < existingStart.Add(TimeSpan.FromMinutes(Math.Max(a.DurationMinutes, 15)))) &&
-                    (requestedEnd > existingStart));
-                if (conflict)
-                    return Conflict(ApiResponse.Error("The selected time slot overlaps with an existing booking."));
-            }
+            int totalDuration = matchedServices.Sum(s => s.EstimatedMinutes);
+            // Build Installation has fixed 120 min and no StoreService entry — handle separately
+            var isBuildCategory = string.Equals(dto.Category?.Trim(), "Build", StringComparison.OrdinalIgnoreCase);
+            if (isBuildCategory && totalDuration == 0)
+                totalDuration = 120;
+            DateTime phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
+            var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(Math.Max(totalDuration, 15)));
+            var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
+            var conflict = existing.Any(a =>
+                TimeSpan.TryParse(a.TimeSlot?.Trim(), out var existingStart) &&
+                (requestedStart < existingStart.Add(TimeSpan.FromMinutes(Math.Max(a.DurationMinutes, 15)))) &&
+                (requestedEnd > existingStart));
+            if (conflict)
+                return Conflict(ApiResponse.Error("The selected time slot overlaps with an existing booking."));
 
             var appointment = new Appointment
             {
@@ -122,7 +133,7 @@ public class AppointmentsController : ControllerBase
                 CustomerUserId = customer.Id,
                 ContactNumber = dto.ContactNumber,
                 AppointmentDate = DateTime.SpecifyKind(dto.AppointmentDate.Date, DateTimeKind.Unspecified),
-                TimeSlot = dto.TimeSlot,
+                TimeSlot = requestedStart.ToString(@"hh\:mm"),
                 Category = string.IsNullOrWhiteSpace(dto.Category) ? "General Service" : dto.Category,
                 ServicesRequested = flatServices,
                 SelectedProductsJson = dto.SelectedProductsJson,
@@ -133,6 +144,21 @@ public class AppointmentsController : ControllerBase
                 MechanicName = string.IsNullOrWhiteSpace(dto.MechanicName) ? "Any Available" : dto.MechanicName.Trim(),
                 MotorcycleId = motorcycle?.Id
             };
+
+            if (isBuildCategory)
+            {
+                var latestBuild = await _context.BuildRequests
+                    .Where(b => b.CustomerUserId == customer.Id && b.Status == WorkOrderStatuses.Pending)
+                    .OrderByDescending(b => b.CreatedAt)
+                    .FirstOrDefaultAsync();
+                if (latestBuild != null)
+                {
+                    appointment.BuildRequestId = latestBuild.Id;
+                    if (appointment.TotalAmount == 0)
+                        appointment.TotalAmount = latestBuild.TotalPrice;
+                    appointment.DurationMinutes = 120;
+                }
+            }
 
             var saved = await _repo.AddAsync(appointment);
             return Ok(new { message = "Appointment booked successfully!", id = saved.Id });
@@ -147,46 +173,70 @@ public class AppointmentsController : ControllerBase
     [HttpGet("booked-slots")]
     public async Task<IActionResult> GetBookedSlots([FromQuery] DateTime date, [FromQuery] string? mechanic)
     {
-        var appointments = await _repo.GetAppointmentsByDateAndMechanicAsync(date, mechanic);
-        var slots = appointments.Select(a => new BookedSlotDto { TimeSlot = a.TimeSlot, EstimatedMinutes = a.DurationMinutes }).ToList();
-        return Ok(slots);
+        try
+        {
+            var appointments = await _repo.GetAppointmentsByDateAndMechanicAsync(date, mechanic);
+            var slots = appointments.Select(a => new BookedSlotDto { TimeSlot = a.TimeSlot, EstimatedMinutes = a.DurationMinutes }).ToList();
+            return Ok(slots);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve booked slots for {Date} and mechanic {Mechanic}.", date, mechanic);
+            return StatusCode(500, ApiResponse.Error("Could not retrieve booked slots. Please try again."));
+        }
     }
 
     [HttpGet("all")]
     [Authorize(Roles = "Employee,Admin")]
     public async Task<ActionResult<List<AppointmentDto>>> GetAllAppointments()
     {
-        var appointments = await _repo.GetAllAsync();
-        await EnrichCustomerIdentitiesAsync(appointments);
-        var dtos = appointments.Select(a => MapToDto(a)).ToList();
-        return Ok(dtos);
+        try
+        {
+            var appointments = await _repo.GetAllAsync();
+            await EnrichCustomerIdentitiesAsync(appointments);
+            var dtos = appointments.Select(a => MapToDto(a)).ToList();
+            return Ok(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve all appointments.");
+            return StatusCode(500, ApiResponse.Error("Could not retrieve appointments. Please try again."));
+        }
     }
 
     [HttpPut("{id}/assign-mechanic")]
     [Authorize(Roles = "Employee,Admin")]
     public async Task<IActionResult> AssignMechanic(int id, [FromBody] MechanicAssignmentDto assignment)
     {
-        var appointment = await _repo.GetByIdAsync(id);
-        if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
-
-        if (appointment.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled)
-            return Conflict(ApiResponse.Error("Completed and cancelled appointments are read-only."));
-        if (appointment.Status == WorkOrderStatuses.Pending)
+        try
         {
-            var transitionError = WorkOrderRules.ValidateStatusTransition(
-                appointment.Status,
-                WorkOrderStatuses.Confirmed,
-                User.IsInRole("Admin"));
-            if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
-        }
+            var appointment = await _repo.GetByIdAsync(id);
+            if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
 
-        var previousMechanic = appointment.MechanicName;
-        appointment.MechanicName = assignment.MechanicName;
-        appointment.DurationMinutes = assignment.DurationMinutes;
-        appointment.Status = WorkOrderStatuses.Confirmed;
-        AddAudit("Appointment", id, "MechanicAssigned", previousMechanic, assignment.MechanicName, null);
-        await _repo.UpdateAsync(appointment);
-        return Ok(new { message = $"Assigned to {assignment.MechanicName}" });
+            if (appointment.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled)
+                return Conflict(ApiResponse.Error("Completed and cancelled appointments are read-only."));
+            if (appointment.Status == WorkOrderStatuses.Pending)
+            {
+                var transitionError = WorkOrderRules.ValidateStatusTransition(
+                    appointment.Status,
+                    WorkOrderStatuses.Confirmed,
+                    User.IsInRole("Admin"));
+                if (transitionError is not null) return Conflict(ApiResponse.Error(transitionError));
+            }
+
+            var previousMechanic = appointment.MechanicName;
+            appointment.MechanicName = assignment.MechanicName;
+            appointment.DurationMinutes = assignment.DurationMinutes;
+            appointment.Status = WorkOrderStatuses.Confirmed;
+            AddAudit("Appointment", id, "MechanicAssigned", previousMechanic, assignment.MechanicName, null);
+            await _repo.UpdateAsync(appointment);
+            return Ok(new { message = $"Assigned to {assignment.MechanicName}" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Assigning mechanic for appointment {AppointmentId} failed.", id);
+            return StatusCode(500, ApiResponse.Error("The mechanic could not be assigned. Please try again."));
+        }
     }
 
     [HttpPut("{id}/status")]
@@ -327,23 +377,12 @@ public class AppointmentsController : ControllerBase
         if (unavailable.Count > 0)
             return $"This appointment cannot be confirmed because there is not enough stock for: {string.Join(", ", unavailable)}. Please update the selected parts or restock them first.";
 
-        foreach (var id in productIds)
-            lookup[id].ReserveStock(1);
-
         return null;
     }
 
     private async Task ReleaseAppointmentReservations(Appointment appointment)
     {
-        var productIds = ExtractProductIds(appointment.SelectedProductsJson);
-        if (productIds.Count == 0) return;
-        var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
-        var lookup = products.ToDictionary(p => p.Id);
-        foreach (var id in productIds)
-        {
-            if (lookup.TryGetValue(id, out var product) && product.ReservedStock > 0)
-                product.ReleaseStock(1);
-        }
+        await Task.CompletedTask;
     }
 
     private static List<int> ExtractProductIds(string? json)

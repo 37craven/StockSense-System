@@ -26,6 +26,12 @@ namespace StockSense.Web.Components.Account
                 uri = navigationManager.ToBaseRelativePath(uri);
             }
 
+            // If still not a safe relative URI (absolute external or protocol-relative), fallback to root.
+            if (!Uri.IsWellFormedUriString(uri, UriKind.Relative) || uri.StartsWith("//"))
+            {
+                uri = "/";
+            }
+
             // During static rendering, NavigateTo throws a NavigationException which is handled by the framework as a redirect.
             // So as long as this is called from a statically rendered Identity component, the InvalidOperationException is never thrown.
             navigationManager.NavigateTo(uri);

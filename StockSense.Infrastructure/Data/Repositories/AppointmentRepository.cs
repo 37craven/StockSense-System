@@ -15,6 +15,7 @@ public class AppointmentRepository
     public async Task<List<Appointment>> GetAllAsync()
     {
         return await _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Transaction)
             .Include(a => a.Motorcycle)
             .OrderByDescending(a => a.AppointmentDate)
@@ -66,6 +67,7 @@ public class AppointmentRepository
     public async Task<List<Appointment>> GetByCustomerNameAsync(string customerName)
     {
         return await _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Transaction)
             .Include(a => a.Motorcycle)
             .Where(a => a.CustomerName == customerName)
@@ -79,6 +81,7 @@ public class AppointmentRepository
         string fullName)
     {
         return await _context.Appointments
+            .AsNoTracking()
             .Include(a => a.Transaction)
             .Include(a => a.Motorcycle)
             .Where(a => a.CustomerUserId == userId

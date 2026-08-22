@@ -76,7 +76,7 @@ public sealed class BuildProductStatusTests
     [Fact]
     public async Task CreateBuild_rejects_duplicate_parts_when_available_stock_is_too_low()
     {
-        await using var fixture = await Fixture.CreateAsync(active: true, currentStock: 2, reservedStock: 1);
+        await using var fixture = await Fixture.CreateAsync(active: true, currentStock: 1);
         var command = fixture.Command(1, 1m, "Client value");
         var parts = JsonSerializer.Deserialize<List<ProductDto>>(command.SelectedPartsJson)!;
         parts.Insert(1, parts[0]);
@@ -94,7 +94,7 @@ public sealed class BuildProductStatusTests
     [Fact]
     public async Task CreateAppointment_rejects_out_of_stock_selected_parts_without_creating_booking()
     {
-        await using var fixture = await Fixture.CreateAsync(active: true, currentStock: 1, reservedStock: 1);
+        await using var fixture = await Fixture.CreateAsync(active: true, currentStock: 0);
         var controller = new AppointmentsController(
             new AppointmentRepository(fixture.Context),
             new StoreServiceRepository(fixture.Context),
@@ -164,7 +164,7 @@ public sealed class BuildProductStatusTests
         public BuildsController Controller { get; }
         public UserManager<ApplicationUser> UserManager => _userManager;
 
-        public static async Task<Fixture> CreateAsync(bool active, int currentStock = 10, int reservedStock = 0)
+        public static async Task<Fixture> CreateAsync(bool active, int currentStock = 10)
         {
             var options = new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase($"build-product-status-{Guid.NewGuid():N}")
@@ -178,7 +178,6 @@ public sealed class BuildProductStatusTests
                 Brand = "StockSense",
                 Price = 250m,
                 CurrentStock = currentStock,
-                ReservedStock = reservedStock,
                 IsActive = active
             });
             await context.SaveChangesAsync();

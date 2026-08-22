@@ -34,7 +34,7 @@ public sealed class CustomerBuildPerformanceTests
         Assert.Contains("MaximumReceiveMessageSize = 2 * 1024 * 1024", program, StringComparison.Ordinal);
         Assert.Contains("@if (showDetailModal)", records, StringComparison.Ordinal);
         Assert.Contains("<script src=\"_framework/blazor.web.js\" defer>", app, StringComparison.Ordinal);
-        Assert.Contains("barcodeScannerLoader.js?v=20260817-lazy-scanner-1\" defer", app, StringComparison.Ordinal);
+        Assert.Contains("barcodeScannerLoader.js?v=20260819-fullres-3\" defer", app, StringComparison.Ordinal);
         Assert.Contains("passwordVisibility.js?v=20260810-password-toggle-2\" defer", app, StringComparison.Ordinal);
         Assert.Contains("private const int ProductPageSize = 12", build, StringComparison.Ordinal);
         Assert.Contains("@foreach (var product in VisibleProducts)", build, StringComparison.Ordinal);

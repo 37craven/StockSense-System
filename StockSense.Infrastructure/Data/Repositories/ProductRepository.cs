@@ -15,6 +15,7 @@ public class ProductRepository
     public async Task<List<Product>> GetAllAsync()
     {
         return await _context.Products
+            .AsNoTracking()
             .Include(p => p.Supplier)
             .OrderBy(p => p.Category)
             .ThenBy(p => p.Name)
@@ -40,6 +41,7 @@ public class ProductRepository
     public async Task<List<Product>> GetByIdsAsync(List<int> ids)
     {
         return await _context.Products
+            .AsNoTracking()
             .Where(p => ids.Contains(p.Id))
             .ToListAsync();
     }
@@ -69,6 +71,7 @@ public class ProductRepository
     public async Task<Product?> GetByBarcodeAsync(string barcode)
     {
         return await _context.Products
+            .AsNoTracking()
             .Include(p => p.Supplier)
             .FirstOrDefaultAsync(p => p.Barcode == barcode);
     }

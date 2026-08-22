@@ -19,6 +19,8 @@
 
 @attribute [Authorize(Roles = "Admin, Employee")]
 
+<BbPortalHost />
+
 <PageTitle>Checkout Terminal</PageTitle>
 
 @* ═══════════════════════════════════════════════════════════════════════
@@ -279,6 +281,49 @@
     </BbDialogContent>
 </BbDialog>
 
+@* ── B: Denied-attempt logger — stockout prompt (revert: delete this BbDialog + related @code) ── *@
+<BbDialog @bind-Open="stockoutOpen">
+    <BbDialogContent Style="width: min(96vw, 28rem)">
+        <BbDialogHeader>
+            <BbDialogTitle class="flex items-center gap-2">
+                <LucideIcon Name="alert-triangle" Size="18" />
+                Stock limit reached
+            </BbDialogTitle>
+            <BbDialogDescription>
+                @(stockoutItem is null ? "" : $"{stockoutItem.ProductName}: only {stockoutAvailable} in stock.")
+                Log the customer's requested quantity as lost sales?
+            </BbDialogDescription>
+        </BbDialogHeader>
+        @if (stockoutItem is not null)
+        {
+            <div class="flex flex-col gap-3">
+                <div class="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-1 text-sm">
+                    <div class="flex justify-between"><span class="text-muted-foreground">Available</span><span class="font-semibold">@stockoutAvailable</span></div>
+                    <div class="flex justify-between"><span class="text-muted-foreground">In cart</span><span class="font-semibold">@stockoutItem.Quantity</span></div>
+                    @if (stockoutItem.LostSalesQuantity > 0)
+                    {
+                        <div class="flex justify-between text-amber-600 dark:text-amber-400"><span>Already logged lost</span><span class="font-bold">@stockoutItem.LostSalesQuantity</span></div>
+                    }
+                </div>
+                <label class="flex flex-col gap-1 text-xs font-medium text-foreground">
+                    Customer requested (total)
+                    <input type="number" @bind="stockoutRequestedInput" @bind:event="oninput" min="@(stockoutAvailable + 1)" placeholder="@(stockoutAvailable + 1)"
+                           class="h-10 rounded-md border border-input bg-background px-3 text-sm" />
+                    <span class="text-muted-foreground font-normal">Lost = requested − available (@stockoutAvailable). POS still sells only @stockoutAvailable.</span>
+                </label>
+                @if (StockoutValidationError is not null)
+                {
+                    <p role="alert" class="m-0 text-sm text-destructive">@StockoutValidationError</p>
+                }
+            </div>
+        }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelStockout">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmStockout" Disabled="@(StockoutValidationError is not null)">Log lost sale</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 <BbDialog Open="checkoutConfirmationOpen" OpenChanged="OnCheckoutOpenChanged">
     <BbDialogContent class="flex max-h-[90dvh] w-[min(96vw,34rem)] flex-col overflow-hidden">
         @if (completedTransaction is null)
@@ -368,22 +413,31 @@
             @foreach (var item in cart)
             {
                 <tr class="border-b border-border">
-                    <td class="p-1 text-foreground">@item.ProductName</td>
+                    <td class="p-1 text-foreground">
+                        <div class="flex flex-col gap-0.5">
+                            <span>@item.ProductName</span>
+                            @if (item.LostSalesQuantity > 0)
+                            {
+                                <span class="text-[10px] leading-none text-amber-600 dark:text-amber-400 font-medium">Lost: @item.LostSalesQuantity (req @item.RequestedQuantity)</span>
+                            }
+                        </div>
+                    </td>
                     <td class="p-1">
                         <div class="flex items-center gap-0">
                             <button type="button" @onclick="() => DecrementQty(item)"
                                     aria-label="Decrease quantity"
-                                    class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
+                                    class="p-2 rounded hover:bg-muted min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground">
                                 <LucideIcon Name="minus" Size="14" />
                             </button>
                             <input type="number"
-                                   @bind="item.Quantity"
-                                   @bind:event="oninput"
+                                   value="@item.Quantity"
+                                   @oninput="(e) => HandleQtyInput(item, e)"
                                    min="1"
-                                   class="w-8 py-1 px-0 text-center rounded border border-input bg-background text-foreground text-sm box-border" />
+                                   class="w-8 py-1 px-0 text-center rounded border border-input bg-background text-foreground text-sm box-border @(item.LostSalesQuantity > 0 ? "border-amber-500 ring-1 ring-amber-500" : "")"
+                                   title="@(item.LostSalesQuantity > 0 ? $"Lost: {item.LostSalesQuantity} (requested {item.RequestedQuantity})" : null)" />
                             <button type="button" @onclick="() => IncrementQty(item)"
                                     aria-label="Increase quantity"
-                                    class="p-2 rounded hover:bg-muted min-w-[28px] min-h-[28px] flex items-center justify-center text-foreground">
+                                    class="p-2 rounded hover:bg-muted min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground">
                                 <LucideIcon Name="plus" Size="14" />
                             </button>
                         </div>
@@ -401,7 +455,7 @@
                         </button>
                     </td>
                     <td class="p-1">
-                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="() => cart.Remove(item)">
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="() => cart.Remove(item)" aria-label="@($"Remove {item.ProductName}")">
                             <LucideIcon Name="x" Size="14" />
                         </BbButton>
                     </td>
@@ -526,6 +580,64 @@
     private string? authenticatedUserId;
 
     private ReceiptDto? completedTransaction;
+
+    // --- B: stockout logger state (revert: delete entire block) ---
+    private bool stockoutOpen;
+    private CartItemDto? stockoutItem;
+    private int stockoutAvailable;
+    private string stockoutRequestedInput = "";
+    private string? StockoutValidationError
+    {
+        get
+        {
+            if (stockoutItem is null) return "Select a product.";
+            if (!int.TryParse(stockoutRequestedInput, out var v)) return "Enter a valid number.";
+            if (v <= stockoutAvailable) return $"Requested must be over available ({stockoutAvailable}).";
+            if (v > 999_999) return "Requested quantity too large.";
+            return null;
+        }
+    }
+    private void OpenStockoutPrompt(CartItemDto item, int available, int attempted)
+    {
+        stockoutItem = item;
+        stockoutAvailable = available;
+        stockoutRequestedInput = Math.Max(attempted, available + 1).ToString();
+        stockoutOpen = true;
+    }
+    private void CancelStockout() { stockoutOpen = false; stockoutItem = null; }
+    private void ConfirmStockout()
+    {
+        if (StockoutValidationError is not null || stockoutItem is null) return;
+        var requested = int.Parse(stockoutRequestedInput);
+        stockoutItem.RequestedQuantity = requested;
+        stockoutItem.LostSalesQuantity = Math.Max(0, requested - stockoutAvailable);
+        // Keep sold qty capped at available
+        stockoutItem.Quantity = stockoutAvailable;
+        stockoutOpen = false;
+        statusMessage = $"Logged lost sale for {stockoutItem.ProductName}: requested {requested}, sold {stockoutAvailable}, lost {stockoutItem.LostSalesQuantity}.";
+        stockoutItem = null;
+    }
+    private void HandleQtyInput(CartItemDto item, ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var v)) return;
+        var product = catalogProducts.FirstOrDefault(p => p.Id == item.ProductId);
+        var available = product?.CurrentStock ?? item.Quantity;
+        if (v <= 0) { item.Quantity = 1; return; }
+        if (v > available)
+        {
+            item.Quantity = available;
+            OpenStockoutPrompt(item, available, v);
+        }
+        else
+        {
+            item.Quantity = v;
+            // if user manually lowers below old requested, clear lost if now satisfied
+            if (item.RequestedQuantity.HasValue && item.RequestedQuantity.Value <= available && item.LostSalesQuantity > 0)
+            {
+                // keep logged as-is; user can re-log via + button
+            }
+        }
+    }
 
     // --- Barcode scanner inline state ---
     private bool scannerEnabled = false;
@@ -1128,7 +1240,7 @@
         if (existing != null)
         {
             if (existing.Quantity < p.CurrentStock) existing.Quantity++;
-            else statusMessage = $"Limit reached: Only {p.CurrentStock} of {p.Name} in stock.";
+            else OpenStockoutPrompt(existing, p.CurrentStock, existing.Quantity + 1);
         }
         else
         {
@@ -1159,8 +1271,7 @@
         }
         else
         {
-            statusMessage =
-                $"Limit reached: Only {product.CurrentStock} of {product.Name} in stock.";
+            OpenStockoutPrompt(item, product.CurrentStock, item.Quantity + 1);
         }
     }
 
@@ -1201,7 +1312,9 @@
                 {
                     ProductId = item.ProductId,
                     Quantity = item.Quantity,
-                    DiscountAmount = Math.Max(0, item.OriginalPrice - item.Price) * item.Quantity
+                    DiscountAmount = Math.Max(0, item.OriginalPrice - item.Price) * item.Quantity,
+                    RequestedQuantity = item.RequestedQuantity ?? item.Quantity,
+                    LostSalesQuantity = item.LostSalesQuantity
                 }).ToList(),
                 PaymentMethod = paymentMethod,
                 ReferenceNumber = referenceNumber,

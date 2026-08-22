@@ -59,7 +59,7 @@
                         <div class="min-w-0">
 
                             <span class="text-sm font-semibold text-foreground">
-                                @appt.AppointmentDate.ToString("MMM dd, yyyy") · @appt.TimeSlot
+                                @appt.AppointmentDate.ToString("MMM dd, yyyy") · @FormatTimeSlot(appt.TimeSlot)
                             </span>
 
                             <div class="text-xs text-muted-foreground mt-0.5 truncate">
@@ -151,7 +151,7 @@
                     <div class="text-[10px] font-bold text-muted-foreground uppercase">Schedule</div>
                     <div class="flex items-center gap-3 mt-1">
                         <span class="text-sm font-semibold text-foreground">@selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy")</span>
-                        <span class="text-sm text-blue-500 font-bold">@selectedAppointment.TimeSlot</span>
+                        <span class="text-sm text-blue-500 font-bold">@FormatTimeSlot(selectedAppointment.TimeSlot)</span>
                         <span class="text-xs text-muted-foreground">(~@selectedAppointment.DurationMinutes mins)</span>
                     </div>
                 </div>
@@ -242,10 +242,8 @@
 
             return active
                 .Concat(history)
-                .OrderByDescending(
-                    a =>
-                        a.AppointmentDate
-                );
+                .OrderByDescending(a => a.AppointmentDate)
+                .ThenByDescending(a => TimeOnly.TryParseExact(a.TimeSlot?.Trim() ?? "", "HH:mm", out var t) ? t : TimeOnly.MaxValue);
         }
     }
 
@@ -297,6 +295,7 @@
         };
 
 
+    private static string FormatTimeSlot(string? value) => TimeOnly.TryParseExact(value?.Trim() ?? "", "HH:mm", out var t) ? t.ToString("h:mm tt") : (TimeOnly.TryParse(value, out var t2) ? t2.ToString("h:mm tt") : value ?? "");
     private static string GetStatusClass(string? status) =>
         status switch
         {

@@ -38,7 +38,8 @@ public partial class CreateAppointmentDto
     public DateTime AppointmentDate { get; set; } = DateTime.Now;
 
     [Required(ErrorMessage = "Time slot is required.")]
-    [RegularExpression(@"^\d{2}:\d{2}$", ErrorMessage = "Time slot must be in HH:mm format.")]
+    [StringLength(5, MinimumLength = 5, ErrorMessage = "Time slot must be in HH:mm format.")]
+    [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Time slot must be in HH:mm format (00:00-23:59).")]
     public string TimeSlot { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "At least one service must be selected.")]
@@ -84,7 +85,8 @@ public class ScheduleAppointmentRequest
     public DateTime AppointmentDate { get; set; }
 
     [Required]
-    [RegularExpression(@"^\d{2}:\d{2}$", ErrorMessage = "Time slot must be in HH:mm format.")]
+    [StringLength(5, MinimumLength = 5, ErrorMessage = "Time slot must be in HH:mm format.")]
+    [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Time slot must be in HH:mm format (00:00-23:59).")]
     public string TimeSlot { get; set; } = string.Empty;
 
     [Required]

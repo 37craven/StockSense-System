@@ -104,9 +104,22 @@
             var currentPath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
 
             // list of pages where we SHOULD NOT check the session (Auth pages)
+            // Include ForgotPassword/ResetPassword - anonymous hit on api/auth/status => 401
             bool isAuthPage = currentPath.StartsWith("Account/Login", StringComparison.OrdinalIgnoreCase) ||
                              currentPath.StartsWith("Account/Register", StringComparison.OrdinalIgnoreCase) ||
-                             currentPath.StartsWith("/Account/RegisterConfirmation", StringComparison.OrdinalIgnoreCase);
+                             currentPath.StartsWith("Account/RegisterConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             currentPath.StartsWith("Account/ForgotPassword", StringComparison.OrdinalIgnoreCase) ||
+                             currentPath.StartsWith("Account/ResetPassword", StringComparison.OrdinalIgnoreCase) ||
+                             currentPath.StartsWith("Account/ResendEmailConfirmation", StringComparison.OrdinalIgnoreCase) ||
+                             currentPath.StartsWith("Account/ConfirmEmail", StringComparison.OrdinalIgnoreCase);
+
+            // Also handle leading-slash variant (ToBaseRelativePath sometimes returns with/without slash)
+            if (!isAuthPage)
+            {
+                var trimmed = currentPath.TrimStart('/');
+                isAuthPage = trimmed.StartsWith("Account/Login", StringComparison.OrdinalIgnoreCase) ||
+                             trimmed.StartsWith("Account/Register", StringComparison.OrdinalIgnoreCase);
+            }
 
             // Only check the session if we AREN'T on a login/register page
             if (!isAuthPage)
@@ -120,6 +133,13 @@
     {
         try
         {
+            // Anonymous users must not be kicked - api/auth/status is [Authorize] and always 401 for them
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated != true)
+            {
+                return;
+            }
+
             // Pings the server check endpoint
             var response = await Http.GetAsync("api/auth/status");
 

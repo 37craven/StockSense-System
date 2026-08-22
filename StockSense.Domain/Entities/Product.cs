@@ -20,10 +20,9 @@ public class Product
     [JsonInclude]
     public int CurrentStock { get; set; }
     public int ReorderTarget { get; set; }
-    public int ReservedStock { get; set; }
     public bool IsActive { get; set; } = true;
 
-    public int AvailableStock => Math.Max(0, CurrentStock - ReservedStock);
+    public int AvailableStock => CurrentStock;
 
     public void DeductStock(int quantity)
     {
@@ -39,24 +38,6 @@ public class Product
         if (quantity <= 0)
             throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be positive");
         CurrentStock += quantity;
-    }
-
-    public void ReserveStock(int quantity)
-    {
-        if (quantity <= 0)
-            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be positive");
-        if (AvailableStock < quantity)
-            throw new InvalidOperationException($"Insufficient available stock. Available: {AvailableStock}, requested: {quantity}");
-        ReservedStock += quantity;
-    }
-
-    public void ReleaseStock(int quantity)
-    {
-        if (quantity <= 0)
-            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be positive");
-        if (ReservedStock < quantity)
-            throw new ArgumentOutOfRangeException(nameof(quantity), $"Cannot release more than reserved. Reserved: {ReservedStock}, requested: {quantity}");
-        ReservedStock -= quantity;
     }
     [JsonIgnore] public virtual ICollection<StoreService> StoreServices { get; set; } = new List<StoreService>();
     // This links the product to the Supplier class we just made
