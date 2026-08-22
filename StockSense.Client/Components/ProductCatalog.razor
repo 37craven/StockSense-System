@@ -93,17 +93,17 @@ else
     min-width: 0;
     flex: 1;
     }
-.pc-grid {
+    .pc-grid {
     display: grid;
     grid-template-columns: repeat(
-        auto-fill,
-        minmax(max(var(--pc-min-card, 140px), (100% - (var(--pc-cols-max) - 1) * var(--space-3)) / var(--pc-cols-max)), 1fr)
+    auto-fill,
+    minmax(max(var(--pc-min-card, 140px), (100% - (var(--pc-cols-max) - 1) * var(--space-3)) / var(--pc-cols-max)), 1fr)
     );
     grid-auto-rows: max-content;
     gap: var(--space-3);
     min-width: 0;
     overflow: auto;
-}
+    }
     .pc-card {
     transition: box-shadow 0.25s cubic-bezier(0.25, 2, 0.5, 1);
     }

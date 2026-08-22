@@ -69,24 +69,6 @@
         }
         else
         {
-            @if (preview.Warnings.Count > 0)
-            {
-                <div class="p-4 mb-4 rounded-lg text-sm" style="border:1px solid var(--warning);background:color-mix(in oklch,var(--warning) 10%,transparent)">
-                    <div class="flex items-center gap-2 font-semibold mb-3" style="color:var(--warning-muted-foreground)">
-                        <LucideIcon Name="triangle-alert" Size="16" />
-                        <span>Warnings</span>
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        @foreach (var warning in preview.Warnings)
-                        {
-                            <div>
-                                <span class="font-semibold">@warning.ProductName</span><span> — @warning.Message</span>
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
-
             @foreach (var group in preview.SupplierGroups)
             {
                 <div class="panel mb-4">
@@ -285,6 +267,27 @@
 }
 </div>
 
+<BbDialog @bind-Open="warningsOpen">
+    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden" style="min-width: 400px;">
+        <BbDialogHeader>
+            <BbDialogTitle>Preview warnings</BbDialogTitle>
+            <BbDialogDescription>Review these items before creating drafts. You can still adjust quantities or exclude products.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="flex flex-col gap-2 overflow-y-auto pb-2 text-sm">
+            @foreach (var warning in preview?.Warnings ?? [])
+            {
+                <div class="p-3 rounded-lg border border-border bg-muted/30 flex flex-col gap-1">
+                    <span class="font-semibold">@warning.ProductName</span>
+                    <span class="text-muted-foreground">@warning.Message</span>
+                </div>
+            }
+        </div>
+        <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="() => warningsOpen = false">Close</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     private enum CreationMode { Automatic, Manual }
     private sealed class ManualLine { public int ProductId { get; set; } public int Quantity { get; set; } = 1; }
@@ -296,6 +299,7 @@
     private bool busy, manualLoading;
     private int manualSupplierId;
     private string manualReason = "", message = "", error = "";
+    private bool warningsOpen;
     private bool CanCreateAutomatic => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && !SelectedAutomaticItems.Any(x => errors.ContainsKey(x.ProductId));
     private IEnumerable<OrderSlipPreviewItemDto> SelectedAutomaticItems => preview?.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected) ?? [];
     private bool HasUnsavedDraft => mode == CreationMode.Automatic
@@ -333,6 +337,18 @@
             preview = result.Value;
 
             message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations.";
+
+            if (preview.Warnings.Count > 0)
+            {
+                Toast.Show(new ToastData
+                {
+                    Variant = ToastVariant.Warning,
+                    Title = $"{preview.Warnings.Count} inventory warning{(preview.Warnings.Count == 1 ? "" : "s")}",
+                    ActionText = "View warnings",
+                    Duration = 12000, // ponytail: sticky so it can't be missed; auto-dismiss when users complain
+                    OnAction = () => { warningsOpen = true; InvokeAsync(StateHasChanged); }
+                });
+            }
         }
         catch (Exception ex)
         {

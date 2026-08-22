@@ -24,262 +24,262 @@
 <PageTitle>Checkout Terminal</PageTitle>
 
 @* ═══════════════════════════════════════════════════════════════════════
-   MAIN WRAPPER — mobile-first single-column, md+: two-column
-   ═══════════════════════════════════════════════════════════════════════ *@
+MAIN WRAPPER — mobile-first single-column, md+: two-column
+═══════════════════════════════════════════════════════════════════════ *@
 <div class="pos-wrapper no-print @(scannerEnabled ? "scanner-open" : "")">
 
-    @* ─── PRODUCT CATALOG ─── *@
-    <div class="pos-catalog flex-1 min-w-0 overflow-hidden bg-card border border-border rounded-lg flex flex-col"
-         style="@(scannerEnabled ? "padding-bottom: 360px" : "padding-bottom: 56px")">
-        <ProductCatalog @ref="catalog"
-                        Products="catalogProducts"
-                        ActiveOnly="true"
-                        OnProductClick="AddToCart"
-                        IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
+@* ─── PRODUCT CATALOG ─── *@
+<div class="pos-catalog flex-1 min-w-0 overflow-hidden bg-card border border-border rounded-lg flex flex-col"
+style="@(scannerEnabled ? "padding-bottom: 360px" : "padding-bottom: 56px")">
+<ProductCatalog @ref="catalog"
+Products="catalogProducts"
+ActiveOnly="true"
+OnProductClick="AddToCart"
+IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
+</div>
+
+@* ─── DESKTOP RIGHT COLUMN: cart + scanner ─── *@
+<div class="pos-desktop-right flex flex-col gap-4">
+
+@* Cart card *@
+<div class="flex-1 min-h-0 flex flex-col overflow-hidden bg-card border border-border rounded-lg">
+<div class="shrink-0 px-6 py-4 border-b border-border flex items-center gap-2">
+<LucideIcon Name="shopping-cart" Size="18" />
+<span class="text-base font-semibold text-foreground">Current Order</span>
+</div>
+
+<div class="flex-1 overflow-x-hidden overflow-y-auto p-4">
+@if (!cart.Any())
+{
+<div class="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+<LucideIcon Name="shopping-cart" Size="40" />
+<p class="text-sm m-0">Cart is empty</p>
+</div>
+}
+else
+    {
+    @CartTable()
+    }
     </div>
 
-    @* ─── DESKTOP RIGHT COLUMN: cart + scanner ─── *@
-    <div class="pos-desktop-right flex flex-col gap-4">
+    @if (cart.Any())
+    {
+    <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+    <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+    @statusMessage
+    </div>
+    }
+    <div class="grid gap-2">
+    <div class="flex justify-between text-muted-foreground text-sm">
+    <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
+    </div>
+    <div class="flex justify-between text-muted-foreground text-sm">
+    <span>Discount</span><span>-₱@TotalDiscount.ToString("N2")</span>
+    </div>
+    <div class="flex justify-between items-center">
+    <span class="text-base font-semibold text-foreground">Total</span>
+    <span class="text-xl font-bold text-primary">₱@TotalAmount.ToString("N2")</span>
+    </div>
+    </div>
+    @CheckoutFields("desktop")
+    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="() => OpenCheckoutConfirmation(false)" Disabled="@(isProcessing || checkoutConfirmationOpen)">
+    @if (isProcessing)
+    {
+    <BbSpinner Size="SpinnerSize.Small" />
+    <span>Processing...</span>
+    }
+else
+    {
+    <LucideIcon Name="check" Size="16" />
+    <span>Confirm Sale</span>
+    }
+    </BbButton>
+    </div>
+    }
+    </div>
 
-        @* Cart card *@
-        <div class="flex-1 min-h-0 flex flex-col overflow-hidden bg-card border border-border rounded-lg">
-            <div class="shrink-0 px-6 py-4 border-b border-border flex items-center gap-2">
-                <LucideIcon Name="shopping-cart" Size="18" />
-                <span class="text-base font-semibold text-foreground">Current Order</span>
-            </div>
-
-            <div class="flex-1 overflow-x-hidden overflow-y-auto p-4">
-                @if (!cart.Any())
-                {
-                    <div class="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
-                        <LucideIcon Name="shopping-cart" Size="40" />
-                        <p class="text-sm m-0">Cart is empty</p>
-                    </div>
-                }
-                else
-                {
-                    @CartTable()
-                }
-            </div>
-
-            @if (cart.Any())
-            {
-                <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
-                    @if (!string.IsNullOrEmpty(statusMessage))
-                    {
-                        <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
-                            @statusMessage
-                        </div>
-                    }
-                    <div class="grid gap-2">
-                        <div class="flex justify-between text-muted-foreground text-sm">
-                            <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
-                        </div>
-                        <div class="flex justify-between text-muted-foreground text-sm">
-                            <span>Discount</span><span>-₱@TotalDiscount.ToString("N2")</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-base font-semibold text-foreground">Total</span>
-                            <span class="text-xl font-bold text-primary">₱@TotalAmount.ToString("N2")</span>
-                        </div>
-                    </div>
-                    @CheckoutFields("desktop")
-                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="() => OpenCheckoutConfirmation(false)" Disabled="@(isProcessing || checkoutConfirmationOpen)">
-                        @if (isProcessing)
-                        {
-                            <BbSpinner Size="SpinnerSize.Small" />
-                            <span>Processing...</span>
-                        }
-                        else
-                        {
-                            <LucideIcon Name="check" Size="16" />
-                            <span>Confirm Sale</span>
-                        }
-                    </BbButton>
-                </div>
-            }
-        </div>
-
-        @* Scanner card (desktop) *@
-        <div class="shrink-0 bg-card border border-border rounded-lg overflow-hidden flex flex-col">
-            @ScannerHeader()
-            @if (scannerEnabled)
-            {
-                @ScannerBody("barcode-camera-container")
-            }
-        </div>
+    @* Scanner card (desktop) *@
+    <div class="shrink-0 bg-card border border-border rounded-lg overflow-hidden flex flex-col">
+    @ScannerHeader()
+    @if (scannerEnabled)
+    {
+    @ScannerBody("barcode-camera-container")
+    }
+    </div>
     </div>
 
     @* ─── MOBILE: Floating cart button ─── *@
     @if (cart.Any())
     {
-        <button type="button" @onclick="() => cartModalOpen = true"
-                class="pos-mobile-cart-btn fixed right-4 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg font-bold text-sm min-h-[44px]">
-            <LucideIcon Name="shopping-cart" Size="18" />
-            <span>@cart.Sum(i => i.Quantity)</span>
-            <span>₱@TotalAmount.ToString("N2")</span>
-        </button>
+    <button type="button" @onclick="() => cartModalOpen = true"
+    class="pos-mobile-cart-btn fixed right-4 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-primary text-primary-foreground shadow-lg font-bold text-sm min-h-[44px]">
+    <LucideIcon Name="shopping-cart" Size="18" />
+    <span>@cart.Sum(i => i.Quantity)</span>
+    <span>₱@TotalAmount.ToString("N2")</span>
+    </button>
     }
 
     @* ─── MOBILE: Scanner docked at bottom ─── *@
     <div class="pos-scanner-mobile fixed bottom-0 left-0 right-0 z-30 bg-card border-t border-border @(scannerEnabled ? "shadow-lg" : "")">
-        @ScannerHeader()
-        @if (scannerEnabled)
-        {
-            @ScannerBody("barcode-camera-container-mobile")
-        }
+    @ScannerHeader()
+    @if (scannerEnabled)
+    {
+    @ScannerBody("barcode-camera-container-mobile")
+    }
     </div>
-</div>
+    </div>
 
-@* ═══════════════════════════════════════════════════════════════════════
-   CART MODAL (mobile)
-   ═══════════════════════════════════════════════════════════════════════ *@
-<BbDialog @bind-Open="cartModalOpen">
+    @* ═══════════════════════════════════════════════════════════════════════
+    CART MODAL (mobile)
+    ═══════════════════════════════════════════════════════════════════════ *@
+    <BbDialog @bind-Open="cartModalOpen">
     <BbDialogContent Style="width: min(98vw, 500px); max-height: 90dvh" class="flex flex-col p-0 overflow-hidden">
-        <BbDialogHeader class="shrink-0 px-4 py-3 border-b border-border">
-            <BbDialogTitle class="flex items-center gap-2 text-base font-semibold">
-                <LucideIcon Name="shopping-cart" Size="18" />
-                Current Order (@cart.Count items)
-                @if (cart.Any())
-                {
-                    <span class="bg-primary text-primary-foreground rounded-full px-2 text-xs font-bold">
-                        @cart.Sum(i => i.Quantity)
-                    </span>
-                }
-            </BbDialogTitle>
-        </BbDialogHeader>
+    <BbDialogHeader class="shrink-0 px-4 py-3 border-b border-border">
+    <BbDialogTitle class="flex items-center gap-2 text-base font-semibold">
+    <LucideIcon Name="shopping-cart" Size="18" />
+    Current Order (@cart.Count items)
+    @if (cart.Any())
+    {
+    <span class="bg-primary text-primary-foreground rounded-full px-2 text-xs font-bold">
+    @cart.Sum(i => i.Quantity)
+    </span>
+    }
+    </BbDialogTitle>
+    </BbDialogHeader>
 
-        <div class="flex-1 overflow-y-auto p-4">
-            @if (!cart.Any())
-            {
-                <div class="flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
-                    <LucideIcon Name="shopping-cart" Size="32" />
-                    <p class="text-sm m-0">Cart is empty</p>
-                </div>
-            }
-            else
-            {
-                @CartTable()
-            }
-        </div>
+    <div class="flex-1 overflow-y-auto p-4">
+    @if (!cart.Any())
+    {
+    <div class="flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
+    <LucideIcon Name="shopping-cart" Size="32" />
+    <p class="text-sm m-0">Cart is empty</p>
+    </div>
+    }
+else
+    {
+    @CartTable()
+    }
+    </div>
 
-        @if (cart.Any())
-        {
-            <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
-                @if (!string.IsNullOrEmpty(statusMessage))
-                {
-                    <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
-                        @statusMessage
-                    </div>
-                }
-                <div class="grid gap-2">
-                    <div class="flex justify-between text-muted-foreground text-sm">
-                        <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
-                    </div>
-                    <div class="flex justify-between text-muted-foreground text-sm">
-                        <span>Discount</span><span>-₱@TotalDiscount.ToString("N2")</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-base font-semibold text-foreground">Total</span>
-                        <span class="text-xl font-bold text-primary">₱@TotalAmount.ToString("N2")</span>
-                    </div>
-                </div>
-                @CheckoutFields("mobile")
-                <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="() => OpenCheckoutConfirmation(true)" Disabled="@(isProcessing || checkoutConfirmationOpen || !cart.Any())">
-                    @if (isProcessing)
-                    {
-                        <BbSpinner Size="SpinnerSize.Small" />
-                        <span>Processing...</span>
-                    }
-                    else
-                    {
-                        <LucideIcon Name="check" Size="16" />
-                        <span>Confirm Sale — ₱@TotalAmount.ToString("N2")</span>
-                    }
-                </BbButton>
-            </div>
-        }
+    @if (cart.Any())
+    {
+    <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+    <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+    @statusMessage
+    </div>
+    }
+    <div class="grid gap-2">
+    <div class="flex justify-between text-muted-foreground text-sm">
+    <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
+    </div>
+    <div class="flex justify-between text-muted-foreground text-sm">
+    <span>Discount</span><span>-₱@TotalDiscount.ToString("N2")</span>
+    </div>
+    <div class="flex justify-between items-center">
+    <span class="text-base font-semibold text-foreground">Total</span>
+    <span class="text-xl font-bold text-primary">₱@TotalAmount.ToString("N2")</span>
+    </div>
+    </div>
+    @CheckoutFields("mobile")
+    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="() => OpenCheckoutConfirmation(true)" Disabled="@(isProcessing || checkoutConfirmationOpen || !cart.Any())">
+    @if (isProcessing)
+    {
+    <BbSpinner Size="SpinnerSize.Small" />
+    <span>Processing...</span>
+    }
+else
+    {
+    <LucideIcon Name="check" Size="16" />
+    <span>Confirm Sale — ₱@TotalAmount.ToString("N2")</span>
+    }
+    </BbButton>
+    </div>
+    }
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-<BbDialog @bind-Open="discountOpen">
+    <BbDialog @bind-Open="discountOpen">
     <BbDialogContent Style="width: min(96vw, 36rem)">
-        <BbDialogHeader>
-            <BbDialogTitle>Discount</BbDialogTitle>
-            <BbDialogDescription>@(discountItem?.ProductName ?? "Cart item")</BbDialogDescription>
-        </BbDialogHeader>
-        @if (discountItem is not null)
-        {
-            <div class="flex flex-col gap-3">
-                <label class="flex flex-col gap-1 text-xs font-medium text-foreground">
-                    @(discountMode == "percent" ? "Percent discount" : "Peso discount per unit")
-                    <div class="flex gap-1 items-center">
-                        @if (discountMode == "percent")
-                        {
-                            <input type="range" min="0" max="100" step="5" @bind="discountValueText" @bind:event="oninput"
-                                   aria-invalid="@(DiscountValueError is not null)"
-                                   aria-describedby="discount-value-help"
-                                   class="discount-slider h-10 min-w-0 flex-1" />
-                            <span class="shrink-0 w-12 text-right text-sm font-semibold text-foreground" aria-live="polite">@(TryParseDiscountValue()?.ToString("0.##") ?? "0")%</span>
-                        }
-                        else
-                        {
-                            <input type="number" min="0" step="0.01" @bind="discountValueText" @bind:event="oninput"
-                                   placeholder="e.g. 50" inputmode="decimal"
-                                   aria-invalid="@(DiscountValueError is not null)"
-                                   aria-describedby="discount-value-help"
-                                   class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground" />
-                        }
-                        <div class="flex gap-1 h-10 rounded-md border border-border bg-muted/30 p-1 shrink-0" role="group" aria-label="Discount type">
-                            <button type="button" @onclick="SetModePercent" title="Percent discount"
-                                    aria-label="Percent discount"
-                                    aria-pressed="@(discountMode == "percent")"
-                                    class="h-full px-3 rounded text-sm font-semibold @(discountMode == "percent" ? "discount-mode-active border" : "text-muted-foreground border border-transparent")">
-                                %
-                            </button>
-                            <button type="button" @onclick="SetModePeso" title="Peso discount per unit"
-                                    aria-label="Peso discount per unit"
-                                    aria-pressed="@(discountMode == "peso")"
-                                    class="h-full px-3 rounded text-sm font-semibold @(discountMode == "peso" ? "discount-mode-active border" : "text-muted-foreground border border-transparent")">
-                                ₱
-                            </button>
-                        </div>
-                    </div>
-                </label>
-                <p id="discount-value-help" class="m-0 text-xs text-muted-foreground">
-                    @(discountMode == "percent"
-                        ? "Percentage taken off the original unit price."
-                        : "Pesos taken off each unit's original price.")
-                </p>
-                @if (DiscountValueError is not null)
-                {
-                    <p role="alert" class="m-0 text-sm text-destructive">@DiscountValueError</p>
-                }
-                <div class="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-1 text-sm" aria-live="polite">
-                    <div class="flex justify-between text-muted-foreground"><span>Regular unit price</span><span>₱@discountItem.OriginalPrice.ToString("N2")</span></div>
-                    <div class="flex justify-between text-muted-foreground"><span>Discounted unit price</span><span>₱@DiscountPreviewUnitPrice.ToString("N2")</span></div>
-                    <div class="flex justify-between font-semibold text-foreground"><span>Line total (×@discountItem.Quantity)</span><span>₱@((DiscountPreviewUnitPrice * discountItem.Quantity).ToString("N2"))</span></div>
-                    @if (DiscountPreviewSaved > 0)
-                    {
-                        <div class="flex justify-between text-primary text-xs font-bold"><span>Discounted total</span><span>-₱@DiscountPreviewSaved.ToString("N2")</span></div>
-                    }
-                </div>
-                <p class="m-0 text-xs text-muted-foreground">Applies to this sale only — the product's regular price is unchanged.</p>
-            </div>
-        }
-        <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
-            @if (discountItem is not null && discountItem.Price < discountItem.OriginalPrice)
-            {
-                <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearDiscount">Clear discount</BbButton>
-            }
-            <BbButton Variant="ButtonVariant.Outline" OnClick="() => discountOpen = false">Cancel</BbButton>
-            <BbButton Variant="ButtonVariant.Default" OnClick="ApplyDiscount"
-                      Disabled="@(DiscountValueError is not null || (TryParseDiscountValue() ?? 0) <= 0)">
-                Apply
-            </BbButton>
-        </BbDialogFooter>
+    <BbDialogHeader>
+    <BbDialogTitle>Discount</BbDialogTitle>
+    <BbDialogDescription>@(discountItem?.ProductName ?? "Cart item")</BbDialogDescription>
+    </BbDialogHeader>
+    @if (discountItem is not null)
+    {
+    <div class="flex flex-col gap-3">
+    <label class="flex flex-col gap-1 text-xs font-medium text-foreground">
+    @(discountMode == "percent" ? "Percent discount" : "Peso discount per unit")
+    <div class="flex gap-1 items-center">
+    @if (discountMode == "percent")
+    {
+    <input type="range" min="0" max="100" step="5" @bind="discountValueText" @bind:event="oninput"
+    aria-invalid="@(DiscountValueError is not null)"
+    aria-describedby="discount-value-help"
+    class="discount-slider h-10 min-w-0 flex-1" />
+    <span class="shrink-0 w-12 text-right text-sm font-semibold text-foreground" aria-live="polite">@(TryParseDiscountValue()?.ToString("0.##") ?? "0")%</span>
+    }
+else
+    {
+    <input type="number" min="0" step="0.01" @bind="discountValueText" @bind:event="oninput"
+    placeholder="e.g. 50" inputmode="decimal"
+    aria-invalid="@(DiscountValueError is not null)"
+    aria-describedby="discount-value-help"
+    class="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground" />
+    }
+    <div class="flex gap-1 h-10 rounded-md border border-border bg-muted/30 p-1 shrink-0" role="group" aria-label="Discount type">
+    <button type="button" @onclick="SetModePercent" title="Percent discount"
+    aria-label="Percent discount"
+    aria-pressed="@(discountMode == "percent")"
+    class="h-full px-3 rounded text-sm font-semibold @(discountMode == "percent" ? "discount-mode-active border" : "text-muted-foreground border border-transparent")">
+    %
+    </button>
+    <button type="button" @onclick="SetModePeso" title="Peso discount per unit"
+    aria-label="Peso discount per unit"
+    aria-pressed="@(discountMode == "peso")"
+    class="h-full px-3 rounded text-sm font-semibold @(discountMode == "peso" ? "discount-mode-active border" : "text-muted-foreground border border-transparent")">
+    ₱
+    </button>
+    </div>
+    </div>
+    </label>
+    <p id="discount-value-help" class="m-0 text-xs text-muted-foreground">
+    @(discountMode == "percent"
+    ? "Percentage taken off the original unit price."
+    : "Pesos taken off each unit's original price.")
+    </p>
+    @if (DiscountValueError is not null)
+    {
+    <p role="alert" class="m-0 text-sm text-destructive">@DiscountValueError</p>
+    }
+    <div class="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-1 text-sm" aria-live="polite">
+    <div class="flex justify-between text-muted-foreground"><span>Regular unit price</span><span>₱@discountItem.OriginalPrice.ToString("N2")</span></div>
+    <div class="flex justify-between text-muted-foreground"><span>Discounted unit price</span><span>₱@DiscountPreviewUnitPrice.ToString("N2")</span></div>
+    <div class="flex justify-between font-semibold text-foreground"><span>Line total (×@discountItem.Quantity)</span><span>₱@((DiscountPreviewUnitPrice * discountItem.Quantity).ToString("N2"))</span></div>
+    @if (DiscountPreviewSaved > 0)
+    {
+    <div class="flex justify-between text-primary text-xs font-bold"><span>Discounted total</span><span>-₱@DiscountPreviewSaved.ToString("N2")</span></div>
+    }
+    </div>
+    <p class="m-0 text-xs text-muted-foreground">Applies to this sale only — the product's regular price is unchanged.</p>
+    </div>
+    }
+    <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+    @if (discountItem is not null && discountItem.Price < discountItem.OriginalPrice)
+    {
+    <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearDiscount">Clear discount</BbButton>
+    }
+    <BbButton Variant="ButtonVariant.Outline" OnClick="() => discountOpen = false">Cancel</BbButton>
+    <BbButton Variant="ButtonVariant.Default" OnClick="ApplyDiscount"
+    Disabled="@(DiscountValueError is not null || (TryParseDiscountValue() ?? 0) <= 0)">
+    Apply
+    </BbButton>
+    </BbDialogFooter>
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
 @* ── B: Denied-attempt logger — stockout prompt (revert: delete this BbDialog + related @code) ── *@
 <BbDialog @bind-Open="stockoutOpen">
@@ -326,79 +326,79 @@
 
 <BbDialog Open="checkoutConfirmationOpen" OpenChanged="OnCheckoutOpenChanged">
     <BbDialogContent class="flex max-h-[90dvh] w-[min(96vw,34rem)] flex-col overflow-hidden">
-        @if (completedTransaction is null)
-        {
-            <BbDialogHeader>
-                <BbDialogTitle>Confirm sale</BbDialogTitle>
-                <BbDialogDescription>Review this payment before recording the sale. Inventory and transaction records will be updated.</BbDialogDescription>
-            </BbDialogHeader>
+    @if (completedTransaction is null)
+    {
+    <BbDialogHeader>
+    <BbDialogTitle>Confirm sale</BbDialogTitle>
+    <BbDialogDescription>Review this payment before recording the sale. Inventory and transaction records will be updated.</BbDialogDescription>
+    </BbDialogHeader>
 
-            <div class="min-h-0 space-y-4 overflow-y-auto" aria-label="Sale summary">
-                <div class="rounded-lg border border-border bg-muted/30">
-                    @foreach (var item in cart)
-                    {
-                        <div class="flex items-start justify-between gap-4 border-b border-border px-3 py-2 last:border-b-0">
-                            <div class="min-w-0">
-                                <p class="m-0 truncate text-sm font-medium text-foreground">@item.ProductName</p>
-                                <p class="m-0 text-xs text-muted-foreground">@item.Quantity × ₱@item.Price.ToString("N2")</p>
-                            </div>
-                            <span class="shrink-0 text-sm font-semibold">₱@((item.Price * item.Quantity).ToString("N2"))</span>
-                        </div>
-                    }
-                </div>
-                <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                    <dt class="text-muted-foreground">Items</dt>
-                    <dd class="m-0 text-right font-medium">@cart.Sum(item => item.Quantity)</dd>
-                    <dt class="text-muted-foreground">Payment</dt>
-                    <dd class="m-0 text-right font-medium">@paymentMethod</dd>
-                    <dt class="text-muted-foreground">Reference</dt>
-                    <dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(referenceNumber) ? "None" : referenceNumber)</dd>
-                    <dt class="text-base font-semibold">Total</dt>
-                    <dd class="m-0 text-right text-lg font-bold text-primary">₱@TotalAmount.ToString("N2")</dd>
-                </dl>
-            </div>
+    <div class="min-h-0 space-y-4 overflow-y-auto" aria-label="Sale summary">
+    <div class="rounded-lg border border-border bg-muted/30">
+    @foreach (var item in cart)
+    {
+    <div class="flex items-start justify-between gap-4 border-b border-border px-3 py-2 last:border-b-0">
+    <div class="min-w-0">
+    <p class="m-0 truncate text-sm font-medium text-foreground">@item.ProductName</p>
+    <p class="m-0 text-xs text-muted-foreground">@item.Quantity × ₱@item.Price.ToString("N2")</p>
+    </div>
+    <span class="shrink-0 text-sm font-semibold">₱@((item.Price * item.Quantity).ToString("N2"))</span>
+    </div>
+    }
+    </div>
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+    <dt class="text-muted-foreground">Items</dt>
+    <dd class="m-0 text-right font-medium">@cart.Sum(item => item.Quantity)</dd>
+    <dt class="text-muted-foreground">Payment</dt>
+    <dd class="m-0 text-right font-medium">@paymentMethod</dd>
+    <dt class="text-muted-foreground">Reference</dt>
+    <dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(referenceNumber) ? "None" : referenceNumber)</dd>
+    <dt class="text-base font-semibold">Total</dt>
+    <dd class="m-0 text-right text-lg font-bold text-primary">₱@TotalAmount.ToString("N2")</dd>
+    </dl>
+    </div>
 
-            <BbDialogFooter>
-                <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelCheckoutConfirmation" Disabled="@isProcessing">Go back</BbButton>
-                <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmCheckout" Disabled="@(isProcessing || !cart.Any())">
-                    @if (isProcessing)
-                    {
-                        <BbSpinner Size="SpinnerSize.Small" />
-                        <span>Recording sale...</span>
-                    }
-                    else
-                    {
-                        <span>Record sale · ₱@TotalAmount.ToString("N2")</span>
-                    }
-                </BbButton>
-            </BbDialogFooter>
-        }
-        else
-        {
-            <BbDialogHeader>
-                <BbDialogTitle>Sale confirmed</BbDialogTitle>
-                <BbDialogDescription>Transaction @completedTransaction.InvoiceNumber has been recorded.</BbDialogDescription>
-            </BbDialogHeader>
+    <BbDialogFooter>
+    <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelCheckoutConfirmation" Disabled="@isProcessing">Go back</BbButton>
+    <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmCheckout" Disabled="@(isProcessing || !cart.Any())">
+    @if (isProcessing)
+    {
+    <BbSpinner Size="SpinnerSize.Small" />
+    <span>Recording sale...</span>
+    }
+else
+    {
+    <span>Record sale · ₱@TotalAmount.ToString("N2")</span>
+    }
+    </BbButton>
+    </BbDialogFooter>
+    }
+else
+    {
+    <BbDialogHeader>
+    <BbDialogTitle>Sale confirmed</BbDialogTitle>
+    <BbDialogDescription>Transaction @completedTransaction.InvoiceNumber has been recorded.</BbDialogDescription>
+    </BbDialogHeader>
 
-            <div class="min-h-0 overflow-y-auto flex flex-col items-center gap-3 py-4 text-center" role="status" aria-live="polite">
-                <span class="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                    <LucideIcon Name="check" Size="24" />
-                </span>
-                <p class="m-0 text-2xl font-bold text-foreground">₱@completedTransaction.TotalAmount.ToString("N2")</p>
-                <p class="m-0 text-sm text-muted-foreground">
-                    @(completedTransaction.PaymentMethod) · @completedTransaction.TransactionDate.ToString("MM/dd/yyyy HH:mm")
-                </p>
-            </div>
+    <div class="min-h-0 overflow-y-auto flex flex-col items-center gap-3 py-4 text-center" role="status" aria-live="polite">
+    <span class="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+    <LucideIcon Name="check" Size="24" />
+    </span>
+    <p class="m-0 text-2xl font-bold text-foreground">₱@completedTransaction.TotalAmount.ToString("N2")</p>
+    <p class="m-0 text-sm text-muted-foreground">
+    @(completedTransaction.PaymentMethod) · @completedTransaction.TransactionDate.ToString("MM/dd/yyyy HH:mm")
+    </p>
+    </div>
 
-            <p class="w-full text-center text-xs text-muted-foreground m-0 px-6 pb-3">Closing in @(receiptCountdown)s…</p>
-            <div class="receipt-countdown-track w-full shrink-0" aria-hidden="true">
-                <div class="receipt-countdown-bar"></div>
-            </div>
-        }
+    <p class="w-full text-center text-xs text-muted-foreground m-0 px-6 pb-3">Closing in @(receiptCountdown)s…</p>
+    <div class="receipt-countdown-track w-full shrink-0" aria-hidden="true">
+    <div class="receipt-countdown-bar"></div>
+    </div>
+    }
     </BbDialogContent>
-</BbDialog>
+    </BbDialog>
 
-@code {
+    @code {
     private RenderFragment CartTable() =>
     @<table class="w-full border-collapse text-sm">
         <thead>
@@ -466,101 +466,101 @@
 
     private RenderFragment CheckoutFields(string idPrefix) =>
     @<div class="grid gap-2">
-        <div class="flex flex-col gap-2">
-            <label for="@(idPrefix)-payment-method" class="text-xs font-medium text-foreground">Payment method</label>
-            <select id="@(idPrefix)-payment-method" @bind="paymentMethod"
-                    class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm">
-                <option value="Cash">Cash</option>
-                <option value="Online">Online</option>
-            </select>
-        </div>
-        <div class="flex flex-col gap-2">
-            <label for="@(idPrefix)-reference-number" class="text-xs font-medium text-foreground">
-                Reference number <span class="text-muted-foreground font-normal">(optional)</span>
-            </label>
-            <input id="@(idPrefix)-reference-number" @bind="referenceNumber" maxlength="100"
-                   placeholder="Payment or external reference"
-                   class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm" />
-        </div>
-        <div class="flex flex-col gap-2">
-            <label for="@(idPrefix)-remarks" class="text-xs font-medium text-foreground">
-                Remarks <span class="text-muted-foreground font-normal">(optional)</span>
-            </label>
-            <textarea id="@(idPrefix)-remarks" @bind="remarks" maxlength="500" rows="2"
-                      placeholder="Notes about this sale"
-                      class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm resize-y"></textarea>
-        </div>
+    <div class="flex flex-col gap-2">
+    <label for="@(idPrefix)-payment-method" class="text-xs font-medium text-foreground">Payment method</label>
+    <select id="@(idPrefix)-payment-method" @bind="paymentMethod"
+    class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm">
+    <option value="Cash">Cash</option>
+    <option value="Online">Online</option>
+    </select>
+    </div>
+    <div class="flex flex-col gap-2">
+    <label for="@(idPrefix)-reference-number" class="text-xs font-medium text-foreground">
+    Reference number <span class="text-muted-foreground font-normal">(optional)</span>
+    </label>
+    <input id="@(idPrefix)-reference-number" @bind="referenceNumber" maxlength="100"
+    placeholder="Payment or external reference"
+    class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm" />
+    </div>
+    <div class="flex flex-col gap-2">
+    <label for="@(idPrefix)-remarks" class="text-xs font-medium text-foreground">
+    Remarks <span class="text-muted-foreground font-normal">(optional)</span>
+    </label>
+    <textarea id="@(idPrefix)-remarks" @bind="remarks" maxlength="500" rows="2"
+    placeholder="Notes about this sale"
+    class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm resize-none"></textarea>
+    </div>
     </div>;
 
     private RenderFragment ScannerHeader() =>
     @<div class="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 min-w-0">
-            <LucideIcon Name="scan-line" Size="16" />
-            <span class="text-sm font-semibold text-foreground truncate">Barcode Scanner</span>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleCamera" title="Flip camera">
-                <LucideIcon Name="switch-camera" Size="16" />
-            </BbButton>
-            <label class="switch">
-                <input type="checkbox" id="scanner-toggle" role="switch" aria-label="Barcode scanner" @bind="scannerEnabled" />
-                <span class="slider"></span>
-            </label>
-        </div>
+    <div class="flex items-center gap-2 min-w-0">
+    <LucideIcon Name="scan-line" Size="16" />
+    <span class="text-sm font-semibold text-foreground truncate">Barcode Scanner</span>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleCamera" title="Flip camera">
+    <LucideIcon Name="switch-camera" Size="16" />
+    </BbButton>
+    <label class="switch">
+    <input type="checkbox" id="scanner-toggle" role="switch" aria-label="Barcode scanner" @bind="scannerEnabled" />
+    <span class="slider"></span>
+    </label>
+    </div>
     </div>;
 
     private RenderFragment ScannerBody(string elementId) =>
     @<div class="pos-scanner-body p-3 flex flex-col gap-3">
-        <div id="@elementId" class="pos-camera-preview w-full bg-black rounded-lg overflow-hidden border-2 box-border @CameraClass">
-        </div>
+    <div id="@elementId" class="pos-camera-preview w-full bg-black rounded-lg overflow-hidden border-2 box-border @CameraClass">
+    </div>
 
-        @if (!string.IsNullOrEmpty(scanErrorMessage))
-        {
-            <div class="flex flex-col gap-1 py-2 px-3 rounded-md text-xs bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
-                <div class="flex items-center gap-2">
-                    <LucideIcon Name="camera-off" Size="14" />
-                    <span>@scanErrorMessage</span>
-                </div>
-                @if (!string.IsNullOrEmpty(scanErrorDetail))
-                {
-                    <span class="opacity-70 break-all">@scanErrorDetail</span>
-                }
-            </div>
-        }
-        else if (scannedProduct != null)
-        {
-            <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between gap-2 flex-wrap">
-                    <span class="text-sm font-semibold text-foreground truncate flex-1 min-w-0">@scannedProduct.Name</span>
-                    <span class="text-base font-bold text-primary shrink-0">₱@scannedProduct.Price.ToString("N2")</span>
-                    <span class="text-xs text-muted-foreground shrink-0">Stock: @scannedProduct.CurrentStock</span>
-                </div>
-                @if (scannedProduct.CurrentStock <= 0)
-                {
-                    <div class="text-center py-2 px-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
-                        Out of stock — cannot add.
-                    </div>
-                }
-                else
-                {
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm text-foreground shrink-0">Qty:</label>
-                        <input type="number" @bind="scanQuantity" min="1" max="@scannedProduct.CurrentStock"
-                               class="w-[72px] py-1 px-2 rounded-md border border-input bg-background text-foreground text-sm box-border" />
-                    </div>
-                }
-                <div class="flex gap-2">
-                    <BbButton Variant="ButtonVariant.Outline" Class="flex-1" OnClick="DiscardScannedItem">Discard</BbButton>
-                    <BbButton Variant="ButtonVariant.Default" Class="flex-1" OnClick="ConfirmScannedItem" Disabled="@(scannedProduct.CurrentStock <= 0)">Add to Order</BbButton>
-                </div>
-            </div>
-        }
-        else
-        {
-            <div class="text-center py-2 px-3 rounded-md text-sm text-muted-foreground">
-                Point camera at a barcode
-            </div>
-        }
+    @if (!string.IsNullOrEmpty(scanErrorMessage))
+    {
+    <div class="flex flex-col gap-1 py-2 px-3 rounded-md text-xs bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+    <div class="flex items-center gap-2">
+    <LucideIcon Name="camera-off" Size="14" />
+    <span>@scanErrorMessage</span>
+    </div>
+    @if (!string.IsNullOrEmpty(scanErrorDetail))
+    {
+    <span class="opacity-70 break-all">@scanErrorDetail</span>
+    }
+    </div>
+    }
+else if (scannedProduct != null)
+    {
+    <div class="flex flex-col gap-2">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+    <span class="text-sm font-semibold text-foreground truncate flex-1 min-w-0">@scannedProduct.Name</span>
+    <span class="text-base font-bold text-primary shrink-0">₱@scannedProduct.Price.ToString("N2")</span>
+    <span class="text-xs text-muted-foreground shrink-0">Stock: @scannedProduct.CurrentStock</span>
+    </div>
+    @if (scannedProduct.CurrentStock <= 0)
+    {
+    <div class="text-center py-2 px-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
+    Out of stock — cannot add.
+    </div>
+    }
+else
+    {
+    <div class="flex items-center gap-2">
+    <label class="text-sm text-foreground shrink-0">Qty:</label>
+    <input type="number" @bind="scanQuantity" min="1" max="@scannedProduct.CurrentStock"
+    class="w-[72px] py-1 px-2 rounded-md border border-input bg-background text-foreground text-sm box-border" />
+    </div>
+    }
+    <div class="flex gap-2">
+    <BbButton Variant="ButtonVariant.Outline" Class="flex-1" OnClick="DiscardScannedItem">Discard</BbButton>
+    <BbButton Variant="ButtonVariant.Default" Class="flex-1" OnClick="ConfirmScannedItem" Disabled="@(scannedProduct.CurrentStock <= 0)">Add to Order</BbButton>
+    </div>
+    </div>
+    }
+else
+    {
+    <div class="text-center py-2 px-3 rounded-md text-sm text-muted-foreground">
+    Point camera at a barcode
+    </div>
+    }
     </div>;
 
     private ProductCatalog? catalog;
@@ -657,73 +657,73 @@
     private bool _scannerStartAttempted = false;
 
     private string CameraClass => scannedProduct != null
-        ? "border-green-500 dark:border-green-400"
-        : "border-destructive";
+    ? "border-green-500 dark:border-green-400"
+    : "border-destructive";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+    if (firstRender)
         {
-            _lastViewportWidth = 0;
-            _lastViewportHeight = 0;
+        _lastViewportWidth = 0;
+        _lastViewportHeight = 0;
 
-            try
-            {
-                var viewport = await JS.InvokeAsync<ViewportSize>("barcodeScanner.getViewportSize");
-                _lastViewportWidth = viewport.Width;
-                _lastViewportHeight = viewport.Height;
-            }
-            catch (JSException)
-            {
+        try
+        {
+        var viewport = await JS.InvokeAsync<ViewportSize>("barcodeScanner.getViewportSize");
+        _lastViewportWidth = viewport.Width;
+        _lastViewportHeight = viewport.Height;
+        }
+        catch (JSException)
+        {
                 // barcodeScanner is lazy-loaded; fall back to the watchViewport callback.
-            }
+        }
 
-            var useDesktopScanner = await JS.InvokeAsync<bool>("barcodeScanner.isDesktopScanner");
+        var useDesktopScanner = await JS.InvokeAsync<bool>("barcodeScanner.isDesktopScanner");
 
-            _scannerElementId = useDesktopScanner
-                ? "barcode-camera-container"
-                : "barcode-camera-container-mobile";
+        _scannerElementId = useDesktopScanner
+        ? "barcode-camera-container"
+        : "barcode-camera-container-mobile";
 
-            viewportDotNetRef = DotNetObjectReference.Create(this);
+        viewportDotNetRef = DotNetObjectReference.Create(this);
 
-            try
-            {
-                /*
-                 * Mobile browsers only show the camera permission prompt
-                 * inside a real tap. Blazor's @bind goes through a server
-                 * round-trip first, so request the permission from a
-                 * native click listener on the toggle instead.
-                 */
-                await JS.InvokeVoidAsync(
-                    "barcodeScanner.requestPermissionOnToggle",
-                    "scanner-toggle");
-            }
-            catch (JSException)
-            {
+        try
+        {
+        /*
+        * Mobile browsers only show the camera permission prompt
+        * inside a real tap. Blazor's @bind goes through a server
+        * round-trip first, so request the permission from a
+        * native click listener on the toggle instead.
+        */
+        await JS.InvokeVoidAsync(
+        "barcodeScanner.requestPermissionOnToggle",
+        "scanner-toggle");
+        }
+        catch (JSException)
+        {
                 // Old cached barcodeScanner.js without the function;
                 // the scanner will still request permission on start().
-            }
+        }
 
-            try
-            {
-                await JS.InvokeVoidAsync(
-                    "barcodeScanner.watchViewport",
-                    viewportDotNetRef);
-            }
-            catch (JSException ex)
-            {
-                Logger.LogWarning(
-                    ex,
-                    "barcodeScanner.watchViewport is unavailable. Refresh static JS assets.");
+        try
+        {
+        await JS.InvokeVoidAsync(
+        "barcodeScanner.watchViewport",
+        viewportDotNetRef);
+        }
+        catch (JSException ex)
+        {
+        Logger.LogWarning(
+        ex,
+        "barcodeScanner.watchViewport is unavailable. Refresh static JS assets.");
 
                 // Keep this as a developer-side warning only.
                 // Do not show a scanner error to the user if the camera itself still works.
-                scanErrorMessage = null;
-            }
+        scanErrorMessage = null;
+        }
         }
 
         if (_scannerRestartPending && scannerEnabled)
-        {
+            {
             _scannerRestartPending = false;
             scanErrorMessage = null;
             scanErrorDetail = null;
@@ -736,168 +736,168 @@
                 // iPad/iPhone browsers need time after rotation for:
                 // 1) the old MediaStream to be released, and
                 // 2) the new scanner container to finish becoming visible.
-                await JS.InvokeVoidAsync(
-                    "barcodeScanner.restartAfterViewportChange",
-                    _scannerElementId,
-                    dotNetRef);
+            await JS.InvokeVoidAsync(
+            "barcodeScanner.restartAfterViewportChange",
+            _scannerElementId,
+            dotNetRef);
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "Scanner restart after rotation failed.");
-                scanErrorMessage =
-                    "The camera could not restart after rotation. Toggle the scanner off and on.";
+            Logger.LogWarning(ex, "Scanner restart after rotation failed.");
+            scanErrorMessage =
+            "The camera could not restart after rotation. Toggle the scanner off and on.";
             }
 
             return;
-        }
-
-        if (scannerEnabled && dotNetRef == null && !_scannerStartAttempted)
-        {
-            _scannerStartAttempted = true;
-            scanErrorMessage = null;
-            scanErrorDetail = null;
-            dotNetRef = DotNetObjectReference.Create(this);
-
-            try
-            {
-                await JS.InvokeVoidAsync("barcodeScanner.start", _scannerElementId, dotNetRef);
             }
-            catch (JSException ex)
-            {
+
+            if (scannerEnabled && dotNetRef == null && !_scannerStartAttempted)
+                {
+                _scannerStartAttempted = true;
+                scanErrorMessage = null;
+                scanErrorDetail = null;
+                dotNetRef = DotNetObjectReference.Create(this);
+
+                try
+                {
+                await JS.InvokeVoidAsync("barcodeScanner.start", _scannerElementId, dotNetRef);
+                }
+                catch (JSException ex)
+                {
                 Logger.LogWarning(ex, "Barcode scanner JavaScript could not be started.");
                 scanErrorMessage =
-                    "The barcode scanner could not load. Refresh the page, then turn the scanner on again.";
-            }
-            catch (InvalidOperationException ex)
-            {
+                "The barcode scanner could not load. Refresh the page, then turn the scanner on again.";
+                }
+                catch (InvalidOperationException ex)
+                {
                 Logger.LogWarning(ex, "Barcode scanner could not start while the page was rendering.");
                 scanErrorMessage =
-                    "The barcode scanner is temporarily unavailable. Refresh the page and try again.";
-            }
-        }
-        else if (!scannerEnabled && (dotNetRef != null || _scannerStartAttempted))
-        {
-            _scannerStartAttempted = false;
+                "The barcode scanner is temporarily unavailable. Refresh the page and try again.";
+                }
+                }
+            else if (!scannerEnabled && (dotNetRef != null || _scannerStartAttempted))
+                {
+                _scannerStartAttempted = false;
 
-            try
-            {
+                try
+                {
                 await JS.InvokeVoidAsync("barcodeScanner.stop");
-            }
-            catch (JSException ex)
-            {
+                }
+                catch (JSException ex)
+                {
                 Logger.LogDebug(ex, "Barcode scanner JavaScript was unavailable while stopping.");
-            }
+                }
 
-            dotNetRef?.Dispose();
-            dotNetRef = null;
-        }
-    }
+                dotNetRef?.Dispose();
+                dotNetRef = null;
+                }
+                }
 
-    [JSInvokable]
-    public async Task OnPosViewportChanged(int width, int height, bool useDesktopScanner)
-    {
-        var oldLandscape = _lastViewportWidth > _lastViewportHeight;
-        var newLandscape = width > height;
+                [JSInvokable]
+                public async Task OnPosViewportChanged(int width, int height, bool useDesktopScanner)
+                {
+                var oldLandscape = _lastViewportWidth > _lastViewportHeight;
+                var newLandscape = width > height;
 
-        var newElementId = useDesktopScanner
-            ? "barcode-camera-container"
-            : "barcode-camera-container-mobile";
+                var newElementId = useDesktopScanner
+                ? "barcode-camera-container"
+                : "barcode-camera-container-mobile";
 
-        var targetChanged = !string.Equals(
-            newElementId,
-            _scannerElementId,
-            StringComparison.Ordinal);
+                var targetChanged = !string.Equals(
+                newElementId,
+                _scannerElementId,
+                StringComparison.Ordinal);
 
-        var orientationChanged =
-            _lastViewportWidth > 0 &&
-            _lastViewportHeight > 0 &&
-            oldLandscape != newLandscape;
+                var orientationChanged =
+                _lastViewportWidth > 0 &&
+                _lastViewportHeight > 0 &&
+                oldLandscape != newLandscape;
 
-        _lastViewportWidth = width;
-        _lastViewportHeight = height;
+                _lastViewportWidth = width;
+                _lastViewportHeight = height;
 
         // If rotation keeps us in the same tablet/mobile scanner container,
         // do nothing. The existing video stream can continue running.
-        if (!targetChanged)
-            return;
+                if (!targetChanged)
+                    return;
 
-        _scannerElementId = newElementId;
+                    _scannerElementId = newElementId;
 
-        if (!scannerEnabled)
-            return;
+                    if (!scannerEnabled)
+                        return;
 
-        try
-        {
+                        try
+                        {
             // Only restart when we actually cross the tablet/desktop breakpoint
             // and therefore need to move the camera into a different DOM element.
-            await JS.InvokeVoidAsync("barcodeScanner.stop");
+                        await JS.InvokeVoidAsync("barcodeScanner.stop");
 
-            dotNetRef?.Dispose();
-            dotNetRef = null;
+                        dotNetRef?.Dispose();
+                        dotNetRef = null;
 
-            _scannerRestartPending = true;
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Scanner preparation for layout change failed.");
-            scanErrorMessage =
-                "The camera could not restart after the layout changed. Toggle the scanner off and on.";
-            await InvokeAsync(StateHasChanged);
-        }
-    }
+                        _scannerRestartPending = true;
+                        await InvokeAsync(StateHasChanged);
+                        }
+                        catch (Exception ex)
+                        {
+                        Logger.LogWarning(ex, "Scanner preparation for layout change failed.");
+                        scanErrorMessage =
+                        "The camera could not restart after the layout changed. Toggle the scanner off and on.";
+                        await InvokeAsync(StateHasChanged);
+                        }
+                        }
 
-    private async Task ToggleCamera()
-    {
-        if (dotNetRef == null)
-            return;
+                        private async Task ToggleCamera()
+                        {
+                        if (dotNetRef == null)
+                            return;
 
-        try
-        {
-            await JS.InvokeVoidAsync(
-                "barcodeScanner.cycleCamera",
-                _scannerElementId);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Camera switch failed.");
-            scanErrorMessage =
-                "The camera could not be switched. Try turning the scanner off and on again.";
-        }
-    }
+                            try
+                            {
+                            await JS.InvokeVoidAsync(
+                            "barcodeScanner.cycleCamera",
+                            _scannerElementId);
+                            }
+                            catch (Exception ex)
+                            {
+                            Logger.LogWarning(ex, "Camera switch failed.");
+                            scanErrorMessage =
+                            "The camera could not be switched. Try turning the scanner off and on again.";
+                            }
+                            }
 
     // Called from barcodeScanner.js for non-error notices (e.g., no other camera available).
-    [JSInvokable]
-    public async Task OnScannerInfo(string message)
-    {
-        if (!string.IsNullOrWhiteSpace(message))
-        {
-            scanErrorMessage = message;
-            scanErrorDetail = null;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
+                            [JSInvokable]
+                            public async Task OnScannerInfo(string message)
+                            {
+                            if (!string.IsNullOrWhiteSpace(message))
+                                {
+                                scanErrorMessage = message;
+                                scanErrorDetail = null;
+                                await InvokeAsync(StateHasChanged);
+                                }
+                                }
 
     // Called from barcodeScanner.js whenever a barcode is decoded.
-    [JSInvokable]
-    public async Task OnBarcodeScanned(string barcode)
-    {
-        try
-        {
-            Console.WriteLine(
-                $"[BarcodeScanner] Decoded value received: '{barcode}'");
+                                [JSInvokable]
+                                public async Task OnBarcodeScanned(string barcode)
+                                {
+                                try
+                                {
+                                Console.WriteLine(
+                                $"[BarcodeScanner] Decoded value received: '{barcode}'");
 
-            if (string.IsNullOrWhiteSpace(barcode))
-            {
-                scanErrorMessage = "The scanner returned an empty value.";
-                scanErrorDetail = null;
-                scannedProduct = null;
+                                if (string.IsNullOrWhiteSpace(barcode))
+                                    {
+                                    scanErrorMessage = "The scanner returned an empty value.";
+                                    scanErrorDetail = null;
+                                    scannedProduct = null;
 
-                await InvokeAsync(StateHasChanged);
-                return;
-            }
+                                    await InvokeAsync(StateHasChanged);
+                                    return;
+                                    }
 
-            barcode = barcode.Trim();
+                                    barcode = barcode.Trim();
 
             // Ignore repeated decodes of the same code within the
             // cooldown window regardless of the outcome (found, not
@@ -905,337 +905,337 @@
             // "not found" code re-fires on every JS decode window and
             // keeps resetting the auto-dismiss timer for the error
             // banner, so the error would never go away.
-            var now = DateTimeOffset.UtcNow;
+                                    var now = DateTimeOffset.UtcNow;
 
-            if (
-                string.Equals(
-                    _lastHandledBarcode,
-                    barcode,
-                    StringComparison.OrdinalIgnoreCase) &&
-                now - _lastHandledAt < TimeSpan.FromSeconds(2.5))
-            {
-                return;
-            }
+                                    if (
+                                        string.Equals(
+                                        _lastHandledBarcode,
+                                        barcode,
+                                        StringComparison.OrdinalIgnoreCase) &&
+                                        now - _lastHandledAt < TimeSpan.FromSeconds(2.5))
+                                        {
+                                        return;
+                                        }
 
-            _lastHandledBarcode = barcode;
-            _lastHandledAt = now;
+                                        _lastHandledBarcode = barcode;
+                                        _lastHandledAt = now;
 
             // Prevent the same code from reopening the same product
             // repeatedly while the camera is still pointed at it.
-            if (
-                scannedProduct != null &&
-                string.Equals(
-                    scannedProduct.Barcode,
-                    barcode,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
+                                        if (
+                                            scannedProduct != null &&
+                                            string.Equals(
+                                            scannedProduct.Barcode,
+                                            barcode,
+                                            StringComparison.OrdinalIgnoreCase))
+                                            {
+                                            return;
+                                            }
 
-            var product =
-                await ProductRepo.GetActiveByBarcodeAsync(barcode);
+                                            var product =
+                                            await ProductRepo.GetActiveByBarcodeAsync(barcode);
 
-            if (product == null)
-            {
-                Console.WriteLine(
-                    $"[BarcodeScanner] No product found for: '{barcode}'");
+                                            if (product == null)
+                                                {
+                                                Console.WriteLine(
+                                                $"[BarcodeScanner] No product found for: '{barcode}'");
 
-                scanErrorMessage =
-                    $"No product found for barcode \"{barcode}\".";
+                                                scanErrorMessage =
+                                                $"No product found for barcode \"{barcode}\".";
 
-                scanErrorDetail =
-                    $"Decoded value: {barcode}";
+                                                scanErrorDetail =
+                                                $"Decoded value: {barcode}";
 
                 // Keep the currently displayed product (if any) so a
                 // stray miss does not wipe the card mid-scan. The
                 // error banner auto-dismisses.
-                await InvokeAsync(StateHasChanged);
+                                                await InvokeAsync(StateHasChanged);
 
-                _ = AutoDismissScanMessageAsync(scanErrorMessage!, 4000);
-                return;
-            }
+                                                _ = AutoDismissScanMessageAsync(scanErrorMessage!, 4000);
+                                                return;
+                                                }
 
-            Console.WriteLine(
-                $"[BarcodeScanner] Product found: {product.Name}");
+                                                Console.WriteLine(
+                                                $"[BarcodeScanner] Product found: {product.Name}");
 
-            if (!product.IsActive)
-            {
-                scanErrorMessage =
-                    $"Product \"{product.Name}\" is inactive.";
+                                                if (!product.IsActive)
+                                                    {
+                                                    scanErrorMessage =
+                                                    $"Product \"{product.Name}\" is inactive.";
 
-                scanErrorDetail = null;
-                scannedProduct = null;
+                                                    scanErrorDetail = null;
+                                                    scannedProduct = null;
 
-                await InvokeAsync(StateHasChanged);
-                return;
-            }
+                                                    await InvokeAsync(StateHasChanged);
+                                                    return;
+                                                    }
 
-            if (product.CurrentStock <= 0)
-            {
-                scanErrorMessage =
-                    $"Product \"{product.Name}\" is out of stock.";
+                                                    if (product.CurrentStock <= 0)
+                                                        {
+                                                        scanErrorMessage =
+                                                        $"Product \"{product.Name}\" is out of stock.";
 
-                scanErrorDetail = null;
-                scannedProduct = product;
-                scanQuantity = 1;
+                                                        scanErrorDetail = null;
+                                                        scannedProduct = product;
+                                                        scanQuantity = 1;
 
-                await InvokeAsync(StateHasChanged);
-                return;
-            }
+                                                        await InvokeAsync(StateHasChanged);
+                                                        return;
+                                                        }
 
-            scannedProduct = product;
-            scanQuantity = 1;
-            scanErrorMessage = null;
-            scanErrorDetail = null;
+                                                        scannedProduct = product;
+                                                        scanQuantity = 1;
+                                                        scanErrorMessage = null;
+                                                        scanErrorDetail = null;
 
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(
-                ex,
-                "Error processing scanned barcode/QR value.");
+                                                        await InvokeAsync(StateHasChanged);
+                                                        }
+                                                        catch (Exception ex)
+                                                        {
+                                                        Logger.LogError(
+                                                        ex,
+                                                        "Error processing scanned barcode/QR value.");
 
-            scanErrorMessage =
-                "The scanned code could not be processed.";
+                                                        scanErrorMessage =
+                                                        "The scanned code could not be processed.";
 
-            scanErrorDetail =
-                ex.Message;
+                                                        scanErrorDetail =
+                                                        ex.Message;
 
-            scannedProduct = null;
-            scanQuantity = 1;
+                                                        scannedProduct = null;
+                                                        scanQuantity = 1;
 
-            await InvokeAsync(StateHasChanged);
-        }
-    }
+                                                        await InvokeAsync(StateHasChanged);
+                                                        }
+                                                        }
 
     // Called from barcodeScanner.js when the camera/scanner starts successfully.
-    [JSInvokable]
-    public async Task OnScannerStarted()
-    {
-        scanErrorMessage = null;
-        scanErrorDetail = null;
-        await InvokeAsync(StateHasChanged);
-    }
+                                                        [JSInvokable]
+                                                        public async Task OnScannerStarted()
+                                                        {
+                                                        scanErrorMessage = null;
+                                                        scanErrorDetail = null;
+                                                        await InvokeAsync(StateHasChanged);
+                                                        }
 
-    private async Task AutoDismissScanMessageAsync(string message, int delayMs)
-    {
-        _scanMessageCts?.Cancel();
-        _scanMessageCts?.Dispose();
+                                                        private async Task AutoDismissScanMessageAsync(string message, int delayMs)
+                                                        {
+                                                        _scanMessageCts?.Cancel();
+                                                        _scanMessageCts?.Dispose();
 
-        var cts = new CancellationTokenSource();
-        _scanMessageCts = cts;
+                                                        var cts = new CancellationTokenSource();
+                                                        _scanMessageCts = cts;
 
-        try
-        {
-            await Task.Delay(delayMs, cts.Token);
-        }
-        catch (TaskCanceledException)
-        {
-            return;
-        }
+                                                        try
+                                                        {
+                                                        await Task.Delay(delayMs, cts.Token);
+                                                        }
+                                                        catch (TaskCanceledException)
+                                                        {
+                                                        return;
+                                                        }
 
-        if (scanErrorMessage == message)
-        {
-            scanErrorMessage = null;
-            scanErrorDetail = null;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
+                                                        if (scanErrorMessage == message)
+                                                            {
+                                                            scanErrorMessage = null;
+                                                            scanErrorDetail = null;
+                                                            await InvokeAsync(StateHasChanged);
+                                                            }
+                                                            }
 
     // Called from barcodeScanner.js if the camera fails to start.
-    [JSInvokable]
-    public async Task OnScannerError(string message)
-    {
-        Logger.LogWarning("Barcode scanner could not start: {ScannerMessage}", message);
+                                                            [JSInvokable]
+                                                            public async Task OnScannerError(string message)
+                                                            {
+                                                            Logger.LogWarning("Barcode scanner could not start: {ScannerMessage}", message);
 
-        scanErrorDetail = null;
+                                                            scanErrorDetail = null;
 
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
-        }
-        else if (message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("NotAllowed", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("blocked", StringComparison.OrdinalIgnoreCase))
-        {
-            scanErrorMessage = "Camera permission is blocked. Allow camera access in your browser settings and try again.";
-        }
-        else if (message.Contains("NotFound", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("No camera", StringComparison.OrdinalIgnoreCase))
-        {
-            scanErrorMessage = "No camera was found on this device.";
-        }
-        else if (message.Contains("NotReadable", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("being used", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("busy", StringComparison.OrdinalIgnoreCase))
-        {
-            scanErrorMessage = "The camera is busy or being used by another application. Wait a moment and try switching cameras again.";
-        }
-        else if (message.Contains("HTTPS", StringComparison.OrdinalIgnoreCase) ||
-                 message.Contains("secure", StringComparison.OrdinalIgnoreCase))
-        {
-            scanErrorMessage = "Camera access requires a secure HTTPS connection.";
-        }
-        else
-        {
-            scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
-        }
+                                                            if (string.IsNullOrWhiteSpace(message))
+                                                                {
+                                                                scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
+                                                                }
+                                                            else if (message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
+                                                                message.Contains("NotAllowed", StringComparison.OrdinalIgnoreCase) ||
+                                                                message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
+                                                                message.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                scanErrorMessage = "Camera permission is blocked. Allow camera access in your browser settings and try again.";
+                                                                }
+                                                            else if (message.Contains("NotFound", StringComparison.OrdinalIgnoreCase) ||
+                                                                message.Contains("No camera", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                scanErrorMessage = "No camera was found on this device.";
+                                                                }
+                                                            else if (message.Contains("NotReadable", StringComparison.OrdinalIgnoreCase) ||
+                                                                message.Contains("being used", StringComparison.OrdinalIgnoreCase) ||
+                                                                message.Contains("busy", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                scanErrorMessage = "The camera is busy or being used by another application. Wait a moment and try switching cameras again.";
+                                                                }
+                                                            else if (message.Contains("HTTPS", StringComparison.OrdinalIgnoreCase) ||
+                                                                message.Contains("secure", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                scanErrorMessage = "Camera access requires a secure HTTPS connection.";
+                                                                }
+                                                            else
+                                                                {
+                                                                scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
+                                                                }
 
-        await InvokeAsync(StateHasChanged);
-    }
+                                                                await InvokeAsync(StateHasChanged);
+                                                                }
 
-    private void ConfirmScannedItem()
-    {
-        if (
-            scannedProduct == null ||
-            !scannedProduct.IsActive ||
-            scannedProduct.CurrentStock <= 0)
-        {
-            return;
-        }
+                                                                private void ConfirmScannedItem()
+                                                                {
+                                                                if (
+                                                                    scannedProduct == null ||
+                                                                    !scannedProduct.IsActive ||
+                                                                    scannedProduct.CurrentStock <= 0)
+                                                                    {
+                                                                    return;
+                                                                    }
 
-        var quantity =
-            Math.Clamp(
-                scanQuantity,
-                1,
-                scannedProduct.CurrentStock);
+                                                                    var quantity =
+                                                                    Math.Clamp(
+                                                                    scanQuantity,
+                                                                    1,
+                                                                    scannedProduct.CurrentStock);
 
-        for (var i = 0; i < quantity; i++)
-        {
-            AddToCart(scannedProduct);
-        }
+                                                                    for (var i = 0; i < quantity; i++)
+                                                                        {
+                                                                        AddToCart(scannedProduct);
+                                                                        }
 
-        statusMessage =
-            $"{scannedProduct.Name} added to the order.";
+                                                                        statusMessage =
+                                                                        $"{scannedProduct.Name} added to the order.";
 
-        scannedProduct = null;
-        scanQuantity = 1;
-        scanErrorMessage = null;
-        scanErrorDetail = null;
-    }
+                                                                        scannedProduct = null;
+                                                                        scanQuantity = 1;
+                                                                        scanErrorMessage = null;
+                                                                        scanErrorDetail = null;
+                                                                        }
 
-    private void DiscardScannedItem()
-    {
-        scannedProduct = null;
-        scanErrorMessage = null;
-        scanErrorDetail = null;
-        scanQuantity = 1;
-    }
+                                                                        private void DiscardScannedItem()
+                                                                        {
+                                                                        scannedProduct = null;
+                                                                        scanErrorMessage = null;
+                                                                        scanErrorDetail = null;
+                                                                        scanQuantity = 1;
+                                                                        }
 
-    public async ValueTask DisposeAsync()
-    {
-        _scanMessageCts?.Cancel();
-        _scanMessageCts?.Dispose();
-        _scanMessageCts = null;
+                                                                        public async ValueTask DisposeAsync()
+                                                                        {
+                                                                        _scanMessageCts?.Cancel();
+                                                                        _scanMessageCts?.Dispose();
+                                                                        _scanMessageCts = null;
 
-        receiptCloseCts?.Cancel();
-        receiptCloseCts?.Dispose();
-        receiptCloseCts = null;
+                                                                        receiptCloseCts?.Cancel();
+                                                                        receiptCloseCts?.Dispose();
+                                                                        receiptCloseCts = null;
 
-        try
-        {
-            await JS.InvokeVoidAsync("barcodeScanner.unwatchViewport");
-            await JS.InvokeVoidAsync("barcodeScanner.stop");
-        }
-        catch
-        {
+                                                                        try
+                                                                        {
+                                                                        await JS.InvokeVoidAsync("barcodeScanner.unwatchViewport");
+                                                                        await JS.InvokeVoidAsync("barcodeScanner.stop");
+                                                                        }
+                                                                        catch
+                                                                        {
             // The JS runtime may already be disconnected during navigation.
-        }
+                                                                        }
 
-        dotNetRef?.Dispose();
-        viewportDotNetRef?.Dispose();
+                                                                        dotNetRef?.Dispose();
+                                                                        viewportDotNetRef?.Dispose();
 
-        dotNetRef = null;
-        viewportDotNetRef = null;
-    }
+                                                                        dotNetRef = null;
+                                                                        viewportDotNetRef = null;
+                                                                        }
 
-    protected override async Task OnInitializedAsync()
-    {
-        var authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
-        authenticatedUserId = authenticationState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        catalogProducts = (await ProductRepo.GetActiveAsync()).ToList();
-    }
+                                                                        protected override async Task OnInitializedAsync()
+                                                                        {
+                                                                        var authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
+                                                                        authenticatedUserId = authenticationState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                                                                        catalogProducts = (await ProductRepo.GetActiveAsync()).ToList();
+                                                                        }
 
-    private decimal SubtotalAmount => cart.Sum(item => item.OriginalPrice * item.Quantity);
-    private decimal TotalDiscount => cart.Sum(item => (item.OriginalPrice - item.Price) * item.Quantity);
-    private decimal TotalAmount => cart.Sum(item => item.Price * item.Quantity);
+                                                                        private decimal SubtotalAmount => cart.Sum(item => item.OriginalPrice * item.Quantity);
+                                                                        private decimal TotalDiscount => cart.Sum(item => (item.OriginalPrice - item.Price) * item.Quantity);
+                                                                        private decimal TotalAmount => cart.Sum(item => item.Price * item.Quantity);
 
-    private void OpenDiscountDialog(CartItemDto item)
-    {
-        discountItem = item;
-        discountMode = "percent";
-        var currentOff = item.OriginalPrice - item.Price;
-        discountValueText = currentOff > 0 && item.OriginalPrice > 0
-            ? (currentOff / item.OriginalPrice * 100m).ToString("0.##")
-            : "0";
-        discountOpen = true;
-    }
+                                                                        private void OpenDiscountDialog(CartItemDto item)
+                                                                        {
+                                                                        discountItem = item;
+                                                                        discountMode = "percent";
+                                                                        var currentOff = item.OriginalPrice - item.Price;
+                                                                        discountValueText = currentOff > 0 && item.OriginalPrice > 0
+                                                                        ? (currentOff / item.OriginalPrice * 100m).ToString("0.##")
+                                                                        : "0";
+                                                                        discountOpen = true;
+                                                                        }
 
-    private decimal? TryParseDiscountValue() =>
-        decimal.TryParse(discountValueText, System.Globalization.NumberStyles.Number,
-            System.Globalization.CultureInfo.CurrentCulture, out var value) ? value : null;
+                                                                        private decimal? TryParseDiscountValue() =>
+                                                                        decimal.TryParse(discountValueText, System.Globalization.NumberStyles.Number,
+                                                                        System.Globalization.CultureInfo.CurrentCulture, out var value) ? value : null;
 
-    private string? DiscountValueError
-    {
-        get
-        {
-            if (discountItem is null) return null;
-            if (string.IsNullOrWhiteSpace(discountValueText)) return null;
-            var value = TryParseDiscountValue();
-            if (value is null) return "Enter a valid number.";
-            if (discountMode == "percent" && (value < 0 || value > 100)) return "Percentage must be between 0 and 100.";
-            if (discountMode == "peso" && value < 0) return "Discount cannot be negative.";
-            if (discountMode == "peso" && value > discountItem.OriginalPrice) return "Discount exceeds the original price.";
-            return null;
-        }
-    }
+                                                                        private string? DiscountValueError
+                                                                        {
+                                                                        get
+                                                                        {
+                                                                        if (discountItem is null) return null;
+                                                                            if (string.IsNullOrWhiteSpace(discountValueText)) return null;
+                                                                                var value = TryParseDiscountValue();
+                                                                                if (value is null) return "Enter a valid number.";
+                                                                                    if (discountMode == "percent" && (value < 0 || value > 100)) return "Percentage must be between 0 and 100.";
+                                                                                        if (discountMode == "peso" && value < 0) return "Discount cannot be negative.";
+                                                                                            if (discountMode == "peso" && value > discountItem.OriginalPrice) return "Discount exceeds the original price.";
+                                                                                                return null;
+                                                                                                }
+                                                                                                }
 
-    private decimal DiscountPreviewUnitPrice
-    {
-        get
-        {
-            if (discountItem is null) return 0;
-            var value = TryParseDiscountValue();
-            if (value is null || value <= 0) return discountItem.OriginalPrice;
-            return discountMode == "percent"
-                ? Math.Max(0, discountItem.OriginalPrice * (1 - value.Value / 100m))
-                : Math.Max(0, discountItem.OriginalPrice - value.Value);
-        }
-    }
+                                                                                                private decimal DiscountPreviewUnitPrice
+                                                                                                {
+                                                                                                get
+                                                                                                {
+                                                                                                if (discountItem is null) return 0;
+                                                                                                    var value = TryParseDiscountValue();
+                                                                                                    if (value is null || value <= 0) return discountItem.OriginalPrice;
+                                                                                                        return discountMode == "percent"
+                                                                                                        ? Math.Max(0, discountItem.OriginalPrice * (1 - value.Value / 100m))
+                                                                                                        : Math.Max(0, discountItem.OriginalPrice - value.Value);
+                                                                                                        }
+                                                                                                        }
 
-    private decimal DiscountPreviewSaved =>
-        discountItem is null ? 0 :
-        Math.Max(0, (discountItem.OriginalPrice - DiscountPreviewUnitPrice) * discountItem.Quantity);
+                                                                                                        private decimal DiscountPreviewSaved =>
+                                                                                                        discountItem is null ? 0 :
+                                                                                                        Math.Max(0, (discountItem.OriginalPrice - DiscountPreviewUnitPrice) * discountItem.Quantity);
 
-    private void ApplyDiscount()
-    {
-        if (discountItem is null || DiscountValueError is not null || string.IsNullOrWhiteSpace(discountValueText)) return;
-        discountItem.Price = DiscountPreviewUnitPrice;
-        discountOpen = false;
-        discountItem = null;
-        discountValueText = "";
-    }
+                                                                                                        private void ApplyDiscount()
+                                                                                                        {
+                                                                                                        if (discountItem is null || DiscountValueError is not null || string.IsNullOrWhiteSpace(discountValueText)) return;
+                                                                                                            discountItem.Price = DiscountPreviewUnitPrice;
+                                                                                                            discountOpen = false;
+                                                                                                            discountItem = null;
+                                                                                                            discountValueText = "";
+                                                                                                            }
 
-    private void SetModePercent() => discountMode = "percent";
-    private void SetModePeso() => discountMode = "peso";
+                                                                                                            private void SetModePercent() => discountMode = "percent";
+                                                                                                            private void SetModePeso() => discountMode = "peso";
 
-    private void ClearDiscount()
-    {
-        if (discountItem is null) return;
-        discountItem.Price = discountItem.OriginalPrice;
-        discountOpen = false;
-        discountItem = null;
-        discountValueText = "";
-    }
+                                                                                                            private void ClearDiscount()
+                                                                                                            {
+                                                                                                            if (discountItem is null) return;
+                                                                                                                discountItem.Price = discountItem.OriginalPrice;
+                                                                                                                discountOpen = false;
+                                                                                                                discountItem = null;
+                                                                                                                discountValueText = "";
+                                                                                                                }
 
-    private void AddToCart(Product p)
-    {
-        if (!p.IsActive || p.CurrentStock <= 0) return;
-        statusMessage = null;
+                                                                                                                private void AddToCart(Product p)
+                                                                                                                {
+                                                                                                                if (!p.IsActive || p.CurrentStock <= 0) return;
+                                                                                                                    statusMessage = null;
 
-        var existing = cart.FirstOrDefault(i => i.ProductId == p.Id);
+                                                                                                                    var existing = cart.FirstOrDefault(i => i.ProductId == p.Id);
 
         if (existing != null)
         {
@@ -1248,22 +1248,22 @@
         }
     }
 
-    private void DecrementQty(CartItemDto item)
-    {
-        if (item.Quantity > 1) item.Quantity--;
-        else cart.Remove(item);
-    }
+                                                                                                                            private void DecrementQty(CartItemDto item)
+                                                                                                                            {
+                                                                                                                            if (item.Quantity > 1) item.Quantity--;
+                                                                                                                            else cart.Remove(item);
+                                                                                                                                }
 
-    private void IncrementQty(CartItemDto item)
-    {
-        var product =
-            catalogProducts.FirstOrDefault(
-                p => p.Id == item.ProductId);
+                                                                                                                                private void IncrementQty(CartItemDto item)
+                                                                                                                                {
+                                                                                                                                var product =
+                                                                                                                                catalogProducts.FirstOrDefault(
+                                                                                                                                p => p.Id == item.ProductId);
 
-        if (product == null)
-        {
-            return;
-        }
+                                                                                                                                if (product == null)
+                                                                                                                                    {
+                                                                                                                                    return;
+                                                                                                                                    }
 
         if (item.Quantity < product.CurrentStock)
         {
@@ -1275,30 +1275,30 @@
         }
     }
 
-    private bool checkoutConfirmationOpen;
-    private bool checkoutConfirmationFromMobile;
+                                                                                                                                        private bool checkoutConfirmationOpen;
+                                                                                                                                        private bool checkoutConfirmationFromMobile;
 
-    private void OpenCheckoutConfirmation(bool fromMobile)
-    {
-        if (isProcessing || !cart.Any()) return;
-        checkoutConfirmationFromMobile = fromMobile;
-        if (fromMobile) cartModalOpen = false;
-        completedTransaction = null;
-        checkoutConfirmationOpen = true;
-    }
+                                                                                                                                        private void OpenCheckoutConfirmation(bool fromMobile)
+                                                                                                                                        {
+                                                                                                                                        if (isProcessing || !cart.Any()) return;
+                                                                                                                                            checkoutConfirmationFromMobile = fromMobile;
+                                                                                                                                            if (fromMobile) cartModalOpen = false;
+                                                                                                                                                completedTransaction = null;
+                                                                                                                                                checkoutConfirmationOpen = true;
+                                                                                                                                                }
 
-    private void CancelCheckoutConfirmation()
-    {
-        if (isProcessing) return;
-        checkoutConfirmationOpen = false;
-        if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
-    }
+                                                                                                                                                private void CancelCheckoutConfirmation()
+                                                                                                                                                {
+                                                                                                                                                if (isProcessing) return;
+                                                                                                                                                    checkoutConfirmationOpen = false;
+                                                                                                                                                    if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
+                                                                                                                                                        }
 
-    private async Task ConfirmCheckout()
-    {
-        if (isProcessing || !cart.Any()) return;
-        await Checkout();
-    }
+                                                                                                                                                        private async Task ConfirmCheckout()
+                                                                                                                                                        {
+                                                                                                                                                        if (isProcessing || !cart.Any()) return;
+                                                                                                                                                            await Checkout();
+                                                                                                                                                            }
 
     private async Task Checkout()
     {
@@ -1321,428 +1321,428 @@
                 Remarks = remarks
             };
 
-            var locationId = Configuration[$"{PosOptions.SectionName}:LocationId"]
-                ?? PosOptions.DefaultLocationId;
-            completedTransaction = await SaleService.ProcessSaleAsync(
-                request,
-                authenticatedUserId,
-                locationId);
+                                                                                                                                                                var locationId = Configuration[$"{PosOptions.SectionName}:LocationId"]
+                                                                                                                                                                ?? PosOptions.DefaultLocationId;
+                                                                                                                                                                completedTransaction = await SaleService.ProcessSaleAsync(
+                                                                                                                                                                request,
+                                                                                                                                                                authenticatedUserId,
+                                                                                                                                                                locationId);
 
-            statusMessage = "Sale complete! Transaction summary generated.";
+                                                                                                                                                                statusMessage = "Sale complete! Transaction summary generated.";
 
-            StartReceiptCountdown();
-            Toast.Success("Transaction Recorded");
+                                                                                                                                                                StartReceiptCountdown();
+                                                                                                                                                                Toast.Success("Transaction Recorded");
 
-            cart.Clear();
-            cartModalOpen = false;
-            paymentMethod = "Cash";
-            referenceNumber = null;
-            remarks = null;
+                                                                                                                                                                cart.Clear();
+                                                                                                                                                                cartModalOpen = false;
+                                                                                                                                                                paymentMethod = "Cash";
+                                                                                                                                                                referenceNumber = null;
+                                                                                                                                                                remarks = null;
 
-            catalogProducts = (await ProductRepo.GetActiveAsync()).ToList();
-            if (catalog is not null) await catalog.ReloadAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Point-of-sale checkout failed.");
-            statusMessage = ApiErrorMessage.FromException(ex, "The sale could not be completed. Review the cart and try again.");
-        }
-        finally
-        {
-            isProcessing = false;
-        }
-    }
+                                                                                                                                                                catalogProducts = (await ProductRepo.GetActiveAsync()).ToList();
+                                                                                                                                                                if (catalog is not null) await catalog.ReloadAsync();
+                                                                                                                                                                    }
+                                                                                                                                                                    catch (Exception ex)
+                                                                                                                                                                    {
+                                                                                                                                                                    Logger.LogError(ex, "Point-of-sale checkout failed.");
+                                                                                                                                                                    statusMessage = ApiErrorMessage.FromException(ex, "The sale could not be completed. Review the cart and try again.");
+                                                                                                                                                                    }
+                                                                                                                                                                    finally
+                                                                                                                                                                    {
+                                                                                                                                                                    isProcessing = false;
+                                                                                                                                                                    }
+                                                                                                                                                                    }
 
-    private CancellationTokenSource? receiptCloseCts;
-    private int receiptCountdown;
+                                                                                                                                                                    private CancellationTokenSource? receiptCloseCts;
+                                                                                                                                                                    private int receiptCountdown;
 
-    private void StartReceiptCountdown()
-    {
-        receiptCloseCts?.Cancel();
-        receiptCloseCts = new CancellationTokenSource();
-        receiptCountdown = 10;
-        _ = RunReceiptCountdownAsync(receiptCloseCts.Token);
-    }
+                                                                                                                                                                    private void StartReceiptCountdown()
+                                                                                                                                                                    {
+                                                                                                                                                                    receiptCloseCts?.Cancel();
+                                                                                                                                                                    receiptCloseCts = new CancellationTokenSource();
+                                                                                                                                                                    receiptCountdown = 10;
+                                                                                                                                                                    _ = RunReceiptCountdownAsync(receiptCloseCts.Token);
+                                                                                                                                                                    }
 
-    private async Task RunReceiptCountdownAsync(CancellationToken token)
-    {
-        try
-        {
-            while (receiptCountdown > 0)
-            {
-                await Task.Delay(1000, token);
-                if (token.IsCancellationRequested) return;
-                receiptCountdown--;
-                StateHasChanged();
-            }
-            if (completedTransaction is not null && checkoutConfirmationOpen) CloseCheckoutConfirmation();
-        }
-        catch (OperationCanceledException)
-        {
+                                                                                                                                                                    private async Task RunReceiptCountdownAsync(CancellationToken token)
+                                                                                                                                                                    {
+                                                                                                                                                                    try
+                                                                                                                                                                    {
+                                                                                                                                                                    while (receiptCountdown > 0)
+                                                                                                                                                                        {
+                                                                                                                                                                        await Task.Delay(1000, token);
+                                                                                                                                                                        if (token.IsCancellationRequested) return;
+                                                                                                                                                                            receiptCountdown--;
+                                                                                                                                                                            StateHasChanged();
+                                                                                                                                                                            }
+                                                                                                                                                                            if (completedTransaction is not null && checkoutConfirmationOpen) CloseCheckoutConfirmation();
+                                                                                                                                                                                }
+                                                                                                                                                                                catch (OperationCanceledException)
+                                                                                                                                                                                {
             // Modal closed manually.
-        }
-    }
+                                                                                                                                                                                }
+                                                                                                                                                                                }
 
-    private void CloseCheckoutConfirmation()
-    {
-        receiptCloseCts?.Cancel();
-        receiptCloseCts = null;
-        checkoutConfirmationOpen = false;
-        completedTransaction = null;
-        if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
-        StateHasChanged();
-    }
+                                                                                                                                                                                private void CloseCheckoutConfirmation()
+                                                                                                                                                                                {
+                                                                                                                                                                                receiptCloseCts?.Cancel();
+                                                                                                                                                                                receiptCloseCts = null;
+                                                                                                                                                                                checkoutConfirmationOpen = false;
+                                                                                                                                                                                completedTransaction = null;
+                                                                                                                                                                                if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
+                                                                                                                                                                                    StateHasChanged();
+                                                                                                                                                                                    }
 
-    private Task OnCheckoutOpenChanged(bool open)
-    {
-        if (open)
-        {
-            checkoutConfirmationOpen = true;
-        }
-        else
-        {
-            CloseCheckoutConfirmation();
-        }
-        return Task.CompletedTask;
-    }
-}
+                                                                                                                                                                                    private Task OnCheckoutOpenChanged(bool open)
+                                                                                                                                                                                    {
+                                                                                                                                                                                    if (open)
+                                                                                                                                                                                        {
+                                                                                                                                                                                        checkoutConfirmationOpen = true;
+                                                                                                                                                                                        }
+                                                                                                                                                                                    else
+                                                                                                                                                                                        {
+                                                                                                                                                                                        CloseCheckoutConfirmation();
+                                                                                                                                                                                        }
+                                                                                                                                                                                        return Task.CompletedTask;
+                                                                                                                                                                                        }
+                                                                                                                                                                                        }
 
-<style>
-    /* ─── POS responsive layout (pre-built Tailwind lacks these breakpoints) ─── */
-    .discount-slider {
-        accent-color: var(--primary);
-    }
+                                                                                                                                                                                        <style>
+                                                                                                                                                                                        /* ─── POS responsive layout (pre-built Tailwind lacks these breakpoints) ─── */
+                                                                                                                                                                                        .discount-slider {
+                                                                                                                                                                                        accent-color: var(--primary);
+                                                                                                                                                                                        }
 
-    .discount-mode-active {
-        background-color: color-mix(in oklch, var(--destructive) 10%, transparent);
-        border-color: color-mix(in oklch, var(--destructive) 45%, transparent);
-        color: var(--destructive-muted-foreground);
-    }
+                                                                                                                                                                                        .discount-mode-active {
+                                                                                                                                                                                        background-color: color-mix(in oklch, var(--destructive) 10%, transparent);
+                                                                                                                                                                                        border-color: color-mix(in oklch, var(--destructive) 45%, transparent);
+                                                                                                                                                                                        color: var(--destructive-muted-foreground);
+                                                                                                                                                                                        }
 
-    .receipt-countdown-track {
-        height: 4px;
-        background: var(--muted);
-    }
+                                                                                                                                                                                        .receipt-countdown-track {
+                                                                                                                                                                                        height: 4px;
+                                                                                                                                                                                        background: var(--muted);
+                                                                                                                                                                                        }
 
-    .receipt-countdown-bar {
-        height: 100%;
-        background: var(--destructive);
-        animation: receipt-countdown-shrink 10s linear forwards;
-    }
+                                                                                                                                                                                        .receipt-countdown-bar {
+                                                                                                                                                                                        height: 100%;
+                                                                                                                                                                                        background: var(--destructive);
+                                                                                                                                                                                        animation: receipt-countdown-shrink 10s linear forwards;
+                                                                                                                                                                                        }
 
-    @@keyframes receipt-countdown-shrink {
-        from {
-            width: 100%;
-        }
+                                                                                                                                                                                        @@keyframes receipt-countdown-shrink {
+                                                                                                                                                                                        from {
+                                                                                                                                                                                        width: 100%;
+                                                                                                                                                                                        }
 
-        to {
-            width: 0%;
-        }
-    }
+                                                                                                                                                                                        to {
+                                                                                                                                                                                        width: 0%;
+                                                                                                                                                                                        }
+                                                                                                                                                                                        }
 
-    .pos-wrapper {
-        display: flex;
-        flex-direction: column;
-        height: calc(100dvh - 3.5rem);
-        overflow: hidden;
-        position: relative;
-    }
+                                                                                                                                                                                        .pos-wrapper {
+                                                                                                                                                                                        display: flex;
+                                                                                                                                                                                        flex-direction: column;
+                                                                                                                                                                                        height: calc(100dvh - 3.5rem);
+                                                                                                                                                                                        overflow: hidden;
+                                                                                                                                                                                        position: relative;
+                                                                                                                                                                                        }
 
-    .pos-catalog {
-        padding-bottom: 0;
-    }
+                                                                                                                                                                                        .pos-catalog {
+                                                                                                                                                                                        padding-bottom: 0;
+                                                                                                                                                                                        }
 
-    .pos-desktop-right {
-        display: none;
-    }
+                                                                                                                                                                                        .pos-desktop-right {
+                                                                                                                                                                                        display: none;
+                                                                                                                                                                                        }
 
-    .pos-mobile-cart-btn {
-        display: flex;
-        top: 1rem;
-        right: 1rem;
-        bottom: auto;
-        transition: none;
-        z-index: 40;
-    }
+                                                                                                                                                                                        .pos-mobile-cart-btn {
+                                                                                                                                                                                        display: flex;
+                                                                                                                                                                                        top: 1rem;
+                                                                                                                                                                                        right: 1rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        transition: none;
+                                                                                                                                                                                        z-index: 40;
+                                                                                                                                                                                        }
 
-    .pos-wrapper.scanner-open .pos-mobile-cart-btn {
-        top: 1rem;
-        bottom: auto;
-    }
+                                                                                                                                                                                        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+                                                                                                                                                                                        top: 1rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        }
 
-    .pos-scanner-mobile {
-        display: block;
-        z-index: 30;
-    }
+                                                                                                                                                                                        .pos-scanner-mobile {
+                                                                                                                                                                                        display: block;
+                                                                                                                                                                                        z-index: 30;
+                                                                                                                                                                                        }
 
-    .pos-camera-preview {
-        display: block;
-        width: 100%;
-        height: auto;
-        aspect-ratio: 16 / 9;
-        min-height: 0;
-        position: relative;
-        background: #000;
-    }
+                                                                                                                                                                                        .pos-camera-preview {
+                                                                                                                                                                                        display: block;
+                                                                                                                                                                                        width: 100%;
+                                                                                                                                                                                        height: auto;
+                                                                                                                                                                                        aspect-ratio: 16 / 9;
+                                                                                                                                                                                        min-height: 0;
+                                                                                                                                                                                        position: relative;
+                                                                                                                                                                                        background: #000;
+                                                                                                                                                                                        }
 
-    .pos-camera-preview {
-        overflow: hidden !important;
-    }
+                                                                                                                                                                                        .pos-camera-preview {
+                                                                                                                                                                                        overflow: hidden !important;
+                                                                                                                                                                                        }
 
-        .pos-camera-preview video {
-            width: 100% !important;
-            height: 100% !important;
-            min-width: 100% !important;
-            min-height: 100% !important;
-            max-width: none !important;
-            max-height: none !important;
-            display: block !important;
-            object-fit: cover !important;
-            object-position: center center !important;
-            background: transparent !important;
-        }
+                                                                                                                                                                                        .pos-camera-preview video {
+                                                                                                                                                                                        width: 100% !important;
+                                                                                                                                                                                        height: 100% !important;
+                                                                                                                                                                                        min-width: 100% !important;
+                                                                                                                                                                                        min-height: 100% !important;
+                                                                                                                                                                                        max-width: none !important;
+                                                                                                                                                                                        max-height: none !important;
+                                                                                                                                                                                        display: block !important;
+                                                                                                                                                                                        object-fit: cover !important;
+                                                                                                                                                                                        object-position: center center !important;
+                                                                                                                                                                                        background: transparent !important;
+                                                                                                                                                                                        }
 
-        .pos-camera-preview canvas {
-            opacity: 0 !important;
-        }
+                                                                                                                                                                                        .pos-camera-preview canvas {
+                                                                                                                                                                                        opacity: 0 !important;
+                                                                                                                                                                                        }
 
-    @@media (max-width: 767px) {
-        .pos-mobile-cart-btn {
-            top: 4.75rem;
-            right: 1rem;
-            bottom: auto;
-        }
+                                                                                                                                                                                        @@media (max-width: 767px) {
+                                                                                                                                                                                        .pos-mobile-cart-btn {
+                                                                                                                                                                                        top: 4.75rem;
+                                                                                                                                                                                        right: 1rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        }
 
-        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
-            top: 4.75rem;
-            bottom: auto;
-        }
+                                                                                                                                                                                        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+                                                                                                                                                                                        top: 4.75rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        }
 
-        .pos-scanner-mobile {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-        }
+                                                                                                                                                                                        .pos-scanner-mobile {
+                                                                                                                                                                                        position: fixed;
+                                                                                                                                                                                        left: 0;
+                                                                                                                                                                                        right: 0;
+                                                                                                                                                                                        bottom: 0;
+                                                                                                                                                                                        }
 
-        .pos-wrapper.scanner-open .pos-catalog {
-            padding-bottom: 18rem !important;
-        }
+                                                                                                                                                                                        .pos-wrapper.scanner-open .pos-catalog {
+                                                                                                                                                                                        padding-bottom: 18rem !important;
+                                                                                                                                                                                        }
 
-        .pos-camera-preview {
-            width: 100%;
-            height: auto;
-            aspect-ratio: 16 / 9;
-            min-height: 0;
-            max-height: 55dvh;
-        }
-    }
+                                                                                                                                                                                        .pos-camera-preview {
+                                                                                                                                                                                        width: 100%;
+                                                                                                                                                                                        height: auto;
+                                                                                                                                                                                        aspect-ratio: 16 / 9;
+                                                                                                                                                                                        min-height: 0;
+                                                                                                                                                                                        max-height: 55dvh;
+                                                                                                                                                                                        }
+                                                                                                                                                                                        }
 
-    @@media (min-width: 768px) and (max-width: 1279px) {
-        .pos-wrapper {
-            flex-direction: column;
-            gap: 0;
-        }
+                                                                                                                                                                                        @@media (min-width: 768px) and (max-width: 1279px) {
+                                                                                                                                                                                        .pos-wrapper {
+                                                                                                                                                                                        flex-direction: column;
+                                                                                                                                                                                        gap: 0;
+                                                                                                                                                                                        }
 
-        .pos-catalog {
-            width: 100%;
-            padding-bottom: 4.5rem !important;
-        }
+                                                                                                                                                                                        .pos-catalog {
+                                                                                                                                                                                        width: 100%;
+                                                                                                                                                                                        padding-bottom: 4.5rem !important;
+                                                                                                                                                                                        }
 
-        .pos-wrapper.scanner-open .pos-catalog {
-            padding-bottom: 18rem !important;
-        }
+                                                                                                                                                                                        .pos-wrapper.scanner-open .pos-catalog {
+                                                                                                                                                                                        padding-bottom: 18rem !important;
+                                                                                                                                                                                        }
 
-        .pos-desktop-right {
-            display: none;
-        }
+                                                                                                                                                                                        .pos-desktop-right {
+                                                                                                                                                                                        display: none;
+                                                                                                                                                                                        }
 
-        .pos-mobile-cart-btn {
-            display: flex;
-            top: 1rem;
-            right: 1.25rem;
-            bottom: auto;
-        }
+                                                                                                                                                                                        .pos-mobile-cart-btn {
+                                                                                                                                                                                        display: flex;
+                                                                                                                                                                                        top: 1rem;
+                                                                                                                                                                                        right: 1.25rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        }
 
-        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
-            top: 1rem;
-            bottom: auto;
-        }
+                                                                                                                                                                                        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+                                                                                                                                                                                        top: 1rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        }
 
-        .pos-scanner-mobile {
-            display: block;
-            position: absolute !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100%;
-            max-width: 100%;
-        }
+                                                                                                                                                                                        .pos-scanner-mobile {
+                                                                                                                                                                                        display: block;
+                                                                                                                                                                                        position: absolute !important;
+                                                                                                                                                                                        left: 0 !important;
+                                                                                                                                                                                        right: 0 !important;
+                                                                                                                                                                                        bottom: 0 !important;
+                                                                                                                                                                                        width: 100%;
+                                                                                                                                                                                        max-width: 100%;
+                                                                                                                                                                                        }
 
-            .pos-scanner-mobile > div:first-child {
-                padding-top: .65rem !important;
-                padding-bottom: .65rem !important;
-            }
+                                                                                                                                                                                        .pos-scanner-mobile > div:first-child {
+                                                                                                                                                                                        padding-top: .65rem !important;
+                                                                                                                                                                                        padding-bottom: .65rem !important;
+                                                                                                                                                                                        }
 
-        .pos-camera-preview {
-            width: min(100%, 520px);
-            height: auto;
-            aspect-ratio: 16 / 9;
-            min-height: 0;
-            max-height: 55dvh;
-            margin-left: auto;
-            margin-right: auto;
-        }
-    }
+                                                                                                                                                                                        .pos-camera-preview {
+                                                                                                                                                                                        width: min(100%, 520px);
+                                                                                                                                                                                        height: auto;
+                                                                                                                                                                                        aspect-ratio: 16 / 9;
+                                                                                                                                                                                        min-height: 0;
+                                                                                                                                                                                        max-height: 55dvh;
+                                                                                                                                                                                        margin-left: auto;
+                                                                                                                                                                                        margin-right: auto;
+                                                                                                                                                                                        }
+                                                                                                                                                                                        }
 
-    @@media (min-width: 768px) and (max-width: 1279px) {
-        .pos-scanner-body {
-            padding: .65rem !important;
-            gap: .5rem !important;
-            align-items: center;
-        }
+                                                                                                                                                                                        @@media (min-width: 768px) and (max-width: 1279px) {
+                                                                                                                                                                                        .pos-scanner-body {
+                                                                                                                                                                                        padding: .65rem !important;
+                                                                                                                                                                                        gap: .5rem !important;
+                                                                                                                                                                                        align-items: center;
+                                                                                                                                                                                        }
 
-        .pos-camera-preview {
-            width: min(100%, 520px);
-            height: auto;
-            aspect-ratio: 16 / 9;
-            min-height: 0;
-            max-height: 55dvh;
-            margin-left: auto;
-            margin-right: auto;
-        }
+                                                                                                                                                                                        .pos-camera-preview {
+                                                                                                                                                                                        width: min(100%, 520px);
+                                                                                                                                                                                        height: auto;
+                                                                                                                                                                                        aspect-ratio: 16 / 9;
+                                                                                                                                                                                        min-height: 0;
+                                                                                                                                                                                        max-height: 55dvh;
+                                                                                                                                                                                        margin-left: auto;
+                                                                                                                                                                                        margin-right: auto;
+                                                                                                                                                                                        }
 
-            .pos-camera-preview video {
-                width: 100% !important;
-                height: 100% !important;
-                min-width: 100% !important;
-                min-height: 100% !important;
-                max-width: none !important;
-                max-height: none !important;
-                object-fit: cover !important;
-                object-position: center center !important;
-                background: transparent !important;
-            }
+                                                                                                                                                                                        .pos-camera-preview video {
+                                                                                                                                                                                        width: 100% !important;
+                                                                                                                                                                                        height: 100% !important;
+                                                                                                                                                                                        min-width: 100% !important;
+                                                                                                                                                                                        min-height: 100% !important;
+                                                                                                                                                                                        max-width: none !important;
+                                                                                                                                                                                        max-height: none !important;
+                                                                                                                                                                                        object-fit: cover !important;
+                                                                                                                                                                                        object-position: center center !important;
+                                                                                                                                                                                        background: transparent !important;
+                                                                                                                                                                                        }
 
-            .pos-camera-preview canvas {
-                opacity: 0 !important;
-                background: transparent;
-            }
+                                                                                                                                                                                        .pos-camera-preview canvas {
+                                                                                                                                                                                        opacity: 0 !important;
+                                                                                                                                                                                        background: transparent;
+                                                                                                                                                                                        }
 
-        .pos-scanner-body > div:not(.pos-camera-preview) {
-            width: min(100%, 520px);
-        }
-    }
+                                                                                                                                                                                        .pos-scanner-body > div:not(.pos-camera-preview) {
+                                                                                                                                                                                        width: min(100%, 520px);
+                                                                                                                                                                                        }
+                                                                                                                                                                                        }
 
-    /* iPad Pro / large touch tablets: stay in tablet POS mode even above 1280px. */
-    @@media (min-width: 1280px) and (hover: none), (min-width: 1280px) and (pointer: coarse) {
-        .pos-wrapper {
-            flex-direction: column;
-            gap: 0;
-        }
+                                                                                                                                                                                        /* iPad Pro / large touch tablets: stay in tablet POS mode even above 1280px. */
+                                                                                                                                                                                        @@media (min-width: 1280px) and (hover: none), (min-width: 1280px) and (pointer: coarse) {
+                                                                                                                                                                                        .pos-wrapper {
+                                                                                                                                                                                        flex-direction: column;
+                                                                                                                                                                                        gap: 0;
+                                                                                                                                                                                        }
 
-        .pos-catalog {
-            width: 100%;
-            padding-bottom: 4.5rem !important;
-        }
+                                                                                                                                                                                        .pos-catalog {
+                                                                                                                                                                                        width: 100%;
+                                                                                                                                                                                        padding-bottom: 4.5rem !important;
+                                                                                                                                                                                        }
 
-        .pos-wrapper.scanner-open .pos-catalog {
-            padding-bottom: 18rem !important;
-        }
+                                                                                                                                                                                        .pos-wrapper.scanner-open .pos-catalog {
+                                                                                                                                                                                        padding-bottom: 18rem !important;
+                                                                                                                                                                                        }
 
-        .pos-desktop-right {
-            display: none !important;
-        }
+                                                                                                                                                                                        .pos-desktop-right {
+                                                                                                                                                                                        display: none !important;
+                                                                                                                                                                                        }
 
-        .pos-mobile-cart-btn {
-            display: flex !important;
-            top: 1rem;
-            right: 1.25rem;
-            bottom: auto;
-        }
+                                                                                                                                                                                        .pos-mobile-cart-btn {
+                                                                                                                                                                                        display: flex !important;
+                                                                                                                                                                                        top: 1rem;
+                                                                                                                                                                                        right: 1.25rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        }
 
-        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
-            top: 1rem;
-            bottom: auto;
-        }
+                                                                                                                                                                                        .pos-wrapper.scanner-open .pos-mobile-cart-btn {
+                                                                                                                                                                                        top: 1rem;
+                                                                                                                                                                                        bottom: auto;
+                                                                                                                                                                                        }
 
-        .pos-scanner-mobile {
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100%;
-            max-width: 100%;
-        }
+                                                                                                                                                                                        .pos-scanner-mobile {
+                                                                                                                                                                                        display: block !important;
+                                                                                                                                                                                        position: absolute !important;
+                                                                                                                                                                                        left: 0 !important;
+                                                                                                                                                                                        right: 0 !important;
+                                                                                                                                                                                        bottom: 0 !important;
+                                                                                                                                                                                        width: 100%;
+                                                                                                                                                                                        max-width: 100%;
+                                                                                                                                                                                        }
 
-            .pos-scanner-mobile > div:first-child {
-                padding-top: .65rem !important;
-                padding-bottom: .65rem !important;
-            }
+                                                                                                                                                                                        .pos-scanner-mobile > div:first-child {
+                                                                                                                                                                                        padding-top: .65rem !important;
+                                                                                                                                                                                        padding-bottom: .65rem !important;
+                                                                                                                                                                                        }
 
-        .pos-scanner-body {
-            padding: .65rem !important;
-            gap: .5rem !important;
-            align-items: center;
-        }
+                                                                                                                                                                                        .pos-scanner-body {
+                                                                                                                                                                                        padding: .65rem !important;
+                                                                                                                                                                                        gap: .5rem !important;
+                                                                                                                                                                                        align-items: center;
+                                                                                                                                                                                        }
 
-        .pos-camera-preview {
-            width: min(100%, 520px);
-            height: auto;
-            aspect-ratio: 16 / 9;
-            min-height: 0;
-            max-height: 55dvh;
-            margin-left: auto;
-            margin-right: auto;
-        }
+                                                                                                                                                                                        .pos-camera-preview {
+                                                                                                                                                                                        width: min(100%, 520px);
+                                                                                                                                                                                        height: auto;
+                                                                                                                                                                                        aspect-ratio: 16 / 9;
+                                                                                                                                                                                        min-height: 0;
+                                                                                                                                                                                        max-height: 55dvh;
+                                                                                                                                                                                        margin-left: auto;
+                                                                                                                                                                                        margin-right: auto;
+                                                                                                                                                                                        }
 
-            .pos-camera-preview video {
-                width: 100% !important;
-                height: 100% !important;
-                min-width: 100% !important;
-                min-height: 100% !important;
-                max-width: none !important;
-                max-height: none !important;
-                object-fit: cover !important;
-                object-position: center center !important;
-                background: transparent !important;
-            }
+                                                                                                                                                                                        .pos-camera-preview video {
+                                                                                                                                                                                        width: 100% !important;
+                                                                                                                                                                                        height: 100% !important;
+                                                                                                                                                                                        min-width: 100% !important;
+                                                                                                                                                                                        min-height: 100% !important;
+                                                                                                                                                                                        max-width: none !important;
+                                                                                                                                                                                        max-height: none !important;
+                                                                                                                                                                                        object-fit: cover !important;
+                                                                                                                                                                                        object-position: center center !important;
+                                                                                                                                                                                        background: transparent !important;
+                                                                                                                                                                                        }
 
-            .pos-camera-preview canvas {
-                opacity: 0 !important;
-                background: transparent;
-            }
+                                                                                                                                                                                        .pos-camera-preview canvas {
+                                                                                                                                                                                        opacity: 0 !important;
+                                                                                                                                                                                        background: transparent;
+                                                                                                                                                                                        }
 
-        .pos-scanner-body > div:not(.pos-camera-preview) {
-            width: min(100%, 520px);
-        }
-    }
+                                                                                                                                                                                        .pos-scanner-body > div:not(.pos-camera-preview) {
+                                                                                                                                                                                        width: min(100%, 520px);
+                                                                                                                                                                                        }
+                                                                                                                                                                                        }
 
-    /* True desktop/laptop mode: wide screen plus mouse/fine pointer. */
-    @@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
-        .pos-wrapper {
-            flex-direction: row;
-            gap: 1.5rem;
-        }
+                                                                                                                                                                                        /* True desktop/laptop mode: wide screen plus mouse/fine pointer. */
+                                                                                                                                                                                        @@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
+                                                                                                                                                                                        .pos-wrapper {
+                                                                                                                                                                                        flex-direction: row;
+                                                                                                                                                                                        gap: 1.5rem;
+                                                                                                                                                                                        }
 
-        .pos-catalog {
-            padding-bottom: 0 !important;
-        }
+                                                                                                                                                                                        .pos-catalog {
+                                                                                                                                                                                        padding-bottom: 0 !important;
+                                                                                                                                                                                        }
 
-        .pos-desktop-right {
-            display: flex;
-            width: 25rem;
-            flex-shrink: 0;
-        }
+                                                                                                                                                                                        .pos-desktop-right {
+                                                                                                                                                                                        display: flex;
+                                                                                                                                                                                        width: 25rem;
+                                                                                                                                                                                        flex-shrink: 0;
+                                                                                                                                                                                        }
 
-        .pos-mobile-cart-btn {
-            display: none;
-        }
+                                                                                                                                                                                        .pos-mobile-cart-btn {
+                                                                                                                                                                                        display: none;
+                                                                                                                                                                                        }
 
-        .pos-scanner-mobile {
-            display: none;
-        }
-    }
+                                                                                                                                                                                        .pos-scanner-mobile {
+                                                                                                                                                                                        display: none;
+                                                                                                                                                                                        }
+                                                                                                                                                                                        }
 
-</style>
+                                                                                                                                                                                        </style>
