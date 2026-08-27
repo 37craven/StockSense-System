@@ -932,9 +932,14 @@
                 response.Body,
                 new JsonSerializerOptions
                 {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                    PropertyNameCaseInsensitive = true
                 });
+
+            var actionDebug = result?.Actions != null
+                ? string.Join(", ", result.Actions.Select(a => $"{a.ActionType}:{a.Label}(bookingData={a.BookingData?.Count ?? 0})"))
+                : "null";
+            await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] Deserialized: actionCount={result?.Actions?.Count ?? 0} actions=[{actionDebug}] wfStatus={result?.WorkflowState?.Status}");
+
             if (string.IsNullOrWhiteSpace(result?.Reply))
             {
                 errorMessage = "The assistant returned an empty response. Please try again.";
@@ -949,6 +954,9 @@
             // booking data and the frontend calls POST api/appointments directly.
             var bookAction = result.Actions?.FirstOrDefault(
                 a => a.ActionType == "book_appointment" && a.BookingData is { Count: > 0 });
+            var bookActionInfo = bookAction != null ? $"{bookAction.ActionType}:{bookAction.Label}" : "null";
+            var firstActionType = result.Actions?.FirstOrDefault()?.ActionType ?? "null";
+            await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] Auto-execute check: bookAction={bookActionInfo} actionType={firstActionType}");
             if (bookAction is not null)
             {
                 await BookAppointmentAsync(bookAction.BookingData!);
@@ -1055,6 +1063,7 @@
 
     private async Task BookAppointmentAsync(Dictionary<string, string> bookingData)
     {
+        await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] BookAppointmentAsync called with data: {string.Join(", ", bookingData.Select(kv => $"{kv.Key}={kv.Value}"))}");
         isSending = true;
         try
         {
@@ -1063,6 +1072,19 @@
             var serviceStr = bookingData.GetValueOrDefault("service", "");
             var mechanicStr = bookingData.GetValueOrDefault("mechanic", "");
             var contactStr = bookingData.GetValueOrDefault("contact_number", "");
+
+            // Strip non-digit characters for phone validation
+            var cleanContact = string.IsNullOrWhiteSpace(contactStr)
+                ? null
+                : new string(contactStr.Where(char.IsDigit).ToArray());
+            if (cleanContact != null && cleanContact.Length < 7)
+                cleanContact = null;
+            var motorcycleStr = bookingData.GetValueOrDefault("motorcycle", "");
+
+            // Split multiple services into a list
+            var serviceList = serviceStr
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
 
             if (!DateTime.TryParse(dateStr, out var appointmentDate))
             {
@@ -1075,30 +1097,37 @@
             var newAppt = new
             {
                 CustomerName = customerName,
-                ContactNumber = string.IsNullOrWhiteSpace(contactStr) ? null : contactStr,
+                ContactNumber = cleanContact,
                 AppointmentDate = DateTime.SpecifyKind(appointmentDate.Date, DateTimeKind.Unspecified),
                 TimeSlot = timeStr,
-                SelectedServices = new List<string> { serviceStr },
+                SelectedServices = serviceList,
                 Category = "General",
                 MechanicName = string.IsNullOrWhiteSpace(mechanicStr) ? null : mechanicStr,
             };
 
             var response = await JS.InvokeAsync<BrowserApiResponse>("stockSenseApi.postJson", componentLifetime.Token, "api/appointments", newAppt);
+            var responseBody = response.Body?.Length > 200 ? response.Body[..200] : response.Body;
+            await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] Appointment API response: ok={response.Ok} status={response.Status} body={responseBody}");
             if (response.Ok)
             {
+                var motorcycleLine = string.IsNullOrWhiteSpace(motorcycleStr) ? "" : $"Motorcycle: {motorcycleStr}\n";
+                var serviceDisplay = string.Join(", ", serviceList);
                 messages.Add(new ChatMessage("assistant",
                     $"Your appointment has been booked successfully!\n\n" +
-                    $"Service: {serviceStr}\n" +
+                    $"Service: {serviceDisplay}\n" +
                     $"Date: {dateStr}\n" +
                     $"Time: {timeStr}\n" +
-                    $"Mechanic: {(string.IsNullOrWhiteSpace(mechanicStr) ? "Any Available" : mechanicStr)}\n\n" +
-                    $"You can view and manage your booking in My Bookings."));
+                    $"Mechanic: {(string.IsNullOrWhiteSpace(mechanicStr) ? "Any Available" : mechanicStr)}\n" +
+                    $"{motorcycleLine}" +
+                    $"\nYou can view and manage your booking in My Bookings."));
                 activeWorkflowState = null;
             }
             else
             {
+                var errorMsg = response.Body?.Length > 300 ? response.Body[..300] : response.Body;
+                await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] Appointment API error: {errorMsg}");
                 messages.Add(new ChatMessage("assistant",
-                    "I couldn't complete the booking. The time slot may be unavailable. Please try booking from the appointment page or choose a different time."));
+                    $"I couldn't complete the booking. {errorMsg}\n\nPlease try booking from the appointment page or choose a different time."));
             }
         }
         catch (Exception)

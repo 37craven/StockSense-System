@@ -33,9 +33,18 @@ public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceCl
         CancellationToken cancellationToken)
     {
         var endpoint = GetChatEndpoint(httpClient.BaseAddress);
+        var snakeOpts = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNameCaseInsensitive = true,
+        };
+        var chatbotReq = new ChatbotRequest(message, userRole, history, workflowState, customerName, customerEmail, customerUserId);
+        var requestBody = JsonSerializer.Serialize(chatbotReq, snakeOpts);
+        logger.LogWarning("[ASSIST-CLIENT] Sending to chatbot: {Body}", requestBody.Length > 500 ? requestBody[..500] : requestBody);
+
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
-            Content = JsonContent.Create(new ChatbotRequest(message, userRole, history, workflowState, customerName, customerEmail, customerUserId))
+            Content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json")
         };
         request.Headers.TryAddWithoutValidation("X-Correlation-ID", correlationId);
         using var response = await httpClient.SendAsync(request, cancellationToken);
@@ -50,19 +59,27 @@ public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceCl
 
         try
         {
-            var result = await response.Content.ReadFromJsonAsync<ChatbotResponse>(
+            var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogWarning("[ASSIST-CLIENT] Raw chatbot response: {Json}", rawJson.Length > 500 ? rawJson[..500] : rawJson);
+
+            var result = JsonSerializer.Deserialize<ChatbotResponse>(
+                rawJson,
                 new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-                },
-                cancellationToken);
+                });
             if (string.IsNullOrWhiteSpace(result?.Reply))
             {
                 logger.LogWarning("Chatbot returned an empty or invalid response.");
                 throw new AssistanceUpstreamException();
             }
 
+            logger.LogWarning("[ASSIST-CLIENT] Deserialized: Reply={Reply} ActionCount={Count} Actions={Actions} WfStatus={WfStatus}",
+                result.Reply?.Length > 80 ? result.Reply[..80] : result.Reply,
+                result.Actions?.Count ?? 0,
+                string.Join(", ", result.Actions?.Select(a => $"{a.ActionType}:{a.Label}") ?? []),
+                result.WorkflowState?.Status);
             return (result.Reply, result.Actions, result.WorkflowState);
         }
         catch (JsonException exception)

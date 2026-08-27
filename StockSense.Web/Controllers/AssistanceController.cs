@@ -97,6 +97,13 @@ public sealed class AssistanceController(
                 customerId,
                 correlationId,
                 cancellationToken);
+
+            var actionSummary = actions?.Select(a => $"{a.ActionType}:{a.Label}") ?? [];
+            logger.LogWarning("[ASSIST-CTRL] Returning to frontend: Reply={Reply} Actions=[{Actions}] WfStatus={WfStatus}",
+                reply?.Length > 80 ? reply[..80] : reply,
+                string.Join(", ", actionSummary),
+                workflowState?.Status);
+
             AuditStaffAccess(role, actorHash, correlationId, "succeeded", "completed");
             return Ok(new AssistanceResponse(reply, actions, workflowState));
         }
