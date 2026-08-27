@@ -192,6 +192,7 @@ public class AppointmentsController : ControllerBase
     {
         try
         {
+            await ExpirePastDueAppointmentsAsync();
             var appointments = await _repo.GetAllAsync();
             await EnrichCustomerIdentitiesAsync(appointments);
             var dtos = appointments.Select(a => MapToDto(a)).ToList();
@@ -213,8 +214,8 @@ public class AppointmentsController : ControllerBase
             var appointment = await _repo.GetByIdAsync(id);
             if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
 
-            if (appointment.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled)
-                return Conflict(ApiResponse.Error("Completed and cancelled appointments are read-only."));
+            if (appointment.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled or WorkOrderStatuses.Expired)
+                return Conflict(ApiResponse.Error("Completed, cancelled, and expired appointments are read-only."));
             if (appointment.Status == WorkOrderStatuses.Pending)
             {
                 var transitionError = WorkOrderRules.ValidateStatusTransition(
@@ -237,6 +238,68 @@ public class AppointmentsController : ControllerBase
             _logger.LogError(ex, "Assigning mechanic for appointment {AppointmentId} failed.", id);
             return StatusCode(500, ApiResponse.Error("The mechanic could not be assigned. Please try again."));
         }
+    }
+
+    [HttpPut("{id}/details")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<IActionResult> UpdateDetails(int id, [FromBody] UpdateAppointmentDetailsDto dto)
+    {
+        var appointment = await _context.Appointments.FindAsync(id);
+        if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
+
+        if (appointment.Status is WorkOrderStatuses.Completed or WorkOrderStatuses.Cancelled or WorkOrderStatuses.Expired)
+            return Conflict(ApiResponse.Error("Completed, cancelled, and expired appointments are read-only."));
+
+        AdminPinVerificationResult? approval = null;
+        if (appointment.Status != WorkOrderStatuses.Pending && !User.IsInRole("Admin"))
+        {
+            if (_adminPinService is null) return StatusCode(403, ApiResponse.Error("Admin approval is required."));
+            approval = !string.IsNullOrWhiteSpace(dto.AdminUserId)
+                ? await _adminPinService.VerifyByUserIdAsync(dto.AdminUserId, dto.AdminPin ?? "")
+                : await _adminPinService.VerifyAsync(dto.AdminEmail ?? "", dto.AdminPin ?? "");
+            if (!approval.Succeeded)
+                return StatusCode(approval.LockedUntil.HasValue ? 429 : 403, ApiResponse.Error(approval.Error ?? "Admin approval failed."));
+        }
+
+        var reason = dto.Reason?.Trim();
+        if (appointment.Status != WorkOrderStatuses.Pending && string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("Please provide a reason for this change."));
+        if (reason?.Length > 500)
+            return BadRequest(ApiResponse.Error("The reason cannot exceed 500 characters."));
+
+        var timeSlot = dto.TimeSlot?.Trim() ?? string.Empty;
+        if (!TimeSpan.TryParseExact(timeSlot, @"hh\:mm", null, out var requestedStart) && !TimeSpan.TryParse(timeSlot, out requestedStart))
+            return BadRequest(ApiResponse.Error("Time slot must be in HH:mm format (00:00-23:59)."));
+
+        var duration = dto.DurationMinutes > 0 ? dto.DurationMinutes : appointment.DurationMinutes;
+        var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(Math.Max(duration, 15)));
+
+        var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
+        var conflict = existing.Any(a =>
+            a.Id != id &&
+            TimeSpan.TryParse(a.TimeSlot?.Trim(), out var existingStart) &&
+            requestedStart < existingStart.Add(TimeSpan.FromMinutes(Math.Max(a.DurationMinutes, 15))) &&
+            requestedEnd > existingStart);
+        if (conflict)
+            return Conflict(ApiResponse.Error("The selected time slot overlaps with an existing booking."));
+
+        var previousSchedule = $"{appointment.AppointmentDate:yyyy-MM-dd} {appointment.TimeSlot}";
+        var newSchedule = $"{dto.AppointmentDate:yyyy-MM-dd} {requestedStart:hh\\:mm}";
+        var previousMechanic = appointment.MechanicName;
+        var newMechanic = string.IsNullOrWhiteSpace(dto.MechanicName) ? "Any Available" : dto.MechanicName.Trim();
+
+        appointment.AppointmentDate = DateTime.SpecifyKind(dto.AppointmentDate.Date, DateTimeKind.Unspecified);
+        appointment.TimeSlot = requestedStart.ToString(@"hh\:mm");
+        appointment.DurationMinutes = duration;
+        appointment.MechanicName = newMechanic;
+
+        if (!string.Equals(previousSchedule, newSchedule, StringComparison.Ordinal))
+            AddAudit("Appointment", id, "ScheduleChanged", previousSchedule, newSchedule, reason, approval);
+        if (!string.Equals(previousMechanic, newMechanic, StringComparison.Ordinal))
+            AddAudit("Appointment", id, "MechanicAssigned", previousMechanic, newMechanic, reason, approval);
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Appointment details updated." });
     }
 
     [HttpPut("{id}/status")]
@@ -402,8 +465,8 @@ public class AppointmentsController : ControllerBase
     {
         var appointment = await _context.Appointments.FindAsync(id);
         if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
-        if (appointment.Status is "Completed" or "Cancelled")
-            return Conflict(ApiResponse.Error("Cannot edit parts for completed or cancelled appointments."));
+        if (appointment.Status is "Completed" or "Cancelled" or "Expired")
+            return Conflict(ApiResponse.Error("Cannot edit parts for completed, cancelled, or expired appointments."));
         AdminPinVerificationResult? approval = null;
         if (appointment.Status != WorkOrderStatuses.Pending && !User.IsInRole("Admin"))
         {
@@ -489,6 +552,7 @@ public class AppointmentsController : ControllerBase
     {
         var customer = await _userManager.GetUserAsync(User);
         if (customer is null) return Unauthorized();
+        await ExpirePastDueAppointmentsAsync();
         var appointments = await _repo.GetByCustomerIdentityAsync(
             customer.Id,
             customer.Email ?? string.Empty,
@@ -496,6 +560,35 @@ public class AppointmentsController : ControllerBase
         await EnrichCustomerIdentitiesAsync(appointments);
         var dtos = appointments.Select(a => MapToDto(a)).ToList();
         return Ok(dtos);
+    }
+
+    [HttpGet("{id}/audit")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<ActionResult<List<WorkOrderAuditDto>>> GetAuditTrail(int id)
+    {
+        try
+        {
+            var audits = await _context.WorkOrderAudits
+                .AsNoTracking()
+                .Where(audit => audit.WorkOrderType == "Appointment" && audit.WorkOrderId == id)
+                .OrderByDescending(audit => audit.CreatedAt)
+                .ToListAsync();
+            var actorIds = audits
+                .Select(audit => audit.ActorUserId)
+                .Where(userId => !string.IsNullOrEmpty(userId))
+                .Distinct()
+                .ToList();
+            var users = await _userManager.Users.AsNoTracking()
+                .Where(user => actorIds.Contains(user.Id))
+                .ToListAsync();
+            var actorNames = users.ToDictionary(user => user.Id, GetFullName);
+            return Ok(audits.Select(audit => MapAudit(audit, actorNames)).ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve audit trail for appointment {AppointmentId}.", id);
+            return StatusCode(500, ApiResponse.Error("Could not retrieve the appointment history. Please try again."));
+        }
     }
 
     [HttpPut("{id}/cancel")]
@@ -568,6 +661,37 @@ public class AppointmentsController : ControllerBase
         }
     }
 
+    private async Task ExpirePastDueAppointmentsAsync()
+    {
+        var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone).Date;
+        var pastDue = await _context.Appointments
+            .Where(appointment =>
+                (appointment.Status == WorkOrderStatuses.Pending || appointment.Status == WorkOrderStatuses.Confirmed)
+                && appointment.AppointmentDate < today)
+            .ToListAsync();
+
+        foreach (var appointment in pastDue)
+        {
+            var previousStatus = appointment.Status;
+            appointment.Status = WorkOrderStatuses.Expired;
+            _context.WorkOrderAudits.Add(new WorkOrderAudit
+            {
+                WorkOrderType = "Appointment",
+                WorkOrderId = appointment.Id,
+                Action = "StatusChanged",
+                PreviousValue = previousStatus,
+                NewValue = WorkOrderStatuses.Expired,
+                ActorUserId = "system",
+                ActorRole = "System",
+                Reason = "Scheduled date has passed",
+                CreatedAt = DateTime.Now
+            });
+        }
+
+        if (pastDue.Count > 0)
+            await _context.SaveChangesAsync();
+    }
+
     private void AddAudit(string type, int id, string action, string? previousValue, string? newValue, string? reason,
         AdminPinVerificationResult? approval = null)
     {
@@ -586,6 +710,23 @@ public class AppointmentsController : ControllerBase
             CreatedAt = DateTime.Now
         });
     }
+
+    private static WorkOrderAuditDto MapAudit(WorkOrderAudit audit, IReadOnlyDictionary<string, string> actorNames) => new()
+    {
+        Id = audit.Id,
+        WorkOrderType = audit.WorkOrderType,
+        WorkOrderId = audit.WorkOrderId,
+        Action = audit.Action,
+        PreviousValue = audit.PreviousValue,
+        NewValue = audit.NewValue,
+        ActorUserId = audit.ActorUserId,
+        ActorName = actorNames.GetValueOrDefault(audit.ActorUserId, string.Empty),
+        ActorRole = audit.ActorRole,
+        ApproverUserId = audit.ApproverUserId,
+        ApproverEmail = audit.ApproverEmail,
+        Reason = audit.Reason,
+        CreatedAt = audit.CreatedAt
+    };
 
     private class ServiceProductBreakdown
     {

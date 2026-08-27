@@ -226,6 +226,7 @@
                     a =>
                         a.Status == "Completed"
                         || a.Status == "Cancelled"
+                        || a.Status == "Expired"
                 );
 
             if (!showAllHistory)
@@ -291,6 +292,7 @@
             "Confirmed" => "#3b82f6",
             "Completed" => "#10b981",
             "Cancelled" => "#ef4444",
+            "Expired" => "#6b7280",
             _ => "#888888"
         };
 
@@ -303,6 +305,7 @@
             "Confirmed" => "appointment-status--confirmed",
             "Completed" => "appointment-status--completed",
             "Cancelled" => "appointment-status--cancelled",
+            "Expired" => "appointment-status--expired",
             _ => "appointment-status--unknown"
         };
 

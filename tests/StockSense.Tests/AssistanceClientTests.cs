@@ -24,9 +24,9 @@ public sealed class AssistanceClientTests
             new AssistanceHistoryMessage("user", "2022 V2"),
             new AssistanceHistoryMessage("assistant", "first answer")
         };
-        var reply = await client.AskAsync("question", "Employee", history, "corr-123", default);
+        var reply = await client.AskAsync("question", "Employee", history, null, "", "", "", "corr-123", default);
 
-        Assert.Equal("answer", reply);
+        Assert.Equal("answer", reply.Reply);
         Assert.Equal(new Uri("https://internal.example/chatbot/api/chat"), handler.RequestUri);
         Assert.Equal("corr-123", handler.CorrelationId);
         using var payload = JsonDocument.Parse(handler.RequestBody!);
@@ -45,7 +45,7 @@ public sealed class AssistanceClientTests
         var handler = new RecordingHandler();
         var client = CreateClient(handler, "https://internal.example/chatbot/");
 
-        await client.AskAsync("question", "Customer", [], "corr", default);
+        await client.AskAsync("question", "Customer", [], null, "", "", "", "corr", default);
 
         Assert.Equal(new Uri("https://internal.example/chatbot/api/chat"), handler.RequestUri);
     }
@@ -59,7 +59,7 @@ public sealed class AssistanceClientTests
         var client = CreateClient(new StaticHandler(new HttpResponseMessage(status)));
 
         await Assert.ThrowsAsync<AssistanceUpstreamException>(() =>
-            client.AskAsync("SECRET PROMPT", "Customer", [], "corr", default));
+            client.AskAsync("SECRET PROMPT", "Customer", [], null, "", "", "", "corr", default));
     }
 
     [Theory]
@@ -76,7 +76,7 @@ public sealed class AssistanceClientTests
         var client = CreateClient(new StaticHandler(response));
 
         await Assert.ThrowsAsync<AssistanceUpstreamException>(() =>
-            client.AskAsync("question", "Customer", [], "corr", default));
+            client.AskAsync("question", "Customer", [], null, "", "", "", "corr", default));
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class AssistanceClientTests
         var client = CreateClient(new CancellationHandler());
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            client.AskAsync("question", "Customer", [], "corr", cancellation.Token));
+            client.AskAsync("question", "Customer", [], null, "", "", "", "corr", cancellation.Token));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class AssistanceClientTests
         var client = new AssistanceClient(new HttpClient(new RecordingHandler()), NullLogger<AssistanceClient>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            client.AskAsync("question", "Customer", [], "corr", default));
+            client.AskAsync("question", "Customer", [], null, "", "", "", "corr", default));
     }
 
     private static AssistanceClient CreateClient(HttpMessageHandler handler, string baseUrl = "https://internal.example/") =>
@@ -117,7 +117,7 @@ public sealed class AssistanceClientTests
             RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("{\"reply\":\"answer\"}", Encoding.UTF8, "application/json")
+                Content = new StringContent("{\"reply\":\"answer\",\"actions\":null,\"workflowState\":null}", Encoding.UTF8, "application/json")
             };
         }
     }

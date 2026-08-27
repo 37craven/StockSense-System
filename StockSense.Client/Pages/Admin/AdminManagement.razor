@@ -206,7 +206,7 @@
 
                     <form @onsubmit="SaveAdminPin" @onsubmit:preventDefault class="space-y-6" aria-busy="@isSavingPin">
                         <div class="max-w-xl space-y-3">
-                            <label for="admin-current-password" class="text-sm font-medium text-foreground">Current account password</label>
+                            <label for="admin-current-password" class="text-sm font-medium text-foreground">Current account password <span class="text-destructive" aria-hidden="true">*</span></label>
                             <div class="relative">
                                 <input id="admin-current-password"
                                        @bind="pinForm.CurrentPassword"
@@ -227,7 +227,7 @@
 
                         <div class="grid max-w-xl gap-4 sm:grid-cols-2">
                             <div class="space-y-3">
-                                <label for="admin-new-pin" class="text-sm font-medium text-foreground">New 6-digit PIN</label>
+                                <label for="admin-new-pin" class="text-sm font-medium text-foreground">New 6-digit PIN <span class="text-destructive" aria-hidden="true">*</span></label>
                                 <div class="relative">
                                     <input id="admin-new-pin"
                                            @bind="pinForm.NewPin"
@@ -250,7 +250,7 @@
                             </div>
 
                             <div class="space-y-3">
-                                <label for="admin-confirm-pin" class="text-sm font-medium text-foreground">Confirm new PIN</label>
+                                <label for="admin-confirm-pin" class="text-sm font-medium text-foreground">Confirm new PIN <span class="text-destructive" aria-hidden="true">*</span></label>
                                 <div class="relative">
                                     <input id="admin-confirm-pin"
                                            @bind="pinForm.ConfirmPin"
@@ -423,7 +423,7 @@
             </div>
 
             <div class="flex flex-col gap-2">
-                <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Role</label>
+                <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Role <span class="text-destructive" aria-hidden="true">*</span></label>
                 <select @bind="newEmp.Role"
                         style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;">
                     <option value="Employee">Employee</option>

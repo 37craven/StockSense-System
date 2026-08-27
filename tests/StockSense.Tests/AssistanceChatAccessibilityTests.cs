@@ -13,7 +13,7 @@ public sealed class AssistanceChatAccessibilityTests
             "AssistanceChat.razor"));
 
         Assert.Contains("Name=\"bot\" Size=\"28\" aria-hidden=\"true\"", component, StringComparison.Ordinal);
-        Assert.Contains("Name=\"message-circle\" Size=\"15\" aria-hidden=\"true\"", component, StringComparison.Ordinal);
+        Assert.Contains("Name=\"@suggestion.Icon\" Size=\"15\" aria-hidden=\"true\"", component, StringComparison.Ordinal);
         Assert.Contains("Name=\"arrow-up-right\" Size=\"14\" aria-hidden=\"true\"", component, StringComparison.Ordinal);
         Assert.Contains("Name=\"plus\" Size=\"15\" aria-hidden=\"true\"", component, StringComparison.Ordinal);
         Assert.Contains("Name=\"circle-alert\" Size=\"15\" aria-hidden=\"true\"", component, StringComparison.Ordinal);

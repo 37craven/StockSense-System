@@ -10,12 +10,15 @@ public sealed class AssistanceSuggestionsTests
         var suggestions = AssistanceSuggestions.ForRole("Customer");
         var labels = suggestions.Select(value => value.Label).ToList();
 
-        Assert.Equal(5, suggestions.Count);
-        Assert.Contains("Product availability", labels);
-        Assert.Contains("Services offered", labels);
-        Assert.Contains("Appointment availability", labels);
-        Assert.Contains("Build quotations", labels);
-        Assert.Contains("Compatibility", labels);
+        Assert.Equal(8, suggestions.Count);
+        Assert.Contains("Book Appointment", labels);
+        Assert.Contains("Browse Services", labels);
+        Assert.Contains("Check Availability", labels);
+        Assert.Contains("Get a Quote", labels);
+        Assert.Contains("Start Custom Build", labels);
+        Assert.Contains("View My Bookings", labels);
+        Assert.Contains("View My Builds", labels);
+        Assert.Contains("Account Settings", labels);
         Assert.DoesNotContain(suggestions, value => value.Prompt.Contains("supplier", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(suggestions, value => value.Prompt.Contains("sales summary", StringComparison.OrdinalIgnoreCase));
     }

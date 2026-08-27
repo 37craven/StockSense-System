@@ -804,8 +804,10 @@
 
             if (dbServices != null)
             {
-                availableServices = dbServices.Select(s =>
-                {
+                availableServices = dbServices
+                    .Where(s => !string.Equals(s.Status, "Inactive", StringComparison.OrdinalIgnoreCase))
+                    .Select(s =>
+                    {
                     List<string> categories;
                     Dictionary<string, List<int>> itemLinkedIds = new();
 

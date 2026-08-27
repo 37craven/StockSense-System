@@ -26,7 +26,7 @@
             <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.RecoveryCode" class="form-control" autocomplete="off" placeholder="RecoveryCode" />
-                <label for="recovery-code" class="form-label">Recovery Code</label>
+                <label for="recovery-code" class="form-label">Recovery Code <span class="text-destructive" aria-hidden="true">*</span></label>
                 <ValidationMessage For="() => Input.RecoveryCode" class="text-danger" />
             </div>
             <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>

@@ -459,7 +459,7 @@
                 <BbButton Variant="ButtonVariant.Outline" Class="@OrderSlipPresentation.DetailsActionClass" OnClick="CloseDetail">Close</BbButton>
                 @if (selectedSlip != null)
                 {
-                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PrintSlip" title="Print this order slip" aria-label="Print this order slip"><LucideIcon Name="printer" Size="14" aria-hidden="true" /> Print</BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="DownloadSlipPdf" title="Download this order slip as PDF" aria-label="Download this order slip as PDF"><LucideIcon Name="download" Size="14" aria-hidden="true" /> Download PDF</BbButton>
                 }
             </div>
             <div class="detail-footer-group">
@@ -576,7 +576,7 @@
                 @if (!isAdmin)
                 {
                     <div class="space-y-2 border-t border-border pt-4">
-                        <label for="close-remaining-admin" class="block text-sm font-medium">Approving admin</label>
+                        <label for="close-remaining-admin" class="block text-sm font-medium">Approving admin <span class="text-destructive" aria-hidden="true">*</span></label>
                         <select id="close-remaining-admin" @bind="closeRemainingAdminUserId" disabled="@isLoadingAdminOptions"
                                 class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
                                 aria-required="true" aria-describedby="close-remaining-admin-help">
@@ -590,7 +590,7 @@
                             @(adminOptions.Count == 0 && !isLoadingAdminOptions ? "No active admins are available." : "Choose the admin approving this one action.")
                         </p>
 
-                        <label for="close-remaining-admin-pin" class="block text-sm font-medium">Admin PIN</label>
+                        <label for="close-remaining-admin-pin" class="block text-sm font-medium">Admin PIN <span class="text-destructive" aria-hidden="true">*</span></label>
                         <div class="relative">
                             <input id="close-remaining-admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
                                    autocomplete="one-time-code" @bind="closeRemainingAdminPin"
@@ -715,10 +715,10 @@
 <BbDialog @bind-Open="cancelOpen">
     <BbDialogContent Style="width:min(99vw,34rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden p-0">
         <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6"><BbDialogTitle>Cancel Order Slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription></BbDialogHeader>
-        <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3 flex flex-col gap-3" style="-webkit-overflow-scrolling:touch;">
-            <label class="flex flex-col gap-1 text-sm font-medium">Reason<textarea @bind="cancelReason" rows="3" maxlength="500" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
+        <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 pt-2 pb-1 flex flex-col gap-3" style="-webkit-overflow-scrolling:touch;">
+            <label class="flex flex-col gap-1 text-sm font-medium"><span>Reason <span class="text-destructive" aria-hidden="true">*</span></span><textarea @bind="cancelReason" rows="3" maxlength="500" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
         </div>
-        <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+        <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 px-4 sm:px-6 pt-2 pb-4 sm:pb-5 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Back</BbButton>
             <BbButton Variant="ButtonVariant.Destructive" OnClick="Cancel">Cancel Order</BbButton>
         </BbDialogFooter>
@@ -1159,10 +1159,22 @@
         }
     }
 
-    private async Task PrintSlip()
+    private sealed record PdfTokenResponse(string Token);
+
+    private async Task DownloadSlipPdf()
     {
         if (selectedSlip == null) return;
-        await JS.InvokeVoidAsync("print");
+        try
+        {
+            var response = await JS.InvokeAsync<PdfTokenResponse>(
+                "stockSenseApi.getJson", $"api/order-slips/{selectedSlip.Id}/download-pdf");
+            await JS.InvokeVoidAsync("triggerDownload",
+                $"api/download/{response.Token}", $"OrderSlip_{selectedSlip.SlipNumber}.pdf");
+        }
+        catch
+        {
+            Toast.Error("The order slip PDF could not be generated. Please try again.", "Download failed");
+        }
     }
 
     private async Task OpenDetailForReceive(OrderSlip slip)

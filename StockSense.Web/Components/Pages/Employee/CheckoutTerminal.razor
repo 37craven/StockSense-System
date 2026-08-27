@@ -34,6 +34,7 @@ style="@(scannerEnabled ? "padding-bottom: 360px" : "padding-bottom: 56px")">
 <ProductCatalog @ref="catalog"
 Products="catalogProducts"
 ActiveOnly="true"
+ResponsiveColumns="true"
 OnProductClick="AddToCart"
 IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
 </div>

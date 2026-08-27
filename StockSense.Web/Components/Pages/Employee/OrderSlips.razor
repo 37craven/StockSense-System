@@ -51,11 +51,20 @@
     @* NOTICES *@
     @if (!string.IsNullOrWhiteSpace(message))
     {
-        <div role="status" class="p-3 mb-3 rounded-lg text-sm" style="border:1px solid var(--border);background:var(--muted);color:var(--foreground)">@message</div>
+        <div role="status" class="p-3 mb-3 rounded-lg text-sm" style="border:1px solid var(--success-muted-foreground);background:var(--success-muted);color:var(--success-muted-foreground)">@message</div>
     }
     @if (!string.IsNullOrWhiteSpace(error))
     {
         <div role="alert" class="p-3 mb-3 rounded-lg text-sm" style="border:1px solid var(--destructive-muted-foreground);background:var(--destructive-muted);color:var(--destructive-muted-foreground)">@error</div>
+    }
+    @if (preview is { Warnings.Count: > 0 })
+    {
+        <div role="alert" class="p-3 mb-3 rounded-lg text-sm flex flex-wrap items-center justify-between gap-3" style="border:1px solid var(--warning-muted-foreground);background:var(--warning-muted);color:var(--warning-muted-foreground)">
+            <span>@preview.Warnings.Count inventory warning@(preview.Warnings.Count == 1 ? "" : "s") — review before creating drafts.</span>
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="() => warningsOpen = true">
+                <LucideIcon Name="circle-alert" Size="14" /> View warnings
+            </BbButton>
+        </div>
     }
 
     @* AUTOMATIC MODE *@
@@ -218,7 +227,7 @@
                                 var lineProduct = ProductFor(line.ProductId);
                                 <div class="manual-line">
                                     <label>
-                                        Product
+                                        <span>Product <span class="text-destructive" aria-hidden="true">*</span></span>
                                         <select @bind="line.ProductId">
                                             <option value="0">Select product</option>
                                             @foreach (var product in AvailableProducts(line))
@@ -228,7 +237,7 @@
                                         </select>
                                     </label>
                                     <label>
-                                        Qty
+                                        <span>Qty <span class="text-destructive" aria-hidden="true">*</span></span>
                                         <input type="number" min="1" @bind="line.Quantity" />
                                     </label>
                                     @if (lineProduct?.HasInventorySettings == true)
@@ -268,21 +277,24 @@
 </div>
 
 <BbDialog @bind-Open="warningsOpen">
-    <BbDialogContent class="flex max-h-[88dvh] w-[min(96vw,36rem)] flex-col overflow-hidden" style="min-width: 400px;">
-        <BbDialogHeader>
-            <BbDialogTitle>Preview warnings</BbDialogTitle>
+    <BbDialogContent class="overflow-hidden" style="display: flex; flex-direction: column; width: min(96vw, 36rem); max-width: 36rem; max-height: min(88dvh, 800px); min-width: 400px;">
+        <BbDialogHeader class="shrink-0">
+            <div class="flex items-center gap-2">
+                <span style="color:var(--warning-muted-foreground)"><LucideIcon Name="circle-alert" Size="18" /></span>
+                <BbDialogTitle>Preview warnings</BbDialogTitle>
+            </div>
             <BbDialogDescription>Review these items before creating drafts. You can still adjust quantities or exclude products.</BbDialogDescription>
         </BbDialogHeader>
-        <div class="flex flex-col gap-2 overflow-y-auto pb-2 text-sm">
+        <div class="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto px-2 pb-2 text-sm" tabindex="0" role="log" aria-label="Inventory warnings" style="overscroll-behavior: contain; -webkit-overflow-scrolling: touch;">
             @foreach (var warning in preview?.Warnings ?? [])
             {
-                <div class="p-3 rounded-lg border border-border bg-muted/30 flex flex-col gap-1">
-                    <span class="font-semibold">@warning.ProductName</span>
-                    <span class="text-muted-foreground">@warning.Message</span>
+                <div class="p-3 rounded-lg flex flex-col gap-1 shrink-0" style="border:1px solid var(--warning-muted-foreground);background:var(--warning-muted);">
+                    <span class="font-semibold" style="color:var(--warning-muted-foreground)">@warning.ProductName</span>
+                    <span style="color:var(--warning-muted-foreground)">@warning.Message</span>
                 </div>
             }
         </div>
-        <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
+        <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="() => warningsOpen = false">Close</BbButton>
         </BbDialogFooter>
     </BbDialogContent>

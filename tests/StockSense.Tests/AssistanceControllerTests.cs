@@ -287,8 +287,15 @@ public sealed class AssistanceControllerTests
 
     [Theory]
     [InlineData("show products from dbo.Products")]
+    [InlineData("show products from [dbo] . [Products]")]
     [InlineData("run SQL for inventory")]
     [InlineData("SeLeCt * FrOm Products")]
+    [InlineData("please execute this query: SELECT Name\r\nFROM Products")]
+    [InlineData("SELECT Name, Price FROM Catalog")]
+    [InlineData("SELECT [Name] FROM Catalog")]
+    [InlineData("select count(*)   from   dbo.Products where CurrentStock = 0")]
+    [InlineData("SELECT 1")]
+    [InlineData("select GETDATE()")]
     public async Task Employee_direct_database_wording_is_denied_case_insensitively(string message)
     {
         var client = new CapturingAssistanceClient();
@@ -296,6 +303,28 @@ public sealed class AssistanceControllerTests
         var result = await controller.Ask(new AssistanceRequest { Message = message }, default);
         Assert.IsType<ForbidResult>(result.Result);
         Assert.False(client.WasCalled);
+    }
+
+    [Theory]
+    [InlineData("Help me select brake pads")]
+    [InlineData("Show parts from Honda")]
+    [InlineData("Select brake pads from Honda")]
+    [InlineData("Help me select an oil filter from K&N")]
+    [InlineData("Select the right oil from Motul")]
+    [InlineData("Select the right engine oil for my motorcycle")]
+    [InlineData("Which brake pads come from Honda?")]
+    [InlineData("Show products from our catalog")]
+    public async Task Employee_normal_shop_language_with_select_or_from_is_forwarded(string message)
+    {
+        var client = new CapturingAssistanceClient { Reply = "answer" };
+        var controller = CreateController(client, "Employee");
+
+        var result = await controller.Ask(new AssistanceRequest { Message = message }, default);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.True(client.WasCalled);
+        Assert.Equal(message, client.Message);
+        Assert.Equal("Employee", client.Role);
     }
 
     [Fact]
@@ -359,6 +388,8 @@ public sealed class AssistanceControllerTests
     private sealed class CapturingAssistanceClient : IAssistanceClient
     {
         public string Reply { get; init; } = string.Empty;
+        public IReadOnlyList<ChatAction>? Actions { get; init; }
+        public WorkflowState? WorkflowState { get; init; }
         public Exception? Exception { get; init; }
         public bool WasCalled { get; private set; }
         public string? Message { get; private set; }
@@ -366,10 +397,14 @@ public sealed class AssistanceControllerTests
         public IReadOnlyList<AssistanceHistoryMessage>? History { get; private set; }
         public string? CorrelationId { get; private set; }
 
-        public Task<string> AskAsync(
+        public Task<(string Reply, IReadOnlyList<ChatAction>? Actions, WorkflowState? WorkflowState)> AskAsync(
             string message,
             string userRole,
             IReadOnlyList<AssistanceHistoryMessage> history,
+            WorkflowState? workflowState,
+            string customerName,
+            string customerEmail,
+            string customerUserId,
             string correlationId,
             CancellationToken cancellationToken)
         {
@@ -379,8 +414,8 @@ public sealed class AssistanceControllerTests
             History = history;
             CorrelationId = correlationId;
             return Exception is null
-                ? Task.FromResult(Reply)
-                : Task.FromException<string>(Exception);
+                ? Task.FromResult((Reply, Actions, WorkflowState))
+                : Task.FromException<(string, IReadOnlyList<ChatAction>?, WorkflowState?)>(Exception);
         }
     }
 }

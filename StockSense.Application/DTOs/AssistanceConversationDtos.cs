@@ -8,3 +8,21 @@ public static class AssistanceConversationLimits
 }
 
 public sealed record AssistanceHistoryMessage(string Role, string Content);
+
+public sealed record WorkflowState(
+    string? WorkflowType,
+    string? CurrentStep,
+    Dictionary<string, object>? CollectedData,
+    string Status,
+    string? ConfirmationSummary,
+    string? PreviousWorkflowType,
+    Dictionary<string, object>? PreviousCollectedData);
+
+public sealed record ChatAction(
+    string Label,
+    string ActionType,
+    string? Url,
+    string? Prompt,
+    string? WorkflowType,
+    string? Icon,
+    Dictionary<string, string>? BookingData);

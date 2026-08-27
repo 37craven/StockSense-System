@@ -1,0 +1,24 @@
+@using StockSense.Application.DTOs
+
+@if (Actions is { Count: > 0 })
+{
+    <div class="chat-action-buttons">
+        @foreach (var action in Actions)
+        {
+            <button @onclick="() => OnActionClick.InvokeAsync(action)"
+                    type="button"
+                    class="chat-action-btn chat-action-@action.ActionType">
+                @if (!string.IsNullOrEmpty(action.Icon))
+                {
+                    <LucideIcon Name="@action.Icon" Size="14" />
+                }
+                <span>@action.Label</span>
+            </button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ChatAction>? Actions { get; set; }
+    [Parameter] public EventCallback<ChatAction> OnActionClick { get; set; }
+}

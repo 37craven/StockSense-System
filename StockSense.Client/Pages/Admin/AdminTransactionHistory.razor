@@ -165,6 +165,37 @@
     .txn-filter-sale-active:hover { filter: brightness(0.96); }
     .txn-filter-correction-active:hover { filter: brightness(0.96); }
 
+    .txn-month-input {
+        border: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-size: var(--text-sm);
+        padding: 0;
+        outline: none;
+        cursor: pointer;
+        width: auto;
+    }
+
+    .txn-filter-clear {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        min-height: 28px;
+        padding: 0 6px;
+        border: none;
+        border-radius: var(--radius);
+        background: transparent;
+        color: var(--muted-foreground);
+        cursor: pointer;
+    }
+
+    .txn-filter-clear:hover {
+        background: var(--muted);
+        color: var(--foreground);
+    }
+
     .txn-type-badge {
         display: inline-flex;
         align-items: center;
@@ -379,6 +410,33 @@
                     <LucideIcon Name="pen-line" Size="14" />
                     Corrections
                 </button>
+        </div>
+
+        <div class="txn-filter-bar" role="group" aria-label="Filter transactions by date">
+            <label class="txn-filter">
+                <LucideIcon Name="calendar" Size="14" />
+                <input id="txn-month" type="month" value="@selectedMonth"
+                       @onchange="e => selectedMonth = e.Value?.ToString()"
+                       class="txn-month-input" aria-label="Filter by month" />
+            </label>
+            @if (!string.IsNullOrWhiteSpace(selectedMonth))
+            {
+                <button type="button" class="txn-filter-clear" @onclick="() => selectedMonth = null" aria-label="Clear month filter">
+                    <LucideIcon Name="x" Size="14" />
+                </button>
+            }
+            <button @onclick='() => SetDays(null)'
+                    class="txn-filter @(daysFilter == null ? "txn-filter-all-active" : "")"
+                    aria-pressed="@(daysFilter == null)">All days</button>
+            <button @onclick='() => SetDays(0)'
+                    class="txn-filter @(daysFilter == 0 ? "txn-filter-all-active" : "")"
+                    aria-pressed="@(daysFilter == 0)">Today</button>
+            <button @onclick='() => SetDays(7)'
+                    class="txn-filter @(daysFilter == 7 ? "txn-filter-all-active" : "")"
+                    aria-pressed="@(daysFilter == 7)">Last 7 days</button>
+            <button @onclick='() => SetDays(30)'
+                    class="txn-filter @(daysFilter == 30 ? "txn-filter-all-active" : "")"
+                    aria-pressed="@(daysFilter == 30)">Last 30 days</button>
         </div>
 
         <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
@@ -632,6 +690,8 @@
 @code {
     private List<TransactionHistoryDto>? allTransactions;
     private string? filterType;
+    private string? selectedMonth;
+    private int? daysFilter;
     private bool showDetailModal;
     private bool showVoidConfirmation;
     private string voidReason = string.Empty;
@@ -644,11 +704,25 @@
     {
         get
         {
-            var src = allTransactions ?? new();
+            IEnumerable<TransactionHistoryDto> src = allTransactions ?? new List<TransactionHistoryDto>();
             if (filterType == "StockCorrection")
                 src = src.Where(t => t.TransactionType == "StockCorrection" || t.IsVoided).ToList();
             else if (!string.IsNullOrWhiteSpace(filterType))
                 src = src.Where(t => t.TransactionType == filterType).ToList();
+
+            if (!string.IsNullOrWhiteSpace(selectedMonth))
+            {
+                var parts = selectedMonth.Split('-');
+                if (parts.Length == 2 && int.TryParse(parts[0], out var year) && int.TryParse(parts[1], out var month))
+                    src = src.Where(t => t.TransactionDate.Year == year && t.TransactionDate.Month == month);
+            }
+
+            if (daysFilter.HasValue)
+            {
+                var today = DateTime.Today;
+                var start = daysFilter.Value == 0 ? today : today.AddDays(-(daysFilter.Value - 1));
+                src = src.Where(t => t.TransactionDate.Date >= start && t.TransactionDate.Date <= today);
+            }
 
             return (sortColumn, sortAsc) switch
             {
@@ -707,6 +781,11 @@
         {
             Console.WriteLine($"Error filtering transactions: {ex.Message}");
         }
+    }
+
+    private void SetDays(int? days)
+    {
+        daysFilter = days;
     }
 
     private void OpenVoidConfirmation()

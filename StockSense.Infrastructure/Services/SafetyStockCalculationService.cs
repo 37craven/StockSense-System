@@ -206,7 +206,6 @@ public sealed class SafetyStockCalculationService : ISafetyStockCalculationServi
                     ApplyMetric(
                         metric,
                         policy,
-                        setting.ServiceLevel,
                         dailyDemand.Count,
                         totalObservedDemand,
                         calculationTime);
@@ -295,7 +294,6 @@ public sealed class SafetyStockCalculationService : ISafetyStockCalculationServi
     private static void ApplyMetric(
         ProductInventoryMetric metric,
         SafetyStockPolicyResult policy,
-        decimal serviceLevel,
         int usableDataDays,
         int totalObservedDemand,
         DateTime calculationTime)
@@ -310,13 +308,14 @@ public sealed class SafetyStockCalculationService : ISafetyStockCalculationServi
         metric.TotalObservedDemand = totalObservedDemand;
         metric.CalculationStage = policy.Stage;
         metric.ConfidenceLevel = policy.Confidence;
-        metric.CalculationReason = string.Concat(
-            policy.Explanation,
-            $" Service level {serviceLevel:0.0000} (Z={policy.ZScore:0.0000}); ",
-            $"demand mean/stddev {policy.AppliedAverageDailyDemand:0.####}/{policy.DemandStandardDeviation:0.####}; ",
-            $"lead-time mean/stddev {policy.AverageLeadTimeDays:0.####}/{policy.LeadTimeStandardDeviation:0.####}; ",
-            $"safety/reorder/target {policy.SafetyStock}/{policy.ReorderPoint}/{policy.TargetStock}; ",
-            $"manual override: {(policy.ManualOverrideUsed ? "yes" : "no")}.");
+        metric.CalculationReason = policy.Stage switch
+        {
+            InventoryCalculationStages.ColdStart => "Cold-start",
+            InventoryCalculationStages.Learning => "Learning",
+            InventoryCalculationStages.DataDriven => "Data-driven",
+            InventoryCalculationStages.Manual => "Manual",
+            _ => policy.Stage
+        };
         metric.LastCalculatedAt = calculationTime;
         metric.CalculationVersion = InventoryDefaults.CalculationVersion;
     }

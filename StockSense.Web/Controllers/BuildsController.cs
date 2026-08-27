@@ -125,6 +125,8 @@ public class BuildsController : ControllerBase
         };
 
         await _buildRepo.AddAsync(request);
+        if (motorcycle is not null)
+            _context.Entry(motorcycle).State = EntityState.Unchanged;
         await _buildRepo.SaveChangesAsync();
         return Ok(MapToDto(request));
     }

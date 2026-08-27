@@ -1,5 +1,7 @@
 @using System.Text.Json
+@using StockSense.Application.DTOs
 @inject IJSRuntime JS
+@inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
@@ -34,7 +36,7 @@
                                 class="chat-suggestion-card">
                             <div class="chat-suggestion-left">
                                 <div class="chat-suggestion-icon">
-                                    <LucideIcon Name="message-circle" Size="15" aria-hidden="true" />
+                                    <LucideIcon Name="@suggestion.Icon" Size="15" aria-hidden="true" />
                                 </div>
                                 <span class="chat-suggestion-label">@suggestion.Label</span>
                             </div>
@@ -66,6 +68,7 @@
                 @foreach (var msg in messages)
                 {
                     var isUser = msg.Role == "user";
+                    var isLastAssistant = !isUser && msg == messages.LastOrDefault(m => m.Role == "assistant");
 
                     <div class="chat-message-row @(isUser ? "chat-message-user" : "chat-message-assistant")">
                         <span class="sr-only">@(isUser ? "You" : roleCopy.AssistantName):</span>
@@ -88,6 +91,19 @@
                                     <div class="chat-assistant-message">
                                         <SafeChatMessage Content="@msg.Content" />
                                     </div>
+
+                                    @if (isLastAssistant && activeWorkflowState?.Status == "awaiting_confirmation")
+                                    {
+                                        <ChatConfirmationUi WorkflowState="@activeWorkflowState"
+                                                            OnConfirm="HandleConfirmAsync"
+                                                            OnChange="HandleChangeAsync"
+                                                            OnCancelWorkflow="HandleCancelWorkflowAsync" />
+                                    }
+                                    else if (isLastAssistant && msg.Actions is { Count: > 0 } && !isSending)
+                                    {
+                                        <ChatActionButtons Actions="@msg.Actions"
+                                                           OnActionClick="HandleActionAsync" />
+                                    }
                                 </div>
                             </div>
                         }
@@ -657,6 +673,122 @@
             border-radius: 16px;
         }
     }
+
+    /* Action Buttons */
+    .chat-action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+    }
+
+    .chat-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .chat-action-btn:hover {
+        background: var(--accent);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .chat-action-btn.chat-action-workflow {
+        border-color: var(--primary);
+        background: color-mix(in srgb, var(--primary) 8%, transparent);
+    }
+
+    /* Confirmation Card */
+    .chat-confirmation-card {
+        margin-top: 12px;
+        border: 1px solid var(--primary);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--card);
+    }
+
+    .chat-confirmation-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 14px;
+        background: color-mix(in srgb, var(--primary) 8%, transparent);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--primary);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .chat-confirmation-body {
+        padding: 14px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--foreground);
+        white-space: pre-wrap;
+    }
+
+    .chat-confirmation-actions {
+        display: flex;
+        gap: 8px;
+        padding: 10px 14px;
+        border-top: 1px solid var(--border);
+    }
+
+    .chat-confirm-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 7px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .chat-confirm-yes {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        border-color: var(--primary);
+    }
+
+    .chat-confirm-yes:hover {
+        opacity: 0.9;
+    }
+
+    .chat-confirm-change {
+        background: var(--card);
+        color: var(--foreground);
+    }
+
+    .chat-confirm-change:hover {
+        background: var(--accent);
+    }
+
+    .chat-confirm-cancel {
+        background: var(--card);
+        color: var(--muted-foreground);
+    }
+
+    .chat-confirm-cancel:hover {
+        background: color-mix(in srgb, var(--destructive) 10%, transparent);
+        color: var(--destructive);
+        border-color: var(--destructive);
+    }
 </style>
 
 @code {
@@ -675,6 +807,7 @@
     private ElementReference sendButtonElement;
     private IReadOnlyList<AssistanceSuggestion> suggestions = AssistanceSuggestions.ForRole(null);
     private AssistanceRoleCopy roleCopy = AssistanceRolePresentation.ForRole(null);
+    private WorkflowState? activeWorkflowState;
 
     [Parameter]
     public bool ShowInitialLoading { get; set; }
@@ -781,7 +914,7 @@
                 "stockSenseApi.postJson",
                 componentLifetime.Token,
                 "api/assistance",
-                new AssistanceRequest(request.Message, request.History));
+                new AssistanceRequest(request.Message, request.History, activeWorkflowState));
 
             if (isDisposed)
                 return;
@@ -797,7 +930,11 @@
 
             var result = JsonSerializer.Deserialize<AssistanceResponse>(
                 response.Body,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                });
             if (string.IsNullOrWhiteSpace(result?.Reply))
             {
                 errorMessage = "The assistant returned an empty response. Please try again.";
@@ -805,7 +942,18 @@
                 return;
             }
 
-            messages.Add(new ChatMessage("assistant", result.Reply));
+            messages.Add(new ChatMessage("assistant", result.Reply, result.Actions));
+            activeWorkflowState = result.WorkflowState;
+
+            // Auto-execute book_appointment actions — the backend returns the
+            // booking data and the frontend calls POST api/appointments directly.
+            var bookAction = result.Actions?.FirstOrDefault(
+                a => a.ActionType == "book_appointment" && a.BookingData is { Count: > 0 });
+            if (bookAction is not null)
+            {
+                await BookAppointmentAsync(bookAction.BookingData!);
+                return;
+            }
         }
         catch (HttpRequestException exception)
         {
@@ -870,7 +1018,117 @@
         message = string.Empty;
         errorMessage = null;
         failedRequest = null;
+        activeWorkflowState = null;
         await TryFocusComposerAsync();
+    }
+
+    private async Task HandleActionAsync(ChatAction action)
+    {
+        if (action.ActionType == "navigate" && !string.IsNullOrEmpty(action.Url))
+        {
+            NavigationManager.NavigateTo(action.Url);
+        }
+        else if (action.ActionType == "workflow" && !string.IsNullOrEmpty(action.WorkflowType))
+        {
+            var promptMap = new Dictionary<string, string>
+            {
+                ["book_appointment"] = "Book an appointment.",
+                ["cancel_appointment"] = "Cancel my appointment.",
+                ["get_quote"] = "Get a quote.",
+                ["custom_build"] = "Start a custom build.",
+            };
+            message = promptMap.TryGetValue(action.WorkflowType, out var wfPrompt)
+                ? wfPrompt
+                : $"I want to {action.Label.ToLower()}";
+            await SendAsync();
+        }
+        else if (action.ActionType == "chat" && !string.IsNullOrEmpty(action.Prompt))
+        {
+            message = action.Prompt;
+            await SendAsync();
+        }
+        else if (action.ActionType == "book_appointment" && action.BookingData is { Count: > 0 })
+        {
+            await BookAppointmentAsync(action.BookingData);
+        }
+    }
+
+    private async Task BookAppointmentAsync(Dictionary<string, string> bookingData)
+    {
+        isSending = true;
+        try
+        {
+            var dateStr = bookingData.GetValueOrDefault("date", "");
+            var timeStr = bookingData.GetValueOrDefault("time", "");
+            var serviceStr = bookingData.GetValueOrDefault("service", "");
+            var mechanicStr = bookingData.GetValueOrDefault("mechanic", "");
+            var contactStr = bookingData.GetValueOrDefault("contact_number", "");
+
+            if (!DateTime.TryParse(dateStr, out var appointmentDate))
+            {
+                appointmentDate = DateTime.Today;
+            }
+
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var customerName = user.Identity?.Name ?? "";
+
+            var newAppt = new
+            {
+                CustomerName = customerName,
+                ContactNumber = string.IsNullOrWhiteSpace(contactStr) ? null : contactStr,
+                AppointmentDate = DateTime.SpecifyKind(appointmentDate.Date, DateTimeKind.Unspecified),
+                TimeSlot = timeStr,
+                SelectedServices = new List<string> { serviceStr },
+                Category = "General",
+                MechanicName = string.IsNullOrWhiteSpace(mechanicStr) ? null : mechanicStr,
+            };
+
+            var response = await JS.InvokeAsync<BrowserApiResponse>("stockSenseApi.postJson", componentLifetime.Token, "api/appointments", newAppt);
+            if (response.Ok)
+            {
+                messages.Add(new ChatMessage("assistant",
+                    $"Your appointment has been booked successfully!\n\n" +
+                    $"Service: {serviceStr}\n" +
+                    $"Date: {dateStr}\n" +
+                    $"Time: {timeStr}\n" +
+                    $"Mechanic: {(string.IsNullOrWhiteSpace(mechanicStr) ? "Any Available" : mechanicStr)}\n\n" +
+                    $"You can view and manage your booking in My Bookings."));
+                activeWorkflowState = null;
+            }
+            else
+            {
+                messages.Add(new ChatMessage("assistant",
+                    "I couldn't complete the booking. The time slot may be unavailable. Please try booking from the appointment page or choose a different time."));
+            }
+        }
+        catch (Exception)
+        {
+            messages.Add(new ChatMessage("assistant",
+                "I couldn't complete the booking due to a connection issue. Please try booking from the appointment page."));
+        }
+        finally
+        {
+            isSending = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleConfirmAsync()
+    {
+        message = "Yes, confirm";
+        await SendAsync();
+    }
+
+    private async Task HandleChangeAsync()
+    {
+        message = "I want to change something";
+        await SendAsync();
+    }
+
+    private async Task HandleCancelWorkflowAsync()
+    {
+        message = "Cancel this";
+        await SendAsync();
     }
 
     private sealed record FailedAssistanceRequest(
@@ -952,9 +1210,9 @@
         }
     }
 
-    private sealed record ChatMessage(string Role, string Content);
-    private sealed record AssistanceRequest(string Message, IReadOnlyList<ChatMessage> History);
-    private sealed record AssistanceResponse(string Reply);
+    private sealed record ChatMessage(string Role, string Content, IReadOnlyList<ChatAction>? Actions = null);
+    private sealed record AssistanceRequest(string Message, IReadOnlyList<ChatMessage> History, WorkflowState? WorkflowState);
+    private sealed record AssistanceResponse(string Reply, IReadOnlyList<ChatAction>? Actions, WorkflowState? WorkflowState);
 
     public sealed class BrowserApiResponse
     {

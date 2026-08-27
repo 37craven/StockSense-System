@@ -137,7 +137,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                 MinimumOrderQuantity = setting.MinimumOrderQuantity,
                 MaximumStockLevel = setting.MaximumStockLevel, UnitCost = product.UnitCost,
                 EstimatedLineTotal = checked(product.UnitCost * suggested),
-                RecommendationReason = metric.CalculationReason ?? "Inventory position is below target stock."
+                RecommendationReason = RecommendationReasonFor(metric)
             });
         }
 
@@ -276,7 +276,7 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
                         PackageSizeSnapshot = setting.PackageSize,
                         MinimumOrderQuantitySnapshot = setting.MinimumOrderQuantity,
                         UnitCostSnapshot = product.UnitCost, EstimatedLineTotal = lineTotal,
-                        RecommendationReason = metric.CalculationReason ?? "Inventory position is below target stock."
+                        RecommendationReason = RecommendationReasonFor(metric)
                     });
                     slip.TotalEstimatedCost = checked(slip.TotalEstimatedCost + lineTotal);
                 }
@@ -807,6 +807,16 @@ public sealed class OrderSlipWorkflowService : IOrderSlipWorkflowService
         if (value.Length > 50) throw new InvalidOperationException("Location identifier cannot exceed 50 characters.");
         return value;
     }
+
+    private static string RecommendationReasonFor(ProductInventoryMetric metric) =>
+        metric.CalculationStage switch
+        {
+            InventoryCalculationStages.ColdStart => "Cold-start",
+            InventoryCalculationStages.Learning => "Learning",
+            InventoryCalculationStages.DataDriven => "Data-driven",
+            InventoryCalculationStages.Manual => "Manual",
+            _ => "Inventory position is below target stock."
+        };
 
     private static string AppendRemark(string? existing, string addition) =>
         string.IsNullOrWhiteSpace(existing) ? addition.Trim() : $"{existing.Trim()} | {addition.Trim()}";

@@ -41,7 +41,7 @@
             <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
 
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 0.5rem; color: var(--foreground);">Authenticator code</label>
+                <label style="display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 0.5rem; color: var(--foreground);">Authenticator code <span class="text-destructive" aria-hidden="true">*</span></label>
                 <InputText @bind-Value="Input.TwoFactorCode" autocomplete="off" style="width: 100%; padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--text-sm); outline: none; box-sizing: border-box; letter-spacing: 2px; font-weight: 600;" />
                 <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: 0.25rem;">
                     <ValidationMessage For="() => Input.TwoFactorCode" />

@@ -127,12 +127,12 @@ public static partial class ChatMessageFormatter
         return item.Length > 0;
     }
 
-    private static bool IsTableRow(string line) => SplitTableRow(line).Count >= 2;
+    private static bool IsTableRow(string line) => SplitTableRow(line).Count >= 1;
 
     private static bool IsTableSeparator(string line)
     {
         var cells = SplitTableRow(line);
-        return cells.Count >= 2 && cells.All(cell => TableSeparatorCellRegex().IsMatch(cell));
+        return cells.Count >= 1 && cells.All(cell => TableSeparatorCellRegex().IsMatch(cell));
     }
 
     private static IReadOnlyList<string> SplitTableRow(string line) => line.Trim().Trim('|')

@@ -83,14 +83,22 @@ public sealed class AssistanceController(
 
         try
         {
-            var reply = await assistanceClient.AskAsync(
+            var customerName = User.FindFirstValue(ClaimTypes.Name) ?? "";
+            var customerEmail = User.FindFirstValue(ClaimTypes.Email) ?? "";
+            var customerId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+            var (reply, actions, workflowState) = await assistanceClient.AskAsync(
                 message,
                 role,
                 normalizedHistory,
+                request.WorkflowState,
+                customerName,
+                customerEmail,
+                customerId,
                 correlationId,
                 cancellationToken);
             AuditStaffAccess(role, actorHash, correlationId, "succeeded", "completed");
-            return Ok(new AssistanceResponse(reply));
+            return Ok(new AssistanceResponse(reply, actions, workflowState));
         }
         catch (OperationCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
         {
@@ -111,8 +119,76 @@ public sealed class AssistanceController(
         }
     }
 
-    internal static bool ContainsDirectDatabaseQuery(string message) =>
-        Regex.IsMatch(message, @"\b(?:select|sql)\b|\bfrom\s+(?:dbo\.)?\w+", RegexOptions.IgnoreCase);
+    internal static bool ContainsDirectDatabaseQuery(string message)
+    {
+        try
+        {
+            return ExplicitSqlRequestRegex.IsMatch(message)
+                || SchemaQualifiedFromRegex.IsMatch(message)
+                || StandaloneSelectExpressionRegex.IsMatch(message)
+                || SelectProjectionSyntaxRegex.IsMatch(message)
+                || SelectsFromKnownTable(message);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // This is a security boundary. If the one bounded backtracking
+            // matcher reaches its deadline, deny instead of returning a 500.
+            return true;
+        }
+    }
+
+    // Match database language by structure instead of treating ordinary shop
+    // words such as "select" and "from" as SQL on their own. The bounded
+    // SELECT-to-FROM scan keeps the check predictable for the 8,000-character
+    // request limit while accepting normal casing and whitespace variations.
+    private const RegexOptions DirectQueryRegexOptions =
+        RegexOptions.IgnoreCase
+        | RegexOptions.CultureInvariant
+        | RegexOptions.NonBacktracking;
+
+    private static readonly Regex ExplicitSqlRequestRegex = new(
+        @"\bsql\b",
+        DirectQueryRegexOptions,
+        TimeSpan.FromMilliseconds(100));
+
+    private static readonly Regex SchemaQualifiedFromRegex = new(
+        @"\bfrom\s+\[?dbo\]?\s*\.\s*\[?[a-z_][a-z0-9_]*\]?",
+        DirectQueryRegexOptions,
+        TimeSpan.FromMilliseconds(100));
+
+    private static readonly Regex StandaloneSelectExpressionRegex = new(
+        @"\bselect\b\s+(?:@@[a-z_][a-z0-9_]*|\d+(?:\.\d+)?|'(?:''|[^'])*'|(?:count|sum|avg|min|max|getdate|newid)\s*\()",
+        DirectQueryRegexOptions,
+        TimeSpan.FromMilliseconds(100));
+
+    private static readonly Regex SelectProjectionSyntaxRegex = new(
+        @"\bselect\b\s+(?:(?:top\s*\(?\d+\)?|distinct)\s+)*(?:\*|\[[^\]\r\n]{1,128}\]|[a-z_][a-z0-9_]*\s*\.\s*[a-z_][a-z0-9_]*|[a-z_][a-z0-9_]*(?:\s*,\s*[a-z_][a-z0-9_]*)+)\s+from\b",
+        DirectQueryRegexOptions,
+        TimeSpan.FromMilliseconds(100));
+
+    private static readonly Regex SelectFromTargetRegex = new(
+        @"\bselect\b[\s\S]{0,500}?\bfrom\s+(?:(?:\[?dbo\]?\s*\.\s*)?\[?(?<table>[a-z_][a-z0-9_]*)\]?)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        TimeSpan.FromMilliseconds(100));
+
+    private static readonly HashSet<string> KnownDatabaseTables = new(
+        [
+            "products", "suppliers", "transactions", "transactionitems",
+            "orderslips", "orderslipitems", "appointments", "buildrequests",
+            "prebuiltpackages", "prebuiltpackageproduct", "motorcycles"
+        ],
+        StringComparer.OrdinalIgnoreCase);
+
+    private static bool SelectsFromKnownTable(string message)
+    {
+        foreach (Match match in SelectFromTargetRegex.Matches(message))
+        {
+            if (KnownDatabaseTables.Contains(match.Groups["table"].Value))
+                return true;
+        }
+
+        return false;
+    }
 
     internal static string GetAuditActorHash(ClaimsPrincipal user)
     {
@@ -164,8 +240,13 @@ public sealed class AssistanceRequest
 
     public IReadOnlyList<AssistanceHistoryMessage?>? History { get; init; }
 
+    public WorkflowState? WorkflowState { get; init; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? AdditionalProperties { get; init; }
 }
 
-public sealed record AssistanceResponse(string Reply);
+public sealed record AssistanceResponse(
+    string Reply,
+    IReadOnlyList<ChatAction>? Actions = null,
+    WorkflowState? WorkflowState = null);

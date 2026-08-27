@@ -82,4 +82,21 @@ public class ServicesController : ControllerBase
         await _serviceRepo.SaveChangesAsync();
         return Ok();
     }
+
+    [HttpPut("{id:int}/status")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<IActionResult> UpdateServiceStatus(int id, [FromBody] UpdateServiceStatusDto dto)
+    {
+        var status = new[] { "Active", "Inactive" }
+            .SingleOrDefault(value => string.Equals(value, dto.Status?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (status is null)
+            return BadRequest(ApiResponse.Error("Unsupported service status."));
+
+        var service = await _serviceRepo.GetByIdWithProductsAsync(id);
+        if (service == null) return NotFound(ApiResponse.NotFound("Service"));
+
+        service.Status = status;
+        await _serviceRepo.SaveChangesAsync();
+        return Ok(new { message = status == "Active" ? "Service activated." : "Service deactivated." });
+    }
 }

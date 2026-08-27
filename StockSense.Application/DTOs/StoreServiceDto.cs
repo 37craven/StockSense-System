@@ -18,3 +18,8 @@ public class StoreServiceDto
     public string Status { get; set; } = "Active";
     public List<ProductDto> RequiredProducts { get; set; } = new();
 }
+
+public class UpdateServiceStatusDto
+{
+    public string Status { get; set; } = string.Empty;
+}

@@ -73,6 +73,18 @@ public class MechanicAssignmentDto
     public int DurationMinutes { get; set; }
 }
 
+public class UpdateAppointmentDetailsDto
+{
+    public DateTime AppointmentDate { get; set; }
+    public string TimeSlot { get; set; } = string.Empty;
+    public int DurationMinutes { get; set; }
+    public string MechanicName { get; set; } = string.Empty;
+    public string? AdminUserId { get; set; }
+    public string? AdminEmail { get; set; }
+    public string? AdminPin { get; set; }
+    public string? Reason { get; set; }
+}
+
 public class ScheduleAppointmentRequest
 {
     [Required]

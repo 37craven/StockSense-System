@@ -26,7 +26,7 @@ public static class AssistanceRolePresentation
         _ => new(
             "Sap Shop Assistant",
             "How can I help?",
-            "Ask about product availability, motorcycle fitment, services, appointments, or build quotations.",
+            "Book appointments, check product availability, browse services, get quotes, start custom builds, or manage your account.",
             "Ask Sap Shop Assistant...",
             "Stock availability may change.")
     };

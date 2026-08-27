@@ -806,6 +806,7 @@ input[type="number"] {
 .appointment-status--confirmed { border-color: var(--info) !important; background: var(--info-muted) !important; color: var(--info-muted-foreground) !important; }
 .appointment-status--completed { border-color: var(--success) !important; background: var(--success-muted) !important; color: var(--success-muted-foreground) !important; }
 .appointment-status--cancelled { border-color: var(--destructive) !important; background: var(--destructive-muted) !important; color: var(--destructive-muted-foreground) !important; }
+.appointment-status--expired { border-color: var(--muted-foreground) !important; background: var(--muted) !important; color: var(--muted-foreground) !important; }
 .appointment-status--unknown { border-color: var(--border) !important; background: var(--muted) !important; color: var(--muted-foreground) !important; }
 
 .appointment-action {

@@ -40,7 +40,8 @@ else if (!FilteredProducts.Any())
     }
 else
     {
-    <div class="pc-grid" style="--pc-cols-max: @Columns; --pc-min-card: @(MinCardWidth)px;">
+    <div class="pc-grid @(ResponsiveColumns ? "pc-grid-responsive" : "")"
+         style="--pc-cols: @Columns; --pc-min-card-width: @(MinCardWidth)px;">
     @foreach (var p in VisibleProducts)
     {
     var isSelected = IsSelected?.Invoke(p) == true;
@@ -73,6 +74,16 @@ else
     <span class="select-none text-xs text-muted-foreground">Stock: @p.CurrentStock</span>
     </div>
     }
+    @if (ShowQuantityStepper && isSelected)
+    {
+    <div class="pc-stepper">
+    <button type="button" @onclick="() => OnQuantityDecrease.InvokeAsync(p)" @onclick:stopPropagation="true" aria-label="Decrease quantity of @p.Name"
+    style="min-width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">−</button>
+    <span style="min-width: 20px; text-align: center; font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground);">@(GetQuantity?.Invoke(p) ?? 1)</span>
+    <button type="button" @onclick="() => OnQuantityIncrease.InvokeAsync(p)" @onclick:stopPropagation="true" aria-label="Increase quantity of @p.Name"
+    style="min-width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">+</button>
+    </div>
+    }
     </div>
     }
     </div>
@@ -95,14 +106,23 @@ else
     }
     .pc-grid {
     display: grid;
-    grid-template-columns: repeat(
-    auto-fill,
-    minmax(max(var(--pc-min-card, 140px), (100% - (var(--pc-cols-max) - 1) * var(--space-3)) / var(--pc-cols-max)), 1fr)
-    );
+    grid-template-columns: repeat(var(--pc-cols, 6), minmax(0, 1fr));
     grid-auto-rows: max-content;
     gap: var(--space-3);
     min-width: 0;
     overflow: auto;
+    }
+
+    .pc-grid-responsive {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, max(var(--pc-min-card-width, 140px), calc((100% - (var(--pc-cols, 6) - 1) * var(--space-3)) / var(--pc-cols, 6)))), 1fr));
+    }
+
+    @@media (max-width: 1023px) {
+    .pc-grid:not(.pc-grid-responsive) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @@media (max-width: 767px) {
+    .pc-grid { grid-template-columns: minmax(0, 1fr); }
     }
     .pc-card {
     transition: box-shadow 0.25s cubic-bezier(0.25, 2, 0.5, 1);
@@ -110,6 +130,18 @@ else
 
     .pc-card:active {
     box-shadow: inset 0 0 0 2px var(--primary);
+    }
+
+    .pc-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    }
+
+    @@media (min-width: 768px) {
+    .pc-stepper { display: none; }
     }
 
     </style>
@@ -127,6 +159,11 @@ else
     [Parameter] public bool ShowImage { get; set; } = false;
     [Parameter] public int PageSize { get; set; } = 0;
     [Parameter] public int MinCardWidth { get; set; } = 140; // pixels
+    [Parameter] public bool ResponsiveColumns { get; set; }
+    [Parameter] public bool ShowQuantityStepper { get; set; }
+    [Parameter] public Func<Product, int>? GetQuantity { get; set; }
+    [Parameter] public EventCallback<Product> OnQuantityDecrease { get; set; }
+    [Parameter] public EventCallback<Product> OnQuantityIncrease { get; set; }
 
     private List<Product> allProducts = new();
     private IReadOnlyCollection<Product>? _boundProducts;

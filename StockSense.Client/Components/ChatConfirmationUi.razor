@@ -1,0 +1,40 @@
+@using StockSense.Application.DTOs
+
+@if (WorkflowState?.Status == "awaiting_confirmation" && !string.IsNullOrEmpty(WorkflowState.ConfirmationSummary))
+{
+    <div class="chat-confirmation-card">
+        <div class="chat-confirmation-header">
+            <LucideIcon Name="shield-check" Size="16" />
+            <span>Confirmation Required</span>
+        </div>
+        <div class="chat-confirmation-body">
+            @FormatConfirmation(WorkflowState.ConfirmationSummary)
+        </div>
+        <div class="chat-confirmation-actions">
+            <button @onclick="() => OnConfirm.InvokeAsync()" class="chat-confirm-btn chat-confirm-yes">
+                <LucideIcon Name="check" Size="14" /> Confirm
+            </button>
+            <button @onclick="() => OnChange.InvokeAsync()" class="chat-confirm-btn chat-confirm-change">
+                <LucideIcon Name="edit" Size="14" /> Change Details
+            </button>
+            <button @onclick="() => OnCancelWorkflow.InvokeAsync()" class="chat-confirm-btn chat-confirm-cancel">
+                <LucideIcon Name="x" Size="14" /> Cancel
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public WorkflowState? WorkflowState { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnChange { get; set; }
+    [Parameter] public EventCallback OnCancelWorkflow { get; set; }
+
+    private static string FormatConfirmation(string summary)
+    {
+        return summary
+            .Replace("**", "")
+            .Replace("\n\n", "\n")
+            .Trim();
+    }
+}

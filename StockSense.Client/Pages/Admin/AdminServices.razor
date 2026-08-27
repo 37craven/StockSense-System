@@ -5,8 +5,10 @@
 @using System.Net.Http.Json
 @using System.Text.Json
 @using StockSense.Client.Layout
+@using BlazorBlueprint.Primitives.Services
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
+@inject ToastService Toast
 
 <UnsavedChangesGuard IsDirty="@HasUnsavedChanges"
                      Message="Your service changes have not been saved. If you leave now, they will be lost." />
@@ -53,6 +55,15 @@
                     </select>
                     <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
+                <div class="relative">
+                    <select id="service-status-filter" @bind="statusFilter" aria-label="Filter services by status"
+                            class="h-9 w-36 appearance-none rounded-md border border-input bg-background px-4 pr-9 text-sm text-foreground">
+                        <option value="">All statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                    <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                </div>
             </div>
         </div>
 
@@ -69,8 +80,12 @@
                     <div>
                         @* Card header *@
                         <div class="service-management-card__header">
-                            <span class="service-management-card__title">@s.Name</span>
-                            <span class="service-management-card__category">@s.Category</span>
+                            <div style="min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
+                                <span class="service-management-card__title">@s.Name</span>
+                                <span class="service-management-card__category">@s.Category</span>
+                            </div>
+                            <span style="flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid @(string.Equals(s.Status, "Inactive", StringComparison.OrdinalIgnoreCase) ? "var(--muted-foreground)" : "var(--success)"); background: @(string.Equals(s.Status, "Inactive", StringComparison.OrdinalIgnoreCase) ? "var(--muted)" : "var(--success-muted)"); color: @(string.Equals(s.Status, "Inactive", StringComparison.OrdinalIgnoreCase) ? "var(--muted-foreground)" : "var(--success-muted-foreground)");"
+                                  role="status" aria-label="Service status: @s.Status">@s.Status</span>
                         </div>
 
                         @* Card body *@
@@ -104,10 +119,16 @@
                     @* Card footer *@
                     <div class="service-management-card__footer">
                         <span style="font-size: var(--text-sm); font-weight: var(--font-bold); color: var(--foreground);">₱@s.Price.ToString("N0")</span>
-                        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="service-management-card__action" OnClick="() => OpenModal(s)">
-                            <LucideIcon Name="settings-2" Size="14" />
-                            Manage Service
-                        </BbButton>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="service-management-card__action" OnClick="() => ToggleServiceStatus(s)" Disabled="isTogglingStatus">
+                                <LucideIcon Name="power" Size="14" />
+                                @(string.Equals(s.Status, "Inactive", StringComparison.OrdinalIgnoreCase) ? "Activate" : "Deactivate")
+                            </BbButton>
+                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="service-management-card__action" OnClick="() => OpenModal(s)">
+                                <LucideIcon Name="settings-2" Size="14" />
+                                Manage Service
+                            </BbButton>
+                        </div>
                     </div>
                 </article>
             }
@@ -258,7 +279,7 @@
         </BbDialogHeader>
         <div class="px-6 py-5 flex flex-col gap-4">
             <div>
-                <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Service Name</label>
+                <label style="font-size: var(--text-xs); font-weight: bold; margin-bottom: 4px; display: block; color: var(--foreground);">Service Name <span class="text-destructive" aria-hidden="true">*</span></label>
                 <input @bind="newServiceName" placeholder="e.g. Change Oil"
                        aria-invalid="@(!string.IsNullOrWhiteSpace(createServiceError))"
                        aria-describedby="@(string.IsNullOrWhiteSpace(createServiceError) ? null : "create-service-error")"
@@ -371,6 +392,8 @@
     private int NewServiceTotalMinutes => Math.Max(newServiceDays, 0) * 1440 + Math.Max(newServiceHours, 0) * 60 + Math.Max(newServiceMins, 0);
     private string serviceSearch = "";
     private string selectedCategory = "";
+    private string statusFilter = "";
+    private bool isTogglingStatus;
     private decimal editPrice;
     private string editBaseline = "";
     private bool showDiscardModal;
@@ -391,6 +414,8 @@
         .Where(service =>
             (string.IsNullOrWhiteSpace(selectedCategory) ||
              string.Equals(service.Category, selectedCategory, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(statusFilter) ||
+             string.Equals(service.Status, statusFilter, StringComparison.OrdinalIgnoreCase)) &&
             ServiceMatchesSearch(service))
         .ToList() ?? [];
 
@@ -431,6 +456,37 @@
         }
 
         await LoadFromLocalStorage();
+    }
+
+    private async Task ToggleServiceStatus(StoreServiceDto service)
+    {
+        if (isTogglingStatus) return;
+        var target = string.Equals(service.Status, "Active", StringComparison.OrdinalIgnoreCase) ? "Inactive" : "Active";
+        isTogglingStatus = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/services/{service.Id}/status", new UpdateServiceStatusDto { Status = target });
+            if (response.IsSuccessStatusCode)
+            {
+                service.Status = target;
+                Toast.Success(target == "Active"
+                    ? $"\"{service.Name}\" is now bookable by customers."
+                    : $"\"{service.Name}\" is now hidden from customer booking.",
+                    target == "Active" ? "Service activated" : "Service deactivated");
+            }
+            else
+            {
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "The service status could not be updated."), "Update failed");
+            }
+        }
+        catch (Exception exception)
+        {
+            Toast.Error(ApiErrorMessage.FromException(exception, "The service status could not be updated. Please try again."), "Update failed");
+        }
+        finally
+        {
+            isTogglingStatus = false;
+        }
     }
 
     private void OpenCreateModal()

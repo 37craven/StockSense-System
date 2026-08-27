@@ -311,6 +311,7 @@
             width: 50%;
         }
     }
+
 </style>
 
 <div>
@@ -554,7 +555,7 @@
 
 @* DETAIL MODAL *@
 <BbDialog @bind-Open="showDetailModal">
-    <BbDialogContent Style="@($"display: flex; flex-direction: column; height: min(85vh, 800px); width: {(isEditingParts ? "98vw" : "min(96vw, 400px)")}; max-width: {(isEditingParts ? "900px" : "380px")}; padding: 0; overflow: hidden; transition: width 0.3s ease, max-width 0.3s ease;")">
+    <BbDialogContent Style="@($"display: flex; flex-direction: column; max-height: min(85dvh, 800px); min-height: 0; width: {(isEditingParts ? "98vw" : "min(96vw, 400px)")}; max-width: {(isEditingParts ? "900px" : "380px")}; padding: 0; overflow: hidden; transition: width 0.3s ease, max-width 0.3s ease;")" class="flex flex-col overflow-hidden p-0 min-h-0">
         @* ── HEADER ── *@
         <div style="padding: var(--space-4) var(--space-4) 0 var(--space-4); flex-shrink: 0;">
             <BbDialogHeader>
@@ -572,8 +573,8 @@
         </div>
 
         @* ── BODY ── *@
-        <div style="flex: 1; overflow: hidden; padding: var(--space-4); display: flex; gap: var(--space-3); min-height: 0;">
-            <div class="@(isEditingParts ? "hidden md:flex" : "flex") flex-col gap-4 min-w-0 w-full overflow-y-auto">
+        <div style="flex: 1; overflow: hidden; padding: var(--space-4); display: flex; gap: var(--space-3); min-height: 0; max-height: calc(min(85dvh, 800px) - 160px);">
+            <div class="@(isEditingParts ? "hidden md:flex" : "flex") min-h-0 flex-col gap-4 min-w-0 w-full overflow-y-auto overscroll-contain" style="-webkit-overflow-scrolling: touch;">
                 @BuildDetailContent()
             </div>
             @if (isEditingParts)
@@ -586,7 +587,11 @@
                                         IsSelected="p => editPartIds.Contains(p.Id)"
                                         ShowCheckbox="false"
                                         IsDisabled="_ => false"
-                                        AllowDisabledClick="true" />
+                                        AllowDisabledClick="true"
+                                        ShowQuantityStepper="true"
+                                        GetQuantity="p => GetEditQuantity(p.Id)"
+                                        OnQuantityDecrease="p => EditPartQuantity(p.Id, -1)"
+                                        OnQuantityIncrease="p => EditPartQuantity(p.Id, 1)" />
                     </div>
                 </div>
             }
@@ -703,7 +708,7 @@
         </BbDialogHeader>
         @if (!isAdmin)
         {
-            <label for="build-admin-user" class="text-sm font-medium">Approving admin</label>
+            <label for="build-admin-user" class="text-sm font-medium">Approving admin <span class="text-destructive" aria-hidden="true">*</span></label>
             <select id="build-admin-user" @bind="restrictedAdminUserId" disabled="@isLoadingAdminOptions"
                     class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-required="true"
                     aria-describedby="build-admin-help">
@@ -721,7 +726,7 @@
             {
                 <p id="build-admin-help" class="text-xs text-muted-foreground">Choose the admin who is approving this change.</p>
             }
-            <label for="build-admin-pin" class="text-sm font-medium">Admin PIN</label>
+            <label for="build-admin-pin" class="text-sm font-medium">Admin PIN <span class="text-destructive" aria-hidden="true">*</span></label>
             <div class="relative">
                 <input id="build-admin-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"
                        @bind="restrictedAdminPin" maxlength="6" class="password-with-toggle w-full rounded-md border border-input bg-background px-3 py-2 pr-12 text-sm"
@@ -734,7 +739,7 @@
             </div>
             <p id="build-pin-help" class="text-xs text-muted-foreground">Enter the admin's 6-digit PIN.</p>
         }
-        <label for="build-change-reason" class="text-sm font-medium">Reason</label>
+        <label for="build-change-reason" class="text-sm font-medium">Reason <span class="text-destructive" aria-hidden="true">*</span></label>
         <textarea id="build-change-reason" @bind="restrictedReason" rows="4" maxlength="500"
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   aria-required="true" placeholder="Explain why this change is needed"></textarea>
@@ -758,6 +763,8 @@
 
     private bool showDetailModal = false;
     private BuildRequestDto? selectedBuild;
+    private List<WorkOrderAudit>? buildAuditTrail;
+    private Dictionary<string, string> auditActorNames = [];
     private string sortColumn = "date";
     private bool sortAsc = false;
     private string checkoutPaymentMethod = "Cash";
@@ -893,6 +900,7 @@
             allBuilds = builds.Select(b => MapToDto(b, users)).ToList();
             selectedBuild = allBuilds?.FirstOrDefault(b => b.Id == selectedBuild.Id);
             isEditingParts = false;
+            await LoadAuditTrail(selectedBuild!.Id);
         }
         catch
         {
@@ -1264,13 +1272,46 @@
 
     private Task ReleaseProductReservations(string? selectedPartsJson) => Task.CompletedTask;
 
-    private void OpenDetail(BuildRequestDto build)
+    private async Task OpenDetail(BuildRequestDto build)
     {
         selectedBuild = build;
         checkoutPaymentMethod = "Cash";
         checkoutReference = null;
         checkoutError = null;
+        isEditingParts = false;
+        editPartIds.Clear();
+        editedPrices.Clear();
+        editQuantities.Clear();
         showDetailModal = true;
+        await LoadAuditTrail(build.Id);
+    }
+
+    private async Task LoadAuditTrail(int buildId)
+    {
+        buildAuditTrail = null;
+        auditActorNames = [];
+        try
+        {
+            var audits = await DbContext.WorkOrderAudits
+                .AsNoTracking()
+                .Where(audit => audit.WorkOrderType == "Build" && audit.WorkOrderId == buildId)
+                .OrderByDescending(audit => audit.CreatedAt)
+                .ToListAsync();
+            var actorIds = audits
+                .Select(audit => audit.ActorUserId)
+                .Where(userId => !string.IsNullOrEmpty(userId))
+                .Distinct()
+                .ToList();
+            var users = await UserManager.Users.AsNoTracking()
+                .Where(user => actorIds.Contains(user.Id))
+                .ToListAsync();
+            auditActorNames = users.ToDictionary(user => user.Id, GetFullName);
+            buildAuditTrail = audits;
+        }
+        catch
+        {
+            buildAuditTrail = [];
+        }
     }
 
     private List<ProductDto> ParseParts(string json)
@@ -1402,6 +1443,7 @@
                 <span role="alert" style="color: var(--destructive-muted-foreground); font-size: var(--text-xs);">@checkoutError</span>
             }
         }
+
     </text>;
 
     private static string GetStatusClass(string? status) => status?.ToLowerInvariant() switch
@@ -1420,4 +1462,37 @@
         "Completed" => "build-action--positive",
         _ => "build-action--primary"
     };
+
+    private static string FormatAuditAction(string? action) => action switch
+    {
+        "StatusChanged" => "Status changed",
+        "MechanicAssigned" => "Mechanic assigned",
+        "ProductsChanged" or "PartsChanged" => "Parts updated",
+        _ => action ?? "Change"
+    };
+
+    private static string FormatAuditChange(string? action, string? previous, string? next)
+    {
+        if (action is "ProductsChanged" or "PartsChanged") return "Updated selected parts";
+        if (!string.IsNullOrEmpty(previous) && !string.IsNullOrEmpty(next)) return $"{previous} → {next}";
+        if (!string.IsNullOrEmpty(previous)) return $"From {previous}";
+        if (!string.IsNullOrEmpty(next)) return $"To {next}";
+        return "";
+    }
+
+    private static string GetFullName(ApplicationUser user)
+    {
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        return string.IsNullOrWhiteSpace(fullName)
+            ? user.Email?.Split('@')[0] ?? "User"
+            : fullName;
+    }
+
+    private string AuditActorName(WorkOrderAudit entry)
+    {
+        auditActorNames.TryGetValue(entry.ActorUserId, out var name);
+        return string.IsNullOrWhiteSpace(name)
+            ? entry.ActorRole
+            : $"{name} ({entry.ActorRole})";
+    }
 }

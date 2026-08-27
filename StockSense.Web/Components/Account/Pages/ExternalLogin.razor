@@ -37,7 +37,7 @@
             <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.Email" class="form-control" autocomplete="email" placeholder="Please enter your email." />
-                <label for="email" class="form-label">Email</label>
+                <label for="email" class="form-label">Email <span class="text-destructive" aria-hidden="true">*</span></label>
                 <ValidationMessage For="() => Input.Email" />
             </div>
             <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>

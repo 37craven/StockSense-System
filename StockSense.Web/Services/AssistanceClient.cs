@@ -7,27 +7,35 @@ namespace StockSense.Web.Services;
 
 public interface IAssistanceClient
 {
-    Task<string> AskAsync(
+    Task<(string Reply, IReadOnlyList<ChatAction>? Actions, WorkflowState? WorkflowState)> AskAsync(
         string message,
         string userRole,
         IReadOnlyList<AssistanceHistoryMessage> history,
+        WorkflowState? workflowState,
+        string customerName,
+        string customerEmail,
+        string customerUserId,
         string correlationId,
         CancellationToken cancellationToken);
 }
 
 public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceClient> logger) : IAssistanceClient
 {
-    public async Task<string> AskAsync(
+    public async Task<(string Reply, IReadOnlyList<ChatAction>? Actions, WorkflowState? WorkflowState)> AskAsync(
         string message,
         string userRole,
         IReadOnlyList<AssistanceHistoryMessage> history,
+        WorkflowState? workflowState,
+        string customerName,
+        string customerEmail,
+        string customerUserId,
         string correlationId,
         CancellationToken cancellationToken)
     {
         var endpoint = GetChatEndpoint(httpClient.BaseAddress);
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
-            Content = JsonContent.Create(new ChatbotRequest(message, userRole, history))
+            Content = JsonContent.Create(new ChatbotRequest(message, userRole, history, workflowState, customerName, customerEmail, customerUserId))
         };
         request.Headers.TryAddWithoutValidation("X-Correlation-ID", correlationId);
         using var response = await httpClient.SendAsync(request, cancellationToken);
@@ -42,14 +50,20 @@ public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceCl
 
         try
         {
-            var result = await response.Content.ReadFromJsonAsync<ChatbotResponse>(cancellationToken: cancellationToken);
+            var result = await response.Content.ReadFromJsonAsync<ChatbotResponse>(
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                },
+                cancellationToken);
             if (string.IsNullOrWhiteSpace(result?.Reply))
             {
                 logger.LogWarning("Chatbot returned an empty or invalid response.");
                 throw new AssistanceUpstreamException();
             }
 
-            return result.Reply;
+            return (result.Reply, result.Actions, result.WorkflowState);
         }
         catch (JsonException exception)
         {
@@ -72,8 +86,15 @@ public sealed class AssistanceClient(HttpClient httpClient, ILogger<AssistanceCl
     private sealed record ChatbotRequest(
         string Message,
         [property: JsonPropertyName("user_role")] string UserRole,
-        IReadOnlyList<AssistanceHistoryMessage> History);
-    private sealed record ChatbotResponse(string Reply);
+        IReadOnlyList<AssistanceHistoryMessage> History,
+        [property: JsonPropertyName("workflow_state")] WorkflowState? WorkflowState,
+        [property: JsonPropertyName("customer_name")] string CustomerName,
+        [property: JsonPropertyName("customer_email")] string CustomerEmail,
+        [property: JsonPropertyName("customer_user_id")] string CustomerUserId);
+    private sealed record ChatbotResponse(
+        string Reply,
+        IReadOnlyList<ChatAction>? Actions,
+        WorkflowState? WorkflowState);
 }
 
 public sealed class AssistanceUpstreamException : Exception
