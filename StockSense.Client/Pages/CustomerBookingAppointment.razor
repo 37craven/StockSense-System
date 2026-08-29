@@ -152,7 +152,7 @@
                             }
                             else
                             {
-                                <span>Confirm & Book</span>
+                                <span>Confirm & Pay Online</span>
                             }
                         </BbButton>
                     }
@@ -420,6 +420,11 @@
                         <p class="text-xs text-muted-foreground m-0 mb-5">Double-check everything before confirming.</p>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3 my-4">
+                            <div class="pt-2 p-4 rounded-lg bg-card border border-border lg:col-span-2">
+                                <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Downpayment Due Today</span>
+                                <p class="text-sm font-medium text-foreground mt-1 mb-0">₱@ServiceOnlyTotal.ToString("N0") <span class="text-xs text-muted-foreground">— 100% of service fees (parts are excluded and paid at the shop on completion)</span></p>
+                                <p class="text-xs text-muted-foreground mt-1 mb-0">Payment is required to book. Completing payment does not guarantee schedule confirmation — a staff member will confirm your slot.</p>
+                            </div>
                             <div class="pt-2 p-4 rounded-lg bg-card border border-border">
                                 <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Customer</span>
                                 <p class="text-sm font-medium text-foreground mt-1 mb-0">@newAppt.CustomerName</p>
@@ -569,14 +574,50 @@
         <BbDialog @bind-Open="showSuccessModal">
             <BbDialogContent Class="max-w-sm">
                 <div class="flex flex-col items-center text-center p-4 px-2 pb-2">
-                    <div class="w-[72px] h-[72px] rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
-                        <LucideIcon Name="calendar-check" Size="36" />
-                    </div>
-                    <BbDialogTitle>Booking Confirmed!</BbDialogTitle>
-                    <BbDialogDescription class="mb-5">
-                        Your appointment has been successfully scheduled.
-                    </BbDialogDescription>
+                    @if (successPaymentStatus == "Paid")
+                    {
+                        <div class="w-[72px] h-[72px] rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-4">
+                            <LucideIcon Name="circle-check" Size="36" />
+                        </div>
+                        <BbDialogTitle>Booking Confirmed & Paid!</BbDialogTitle>
+                        <BbDialogDescription class="mb-5">
+                            Your appointment has been successfully scheduled and your service payment has been received. A staff member will confirm your slot shortly.
+                        </BbDialogDescription>
+                    }
+                    else if (successPaymentStatus == "AwaitingPayment")
+                    {
+                        <div class="w-[72px] h-[72px] rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-4">
+                            <LucideIcon Name="clock" Size="36" />
+                        </div>
+                        <BbDialogTitle>Booking Created!</BbDialogTitle>
+                        <BbDialogDescription class="mb-5">
+                            Your appointment has been saved. Complete your service payment to secure your booking.
+                        </BbDialogDescription>
+                    }
+                    else
+                    {
+                        <div class="w-[72px] h-[72px] rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
+                            <LucideIcon Name="calendar-check" Size="36" />
+                        </div>
+                        <BbDialogTitle>Booking Confirmed!</BbDialogTitle>
+                        <BbDialogDescription class="mb-5">
+                            Your appointment has been successfully scheduled.
+                        </BbDialogDescription>
+                    }
                     <div class="w-full flex flex-col gap-2">
+                        @if (successPaymentStatus == "AwaitingPayment" && lastBookedAppointmentId.HasValue)
+                        {
+                            <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="CheckSuccessPaymentStatus" Disabled="@isCheckingPayment">
+                                @if (isCheckingPayment)
+                                {
+                                    <BbSpinner Size="SpinnerSize.Small" />
+                                }
+                                else
+                                {
+                                    <span>I've completed payment — check status</span>
+                                }
+                            </BbButton>
+                        }
                         <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick='() => NavigationManager.NavigateTo("/my-bookings")'>
                             View My Bookings
                         </BbButton>
@@ -618,6 +659,9 @@
     private string? productModalCategory;
     private ServiceOption? productModalService;
     private ProductDto? productModalPicked;
+    private int? lastBookedAppointmentId;
+    private string successPaymentStatus = "NotRequired";
+    private bool isCheckingPayment;
     private bool HasUnsavedBooking => !showSuccessModal &&
         (SelectedServices.Any() || currentStep > 1 || newAppt.MotorcycleId.HasValue || !string.IsNullOrWhiteSpace(newAppt.TimeSlot));
 
@@ -718,6 +762,7 @@
     private IEnumerable<ServiceOption> SelectedServices => availableServices.Where(s => s.IsSelected);
 
     private decimal TotalPrice => SelectedServices.Sum(s => s.TotalServicePrice);
+    private decimal ServiceOnlyTotal => SelectedServices.Sum(s => s.Price);
     private int TotalDurationMinutes => SelectedServices.Sum(s => s.EstimatedMinutes);
 
     [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
@@ -1069,8 +1114,26 @@
             var response = await JSRuntime.InvokeAsync<BrowserApiResponse>("stockSenseApi.postJson", "api/appointments", newAppt);
             if (response.Ok)
             {
-                ResetBookingState();
-                showSuccessModal = true;
+                int? appointmentId = null;
+                try
+                {
+                    using var bookingDoc = JsonDocument.Parse(response.Body);
+                    var bookingRoot = bookingDoc.RootElement;
+                    if (bookingRoot.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.Number)
+                        appointmentId = idEl.GetInt32();
+                }
+                catch { }
+
+                if (appointmentId is null)
+                {
+                    Toast.Info("Your appointment is booked. Complete payment from My Bookings.", "Payment not started");
+                    ResetBookingState();
+                    showSuccessModal = true;
+                }
+                else
+                {
+                    await StartPaymentAsync(appointmentId.Value);
+                }
             }
             else
             {
@@ -1088,6 +1151,40 @@
             Toast.Error(ToBookingErrorDescription(error), "Booking not submitted");
         }
         finally { isProcessing = false; }
+    }
+
+    private async Task StartPaymentAsync(int appointmentId)
+    {
+        try
+        {
+            var pay = await JSRuntime.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.postJson", $"api/appointments/{appointmentId}/create-payment", new { });
+            if (pay.Ok)
+            {
+                string? checkoutUrl = null;
+                using var doc = JsonDocument.Parse(pay.Body);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("checkoutUrl", out var urlEl) && urlEl.ValueKind == JsonValueKind.String)
+                    checkoutUrl = urlEl.GetString();
+                if (root.TryGetProperty("paymentStatus", out var psEl) && psEl.ValueKind == JsonValueKind.String)
+                    successPaymentStatus = psEl.GetString() ?? "AwaitingPayment";
+
+                lastBookedAppointmentId = appointmentId;
+                ResetBookingState();
+                showSuccessModal = true;
+
+                if (!string.IsNullOrEmpty(checkoutUrl))
+                {
+                    await JSRuntime.InvokeVoidAsync("window.open", checkoutUrl, "_blank");
+                    return;
+                }
+            }
+        }
+        catch { }
+
+        Toast.Info("Your appointment is booked. Complete payment from My Bookings.", "Payment pending");
+        ResetBookingState();
+        showSuccessModal = true;
     }
 
     private static string ToBookingErrorDescription(string error) =>
@@ -1153,7 +1250,35 @@
     private void CloseSuccessModal()
     {
         showSuccessModal = false;
+        lastBookedAppointmentId = null;
+        successPaymentStatus = "NotRequired";
         ResetBookingState();
+    }
+
+    private async Task CheckSuccessPaymentStatus()
+    {
+        if (lastBookedAppointmentId is null || isCheckingPayment) return;
+        isCheckingPayment = true;
+        try
+        {
+            var result = await BrowserGetAsync<PaymentStatusResponse>($"api/appointments/{lastBookedAppointmentId}/payment-status");
+            if (result is not null)
+            {
+                var previous = successPaymentStatus;
+                successPaymentStatus = result.PaymentStatus;
+                if (result.PaymentStatus == "Paid" && previous != "Paid")
+                    Toast.Success("Payment received! Your booking is all set.");
+                else if (result.PaymentStatus == "AwaitingPayment")
+                    Toast.Info("Payment not yet received. Complete the checkout in the other tab, then try again.", "Still pending");
+            }
+        }
+        catch { Toast.Error("Could not check payment status. Please try again."); }
+        finally { isCheckingPayment = false; }
+    }
+
+    private sealed class PaymentStatusResponse
+    {
+        public string PaymentStatus { get; set; } = "NotRequired";
     }
 
     private static string FormatTimeSlot(string? value) => TimeOnly.TryParseExact(value?.Trim() ?? "", "HH:mm", out var t) ? t.ToString("h:mm tt") : (TimeOnly.TryParse(value, out var t2) ? t2.ToString("h:mm tt") : value ?? "");

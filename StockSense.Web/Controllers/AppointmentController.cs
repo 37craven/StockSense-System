@@ -26,6 +26,7 @@ public class AppointmentsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly MotorcycleRepository _motorcycleRepository;
     private readonly ILogger<AppointmentsController> _logger;
+    private readonly PayMongoService _payMongo;
     private readonly IAdminPinService? _adminPinService;
     private static TimeZoneInfo PhZone
     {
@@ -45,6 +46,7 @@ public class AppointmentsController : ControllerBase
         ApplicationDbContext context,
         MotorcycleRepository motorcycleRepository,
         ILogger<AppointmentsController> logger,
+        PayMongoService payMongo,
         IAdminPinService? adminPinService = null)
     {
         _repo = repo;
@@ -55,6 +57,7 @@ public class AppointmentsController : ControllerBase
         _adminPinService = adminPinService;
         _motorcycleRepository = motorcycleRepository;
         _logger = logger;
+        _payMongo = payMongo;
     }
 
     [HttpPost]
@@ -168,6 +171,76 @@ public class AppointmentsController : ControllerBase
             _logger.LogError(ex, "Creating an appointment failed.");
             return StatusCode(500, ApiResponse.Error("The appointment could not be booked. Please try again."));
         }
+    }
+
+    [HttpPost("{id}/create-payment")]
+    public async Task<IActionResult> CreatePayment(int id)
+    {
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+
+        var appointment = await _context.Appointments.FindAsync(id);
+        if (appointment is null) return NotFound(ApiResponse.NotFound("Appointment"));
+        if (appointment.CustomerEmail != customer.Email) return Forbid();
+
+        if (appointment.PaymentStatus == "Paid")
+            return Ok(new { checkoutUrl = (string?)null, paymentStatus = "Paid" });
+
+        var serviceNames = appointment.ServicesRequested
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+        var services = await _serviceRepo.GetByNamesAsync(serviceNames);
+        decimal serviceTotal = services.Sum(s => s.Price);
+
+        if (serviceTotal <= 0)
+        {
+            appointment.PaymentStatus = "NotRequired";
+            await _context.SaveChangesAsync();
+            return Ok(new { checkoutUrl = (string?)null, paymentStatus = "NotRequired" });
+        }
+
+        try
+        {
+            var (linkId, checkoutUrl) = await _payMongo.CreatePaymentLinkAsync(
+                serviceTotal,
+                $"Appointment #{id} service fee",
+                $"appt-{id}-{DateTime.UtcNow:yyyyMMddHHmmssfff}");
+            appointment.PaymentLinkId = linkId;
+            appointment.PaymentStatus = "AwaitingPayment";
+            await _context.SaveChangesAsync();
+            return Ok(new { checkoutUrl, paymentStatus = "AwaitingPayment" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Creating PayMongo payment link for appointment {AppointmentId} failed.", id);
+            return StatusCode(502, ApiResponse.Error("The payment page could not be initialized. Please try again."));
+        }
+    }
+
+    [HttpGet("{id}/payment-status")]
+    public async Task<IActionResult> GetPaymentStatus(int id)
+    {
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+
+        var appointment = await _context.Appointments.FindAsync(id);
+        if (appointment is null) return NotFound(ApiResponse.NotFound("Appointment"));
+        if (appointment.CustomerEmail != customer.Email) return Forbid();
+
+        if (appointment.PaymentStatus is "Paid" or "NotRequired")
+            return Ok(new { paymentStatus = appointment.PaymentStatus });
+
+        if (string.IsNullOrEmpty(appointment.PaymentLinkId))
+            return Ok(new { paymentStatus = appointment.PaymentStatus });
+
+        var status = await _payMongo.GetLinkStatusAsync(appointment.PaymentLinkId);
+        if (string.Equals(status, "paid", StringComparison.OrdinalIgnoreCase))
+        {
+            appointment.PaymentStatus = "Paid";
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok(new { paymentStatus = appointment.PaymentStatus });
     }
 
     [HttpGet("booked-slots")]
@@ -623,7 +696,9 @@ public class AppointmentsController : ControllerBase
         CompletedAt = a.CompletedAt, TransactionId = a.TransactionId,
         InvoiceNumber = a.Transaction?.InvoiceNumber,
         MotorcycleId = a.MotorcycleId,
-        Motorcycle = MapMotorcycle(a.Motorcycle)
+        Motorcycle = MapMotorcycle(a.Motorcycle),
+        PaymentLinkId = a.PaymentLinkId,
+        PaymentStatus = a.PaymentStatus
     };
 
     private static MotorcycleOptionDto? MapMotorcycle(Motorcycle? motorcycle) => motorcycle is null
@@ -667,7 +742,8 @@ public class AppointmentsController : ControllerBase
         var pastDue = await _context.Appointments
             .Where(appointment =>
                 (appointment.Status == WorkOrderStatuses.Pending || appointment.Status == WorkOrderStatuses.Confirmed)
-                && appointment.AppointmentDate < today)
+                && appointment.AppointmentDate < today
+                && appointment.PaymentStatus != "Paid")
             .ToListAsync();
 
         foreach (var appointment in pastDue)

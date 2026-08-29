@@ -20,6 +20,8 @@ public class AppointmentDto
     public int DurationMinutes { get; set; }
     public DateTime? CompletedAt { get; set; }
     public int? TransactionId { get; set; }
+    public string? PaymentLinkId { get; set; }
+    public string PaymentStatus { get; set; } = "NotRequired";
     public string? InvoiceNumber { get; set; }
     public int? MotorcycleId { get; set; }
     public MotorcycleOptionDto? Motorcycle { get; set; }

@@ -26,6 +26,8 @@ public class Appointment
     public DateTime? CompletedAt { get; set; }
     public int? TransactionId { get; set; }
     public Transaction? Transaction { get; set; }
+    public string? PaymentLinkId { get; set; }
+    public string PaymentStatus { get; set; } = "NotRequired";
     public int? BuildRequestId { get; set; }
     public BuildRequest? BuildRequest { get; set; }
     public int? MotorcycleId { get; set; }

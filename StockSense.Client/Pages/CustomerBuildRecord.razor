@@ -71,6 +71,25 @@
     }
     else
     {
+        <div class="flex items-center gap-2 mb-3">
+            <span class="text-xs font-medium text-muted-foreground">Sort by:</span>
+            <button @onclick='() => sortKey = "created"'
+                    class="px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150"
+                    style="border-color: @(sortKey == "created" ? "var(--primary)" : "var(--border)"); background-color: @(sortKey == "created" ? "var(--primary)" : "var(--background)"); color: @(sortKey == "created" ? "var(--primary-foreground)" : "var(--foreground)");">
+                Date created
+            </button>
+            <button @onclick='() => sortKey = "price"'
+                    class="px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150"
+                    style="border-color: @(sortKey == "price" ? "var(--primary)" : "var(--border)"); background-color: @(sortKey == "price" ? "var(--primary)" : "var(--background)"); color: @(sortKey == "price" ? "var(--primary-foreground)" : "var(--foreground)");">
+                Price
+            </button>
+            <button @onclick='() => sortKey = "status"'
+                    class="px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150"
+                    style="border-color: @(sortKey == "status" ? "var(--primary)" : "var(--border)"); background-color: @(sortKey == "status" ? "var(--primary)" : "var(--background)"); color: @(sortKey == "status" ? "var(--primary-foreground)" : "var(--foreground)");">
+                Status
+            </button>
+        </div>
+
         @* Desktop table *@
         <div class="hidden" aria-hidden="true">
 
@@ -383,6 +402,8 @@
 
     private bool showAllHistory = false;
 
+    private string sortKey = "created";
+
     private bool showDetailModal;
 
     private BuildRequestDto? CurrentBuild;
@@ -425,12 +446,12 @@
                     );
             }
 
-            return active
-                .Concat(history)
-                .OrderByDescending(
-                    b =>
-                        b.CreatedAt
-                );
+            return sortKey switch
+            {
+                "price" => active.Concat(history).OrderByDescending(b => b.TotalPrice),
+                "status" => active.Concat(history).OrderBy(b => b.Status).ThenByDescending(b => b.CreatedAt),
+                _ => active.Concat(history).OrderByDescending(b => b.CreatedAt)
+            };
         }
     }
 

@@ -5,14 +5,23 @@
 @using StockSense.Application.DTOs
 @using StockSense.Client.Layout
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject ToastService Toast
 
 @attribute [Authorize]
 
 <div class="w-full max-w-[900px] lg:max-w-[640px] mx-auto px-4 pt-8 pb-[200px] lg:pb-8">
 
     <div style="margin-top: 28px; margin-bottom: 20px;">
-        <PageHeader Title="My Appointments"
-                    Subtitle="Your booking history and appointment status." />
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <PageHeader Title="My Appointments"
+                        Subtitle="Your booking history and appointment status." />
+            <button @onclick="() => showCalendarModal = true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-foreground text-xs font-medium hover:bg-muted transition-colors duration-150 shrink-0">
+                <LucideIcon Name="calendar-days" Size="14" />
+                View Calendar
+            </button>
+        </div>
     </div>
 
     @if (isLoading)
@@ -46,6 +55,20 @@
     }
     else
     {
+        <div class="flex items-center gap-2 mb-3">
+            <span class="text-xs font-medium text-muted-foreground">Sort by:</span>
+            <button @onclick='() => sortKey = "scheduled"'
+                    class="px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150"
+                    style="border-color: @(sortKey == "scheduled" ? "var(--primary)" : "var(--border)"); background-color: @(sortKey == "scheduled" ? "var(--primary)" : "var(--background)"); color: @(sortKey == "scheduled" ? "var(--primary-foreground)" : "var(--foreground)");">
+                Scheduled date
+            </button>
+            <button @onclick='() => sortKey = "created"'
+                    class="px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150"
+                    style="border-color: @(sortKey == "created" ? "var(--primary)" : "var(--border)"); background-color: @(sortKey == "created" ? "var(--primary)" : "var(--background)"); color: @(sortKey == "created" ? "var(--primary-foreground)" : "var(--foreground)");">
+                Date created
+            </button>
+        </div>
+
         <div class="flex flex-col gap-3">
 
             @foreach (var appt in FilteredAppointments)
@@ -68,10 +91,12 @@
 
                         </div>
 
-                        <span class="appointment-status-badge @GetStatusClass(appt.Status) shrink-0"
-                              aria-label="Status: @appt.Status">
-                            @appt.Status
-                        </span>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="appointment-status-badge @GetStatusClass(appt.Status) shrink-0"
+                                  aria-label="Status: @appt.Status">
+                                @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+                            </span>
+                        </div>
 
                     </div>
 
@@ -117,7 +142,7 @@
                     @if (selectedAppointment != null)
                     {
                         <span class="appointment-status-badge @GetStatusClass(selectedAppointment.Status)" aria-label="Status: @selectedAppointment.Status">
-                            @selectedAppointment.Status
+                            @selectedAppointment.Status@(selectedAppointment.PaymentStatus == "Paid" ? " · Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
                         </span>
                     }
                 </div>
@@ -175,6 +200,29 @@
                     <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
                     <span class="text-xl font-bold text-primary">₱@selectedAppointment.TotalAmount.ToString("N2")</span>
                 </div>
+
+                @if (selectedAppointment.PaymentStatus == "Paid")
+                {
+                    <div class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-sm text-emerald-700 dark:text-emerald-300">
+                        Service payment received. Your slot will be confirmed by a staff member.
+                    </div>
+                }
+                else if (selectedAppointment.PaymentStatus == "AwaitingPayment")
+                {
+                    <div class="p-3 rounded-lg bg-muted border border-border flex flex-col gap-2">
+                        <p class="text-xs text-muted-foreground m-0">Service fee payment is required to secure this booking.</p>
+                        <div class="flex gap-2 flex-wrap">
+                            <button type="button" @onclick="PayNow" disabled="@isPaymentBusy"
+                                    class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">
+                                Pay now
+                            </button>
+                            <button type="button" @onclick="CheckPaymentStatus" disabled="@isPaymentBusy"
+                                    class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm hover:bg-muted disabled:opacity-50">
+                                Check status
+                            </button>
+                        </div>
+                    </div>
+                }
             }
         </div>
 
@@ -184,6 +232,136 @@
                 <BbButton Variant="ButtonVariant.Destructive" OnClick="() => CancelFromDetail(selectedAppointment!)">Cancel Appointment</BbButton>
             }
             <BbButton Variant="ButtonVariant.Outline" OnClick="CloseAppointmentDetail">Close</BbButton>
+        </div>
+    </BbDialogContent>
+</BbDialog>
+}
+
+@if (showCalendarModal)
+{
+<BbPortalHost />
+<BbDialogProvider />
+
+<BbDialog @bind-Open="showCalendarModal">
+    <BbDialogContent Style="display: flex; flex-direction: column; height: min(85vh, 700px); width: min(96vw, 500px); max-width: 500px; padding: 0; overflow: hidden;">
+        <div class="p-4 pb-0 shrink-0">
+            <BbDialogHeader>
+                <BbDialogTitle>Upcoming Appointments</BbDialogTitle>
+                <BbDialogDescription>Calendar view of your scheduled services.</BbDialogDescription>
+            </BbDialogHeader>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+            <div class="bg-card border border-border rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <button @onclick="PrevMonth"
+                            class="w-8 h-8 flex items-center justify-center rounded-full border-none bg-transparent cursor-pointer text-foreground hover:bg-muted transition-colors duration-150">
+                        <LucideIcon Name="chevron-left" Size="16" />
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-foreground">
+                            @calendarMonth.ToString("MMMM")
+                            <span class="font-normal text-muted-foreground">@calendarMonth.Year</span>
+                        </span>
+                        <button @onclick="GoToToday"
+                                style="padding: 2px 8px; border-radius: 9999px; border: 1px solid var(--border); background: transparent; font-size: 11px; color: var(--muted-foreground); cursor: pointer;">
+                            Today
+                        </button>
+                    </div>
+                    <button @onclick="NextMonth"
+                            class="w-8 h-8 flex items-center justify-center rounded-full border-none bg-transparent cursor-pointer text-foreground hover:bg-muted transition-colors duration-150">
+                        <LucideIcon Name="chevron-right" Size="16" />
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-7 mb-1">
+                    @foreach (var h in new[] { "M", "T", "W", "T", "F", "S", "S" })
+                    {
+                        <div class="text-center text-xs font-semibold text-muted-foreground py-1">@h</div>
+                    }
+                </div>
+
+                @{
+                    var days = GetCalendarDays().ToList();
+                    var apptCounts = (myAppointments ?? new())
+                        .Where(a => a.Status is "Pending" or "Confirmed")
+                        .GroupBy(a => a.AppointmentDate.Date)
+                        .ToDictionary(g => g.Key, g => g.Count());
+                    for (int row = 0; row < 6; row++)
+                    {
+                        <div class="grid grid-cols-7">
+                            @for (int col = 0; col < 7; col++)
+                            {
+                                var date = days[row * 7 + col];
+                                bool isCurrentMonth = date.Month == calendarMonth.Month;
+                                bool isToday = date.Date == PhToday;
+                                bool isPast = date.Date < PhToday;
+                                int apptCount = apptCounts.GetValueOrDefault(date.Date, 0);
+                                bool isDisabled = isPast || !isCurrentMonth;
+
+                                string cellColor = isDisabled ? "color-mix(in oklch, var(--muted-foreground) 40%, transparent)"
+                                : isToday ? "#fff"
+                                : "var(--foreground)";
+                                string cellBg = isToday ? "var(--primary)" : "transparent";
+                                string fontWeight = isToday || apptCount > 0 ? "700" : "400";
+
+                                <div class="flex flex-col items-center p-0.5">
+                                    <div class="w-8 h-8 min-h-[32px] min-w-[32px] rounded-full text-xs flex flex-col items-center justify-center group cursor-default transition-colors duration-150"
+                                         style="background: @cellBg; color: @cellColor; font-weight: @fontWeight; text-decoration: @(isDisabled ? "line-through" : "none");">
+                                        <span class="group-hover:hidden leading-none">@date.Day</span>
+                                        <span class="hidden group-hover:flex leading-none"
+                                              style="background: #22c55e; color: #000; border-radius: 50%; width: 100%; height: 100%; align-items: center; justify-content: center; font-weight: 700;">@(apptCount > 0 ? apptCount.ToString() : date.Day.ToString())</span>
+                                    </div>
+                                    @if (apptCount > 0 && isCurrentMonth)
+                                    {
+                                        <div style="width: 4px; height: 4px; border-radius: 9999px; background: var(--primary); margin-top: 2px;"></div>
+                                    }
+                                    else
+                                    {
+                                        <div style="width: 4px; height: 4px; margin-top: 2px;"></div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            @{
+                var upcoming = (myAppointments ?? new())
+                    .Where(a => a.AppointmentDate.Date >= PhToday && a.Status is "Pending" or "Confirmed")
+                    .OrderBy(a => a.AppointmentDate)
+                    .ThenBy(a => TimeOnly.TryParseExact(a.TimeSlot?.Trim() ?? "", "HH:mm", out var t) ? t : TimeOnly.MaxValue)
+                    .ToList();
+            }
+            @if (upcoming.Any())
+            {
+                <div>
+                    <div class="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Upcoming</div>
+                    <div class="flex flex-col gap-2">
+                        @foreach (var appt in upcoming)
+                        {
+                            <div class="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-foreground">@appt.AppointmentDate.ToString("MMM dd, yyyy") · @FormatTimeSlot(appt.TimeSlot)</div>
+                                    <div class="text-xs text-muted-foreground mt-0.5 truncate">@appt.ServicesRequested</div>
+                                </div>
+                                <span class="appointment-status-badge @GetStatusClass(appt.Status) shrink-0 ml-2">
+                                    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-4 text-sm text-muted-foreground">No upcoming appointments.</div>
+            }
+        </div>
+
+        <div class="flex justify-end p-3 px-4 border-t border-border shrink-0">
+            <BbButton Variant="ButtonVariant.Outline" OnClick="() => showCalendarModal = false">Close</BbButton>
         </div>
     </BbDialogContent>
 </BbDialog>
@@ -203,6 +381,17 @@
     private bool showDetailModal;
 
     private AppointmentDto? selectedAppointment;
+
+    private bool isPaymentBusy;
+
+    private string sortKey = "scheduled";
+
+    private bool showCalendarModal;
+    private DateTime calendarMonth = new(DateTime.Now.Year, DateTime.Now.Month, 1);
+
+    private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+    private static DateTime PhNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
+    private static DateTime PhToday => PhNow.Date;
 
 
     private IEnumerable<AppointmentDto> FilteredAppointments
@@ -241,10 +430,13 @@
                     );
             }
 
-            return active
-                .Concat(history)
-                .OrderByDescending(a => a.AppointmentDate)
-                .ThenByDescending(a => TimeOnly.TryParseExact(a.TimeSlot?.Trim() ?? "", "HH:mm", out var t) ? t : TimeOnly.MaxValue);
+            return sortKey switch
+            {
+                "created" => active.Concat(history).OrderByDescending(a => a.CreatedAt),
+                _ => active.Concat(history)
+                    .OrderByDescending(a => a.AppointmentDate)
+                    .ThenByDescending(a => TimeOnly.TryParseExact(a.TimeSlot?.Trim() ?? "", "HH:mm", out var t) ? t : TimeOnly.MaxValue)
+            };
         }
     }
 
@@ -347,6 +539,69 @@
         catch { }
     }
 
+    private async Task PayNow()
+    {
+        if (selectedAppointment is null || isPaymentBusy) return;
+        isPaymentBusy = true;
+        try
+        {
+            var response = await JSRuntime.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.postJson", $"api/appointments/{selectedAppointment.Id}/create-payment", new { });
+            if (response.Ok)
+            {
+                string? checkoutUrl = null;
+                using var doc = System.Text.Json.JsonDocument.Parse(response.Body);
+                if (doc.RootElement.TryGetProperty("checkoutUrl", out var urlEl) && urlEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                    checkoutUrl = urlEl.GetString();
+                if (!string.IsNullOrEmpty(checkoutUrl))
+                {
+                    await JSRuntime.InvokeVoidAsync("window.open", checkoutUrl, "_blank");
+                    return;
+                }
+            }
+            Toast.Info("Payment is already being processed or not required.", "No action needed");
+        }
+        catch { Toast.Error("Could not reach the payment service. Please try again."); }
+        finally { isPaymentBusy = false; }
+    }
+
+    private async Task CheckPaymentStatus()
+    {
+        if (selectedAppointment is null || isPaymentBusy) return;
+        isPaymentBusy = true;
+        try
+        {
+            var result = await BrowserGetAsync<PaymentStatusResponse>($"api/appointments/{selectedAppointment.Id}/payment-status");
+            if (result is not null)
+            {
+                var previous = selectedAppointment.PaymentStatus;
+                selectedAppointment.PaymentStatus = result.PaymentStatus;
+                if (result.PaymentStatus == "Paid" && previous != "Paid")
+                    Toast.Success("Payment received! A staff member will confirm your appointment shortly.");
+                else
+                    Toast.Info($"Payment status: {result.PaymentStatus}.", "Status updated");
+            }
+        }
+        catch { Toast.Error("Could not check payment status. Please try again."); }
+        finally { isPaymentBusy = false; }
+    }
+
+    private IEnumerable<DateTime> GetCalendarDays()
+    {
+        var firstDay = new DateTime(calendarMonth.Year, calendarMonth.Month, 1);
+        int offset = ((int)firstDay.DayOfWeek + 6) % 7;
+        var gridStart = firstDay.AddDays(-offset);
+        return Enumerable.Range(0, 42).Select(i => gridStart.AddDays(i));
+    }
+
+    private void PrevMonth() => calendarMonth = calendarMonth.AddMonths(-1);
+    private void NextMonth() => calendarMonth = calendarMonth.AddMonths(1);
+
+    private void GoToToday()
+    {
+        calendarMonth = new DateTime(PhToday.Year, PhToday.Month, 1);
+    }
+
     private ValueTask<T?> BrowserGetAsync<T>(string url) =>
         JSRuntime.InvokeAsync<T?>("stockSenseApi.getJson", url);
 
@@ -355,5 +610,10 @@
         public bool Ok { get; set; }
         public int Status { get; set; }
         public string Body { get; set; } = "";
+    }
+
+    private sealed class PaymentStatusResponse
+    {
+        public string PaymentStatus { get; set; } = "NotRequired";
     }
 }

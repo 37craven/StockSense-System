@@ -794,14 +794,6 @@ input[type="number"] {
     font-weight: 700;
     line-height: 1rem;
 }
-.appointment-status-badge::before {
-    width: 0.375rem;
-    height: 0.375rem;
-    flex-shrink: 0;
-    border-radius: 9999px;
-    background: currentColor;
-    content: "";
-}
 .appointment-status--pending { border-color: var(--warning) !important; background: var(--warning-muted) !important; color: var(--warning-muted-foreground) !important; }
 .appointment-status--confirmed { border-color: var(--info) !important; background: var(--info-muted) !important; color: var(--info-muted-foreground) !important; }
 .appointment-status--completed { border-color: var(--success) !important; background: var(--success-muted) !important; color: var(--success-muted-foreground) !important; }

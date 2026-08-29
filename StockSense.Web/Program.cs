@@ -164,7 +164,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-XSRF-TOKEN";
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
 // --- CONCRETE REPOSITORIES ---
@@ -225,11 +225,25 @@ builder.Services.AddOptions<ChatbotOptions>()
         options => string.IsNullOrEmpty(options.BaseUrl.Query) && string.IsNullOrEmpty(options.BaseUrl.Fragment),
         "Chatbot:BaseUrl cannot contain a query string or fragment.")
     .ValidateOnStart();
+builder.Services.AddOptions<PayMongoOptions>()
+    .Bind(builder.Configuration.GetSection(PayMongoOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(o => o.BaseUrl.IsAbsoluteUri, "PayMongo:BaseUrl must be an absolute URL.")
+    .ValidateOnStart();
 builder.Services.AddHttpClient<IAssistanceClient, AssistanceClient>((services, client) =>
 {
     var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ChatbotOptions>>().Value;
     client.BaseAddress = options.BaseUrl;
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+});
+builder.Services.AddHttpClient<PayMongoService>((services, client) =>
+{
+    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<PayMongoOptions>>().Value;
+    client.BaseAddress = options.BaseUrl;
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+        "Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{options.SecretKey}:")));
+    client.DefaultRequestHeaders.Add("PayMongo-Version", "2025-03-31");
 });
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
