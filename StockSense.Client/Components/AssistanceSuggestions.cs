@@ -1,6 +1,6 @@
 namespace StockSense.Client.Components;
 
-public sealed record AssistanceSuggestion(string Label, string Prompt, string Icon = "message-circle");
+public sealed record AssistanceSuggestion(string Label, string Prompt, string Icon = "message-circle", string? Url = null);
 
 public static class AssistanceSuggestions
 {
@@ -26,11 +26,10 @@ public static class AssistanceSuggestions
             new("Book Appointment", "I want to book an appointment.", "calendar"),
             new("Browse Services", "What services do you offer?", "cog"),
             new("Check Availability", "Which products are currently available?", "search"),
-            new("Get a Quote", "I'd like a parts quote for my motorcycle.", "file-text"),
-            new("Start Custom Build", "I want a custom build for my motorcycle.", "wrench"),
-            new("View My Bookings", "Show my appointment bookings.", "list"),
-            new("View My Builds", "Show my custom builds.", "package"),
-            new("Account Settings", "Take me to my account settings.", "user")
+            new("Start Custom Build", "", "wrench", "/build"),
+            new("Motorcycle Compatibility", "Check motorcycle part compatibility.", "bike"),
+            new("View My Bookings", "show my appointments", "list"),
+            new("View My Builds", "show my builds", "package")
         ]
     };
 }

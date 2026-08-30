@@ -3,7 +3,24 @@ export function scrollToBottom(element) {
         return;
     }
 
-    element.scrollTop = element.scrollHeight;
+    var attempts = 0;
+    var maxAttempts = 10;
+    var lastHeight = 0;
+
+    function scroll() {
+        if (attempts >= maxAttempts) {
+            return;
+        }
+        var currentHeight = element.scrollHeight;
+        element.scrollTop = currentHeight;
+        attempts++;
+        if (currentHeight !== lastHeight) {
+            lastHeight = currentHeight;
+            requestAnimationFrame(scroll);
+        }
+    }
+
+    requestAnimationFrame(scroll);
 }
 
 export function registerChatComposer(textarea, sendButton) {

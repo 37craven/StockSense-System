@@ -2,23 +2,46 @@
 
 @if (WorkflowState?.Status == "awaiting_confirmation" && !string.IsNullOrEmpty(WorkflowState.ConfirmationSummary))
 {
-    <div class="chat-confirmation-card">
-        <div class="chat-confirmation-header">
-            <LucideIcon Name="shield-check" Size="16" />
-            <span>Confirmation Required</span>
+    <div class="chat-review-card">
+        <div class="chat-review-header">
+            <span>Review Your Booking</span>
         </div>
-        <div class="chat-confirmation-body">
-            @FormatConfirmation(WorkflowState.ConfirmationSummary)
+        <div class="chat-review-body">
+            @if (ServiceList.Count > 0)
+            {
+                <div class="chat-review-section">
+                    <span class="chat-review-label">Services</span>
+                    <div class="chat-review-chips">
+                        @foreach (var svc in ServiceList)
+                        {
+                            <span class="chat-review-chip">
+                                @svc
+                                <button type="button" class="chat-review-chip-remove"
+                                        @onclick="() => RemoveServiceAsync(svc)" aria-label="Remove @svc">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+            @foreach (var line in DetailLines)
+            {
+                <div class="chat-review-row">
+                    <span class="chat-review-label">@line.Label</span>
+                    <span class="chat-review-value">@line.Value</span>
+                </div>
+            }
         </div>
-        <div class="chat-confirmation-actions">
-            <button @onclick="() => OnConfirm.InvokeAsync()" class="chat-confirm-btn chat-confirm-yes">
-                <LucideIcon Name="check" Size="14" /> Confirm
+        <div class="chat-review-actions">
+            <button @onclick="() => OnConfirm.InvokeAsync()" class="chat-review-btn chat-review-confirm">
+                Confirm Booking
             </button>
-            <button @onclick="() => OnChange.InvokeAsync()" class="chat-confirm-btn chat-confirm-change">
-                <LucideIcon Name="edit" Size="14" /> Change Details
+            <button @onclick="() => OnChange.InvokeAsync()" class="chat-review-btn chat-review-change">
+                Change Details
             </button>
-            <button @onclick="() => OnCancelWorkflow.InvokeAsync()" class="chat-confirm-btn chat-confirm-cancel">
-                <LucideIcon Name="x" Size="14" /> Cancel
+            <button @onclick="() => OnCancelWorkflow.InvokeAsync()" class="chat-review-btn chat-review-cancel">
+                Cancel
             </button>
         </div>
     </div>
@@ -29,12 +52,48 @@
     [Parameter] public EventCallback OnConfirm { get; set; }
     [Parameter] public EventCallback OnChange { get; set; }
     [Parameter] public EventCallback OnCancelWorkflow { get; set; }
+    [Parameter] public EventCallback<string> OnRemoveService { get; set; }
 
-    private static string FormatConfirmation(string summary)
+    private List<string> ServiceList { get; set; } = new();
+    private List<DetailLine> DetailLines { get; set; } = new();
+
+    private sealed record DetailLine(string Label, string Value);
+
+    protected override void OnParametersSet()
     {
-        return summary
-            .Replace("**", "")
-            .Replace("\n\n", "\n")
-            .Trim();
+        ServiceList.Clear();
+        DetailLines.Clear();
+
+        if (WorkflowState?.ConfirmationSummary is not { Length: > 0 } summary)
+            return;
+
+        var lines = summary.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("Booking Summary", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (line.StartsWith("Ready to confirm", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var colonIdx = line.IndexOf(':');
+            if (colonIdx <= 0) continue;
+
+            var label = line[..colonIdx].Trim();
+            var value = line[(colonIdx + 1)..].Trim();
+
+            if (label.Equals("Services", StringComparison.OrdinalIgnoreCase))
+            {
+                ServiceList = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            }
+            else
+            {
+                DetailLines.Add(new DetailLine(label, value));
+            }
+        }
+    }
+
+    private async Task RemoveServiceAsync(string serviceName)
+    {
+        await OnRemoveService.InvokeAsync(serviceName);
     }
 }
