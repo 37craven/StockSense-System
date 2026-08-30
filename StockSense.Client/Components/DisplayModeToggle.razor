@@ -1,0 +1,35 @@
+@using StockSense.Client.Components
+
+<div class="gap-1 rounded-md border border-border bg-muted/30 p-1" role="group" aria-label="@AriaLabel">
+    @foreach (var option in Options)
+    {
+        <button type="button"
+                @onclick="() => OnSelect.InvokeAsync(option.Value)"
+                class="min-h-[36px] px-3 py-1 rounded-md text-sm font-medium cursor-pointer border-none @(option.Value == Selected ? "bg-secondary text-foreground" : "bg-transparent text-muted-foreground")">
+            @option.Label@if (option.Count.HasValue)
+            {
+                <span> (@option.Count.Value)</span>
+            }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Selected { get; set; } = "";
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+    [Parameter] public string AriaLabel { get; set; } = "Toggle";
+    [Parameter] public List<ToggleOption> Options { get; set; } = new();
+
+    public static List<ToggleOption> TableCalendarOptions { get; } = new()
+    {
+        new() { Value = "table", Label = "Table" },
+        new() { Value = "calendar", Label = "Calendar" }
+    };
+
+    public class ToggleOption
+    {
+        public string Value { get; set; } = "";
+        public string Label { get; set; } = "";
+        public int? Count { get; set; }
+    }
+}

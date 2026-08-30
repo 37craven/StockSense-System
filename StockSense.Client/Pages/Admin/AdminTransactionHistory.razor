@@ -26,11 +26,11 @@
     }
 
     .col-type {
-        width: 16%;
+        width: 22%;
     }
 
     .col-pay {
-        width: 16%;
+        width: 10%;
     }
 
     .col-total {
@@ -201,8 +201,7 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        max-width: 100%;
-        min-width: 0;
+        min-width: max-content;
         box-sizing: border-box;
         padding: 4px 10px;
         border: 1px solid transparent;
@@ -283,6 +282,78 @@
     }
 
     .txn-mobile-list { display: none; }
+
+    .txn-dropdown {
+        position: relative;
+        display: inline-flex;
+    }
+
+    .txn-dropdown-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: var(--space-2) var(--space-4);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: transparent;
+        color: var(--muted-foreground);
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        cursor: pointer;
+        transition: background-color 150ms ease, border-color 150ease, color 150ms ease;
+        white-space: nowrap;
+    }
+
+    .txn-dropdown-btn:hover {
+        background: var(--muted);
+        color: var(--foreground);
+    }
+
+    .txn-dropdown-btn-active {
+        border-color: var(--info-muted-foreground);
+        background: var(--info-muted);
+        color: var(--info-muted-foreground);
+    }
+
+    .txn-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 50;
+        min-width: 180px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+        padding: 4px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .txn-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: calc(var(--radius) - 2px);
+        border: none;
+        background: transparent;
+        color: var(--foreground);
+        font-size: var(--text-sm);
+        font-weight: var(--font-medium);
+        cursor: pointer;
+        text-align: left;
+        width: 100%;
+    }
+
+    .txn-dropdown-item:hover {
+        background: var(--muted);
+    }
+
+    .txn-dropdown-item-selected {
+        background: var(--info-muted);
+        color: var(--info-muted-foreground);
+    }
 
     .txn-mobile-card {
         padding: var(--space-4);
@@ -379,7 +450,14 @@
 
 <div>
     <PageHeader Title="Transaction History"
-                Subtitle="Review sales and stock correction records." />
+                Subtitle="Review sales and stock correction records.">
+        <button @onclick='() => mobileMenuOpen = true'
+                class="md:hidden ml-auto"
+                style="padding: 6px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); cursor: pointer; color: var(--foreground); align-self: center;"
+                aria-label="Open filters">
+            <LucideIcon Name="menu" Size="18" />
+        </button>
+    </PageHeader>
 
     @if (allTransactions == null)
     {
@@ -387,52 +465,175 @@
     }
     else
     {
-        <div class="txn-filter-bar" role="group" aria-label="Filter transactions by type">
-                <button @onclick='() => SetFilter(null)'
-                        class="txn-filter @(filterType == null ? "txn-filter-all-active" : "")"
-                        aria-pressed="@(filterType == null)">
-                    All
+        @* MOBILE HAMBURGER OVERLAY *@
+        @if (mobileMenuOpen)
+        {
+            <div style="position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,0.5);"
+                 @onclick='() => mobileMenuOpen = false'></div>
+            <div style="position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: var(--card); border-bottom: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 16px; max-height: 80vh; overflow-y: auto;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: var(--text-base); font-weight: 700; color: var(--foreground);">Filters</span>
+                    <button @onclick='() => mobileMenuOpen = false'
+                            style="background: none; border: none; cursor: pointer; padding: 4px; color: var(--muted-foreground);">
+                        <LucideIcon Name="x" Size="20" />
+                    </button>
+                </div>
+
+                <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending" Inline="true"
+                              OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+                              OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+                              Columns="@GetSortColumns()" />
+
+                <div>
+                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Transaction Type</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <button @onclick='() => { SetFilter(null); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(filterType == null ? "var(--info-muted)" : "transparent"); color: @(filterType == null ? "var(--info-muted-foreground)" : "var(--muted-foreground)");">
+                            All
+                        </button>
+                        <button @onclick='() => { SetFilter("Sale"); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(filterType == "Sale" ? "var(--success-muted)" : "transparent"); color: @(filterType == "Sale" ? "var(--success-muted-foreground)" : "var(--muted-foreground)");">
+                            Sales
+                        </button>
+                        <button @onclick='() => { SetFilter("StockCorrection"); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(filterType == "StockCorrection" ? "var(--warning-muted)" : "transparent"); color: @(filterType == "StockCorrection" ? "var(--warning-muted-foreground)" : "var(--muted-foreground)");">
+                            Corrections
+                        </button>
+                        <button @onclick='() => { SetFilter("PurchaseReceipt"); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(filterType == "PurchaseReceipt" ? "var(--info-muted)" : "transparent"); color: @(filterType == "PurchaseReceipt" ? "var(--info-muted-foreground)" : "var(--muted-foreground)");">
+                            Purchase Receipts
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Date Range</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <button @onclick='() => { SetDays(null); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(daysFilter == null ? "var(--info-muted)" : "transparent"); color: @(daysFilter == null ? "var(--info-muted-foreground)" : "var(--muted-foreground)");">
+                            All days
+                        </button>
+                        <button @onclick='() => { SetDays(0); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(daysFilter == 0 ? "var(--info-muted)" : "transparent"); color: @(daysFilter == 0 ? "var(--info-muted-foreground)" : "var(--muted-foreground)");">
+                            Today
+                        </button>
+                        <button @onclick='() => { SetDays(7); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(daysFilter == 7 ? "var(--info-muted)" : "transparent"); color: @(daysFilter == 7 ? "var(--info-muted-foreground)" : "var(--muted-foreground)");">
+                            Last 7 days
+                        </button>
+                        <button @onclick='() => { SetDays(30); mobileMenuOpen = false; }'
+                                style="padding: 10px 16px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(daysFilter == 30 ? "var(--info-muted)" : "transparent"); color: @(daysFilter == 30 ? "var(--info-muted-foreground)" : "var(--muted-foreground)");">
+                            Last 30 days
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Month</div>
+                    <label class="txn-filter">
+                        <LucideIcon Name="calendar" Size="14" />
+                        <input id="txn-month-mobile" type="month" value="@selectedMonth"
+                               @onchange="e => { selectedMonth = e.Value?.ToString(); currentPage = 1; }"
+                               class="txn-month-input" aria-label="Filter by month" placeholder="Enter Month & Year" />
+                    </label>
+                    @if (!string.IsNullOrWhiteSpace(selectedMonth))
+                    {
+                        <button type="button" class="txn-filter-clear" @onclick="() => selectedMonth = null" aria-label="Clear month filter" style="margin-left: 8px;">
+                            <LucideIcon Name="x" Size="14" />
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+
+        @* DESKTOP FILTERS *@
+        <div class="hidden md:flex items-center justify-between gap-4 mb-4">
+            <div class="flex items-center gap-2">
+                <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
+                              OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+                              OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+                              Columns="@GetSortColumns()" />
+                <div class="txn-dropdown">
+                <button class="txn-dropdown-btn @(filterType != null ? "txn-dropdown-btn-active" : "")"
+                        @onclick="() => { typeDropdownOpen = !typeDropdownOpen; dayDropdownOpen = false; }">
+                    <LucideIcon Name="@GetTypeFilterIcon()" Size="14" />
+                    @GetTypeFilterLabel()
+                    <LucideIcon Name="chevron-down" Size="14" />
                 </button>
-                <button @onclick='() => SetFilter("Sale")'
-                        class="txn-filter @(filterType == "Sale" ? "txn-filter-sale-active" : "")"
-                        aria-pressed="@(filterType == "Sale")">
-                    <LucideIcon Name="shopping-cart" Size="14" />
-                    Sales
-                </button>
-                <button @onclick='() => SetFilter("StockCorrection")'
-                        class="txn-filter @(filterType == "StockCorrection" ? "txn-filter-correction-active" : "")"
-                        aria-pressed="@(filterType == "StockCorrection")">
-                    <LucideIcon Name="pen-line" Size="14" />
-                    Corrections
-                </button>
+                @if (typeDropdownOpen)
+                {
+                    <div class="txn-dropdown-menu">
+                        <button class="txn-dropdown-item @(filterType == null ? "txn-dropdown-item-selected" : "")"
+                                @onclick='() => { SetFilter(null); typeDropdownOpen = false; }'>
+                            <LucideIcon Name="layers" Size="14" /> All Types
+                        </button>
+                        <button class="txn-dropdown-item @(filterType == "Sale" ? "txn-dropdown-item-selected" : "")"
+                                @onclick='() => { SetFilter("Sale"); typeDropdownOpen = false; }'>
+                            <LucideIcon Name="shopping-cart" Size="14" /> Sales
+                        </button>
+                        <button class="txn-dropdown-item @(filterType == "StockCorrection" ? "txn-dropdown-item-selected" : "")"
+                                @onclick='() => { SetFilter("StockCorrection"); typeDropdownOpen = false; }'>
+                            <LucideIcon Name="pen-line" Size="14" /> Corrections
+                        </button>
+                        <button class="txn-dropdown-item @(filterType == "PurchaseReceipt" ? "txn-dropdown-item-selected" : "")"
+                                @onclick='() => { SetFilter("PurchaseReceipt"); typeDropdownOpen = false; }'>
+                            <LucideIcon Name="receipt" Size="14" /> Purchase Receipts
+                        </button>
+                    </div>
+                }
+            </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <div class="txn-dropdown">
+                    <button class="txn-dropdown-btn @(daysFilter != null ? "txn-dropdown-btn-active" : "")"
+                            @onclick="() => { dayDropdownOpen = !dayDropdownOpen; typeDropdownOpen = false; }">
+                        <LucideIcon Name="calendar" Size="14" />
+                        @GetDayFilterLabel()
+                        <LucideIcon Name="chevron-down" Size="14" />
+                    </button>
+                    @if (dayDropdownOpen)
+                    {
+                        <div class="txn-dropdown-menu">
+                            <button class="txn-dropdown-item @(daysFilter == null ? "txn-dropdown-item-selected" : "")"
+                                    @onclick='() => { SetDays(null); dayDropdownOpen = false; }'>
+                                All days
+                            </button>
+                            <button class="txn-dropdown-item @(daysFilter == 0 ? "txn-dropdown-item-selected" : "")"
+                                    @onclick='() => { SetDays(0); dayDropdownOpen = false; }'>
+                                Today
+                            </button>
+                            <button class="txn-dropdown-item @(daysFilter == 7 ? "txn-dropdown-item-selected" : "")"
+                                    @onclick='() => { SetDays(7); dayDropdownOpen = false; }'>
+                                Last 7 days
+                            </button>
+                            <button class="txn-dropdown-item @(daysFilter == 30 ? "txn-dropdown-item-selected" : "")"
+                                    @onclick='() => { SetDays(30); dayDropdownOpen = false; }'>
+                                Last 30 days
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                <label class="txn-filter">
+                    <LucideIcon Name="calendar" Size="14" />
+                    <input id="txn-month" type="month" value="@selectedMonth"
+                           @onchange="e => { selectedMonth = e.Value?.ToString(); currentPage = 1; }"
+                           class="txn-month-input" aria-label="Filter by month" placeholder="Enter Month & Year" />
+                </label>
+                @if (!string.IsNullOrWhiteSpace(selectedMonth))
+                {
+                    <button type="button" class="txn-filter-clear" @onclick="() => selectedMonth = null" aria-label="Clear month filter">
+                        <LucideIcon Name="x" Size="14" />
+                    </button>
+                }
+            </div>
         </div>
 
-        <div class="txn-filter-bar" role="group" aria-label="Filter transactions by date">
-            <label class="txn-filter">
-                <LucideIcon Name="calendar" Size="14" />
-                <input id="txn-month" type="month" value="@selectedMonth"
-                       @onchange="e => { selectedMonth = e.Value?.ToString(); currentPage = 1; }"
-                       class="txn-month-input" aria-label="Filter by month" />
-            </label>
-            @if (!string.IsNullOrWhiteSpace(selectedMonth))
-            {
-                <button type="button" class="txn-filter-clear" @onclick="() => selectedMonth = null" aria-label="Clear month filter">
-                    <LucideIcon Name="x" Size="14" />
-                </button>
-            }
-            <button @onclick='() => SetDays(null)'
-                    class="txn-filter @(daysFilter == null ? "txn-filter-all-active" : "")"
-                    aria-pressed="@(daysFilter == null)">All days</button>
-            <button @onclick='() => SetDays(0)'
-                    class="txn-filter @(daysFilter == 0 ? "txn-filter-all-active" : "")"
-                    aria-pressed="@(daysFilter == 0)">Today</button>
-            <button @onclick='() => SetDays(7)'
-                    class="txn-filter @(daysFilter == 7 ? "txn-filter-all-active" : "")"
-                    aria-pressed="@(daysFilter == 7)">Last 7 days</button>
-            <button @onclick='() => SetDays(30)'
-                    class="txn-filter @(daysFilter == 30 ? "txn-filter-all-active" : "")"
-                    aria-pressed="@(daysFilter == 30)">Last 30 days</button>
-        </div>
+        @if (typeDropdownOpen || dayDropdownOpen)
+        {
+            <div style="position: fixed; inset: 0; z-index: 40;" @onclick="CloseDropdowns"></div>
+        }
 
         <div class="bg-card border border-border rounded-lg">
             <div class="txn-desktop-table overflow-x-auto">
@@ -449,18 +650,18 @@
                     <thead>
                         <tr class="border-b border-border bg-muted/5">
                             <th class="px-4 py-3"><input type="checkbox" aria-label="Select all visible transactions" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th>
-                            <SortableHeaderCell Label="Invoice #" Sort="sort" Column="invoice" CssClass="col-inv" OnSort="ToggleSort" />
-                            <SortableHeaderCell Label="Date" Sort="sort" Column="date" CssClass="col-date" OnSort="ToggleSort" />
-                            <SortableHeaderCell Label="Type" Sort="sort" Column="type" CssClass="col-type transaction-type-col" OnSort="ToggleSort" />
-                            <SortableHeaderCell Label="Payment" Sort="sort" Column="payment" CssClass="col-pay" OnSort="ToggleSort" />
-                            <SortableHeaderCell Label="Total" Sort="sort" Column="total" CssClass="col-total text-right" OnSort="ToggleSort" />
+                            <th class="text-left px-4 py-3 text-muted-foreground col-inv">Invoice #</th>
+                            <th class="text-left px-4 py-3 text-muted-foreground col-date">Date</th>
+                            <th class="text-left px-4 py-3 text-muted-foreground col-type transaction-type-col">Type</th>
+                            <th class="text-left px-4 py-3 text-muted-foreground col-pay">Payment</th>
+                            <th class="text-right px-4 py-3 text-muted-foreground col-total">Total</th>
                             <th class="text-center px-4 py-3 text-muted-foreground col-items">Items</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (!DisplayTransactions.Any())
                         {
-                            <tr><td colspan="6" class="p-0"><EmptyState Description="No transactions found." Title="" /></td></tr>
+                            <tr><td colspan="7" class="p-0"><EmptyState Description="No transactions found." Title="" /></td></tr>
                         }
                         @foreach (var txn in PagedTransactions)
                         {
@@ -695,10 +896,13 @@
     private string voidReason = string.Empty;
     private bool isProcessing;
     private TransactionHistoryDto? selectedTransaction;
-    private readonly SortState sort = new() { Column = "date" };
+    private readonly SortState sort = new();
     private int currentPage = 1;
     private const int PageSize = 25;
     private readonly HashSet<int> selectedIds = new();
+    private bool mobileMenuOpen = false;
+    private bool typeDropdownOpen = false;
+    private bool dayDropdownOpen = false;
 
     private bool AllVisibleSelected => PagedTransactions.Any() && PagedTransactions.All(x => selectedIds.Contains(x.Id));
 
@@ -809,10 +1013,51 @@
         }
     }
 
+    private List<SortDropdown.SortOption> GetSortColumns() => new()
+    {
+        new() { Value = "invoice", Label = "Invoice #" },
+        new() { Value = "date", Label = "Date" },
+        new() { Value = "type", Label = "Type" },
+        new() { Value = "payment", Label = "Payment" },
+        new() { Value = "total", Label = "Total" }
+    };
+
     private void SetDays(int? days)
     {
         daysFilter = days;
         currentPage = 1;
+    }
+
+    private string GetTypeFilterLabel() => filterType switch
+    {
+        null => "All Types",
+        "Sale" => "Sales",
+        "StockCorrection" => "Corrections",
+        "PurchaseReceipt" => "Purchase Receipts",
+        _ => filterType
+    };
+
+    private string GetDayFilterLabel() => daysFilter switch
+    {
+        null => "All days",
+        0 => "Today",
+        7 => "Last 7 days",
+        30 => "Last 30 days",
+        _ => $"{daysFilter} days"
+    };
+
+    private string GetTypeFilterIcon() => filterType switch
+    {
+        "Sale" => "shopping-cart",
+        "StockCorrection" => "pen-line",
+        "PurchaseReceipt" => "receipt",
+        _ => "layers"
+    };
+
+    private void CloseDropdowns()
+    {
+        typeDropdownOpen = false;
+        dayDropdownOpen = false;
     }
 
     private void OpenVoidConfirmation()
@@ -876,8 +1121,6 @@
     }
 
     private static string GetSaleSource(string invoice) =>
-        invoice.StartsWith("APT-") ? "Sale: Appointment" :
-        invoice.StartsWith("BLD-") ? "Sale: Build" :
         "Sale: POS";
 
     private static string GetTypeLabel(TransactionHistoryDto transaction) => transaction.TransactionType switch

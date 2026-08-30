@@ -60,6 +60,10 @@ class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foregr
 <LucideIcon Name="x" Size="16" /> Clear
 </BbButton>
 }
+<SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
+OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+Columns="@GetSortColumns()" />
 </div>
 
 @if (filtersOpen || AnyFilterActive)
@@ -124,12 +128,12 @@ else
     <table class="inventory-table">
     <thead><tr>
     <th><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th>
-    <SortableHeaderCell Label="Product" Sort="sort" Column="product" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Status" Sort="sort" Column="status" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Stock" Sort="sort" Column="stock" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Position" Sort="sort" Column="position" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Reorder" Sort="sort" Column="reorder" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Calculation" Sort="sort" Column="calculation" OnSort="ToggleSort" />
+    <th class="text-left px-4 py-3 text-muted-foreground">Product</th>
+    <th class="text-left px-4 py-3 text-muted-foreground">Status</th>
+    <th class="text-left px-4 py-3 text-muted-foreground">Stock</th>
+    <th class="text-left px-4 py-3 text-muted-foreground">Position</th>
+    <th class="text-left px-4 py-3 text-muted-foreground">Reorder</th>
+    <th class="text-left px-4 py-3 text-muted-foreground">Calculation</th>
     <th><span class="sr-only">Open</span></th>
     </tr></thead>
     <tbody>
@@ -629,7 +633,7 @@ else
     private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", productStatus = "", message = "", error = "", settingsError = "";
     private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed, filtersOpen;
     private bool inventoryConfirmationOpen, recalculateAllConfirmationOpen, showDiscardDetails, showDiscardNewProduct;
-    private readonly SortState sort = new() { Column = "product" };
+    private readonly SortState sort = new();
     private int currentPage = 1;
     private const int PageSize = 25;
     private string settingsBaseline = "";
@@ -755,6 +759,16 @@ else
 
                         private IEnumerable<InventoryDashboardRowDto> PagedFilteredRows =>
                             SortedFilteredRows.Skip((currentPage - 1) * PageSize).Take(PageSize);
+
+                        private List<SortDropdown.SortOption> GetSortColumns() => new()
+                        {
+                            new() { Value = "product", Label = "Product" },
+                            new() { Value = "status", Label = "Status" },
+                            new() { Value = "stock", Label = "Stock" },
+                            new() { Value = "position", Label = "Position" },
+                            new() { Value = "reorder", Label = "Reorder" },
+                            new() { Value = "calculation", Label = "Calculation" }
+                        };
 
                         private void ToggleSort(string column)
                         {

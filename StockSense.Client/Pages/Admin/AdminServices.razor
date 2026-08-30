@@ -64,6 +64,10 @@
                     </select>
                     <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
+                <SortDropdown SelectedColumn="@sortColumn" Ascending="@sortAscending"
+                              OnColumnChange="v => { sortColumn = v; }"
+                              OnDirectionChange="v => { sortAscending = v; }"
+                              Columns="@GetSortColumns()" />
             </div>
         </div>
 
@@ -393,6 +397,16 @@
     private string serviceSearch = "";
     private string selectedCategory = "";
     private string statusFilter = "";
+    private string sortColumn = "";
+    private bool sortAscending = true;
+
+    private List<SortDropdown.SortOption> GetSortColumns() => new()
+    {
+        new() { Value = "name", Label = "Name" },
+        new() { Value = "category", Label = "Category" },
+        new() { Value = "price", Label = "Price" },
+        new() { Value = "status", Label = "Status" }
+    };
     private bool isTogglingStatus;
     private decimal editPrice;
     private string editBaseline = "";
@@ -410,14 +424,33 @@
         .OrderBy(category => category)
         .ToList() ?? [];
 
-    private IReadOnlyList<StoreServiceDto> FilteredServices => services?
-        .Where(service =>
-            (string.IsNullOrWhiteSpace(selectedCategory) ||
-             string.Equals(service.Category, selectedCategory, StringComparison.OrdinalIgnoreCase)) &&
-            (string.IsNullOrWhiteSpace(statusFilter) ||
-             string.Equals(service.Status, statusFilter, StringComparison.OrdinalIgnoreCase)) &&
-            ServiceMatchesSearch(service))
-        .ToList() ?? [];
+    private IReadOnlyList<StoreServiceDto> FilteredServices
+    {
+        get
+        {
+            var filtered = services?
+                .Where(service =>
+                    (string.IsNullOrWhiteSpace(selectedCategory) ||
+                     string.Equals(service.Category, selectedCategory, StringComparison.OrdinalIgnoreCase)) &&
+                    (string.IsNullOrWhiteSpace(statusFilter) ||
+                     string.Equals(service.Status, statusFilter, StringComparison.OrdinalIgnoreCase)) &&
+                    ServiceMatchesSearch(service))
+                .ToList() ?? [];
+
+            return (sortColumn, sortAscending) switch
+            {
+                ("name", true) => filtered.OrderBy(s => s.Name).ToList(),
+                ("name", false) => filtered.OrderByDescending(s => s.Name).ToList(),
+                ("category", true) => filtered.OrderBy(s => s.Category).ToList(),
+                ("category", false) => filtered.OrderByDescending(s => s.Category).ToList(),
+                ("price", true) => filtered.OrderBy(s => s.Price).ToList(),
+                ("price", false) => filtered.OrderByDescending(s => s.Price).ToList(),
+                ("status", true) => filtered.OrderBy(s => s.Status).ToList(),
+                ("status", false) => filtered.OrderByDescending(s => s.Status).ToList(),
+                _ => filtered
+            };
+        }
+    }
 
     private bool ServiceMatchesSearch(StoreServiceDto service)
     {

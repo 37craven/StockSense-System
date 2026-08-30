@@ -1,0 +1,119 @@
+@using StockSense.Client.Components
+
+@if (Inline)
+{
+    @* Mobile: render options inline (for hamburger menu) *@
+    <div>
+        <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Sort By</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+            <button @onclick="ClearSort"
+                    style="padding: 8px 14px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(string.IsNullOrEmpty(SelectedColumn) ? "var(--secondary)" : "transparent"); color: @(string.IsNullOrEmpty(SelectedColumn) ? "var(--foreground)" : "var(--muted-foreground)");">
+                Default
+            </button>
+            @foreach (var col in Columns)
+            {
+                <button @onclick="() => SelectColumn(col.Value)"
+                        style="padding: 8px 14px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(col.Value == SelectedColumn ? "var(--secondary)" : "transparent"); color: @(col.Value == SelectedColumn ? "var(--foreground)" : "var(--muted-foreground)");">
+                    @col.Label
+                </button>
+            }
+        </div>
+        <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Sort direction</div>
+        <div style="display: flex; gap: 6px;">
+            <button @onclick="() => SetAscending(true)"
+                    style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(Ascending ? "var(--secondary)" : "transparent"); color: @(Ascending ? "var(--foreground)" : "var(--muted-foreground)");">
+                <LucideIcon Name="arrow-up" Size="14" /> Ascending
+            </button>
+            <button @onclick="() => SetAscending(false)"
+                    style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(!Ascending ? "var(--secondary)" : "transparent"); color: @(!Ascending ? "var(--foreground)" : "var(--muted-foreground)");">
+                <LucideIcon Name="arrow-down" Size="14" /> Descending
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    @* Desktop: dropdown *@
+    <div class="txn-dropdown" style="position: relative; display: inline-flex;">
+        <button class="txn-dropdown-btn" @onclick="() => Open = !Open"
+                style="display: inline-flex; align-items: center; gap: 6px; padding: var(--space-2) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--muted-foreground); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; white-space: nowrap;">
+            <LucideIcon Name="arrow-up-down" Size="14" />
+            @(string.IsNullOrEmpty(SelectedColumn) ? "Sort by" : Columns.FirstOrDefault(c => c.Value == SelectedColumn)?.Label)
+            @if (!string.IsNullOrEmpty(SelectedColumn))
+            {
+                <LucideIcon Name="@(Ascending ? "arrow-up" : "arrow-down")" Size="12" />
+            }
+            <LucideIcon Name="chevron-down" Size="14" />
+        </button>
+        @if (Open)
+        {
+            <div style="position: fixed; inset: 0; z-index: 40;" @onclick="() => Open = false"></div>
+            <div style="position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; min-width: 200px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,.12); padding: 4px; display: flex; flex-direction: column;">
+                <button @onclick="ClearSort"
+                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--radius) - 2px); border: none; background: @(string.IsNullOrEmpty(SelectedColumn) ? "var(--info-muted)" : "transparent"); color: @(string.IsNullOrEmpty(SelectedColumn) ? "var(--info-muted-foreground)" : "var(--foreground)"); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; text-align: left; width: 100%;">
+                    <LucideIcon Name="x" Size="12" /> Sort by
+                </button>
+                <div style="border-top: 1px solid var(--border); margin: 4px 0;"></div>
+                @foreach (var col in Columns)
+                {
+                    <button @onclick="() => SelectColumn(col.Value)"
+                            style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--radius) - 2px); border: none; background: @(col.Value == SelectedColumn ? "var(--info-muted)" : "transparent"); color: @(col.Value == SelectedColumn ? "var(--info-muted-foreground)" : "var(--foreground)"); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; text-align: left; width: 100%;">
+                        @if (col.Value == SelectedColumn)
+                        {
+                            <LucideIcon Name="@(Ascending ? "arrow-up" : "arrow-down")" Size="12" />
+                        }
+                        else
+                        {
+                            <span style="width: 12px;"></span>
+                        }
+                        @col.Label
+                    </button>
+                }
+                <div style="border-top: 1px solid var(--border); margin: 4px 0;"></div>
+                <button @onclick="() => SetAscending(true)"
+                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--radius) - 2px); border: none; background: @(Ascending ? "var(--info-muted)" : "transparent"); color: @(Ascending ? "var(--info-muted-foreground)" : "var(--foreground)"); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; text-align: left; width: 100%;">
+                    <LucideIcon Name="arrow-up" Size="12" /> Ascending
+                </button>
+                <button @onclick="() => SetAscending(false)"
+                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--radius) - 2px); border: none; background: @(!Ascending ? "var(--info-muted)" : "transparent"); color: @(!Ascending ? "var(--info-muted-foreground)" : "var(--foreground)"); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; text-align: left; width: 100%;">
+                    <LucideIcon Name="arrow-down" Size="12" /> Descending
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string SelectedColumn { get; set; } = "";
+    [Parameter] public bool Ascending { get; set; }
+    [Parameter] public EventCallback<string> OnColumnChange { get; set; }
+    [Parameter] public EventCallback<bool> OnDirectionChange { get; set; }
+    [Parameter] public List<SortOption> Columns { get; set; } = new();
+    [Parameter] public bool Inline { get; set; }
+
+    private bool Open;
+
+    private void SelectColumn(string column)
+    {
+        OnColumnChange.InvokeAsync(column);
+        Open = false;
+    }
+
+    private void ClearSort()
+    {
+        OnColumnChange.InvokeAsync("");
+        Open = false;
+    }
+
+    private void SetAscending(bool ascending)
+    {
+        OnDirectionChange.InvokeAsync(ascending);
+        Open = false;
+    }
+
+    public class SortOption
+    {
+        public string Value { get; set; } = "";
+        public string Label { get; set; } = "";
+    }
+}

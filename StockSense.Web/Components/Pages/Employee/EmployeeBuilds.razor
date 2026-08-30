@@ -333,7 +333,14 @@
     <PageHeader Title="Manage Builds"
                 Subtitle="Review and manage customer build requests."
                 Badge="@(ActiveBuilds.Count(b => b.Status == "Pending") + " Pending")"
-                Badge2="@(ActiveBuilds.Count(b => b.Status == "Confirmed") + " Upcoming")" />
+                Badge2="@(ActiveBuilds.Count(b => b.Status == "Confirmed") + " Upcoming")">
+        <button @onclick='() => mobileMenuOpen = true'
+                class="md:hidden ml-auto"
+                style="padding: 6px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); cursor: pointer; color: var(--foreground); align-self: center;"
+                aria-label="Open filters">
+            <LucideIcon Name="menu" Size="18" />
+        </button>
+    </PageHeader>
 
     @if (allBuilds == null)
     {
@@ -341,18 +348,50 @@
     }
     else
     {
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
-            <div style="display: flex; gap: var(--space-2);">
-                <button @onclick='() => { activeTab = "Active"; currentPage = 1; }'
-                        class="px-4 py-2 rounded-md text-sm font-medium cursor-pointer border border-border @(activeTab == "Active" ? "bg-secondary text-foreground" : "bg-transparent text-muted-foreground")">
-                    Active (@ActiveBuilds.Count())
-                </button>
-                <button @onclick='() => { activeTab = "History"; currentPage = 1; }'
-                        class="px-4 py-2 rounded-md text-sm font-medium cursor-pointer border border-border @(activeTab == "History" ? "bg-secondary text-foreground" : "bg-transparent text-muted-foreground")">
-                    History (@HistoryBuilds.Count())
-                </button>
-            </div>
+        @* MOBILE HAMBURGER OVERLAY *@
+        @if (mobileMenuOpen)
+        {
+            <div style="position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,0.5);"
+                 @onclick='() => mobileMenuOpen = false'></div>
+            <div style="position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: var(--card); border-bottom: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 16px; max-height: 80vh; overflow-y: auto;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: var(--text-base); font-weight: 700; color: var(--foreground);">Filters</span>
+                    <button @onclick='() => mobileMenuOpen = false'
+                            style="background: none; border: none; cursor: pointer; padding: 4px; color: var(--muted-foreground);">
+                        <LucideIcon Name="x" Size="20" />
+                    </button>
+                </div>
 
+                <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending" Inline="true"
+                              OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+                              OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+                              Columns="@GetSortColumns()" />
+
+                <div>
+                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">View Builds</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button @onclick='() => { activeTab = "Active"; currentPage = 1; mobileMenuOpen = false; }'
+                                style="flex: 1; padding: 10px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(activeTab == "Active" ? "var(--secondary)" : "transparent"); color: @(activeTab == "Active" ? "var(--foreground)" : "var(--muted-foreground)");">
+                            Active (@ActiveBuilds.Count())
+                        </button>
+                        <button @onclick='() => { activeTab = "History"; currentPage = 1; mobileMenuOpen = false; }'
+                                style="flex: 1; padding: 10px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(activeTab == "History" ? "var(--secondary)" : "transparent"); color: @(activeTab == "History" ? "var(--foreground)" : "var(--muted-foreground)");">
+                            History (@HistoryBuilds.Count())
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="hidden md:flex items-center gap-2 mb-4">
+            <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
+                          OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+                          OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+                          Columns="@GetSortColumns()" />
+            <DisplayModeToggle Selected="@activeTab"
+                               OnSelect="v => { activeTab = v; currentPage = 1; }"
+                               AriaLabel="Tab"
+                               Options="@GetTabOptions()" />
         </div>
 
         <div class="build-table-wrap">
@@ -367,12 +406,12 @@
                 <col class="col-act" />
             </Colgroup>
             <Header>
-                <SortableHeaderCell Label="Customer" Sort="sort" Column="customer" CssClass="col-cust" OnSort="ToggleSort" />
-                <SortableHeaderCell Label="Date Received" Sort="sort" Column="date" CssClass="col-date" OnSort="ToggleSort" />
-                <SortableHeaderCell Label="Type" Sort="sort" Column="type" CssClass="col-type" OnSort="ToggleSort" />
+                <th class="text-left px-4 py-3 text-muted-foreground col-cust">Customer</th>
+                <th class="text-left px-4 py-3 text-muted-foreground col-date">Date Received</th>
+                <th class="text-left px-4 py-3 text-muted-foreground col-type">Type</th>
                 <th class="text-left px-4 py-3 text-muted-foreground col-items">Items</th>
-                <SortableHeaderCell Label="Total Value" Sort="sort" Column="total" CssClass="col-total" OnSort="ToggleSort" />
-                <SortableHeaderCell Label="Status" Sort="sort" Column="status" CssClass="col-stat" OnSort="ToggleSort" />
+                <th class="text-left px-4 py-3 text-muted-foreground col-total">Total Value</th>
+                <th class="text-left px-4 py-3 text-muted-foreground col-stat">Status</th>
                 <th class="text-left px-4 py-3 text-muted-foreground col-act">Actions</th>
             </Header>
             <RowTemplate>
@@ -690,12 +729,13 @@
 @code {
     private List<BuildRequestDto>? allBuilds;
     private string activeTab = "Active";
+    private bool mobileMenuOpen = false;
 
     private bool showDetailModal = false;
     private BuildRequestDto? selectedBuild;
     private List<WorkOrderAudit>? buildAuditTrail;
     private Dictionary<string, string> auditActorNames = [];
-    private readonly SortState sort = new() { Column = "date" };
+    private readonly SortState sort = new();
     private int currentPage = 1;
     private const int PageSize = 25;
     private string checkoutPaymentMethod = "Cash";
@@ -847,6 +887,21 @@
         editedPrices.Clear();
         editQuantities.Clear();
     }
+
+    private List<SortDropdown.SortOption> GetSortColumns() => new()
+    {
+        new() { Value = "customer", Label = "Customer" },
+        new() { Value = "date", Label = "Date Received" },
+        new() { Value = "type", Label = "Type" },
+        new() { Value = "total", Label = "Total Value" },
+        new() { Value = "status", Label = "Status" }
+    };
+
+    private List<DisplayModeToggle.ToggleOption> GetTabOptions() => new()
+    {
+        new() { Value = "Active", Label = "Active", Count = ActiveBuilds.Count() },
+        new() { Value = "History", Label = "History", Count = HistoryBuilds.Count() }
+    };
 
     private IEnumerable<BuildRequestDto> ActiveBuilds =>
         allBuilds?.Where(b => b.Status == "Pending" || b.Status == "Confirmed") ?? Enumerable.Empty<BuildRequestDto>();

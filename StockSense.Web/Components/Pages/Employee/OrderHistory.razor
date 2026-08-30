@@ -276,6 +276,10 @@
                     </select>
                     <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 </div>
+                <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
+                              OnColumnChange="v => { sort.Toggle(v); currentPage = 1; ApplySort(); }"
+                              OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; ApplySort(); }"
+                              Columns="@GetSortColumns()" />
             </div>
         </div>
 
@@ -301,10 +305,10 @@
                         </colgroup>
                         <thead>
                             <tr>
-                                <SortableHeaderCell Label="Order Slip" Sort="sort" Column="number" CssClass="cursor-pointer select-none" OnSort="ToggleSort" />
-                                <SortableHeaderCell Label="Supplier" Sort="sort" Column="supplier" CssClass="cursor-pointer select-none hide-ipad" OnSort="ToggleSort" />
-                                <SortableHeaderCell Label="Status" Sort="sort" Column="status" CssClass="cursor-pointer select-none" OnSort="ToggleSort" />
-                                <SortableHeaderCell Label="Generated" Sort="sort" Column="generated" CssClass="cursor-pointer select-none hide-ipad" OnSort="ToggleSort" />
+                                <th class="text-left px-4 py-3 text-muted-foreground cursor-pointer select-none">Order Slip</th>
+                                <th class="text-left px-4 py-3 text-muted-foreground cursor-pointer select-none hide-ipad">Supplier</th>
+                                <th class="text-left px-4 py-3 text-muted-foreground cursor-pointer select-none">Status</th>
+                                <th class="text-left px-4 py-3 text-muted-foreground cursor-pointer select-none hide-ipad">Generated</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -751,9 +755,17 @@
     private string closeRemainingAdminUserId = "", closeRemainingAdminPin = "";
     private bool isAdmin, isLoadingAdminOptions;
     private List<AdminOption> adminOptions = [];
-    private readonly SortState sort = new() { Column = "generated" };
+    private readonly SortState sort = new();
     private int currentPage = 1;
     private const int PageSize = 25;
+
+    private List<SortDropdown.SortOption> GetSortColumns() => new()
+    {
+        new() { Value = "number", Label = "Order Slip" },
+        new() { Value = "supplier", Label = "Supplier" },
+        new() { Value = "status", Label = "Status" },
+        new() { Value = "generated", Label = "Generated" }
+    };
 
     private void ToggleSort(string column)
     {

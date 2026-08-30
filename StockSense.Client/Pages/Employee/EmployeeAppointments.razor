@@ -404,33 +404,6 @@ height: 150vh;
 Subtitle="Review and manage customer appointment requests."
 Badge="@(ActiveAppointments.Count(a => a.Status == "Pending") + " Pending")"
 Badge2="@(ActiveAppointments.Count(a => a.Status == "Confirmed") + " Upcoming")">
-@if (currentTab == "Active")
-{
-<div class="hidden md:flex gap-1 rounded-md border border-border bg-muted/30 p-1" role="group" aria-label="View mode">
-<button type="button" @onclick='() => displayMode = "table"' aria-pressed="@(displayMode == "table")"
-class="min-h-[36px] px-3 rounded text-sm font-semibold border-none @(displayMode == "table" ? "" : "text-muted-foreground")"
-style="@(displayMode == "table" ? "background-color: var(--destructive-muted); border: 1px solid color-mix(in oklch, var(--destructive-muted-foreground) 45%, transparent); color: var(--destructive-muted-foreground);" : "background: transparent; border: 1px solid transparent;")">
-Table
-</button>
-<button type="button" @onclick='() => displayMode = "calendar"' aria-pressed="@(displayMode == "calendar")"
-class="min-h-[36px] px-3 rounded text-sm font-semibold border-none @(displayMode == "calendar" ? "" : "text-muted-foreground")"
-style="@(displayMode == "calendar" ? "background-color: var(--destructive-muted); border: 1px solid color-mix(in oklch, var(--destructive-muted-foreground) 45%, transparent); color: var(--destructive-muted-foreground);" : "background: transparent; border: 1px solid transparent;")">
-Calendar
-</button>
-</div>
-}
-<div class="hidden md:flex gap-1 rounded-md border border-border bg-muted/30 p-1" role="group" aria-label="Tab">
-<button type="button" @onclick='() => SwitchTab("Active")' aria-pressed="@(currentTab == "Active")"
-class="min-h-[36px] px-3 rounded text-sm font-semibold border-none @(currentTab == "Active" ? "" : "text-muted-foreground")"
-style="@(currentTab == "Active" ? "background-color: var(--destructive-muted); border: 1px solid color-mix(in oklch, var(--destructive-muted-foreground) 45%, transparent); color: var(--destructive-muted-foreground);" : "background: transparent; border: 1px solid transparent;")">
-Active (@ActiveAppointments.Count())
-</button>
-<button type="button" @onclick='() => SwitchTab("History")' aria-pressed="@(currentTab == "History")"
-class="min-h-[36px] px-3 rounded text-sm font-semibold border-none @(currentTab == "History" ? "" : "text-muted-foreground")"
-style="@(currentTab == "History" ? "background-color: var(--destructive-muted); border: 1px solid color-mix(in oklch, var(--destructive-muted-foreground) 45%, transparent); color: var(--destructive-muted-foreground);" : "background: transparent; border: 1px solid transparent;")">
-History (@HistoryAppointments.Count())
-</button>
-</div>
 <button @onclick='() => mobileMenuOpen = true'
 class="md:hidden ml-auto"
 style="padding: 6px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); cursor: pointer; color: var(--foreground); align-self: center;"
@@ -438,6 +411,20 @@ aria-label="Open filters">
 <LucideIcon Name="menu" Size="18" />
 </button>
 </PageHeader>
+
+<div class="hidden md:flex items-center gap-2 mb-4">
+<SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
+OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+Columns="@GetSortColumns()" />
+<DisplayModeToggle Selected="@currentTab" OnSelect="v => SwitchTab(v)" AriaLabel="Tab"
+Options="@GetTabOptions()" />
+@if (currentTab == "Active")
+{
+<DisplayModeToggle Selected="@displayMode" OnSelect="v => displayMode = v" AriaLabel="View mode"
+Options="@DisplayModeToggle.TableCalendarOptions" />
+}
+</div>
 
 @if (allAppointments == null)
 {
@@ -458,6 +445,11 @@ else
     <LucideIcon Name="x" Size="20" />
     </button>
     </div>
+
+    <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending" Inline="true"
+    OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+    OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+    Columns="@GetSortColumns()" />
 
     <div>
     <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">View Appointments</div>
@@ -534,11 +526,11 @@ else
     </colgroup>
     <thead>
     <tr class="border-b border-border bg-muted/5">
-    <SortableHeaderCell Label="Customer" Sort="sort" Column="customer" CssClass="col-cust" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Schedule" Sort="sort" Column="schedule" CssClass="col-sched" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Services" Sort="sort" Column="services" CssClass="col-svc" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Total Value" Sort="sort" Column="total" CssClass="col-total" OnSort="ToggleSort" />
-    <SortableHeaderCell Label="Status" Sort="sort" Column="status" CssClass="col-stat" OnSort="ToggleSort" />
+    <th class="text-left px-4 py-3 text-muted-foreground col-cust">Customer</th>
+    <th class="text-left px-4 py-3 text-muted-foreground col-sched">Schedule</th>
+    <th class="text-left px-4 py-3 text-muted-foreground col-svc">Services</th>
+    <th class="text-left px-4 py-3 text-muted-foreground col-total">Total Value</th>
+    <th class="text-left px-4 py-3 text-muted-foreground col-stat">Status</th>
     <th class="text-left px-4 py-3 text-muted-foreground col-act">Actions</th>
     </tr>
     </thead>
@@ -561,7 +553,7 @@ else
     }
     </div>
     <span class="appt-customer-status appointment-status-badge @GetStatusClass(appt.Status) shrink-0" aria-label="Status: @appt.Status">
-    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+    @appt.Status
     </span>
     </div>
     </td>
@@ -570,16 +562,19 @@ else
     <span class="text-info-muted-foreground font-bold ml-1.5">@appt.TimeSlot</span>
     <span class="text-muted-foreground ml-1">(@DurationFormatting.Format(appt.DurationMinutes))</span>
     </td>
-    <td data-label="Status" class="px-4 py-3 col-stat">
-    <span class="appointment-status-badge @GetStatusClass(appt.Status)" aria-label="Status: @appt.Status">
-    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
-    </span>
-    </td>
     <td data-label="Services" class="px-4 py-3 col-svc">
     <div class="text-muted-foreground text-sm truncate">@appt.ServicesRequested</div>
     </td>
     <td data-label="Total" class="px-4 py-3 font-bold text-foreground col-total">
+    <span class="inline-flex items-center gap-1.5">
+    <span class="inline-block w-2 h-2 rounded-full shrink-0 @(appt.PaymentStatus == "Paid" ? "bg-green-500" : appt.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : "bg-muted-foreground/40")" aria-hidden="true"></span>
     ₱@appt.TotalAmount.ToString("N2")
+    </span>
+    </td>
+    <td data-label="Status" class="px-4 py-3 col-stat">
+    <span class="appointment-status-badge @GetStatusClass(appt.Status)" aria-label="Status: @appt.Status">
+    @appt.Status
+    </span>
     </td>
     <td data-label="Actions" class="px-4 py-3 col-act" @onclick:stopPropagation>
     @{
@@ -1099,6 +1094,16 @@ else if (calView == "next7")
                         </span>
                         </div>
 
+                        <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Payment Status</div>
+                        <span class="inline-flex items-center gap-2">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full @(selectedAppointment.PaymentStatus == "Paid" ? "bg-green-500" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : "bg-muted-foreground/40")" aria-hidden="true"></span>
+                        <span style="font-size: var(--text-sm); font-weight: 600; color: var(--foreground);">
+                        @(selectedAppointment.PaymentStatus == "Paid" ? "Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "Awaiting Payment" : "N/A")
+                        </span>
+                        </span>
+                        </div>
+
                         @if (selectedAppointment.Status == "Confirmed")
                         {
                         <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
@@ -1315,7 +1320,7 @@ else if (calView == "next7")
                         private List<WorkOrderAuditDto>? auditTrail;
                         private string sortColumn = "created";
                         private bool sortAsc = false;
-                        private readonly SortState sort = new() { Column = "created" };
+                        private readonly SortState sort = new();
                         private int currentPage = 1;
                         private const int PageSize = 25;
                         private string checkoutPaymentMethod = "Cash";
@@ -1388,6 +1393,21 @@ else if (calView == "next7")
                         private bool restrictedPartsChange;
                         private bool restrictedScheduleChange;
                         private string? restrictedActionError;
+
+                        private List<SortDropdown.SortOption> GetSortColumns() => new()
+                        {
+                            new() { Value = "customer", Label = "Customer" },
+                            new() { Value = "schedule", Label = "Schedule" },
+                            new() { Value = "services", Label = "Services" },
+                            new() { Value = "total", Label = "Total Value" },
+                            new() { Value = "status", Label = "Status" }
+                        };
+
+                        private List<DisplayModeToggle.ToggleOption> GetTabOptions() => new()
+                        {
+                            new() { Value = "Active", Label = "Active", Count = ActiveAppointments.Count() },
+                            new() { Value = "History", Label = "History", Count = HistoryAppointments.Count() }
+                        };
 
                         private decimal GetPartPrice(int productId, decimal defaultPrice) =>
                         editedPrices.TryGetValue(productId, out var p) ? p : defaultPrice;

@@ -23,16 +23,10 @@
     <PageHeader Title="Generate Orders"
                 Subtitle="@(mode == CreationMode.Automatic ? "Use inventory calculations to generate recommended orders." : "Choose supplier, products, and quantities directly.")"
                 Badge="@(mode == CreationMode.Automatic && preview is not null ? $"{preview.SupplierGroups.Sum(g => g.Items.Count(i => i.IsSelected))} selected" : null)">
-        <div class="flex gap-1 rounded-md border border-border bg-muted/30 p-1" role="group" aria-label="Order creation mode">
-            <button type="button" @onclick="ShowAutomatic" aria-pressed="@(mode == CreationMode.Automatic)"
-                    class="min-h-[36px] px-3 rounded text-sm font-semibold @(mode == CreationMode.Automatic ? "mode-button-active border" : "text-muted-foreground border border-transparent")">
-                Automatic
-            </button>
-            <button type="button" @onclick="ShowManual" aria-pressed="@(mode == CreationMode.Manual)"
-                    class="min-h-[36px] px-3 rounded text-sm font-semibold @(mode == CreationMode.Manual ? "mode-button-active border" : "text-muted-foreground border border-transparent")">
-                Manual
-            </button>
-        </div>
+        <DisplayModeToggle Selected="@(mode == CreationMode.Automatic ? "Automatic" : "Manual")"
+                           OnSelect="HandleModeChange"
+                           AriaLabel="Order creation mode"
+                           Options="@ModeOptions" />
         <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/order-history")'>
             View Order History
         </BbButton>
@@ -301,6 +295,12 @@
 </BbDialog>
 
 @code {
+    private static readonly List<DisplayModeToggle.ToggleOption> ModeOptions = new()
+    {
+        new() { Value = "Automatic", Label = "Automatic" },
+        new() { Value = "Manual", Label = "Manual" }
+    };
+
     private enum CreationMode { Automatic, Manual }
     private sealed class ManualLine { public int ProductId { get; set; } public int Quantity { get; set; } = 1; }
     private CreationMode mode;
@@ -318,6 +318,11 @@
         ? preview is not null && SelectedAutomaticItems.Any()
         : manualSupplierId > 0 || manualLines.Count > 0 || !string.IsNullOrWhiteSpace(manualReason);
 
+
+    private void HandleModeChange(string value)
+    {
+        if (value == "Automatic") ShowAutomatic(); else ShowManual();
+    }
 
     private void ShowAutomatic() { mode = CreationMode.Automatic; error = message = ""; }
     private async Task ShowManual() { mode = CreationMode.Manual; error = message = ""; if (manualCatalog == null) await LoadManualCatalog(); }
