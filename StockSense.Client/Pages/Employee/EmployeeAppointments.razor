@@ -9,6 +9,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using StockSense.Client.Layout
 @using BlazorBlueprint.Primitives.Services
+@using StockSense.Client.Components
 @using StockSense.Domain.Entities
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -53,6 +54,22 @@ width: 100%;
 }
 
 .appt-card-list { display: none; }
+.appt-customer-status { display: none; }
+.appt-table-panel { border:1px solid var(--border); border-radius:var(--radius); background:var(--card); }
+
+.appt-table { min-width:0; }
+
+.appt-table td {
+    padding:.95rem 1rem;
+    vertical-align:middle;
+    background:hsl(var(--card));
+    border-bottom:1px solid rgba(120,120,120,.20);
+    transition:background-color .15s ease;
+}
+
+.appt-table tbody tr:not(:last-child) td {
+    border-bottom:1px solid rgba(120,120,120,.20) !important;
+}
 
 .appt-card {
 overflow: hidden;
@@ -182,8 +199,21 @@ height: 100%
 height: 150vh;
 }
 @@media (max-width: 1100px) {
-.appt-table-panel { display: none; }
-.appt-card-list { display: grid; gap: 16px; }
+.appt-table-wrap { overflow:visible; padding:12px; }
+.appt-table { min-width:0; display:block; border-spacing:0; }
+.appt-table thead { display:none; }
+.appt-table tbody { display:flex; flex-direction:column; gap:12px; }
+.appt-table tr { display:grid; grid-template-columns:1fr; gap:0; padding:12px; border:1px solid rgba(127,127,127,.34); border-radius:.65rem; background:var(--background, transparent); box-shadow:0 1px 3px rgba(0,0,0,.05); }
+.appt-table td { display:block; width:100%; padding:0; border:0 !important; min-width:0; background:transparent; border-radius:0 !important; box-shadow:none !important; }
+.appt-table td[data-label="Customer"] { margin-bottom:8px; }
+.appt-table td[data-label="Schedule"] { margin-bottom:4px; }
+.appt-table td[data-label="Status"] { margin-bottom:8px; }
+.appt-table td[data-label="Services"] { display:none; }
+.appt-table td[data-label="Status"] { display:none; }
+.appt-customer-status { display:inline-flex !important; }
+.appt-table td[data-label="Actions"] { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.appt-table tbody tr:not(:last-child) td { border-bottom:0 !important; }
+.appt-actions { justify-content:flex-end; }
 }
 
 @@media (max-width: 1024px) {
@@ -300,8 +330,6 @@ flex-direction: column;
 .cal-header-row {
 display: grid;
 border-bottom: 1px solid var(--border);
-position: sticky;
-top: 0;
 background: var(--card);
 z-index: 5;
 }
@@ -342,25 +370,31 @@ min-height: 0;
 }
 
 @@media (max-width: 1023px) {
+
+display: grid;
+grid-template-columns: repeat(7, 1fr);
+grid-template-rows: repeat(6, 1fr);
+flex: 1;
+min-height: 100vh;
 .page-wrapper {
 height: auto;
 }
 .calendar-section {
-height: 150vh;
+height: fit-content;
 flex: none;
 }
 .time-grid-card {
 flex: none;
-height: 100%;
+height: fit-content;
 }
 .cal-scroll {
 overflow: auto;
 flex: none;
-height: 100%;
+height: fit-content;
 }
 .cal-time-row {
 flex: none;
-min-height: 100%;
+height: 150vh;
 }
 }
 </style>
@@ -487,9 +521,9 @@ else
 
     @if (displayMode == "table")
     {
-    <div class="appt-table-panel" style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
-    <div style="overflow-x: auto;">
-    <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-sm);">
+    <div class="appt-table-panel">
+    <div class="appt-table-wrap">
+    <table class="appt-table w-full border-collapse text-sm" style="table-layout: fixed;">
     <colgroup>
     <col class="col-cust" />
     <col class="col-sched" />
@@ -499,59 +533,55 @@ else
     <col class="col-act" />
     </colgroup>
     <thead>
-    <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
-    <th @onclick="@(() => ToggleSort("customer"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-cust">
-    Customer @SortArrow("customer")
-    </th>
-    <th @onclick="@(() => ToggleSort("schedule"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-sched">
-    Schedule @SortArrow("schedule")
-    </th>
-    <th @onclick="@(() => ToggleSort("services"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-svc">
-    Services @SortArrow("services")
-    </th>
-    <th @onclick="@(() => ToggleSort("total"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-total">
-    Total Value @SortArrow("total")
-    </th>
-    <th @onclick="@(() => ToggleSort("status"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-stat">
-    Status @SortArrow("status")
-    </th>
-    <th style="text-align: left; padding: 12px 16px; color: var(--muted-foreground);" class="col-act">Actions</th>
+    <tr class="border-b border-border bg-muted/5">
+    <SortableHeaderCell Label="Customer" Sort="sort" Column="customer" CssClass="col-cust" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Schedule" Sort="sort" Column="schedule" CssClass="col-sched" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Services" Sort="sort" Column="services" CssClass="col-svc" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Total Value" Sort="sort" Column="total" CssClass="col-total" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Status" Sort="sort" Column="status" CssClass="col-stat" OnSort="ToggleSort" />
+    <th class="text-left px-4 py-3 text-muted-foreground col-act">Actions</th>
     </tr>
     </thead>
     <tbody>
     @if (!DisplayAppointments.Any())
     {
-    <tr><td colspan="6" style="padding: 0;"><EmptyState Description="No appointments found in this section." Title="" /></td></tr>
+    <tr><td colspan="6" class="p-0"><EmptyState Description="No appointments found in this section." Title="" /></td></tr>
     }
-    @foreach (var appt in DisplayAppointments)
+    @foreach (var appt in PagedAppointments)
     {
     <tr @onclick="() => OpenDetail(appt)"
-    style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;"
-    class="row-clickable">
-    <td style="padding: 12px 16px; color: var(--foreground);" class="col-cust">
-    <div style="font-weight: bold;">@appt.CustomerName</div>
+    class="cursor-pointer border-b border-border transition-colors row-clickable">
+    <td data-label="Customer" class="px-4 py-3 text-foreground col-cust">
+    <div class="flex items-center justify-between gap-2">
+    <div class="min-w-0">
+    <div class="font-bold truncate">@appt.CustomerName</div>
     @if (!string.IsNullOrWhiteSpace(appt.CustomerEmail))
     {
-    <div style="font-size: var(--text-xs); color: var(--muted-foreground);">@appt.CustomerEmail</div>
+    <div class="text-xs text-muted-foreground truncate">@appt.CustomerEmail</div>
     }
+    </div>
+    <span class="appt-customer-status appointment-status-badge @GetStatusClass(appt.Status) shrink-0" aria-label="Status: @appt.Status">
+    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+    </span>
+    </div>
     </td>
-    <td style="padding: 12px 16px; white-space: nowrap;" class="col-sched">
-    <span style="color: var(--foreground);">@appt.AppointmentDate.ToString("MMM dd, yyyy")</span>
-    <span style="color: var(--info-muted-foreground); font-weight: bold; margin-left: 6px;">@appt.TimeSlot</span>
-    <span style="color: var(--muted-foreground); margin-left: 4px;">(@DurationFormatting.Format(appt.DurationMinutes))</span>
+    <td data-label="Schedule" class="px-4 py-3 whitespace-nowrap col-sched">
+    <span class="text-foreground">@appt.AppointmentDate.ToString("MMM dd, yyyy")</span>
+    <span class="text-info-muted-foreground font-bold ml-1.5">@appt.TimeSlot</span>
+    <span class="text-muted-foreground ml-1">(@DurationFormatting.Format(appt.DurationMinutes))</span>
     </td>
-    <td style="padding: 12px 16px;" class="col-svc">
-    <div style="color: var(--muted-foreground); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@appt.ServicesRequested</div>
-    </td>
-    <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);" class="col-total">
-    ₱@appt.TotalAmount.ToString("N2")
-    </td>
-    <td style="padding: 12px 16px;" class="col-stat">
+    <td data-label="Status" class="px-4 py-3 col-stat">
     <span class="appointment-status-badge @GetStatusClass(appt.Status)" aria-label="Status: @appt.Status">
     @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
     </span>
     </td>
-    <td style="padding: 12px 16px;" class="col-act" @onclick:stopPropagation>
+    <td data-label="Services" class="px-4 py-3 col-svc">
+    <div class="text-muted-foreground text-sm truncate">@appt.ServicesRequested</div>
+    </td>
+    <td data-label="Total" class="px-4 py-3 font-bold text-foreground col-total">
+    ₱@appt.TotalAmount.ToString("N2")
+    </td>
+    <td data-label="Actions" class="px-4 py-3 col-act" @onclick:stopPropagation>
     @{
     var isPending = appt.Status == "Pending";
     var isConfirmed = appt.Status == "Confirmed";
@@ -573,7 +603,7 @@ else
     Cancel
     </button>
     }
-else if (isConfirmed)
+    else if (isConfirmed)
     {
     <button @onclick="@(() => OpenDetail(appt))"
     title="Checkout"
@@ -585,7 +615,7 @@ else if (isConfirmed)
     <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Cancelled", "Cancel confirmed appointment"))"
     title="Cancel" class="appt-action-btn appointment-action appointment-action--danger">Cancel</button>
     }
-else if (isCompleted || isCancelled)
+    else if (isCompleted || isCancelled)
     {
     <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Pending", "Reopen appointment"))"
     title="Reopen"
@@ -593,9 +623,9 @@ else if (isCompleted || isCancelled)
     Reopen
     </button>
     }
-else if (isExpired)
+    else if (isExpired)
     {
-    <span style="color: var(--muted-foreground); font-size: var(--text-xs); font-style: italic;">Expired</span>
+    <span class="text-muted-foreground text-xs italic">Expired</span>
     }
     </div>
     </td>
@@ -604,85 +634,7 @@ else if (isExpired)
     </tbody>
     </table>
     </div>
-    </div>
-    <div class="appt-card-list" aria-label="Appointments">
-    @if (!DisplayAppointments.Any())
-    {
-    <div class="appt-card"><EmptyState Description="No appointments found in this section." Title="" /></div>
-    }
-    @foreach (var appt in DisplayAppointments)
-    {
-    var isPending = appt.Status == "Pending";
-    var isConfirmed = appt.Status == "Confirmed";
-    var isCompleted = appt.Status == "Completed";
-    var isCancelled = appt.Status == "Cancelled";
-    var isExpired = appt.Status == "Expired";
-
-    <article class="appt-card">
-    <button type="button" class="appt-card-summary" @onclick="() => OpenDetail(appt)"
-    aria-label="@($"{appt.CustomerName}{(string.IsNullOrWhiteSpace(appt.CustomerEmail) ? "" : ", " + appt.CustomerEmail)}, status {appt.Status} — view appointment details")">
-    <span class="appt-card-customer">
-    <span class="appt-card-name">@appt.CustomerName</span>
-    @if (!string.IsNullOrWhiteSpace(appt.CustomerEmail))
-    {
-    <span class="appt-card-email">@appt.CustomerEmail</span>
-    }
-    </span>
-    <span class="flex items-center gap-1.5 justify-end">
-    <span class="appointment-status-badge @GetStatusClass(appt.Status)" role="status" aria-label="Appointment status: @appt.Status">
-    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
-    </span>
-    </span>
-    </button>
-
-    <div class="appt-card-meta">
-    <div>
-    <span class="appt-card-label">Schedule</span>
-    <span class="appt-card-value">@appt.AppointmentDate.ToString("MMM dd, yyyy") · @appt.TimeSlot</span>
-    </div>
-    <div>
-    <span class="appt-card-label">Duration</span>
-    <span class="appt-card-value">@DurationFormatting.Format(appt.DurationMinutes)</span>
-    </div>
-    <div>
-    <span class="appt-card-label">Total value</span>
-    <span class="appt-card-value">₱@appt.TotalAmount.ToString("N2")</span>
-    </div>
-    <div class="appt-card-services">
-    <span class="appt-card-label">Services</span>
-    <span class="appt-card-value">@appt.ServicesRequested</span>
-    </div>
-    </div>
-
-    <div class="appt-card-actions" aria-label="Actions for @appt.CustomerName's appointment">
-    @if (isPending)
-    {
-    <button @onclick="@(() => UpdateStatus(appt, "Confirmed"))"
-    title="Confirm" class="appt-action-btn appointment-action appointment-action--positive">Confirm</button>
-    <button @onclick="@(() => RequestPendingCancellation(appt))"
-    title="Cancel" class="appt-action-btn appointment-action appointment-action--danger">Cancel</button>
-    }
-else if (isConfirmed)
-    {
-    <button @onclick="@(() => OpenDetail(appt))"
-    title="Checkout" class="appt-action-btn appointment-action appointment-action--positive">Checkout</button>
-    <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Pending", "Unconfirm appointment"))"
-    title="Move to Pending" class="appt-action-btn appointment-action appointment-action--warning">Unconfirm</button>
-    <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Cancelled", "Cancel confirmed appointment"))"
-    title="Cancel" class="appt-action-btn appointment-action appointment-action--danger">Cancel</button>
-    }
-else if (isCompleted || isCancelled)
-    {
-    <button @onclick="@(() => RequestRestrictedStatusChange(appt, "Pending", "Reopen appointment"))"
-    title="Reopen" class="appt-action-btn appointment-action appointment-action--primary">Reopen</button>
-    }
-else if (isExpired)
-    {
-    <span style="color: var(--muted-foreground); font-size: var(--text-xs); font-style: italic;">Expired</span>
-    }
-    </div>
-    </article>
-    }
+    <TablePaginator Page="currentPage" TotalItems="@DisplayAppointments.Count()" PageSize="PageSize" OnPageChanged="OnPageChanged" />
     </div>
     @if (currentTab == "History")
     {
@@ -1363,6 +1315,9 @@ else if (calView == "next7")
                         private List<WorkOrderAuditDto>? auditTrail;
                         private string sortColumn = "created";
                         private bool sortAsc = false;
+                        private readonly SortState sort = new() { Column = "created" };
+                        private int currentPage = 1;
+                        private const int PageSize = 25;
                         private string checkoutPaymentMethod = "Cash";
                         private string? checkoutReference;
                         private string? checkoutError;
@@ -1732,47 +1687,51 @@ else if (calView == "next7")
                                                                                                                                                 }
                                                                                                                                                 }
 
-                                                                                                                                                private IEnumerable<AppointmentDto> DisplayAppointments
-                                                                                                                                                {
-                                                                                                                                                get
-                                                                                                                                                {
-                                                                                                                                                var src = currentTab == "Active" ? ActiveAppointments : HistoryAppointments;
-                                                                                                                                                src = calView switch
-                                                                                                                                                {
-                                                                                                                                                "day" => src.Where(a => a.AppointmentDate.Date == CalDay.Date),
-                                                                                                                                                "thisweek" => src.Where(a => GetWeekDays().Any(d => d.Date == a.AppointmentDate.Date)),
-                                                                                                                                                "next7" => src.Where(a => GetNext7Days().Any(d => d.Date == a.AppointmentDate.Date)),
-                                                                                                                                                "month" => src.Where(a => a.AppointmentDate.Month == calMonth.Month && a.AppointmentDate.Year == calMonth.Year),
-                                                                                                                                                _ => src
-                                                                                                                                                };
-                                                                                                                                                return (sortColumn, sortAsc) switch
-                                                                                                                                                {
-                                                                                                                                                ("customer", true) => src.OrderBy(a => a.CustomerName),
-                                                                                                                                                ("customer", false) => src.OrderByDescending(a => a.CustomerName),
-                                                                                                                                                ("schedule", true) => src.OrderBy(a => a.AppointmentDate).ThenBy(a => a.TimeSlot),
-                                                                                                                                                ("schedule", false) => src.OrderByDescending(a => a.AppointmentDate).ThenByDescending(a => a.TimeSlot),
-                                                                                                                                                ("services", true) => src.OrderBy(a => a.ServicesRequested),
-                                                                                                                                                ("services", false) => src.OrderByDescending(a => a.ServicesRequested),
-                                                                                                                                                ("total", true) => src.OrderBy(a => a.TotalAmount),
-                                                                                                                                                ("total", false) => src.OrderByDescending(a => a.TotalAmount),
-                                                                                                                                                ("status", true) => src.OrderBy(a => a.Status),
-                                                                                                                                                ("status", false) => src.OrderByDescending(a => a.Status),
-                                                                                                                                                _ => src.OrderByDescending(a => a.CreatedAt)
-                                                                                                                                                };
-                                                                                                                                                }
-                                                                                                                                                }
+                                                                                                                                                 private IEnumerable<AppointmentDto> DisplayAppointments
+                                                                                                                                                 {
+                                                                                                                                                 get
+                                                                                                                                                 {
+                                                                                                                                                 var src = currentTab == "Active" ? ActiveAppointments : HistoryAppointments;
+                                                                                                                                                 src = calView switch
+                                                                                                                                                 {
+                                                                                                                                                 "day" => src.Where(a => a.AppointmentDate.Date == CalDay.Date),
+                                                                                                                                                 "thisweek" => src.Where(a => GetWeekDays().Any(d => d.Date == a.AppointmentDate.Date)),
+                                                                                                                                                 "next7" => src.Where(a => GetNext7Days().Any(d => d.Date == a.AppointmentDate.Date)),
+                                                                                                                                                 "month" => src.Where(a => a.AppointmentDate.Month == calMonth.Month && a.AppointmentDate.Year == calMonth.Year),
+                                                                                                                                                 _ => src
+                                                                                                                                                 };
+                                                                                                                                                 return (sort.Column, sort.Ascending) switch
+                                                                                                                                                 {
+                                                                                                                                                 ("customer", true) => src.OrderBy(a => a.CustomerName),
+                                                                                                                                                 ("customer", false) => src.OrderByDescending(a => a.CustomerName),
+                                                                                                                                                 ("schedule", true) => src.OrderBy(a => a.AppointmentDate).ThenBy(a => a.TimeSlot),
+                                                                                                                                                 ("schedule", false) => src.OrderByDescending(a => a.AppointmentDate).ThenByDescending(a => a.TimeSlot),
+                                                                                                                                                 ("services", true) => src.OrderBy(a => a.ServicesRequested),
+                                                                                                                                                 ("services", false) => src.OrderByDescending(a => a.ServicesRequested),
+                                                                                                                                                 ("total", true) => src.OrderBy(a => a.TotalAmount),
+                                                                                                                                                 ("total", false) => src.OrderByDescending(a => a.TotalAmount),
+                                                                                                                                                 ("status", true) => src.OrderBy(a => a.Status),
+                                                                                                                                                 ("status", false) => src.OrderByDescending(a => a.Status),
+                                                                                                                                                 _ => src.OrderByDescending(a => a.CreatedAt)
+                                                                                                                                                 };
+                                                                                                                                                 }
+                                                                                                                                                 }
 
-                                                                                                                                                private void ToggleSort(string column)
-                                                                                                                                                {
-                                                                                                                                                if (sortColumn == column) sortAsc = !sortAsc;
-                                                                                                                                                else { sortColumn = column; sortAsc = true; }
-                                                                                                                                                    }
+                                                                                                                                                 private IEnumerable<AppointmentDto> PagedAppointments =>
+                                                                                                                                                     DisplayAppointments.Skip((currentPage - 1) * PageSize).Take(PageSize);
 
-                                                                                                                                                    private string SortArrow(string column)
-                                                                                                                                                    {
-                                                                                                                                                    if (sortColumn != column) return "";
-                                                                                                                                                        return sortAsc ? "▲" : " ▼";
-                                                                                                                                                        }
+                                                                                                                                                 private void ToggleSort(string column)
+                                                                                                                                                 {
+                                                                                                                                                     sort.Toggle(column);
+                                                                                                                                                     currentPage = 1;
+                                                                                                                                                     StateHasChanged();
+                                                                                                                                                 }
+
+                                                                                                                                                 private void OnPageChanged(int page)
+                                                                                                                                                 {
+                                                                                                                                                     currentPage = page;
+                                                                                                                                                     StateHasChanged();
+                                                                                                                                                 }
 
                                                                                                                                                         protected override async Task OnInitializedAsync()
                                                                                                                                                         {

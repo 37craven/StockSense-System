@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using BlazorBlueprint.Primitives.Services
+@using StockSense.Client.Components
 @using StockSense.Client.Layout
 @inject HttpClient Http
 @inject IJSRuntime JS
@@ -121,9 +122,18 @@ else
     </div>
     <div class="inventory-table-wrap">
     <table class="inventory-table">
-    <thead><tr><th><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th><th>Product</th><th>Status</th><th>Stock</th><th>Position</th><th>Reorder</th><th>Calculation</th><th><span class="sr-only">Open</span></th></tr></thead>
+    <thead><tr>
+    <th><input type="checkbox" aria-label="Select all visible products" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th>
+    <SortableHeaderCell Label="Product" Sort="sort" Column="product" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Status" Sort="sort" Column="status" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Stock" Sort="sort" Column="stock" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Position" Sort="sort" Column="position" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Reorder" Sort="sort" Column="reorder" OnSort="ToggleSort" />
+    <SortableHeaderCell Label="Calculation" Sort="sort" Column="calculation" OnSort="ToggleSort" />
+    <th><span class="sr-only">Open</span></th>
+    </tr></thead>
     <tbody>
-    @foreach (var row in FilteredRows)
+    @foreach (var row in PagedFilteredRows)
     {
     <tr class="inventory-row" role="button" tabindex="0" @onclick="() => OpenDetails(row)" @onkeydown='async (e) => { if(e.Key=="Enter"||e.Key==" ") await OpenDetails(row); }'>
     <td @onclick:stopPropagation><input type="checkbox" aria-label="Select @row.ProductName for recalculation" checked="@selectedIds.Contains(row.ProductId)" @onchange="e => Toggle(row.ProductId, e)" /></td>
@@ -139,6 +149,7 @@ else
     </tbody>
     </table>
     </div>
+    <TablePaginator Page="currentPage" TotalItems="@FilteredRows.Count()" PageSize="PageSize" OnPageChanged="OnPageChanged" />
     </div>
     }
     </div>
@@ -618,6 +629,9 @@ else
     private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", productStatus = "", message = "", error = "", settingsError = "";
     private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed, filtersOpen;
     private bool inventoryConfirmationOpen, recalculateAllConfirmationOpen, showDiscardDetails, showDiscardNewProduct;
+    private readonly SortState sort = new() { Column = "product" };
+    private int currentPage = 1;
+    private const int PageSize = 25;
     private string settingsBaseline = "";
     private bool detailOpen
     {
@@ -721,7 +735,41 @@ else
                         .Where(x => !belowReorder || x.InventoryPosition <= x.ReorderPoint)
                         .Where(x => !missingSupplier || !x.SupplierId.HasValue)
                         .Where(x => !automaticOnly || x.IsAutomaticOrderEnabled);
-                        private bool AllVisibleSelected => FilteredRows.Any() && FilteredRows.All(x => selectedIds.Contains(x.ProductId));
+
+                        private IEnumerable<InventoryDashboardRowDto> SortedFilteredRows => (sort.Column, sort.Ascending) switch
+                        {
+                            ("product", true) => FilteredRows.OrderBy(x => x.ProductName),
+                            ("product", false) => FilteredRows.OrderByDescending(x => x.ProductName),
+                            ("status", true) => FilteredRows.OrderBy(x => x.IsActive),
+                            ("status", false) => FilteredRows.OrderByDescending(x => x.IsActive),
+                            ("stock", true) => FilteredRows.OrderBy(x => x.CurrentStock),
+                            ("stock", false) => FilteredRows.OrderByDescending(x => x.CurrentStock),
+                            ("position", true) => FilteredRows.OrderBy(x => x.InventoryPosition),
+                            ("position", false) => FilteredRows.OrderByDescending(x => x.InventoryPosition),
+                            ("reorder", true) => FilteredRows.OrderBy(x => x.ReorderPoint),
+                            ("reorder", false) => FilteredRows.OrderByDescending(x => x.ReorderPoint),
+                            ("calculation", true) => FilteredRows.OrderBy(x => x.CalculationStage),
+                            ("calculation", false) => FilteredRows.OrderByDescending(x => x.CalculationStage),
+                            _ => FilteredRows.OrderByDescending(x => x.ProductName)
+                        };
+
+                        private IEnumerable<InventoryDashboardRowDto> PagedFilteredRows =>
+                            SortedFilteredRows.Skip((currentPage - 1) * PageSize).Take(PageSize);
+
+                        private void ToggleSort(string column)
+                        {
+                            sort.Toggle(column);
+                            currentPage = 1;
+                            StateHasChanged();
+                        }
+
+                        private void OnPageChanged(int page)
+                        {
+                            currentPage = page;
+                            StateHasChanged();
+                        }
+
+                        private bool AllVisibleSelected => PagedFilteredRows.Any() && PagedFilteredRows.All(x => selectedIds.Contains(x.ProductId));
                         private IEnumerable<string> Categories => (rows ?? []).Select(x => x.Category).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Order();
                         private IEnumerable<string> Brands => (rows ?? []).Select(x => x.Brand).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Order();
                         private IEnumerable<string> Suppliers => (rows ?? []).Where(x => x.SupplierId.HasValue).Select(x => x.SupplierName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Order();
@@ -751,7 +799,7 @@ else
                         }
                         }
                         private void Toggle(int id, ChangeEventArgs e) { if (e.Value is true) selectedIds.Add(id); else selectedIds.Remove(id); }
-                        private void ToggleAll(ChangeEventArgs e) { foreach (var row in FilteredRows) { if (e.Value is true) selectedIds.Add(row.ProductId); else selectedIds.Remove(row.ProductId); } }
+                        private void ToggleAll(ChangeEventArgs e) { foreach (var row in PagedFilteredRows) { if (e.Value is true) selectedIds.Add(row.ProductId); else selectedIds.Remove(row.ProductId); } }
                         private async Task DownloadBarcodePdf(int productId, string productName)
                         {
                         var safeName = string.Concat(productName.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));

@@ -1,0 +1,31 @@
+@if (TotalItems > 0)
+{
+    <div class="flex items-center justify-between border-t border-border px-4 py-3 text-xs text-muted-foreground">
+        <span>Showing @Start–@End of @TotalItems</span>
+        <div class="flex items-center gap-1.5">
+            <button type="button" @onclick="Prev" disabled="@(Page <= 1)"
+                    class="px-2 py-1 rounded border border-border disabled:opacity-40 hover:bg-muted transition-colors">
+                ← Prev
+            </button>
+            <span class="px-2">Page @Page / @TotalPages</span>
+            <button type="button" @onclick="Next" disabled="@(Page >= TotalPages)"
+                    class="px-2 py-1 rounded border border-border disabled:opacity-40 hover:bg-muted transition-colors">
+                Next →
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int TotalItems { get; set; }
+    [Parameter] public int PageSize { get; set; } = 25;
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+
+    private int TotalPages => (int)Math.Ceiling(TotalItems / (double)PageSize);
+    private int Start => TotalItems == 0 ? 0 : Math.Min((Page - 1) * PageSize + 1, TotalItems);
+    private int End => Math.Min(Page * PageSize, TotalItems);
+
+    private Task Prev() => OnPageChanged.InvokeAsync(Page - 1);
+    private Task Next() => OnPageChanged.InvokeAsync(Page + 1);
+}

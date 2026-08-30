@@ -1,0 +1,34 @@
+<div class="bg-card border border-border rounded-lg">
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-sm @TableCssClass" style="table-layout: fixed;">
+            <colgroup>@Colgroup</colgroup>
+            <thead>
+                <tr class="border-b border-border bg-muted/5">
+                    @Header
+                </tr>
+            </thead>
+            <tbody>
+                @if (Items is not null && !Items.Any())
+                {
+                    <tr><td colspan="@ColumnCount" class="p-0"><EmptyState Description="@EmptyDescription" Title="" /></td></tr>
+                }
+                @RowTemplate
+            </tbody>
+        </table>
+    </div>
+    @if (Footer is not null)
+    {
+        @Footer
+    }
+</div>
+
+@code {
+    [Parameter] public int ColumnCount { get; set; }
+    [Parameter] public string? EmptyDescription { get; set; }
+    [Parameter] public IEnumerable<object>? Items { get; set; }
+    [Parameter] public RenderFragment? Colgroup { get; set; }
+    [Parameter] public RenderFragment? Header { get; set; }
+    [Parameter] public RenderFragment? RowTemplate { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public string? TableCssClass { get; set; }
+}

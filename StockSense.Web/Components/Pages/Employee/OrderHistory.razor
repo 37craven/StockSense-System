@@ -13,6 +13,7 @@
 @using StockSense.Web.Helpers
 @using StockSense.Client.Layout
 @using BlazorBlueprint.Primitives.Services
+@using StockSense.Client.Components
 @inject ApplicationDbContext Db
 @inject IOrderSlipWorkflowService Workflow
 @inject AuthenticationStateProvider AuthenticationState
@@ -90,6 +91,7 @@
 .order-primary strong { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:.85rem; color:hsl(var(--foreground)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .order-primary small { margin-top:.2rem; color:hsl(var(--muted-foreground)); font-size:.72rem; }
 .order-actions { display:flex; align-items:center; justify-content:flex-end; gap:.4rem; flex-wrap:nowrap; min-height:2rem; white-space:nowrap; }
+.order-status-badge::before { display:none !important; }
 .notice { border-radius:.55rem; border:1px solid hsl(var(--border)); padding:.75rem; font-size:.875rem; background:hsl(var(--muted) / .3); color:hsl(var(--foreground)); }
 .notice.error { border-color:hsl(var(--destructive)); color:hsl(var(--destructive)); background:hsl(var(--destructive) / .08); }
 .detail-body {
@@ -167,6 +169,7 @@
         min-width:0;
         padding:0;
         border:0 !important;
+        border-bottom:0 !important;
         border-radius:0 !important;
         background:transparent;
         box-shadow:none !important;
@@ -179,8 +182,9 @@
         padding-top:.75rem;
         border-top:1px solid hsl(var(--border)) !important;
     }
-    .order-actions { justify-content:flex-start; flex-wrap:wrap; white-space:normal; }
+    .order-actions { justify-content:flex-end; flex-wrap:wrap; white-space:normal; }
     .order-actions button { min-height:2.5rem; }
+    .order-actions .order-details-btn { display:none; }
 }
 
 @@media (max-width: 767px) {
@@ -189,11 +193,14 @@
     .order-table thead { display:none; }
     .order-table tbody { display:flex; flex-direction:column; gap:.65rem; }
     .order-table tr.order-row { display:grid; grid-template-columns:1fr auto; gap:.7rem 1rem; padding:.85rem; border:1px solid rgba(127,127,127,.34); border-radius:.65rem; background:var(--background, transparent); box-shadow:0 1px 3px rgba(0,0,0,.05); }
-    .order-table td { display:block; padding:0; border:0; min-width:0; background:transparent; border-radius:0 !important; box-shadow:none !important; }
+    .order-table td,
+    .order-table th { display:block; padding:0; border:0 !important; min-width:0; background:transparent; border-radius:0 !important; box-shadow:none !important; border-bottom:0 !important; }
     .order-table td[data-label="Order"] { grid-column:1; grid-row:1; }
     .order-table td[data-label="Status"] { grid-column:2; grid-row:1; align-self:start; }
-    .order-table td[data-label="Actions"] { grid-column:1 / -1; padding-top:.65rem; border-top:1px solid hsl(var(--border)); }
-    .order-actions { justify-content:flex-start; }
+    .order-table td[data-label="Actions"] { grid-column:1 / -1; padding-top:.65rem; }
+    .order-table tbody tr:not(:last-child) td { border-bottom:0 !important; }
+    .order-actions { justify-content:flex-end; }
+    .order-actions .order-details-btn { display:none; }
     .detail-summary-grid { grid-template-columns:1fr 1fr; }
     .detail-footer { align-items:center; flex-direction:row; flex-wrap:wrap; gap:.75rem; }
     .detail-footer-group { width:auto; flex:0 1 auto; justify-content:flex-start; }
@@ -222,7 +229,7 @@
 <PageTitle>Order History</PageTitle>
 
 <div class="order-page">
-    <PageHeader Title="Order Slips"
+    <PageHeader Title="Order Slips History"
                 Subtitle="Review purchase orders and track receipt progress."
                 Badge="@(slips?.Count(s => s.Status is OrderSlipStatuses.Draft or OrderSlipStatuses.Approved or OrderSlipStatuses.Ordered or OrderSlipStatuses.PartiallyReceived).ToString() + " Active")"
                 Badge2="@(slips?.Count(s => s.Status == OrderSlipStatuses.Completed).ToString() + " Completed")">
@@ -294,23 +301,15 @@
                         </colgroup>
                         <thead>
                             <tr>
-                                <th @onclick='@(() => ToggleSort("number"))' class="cursor-pointer select-none">
-                                    Order Slip @SortArrow("number")
-                                </th>
-                                <th @onclick='@(() => ToggleSort("supplier"))' class="cursor-pointer select-none hide-ipad">
-                                    Supplier @SortArrow("supplier")
-                                </th>
-                                <th @onclick='@(() => ToggleSort("status"))' class="cursor-pointer select-none">
-                                    Status @SortArrow("status")
-                                </th>
-                                <th @onclick='@(() => ToggleSort("generated"))' class="cursor-pointer select-none hide-ipad">
-                                    Generated @SortArrow("generated")
-                                </th>
+                                <SortableHeaderCell Label="Order Slip" Sort="sort" Column="number" CssClass="cursor-pointer select-none" OnSort="ToggleSort" />
+                                <SortableHeaderCell Label="Supplier" Sort="sort" Column="supplier" CssClass="cursor-pointer select-none hide-ipad" OnSort="ToggleSort" />
+                                <SortableHeaderCell Label="Status" Sort="sort" Column="status" CssClass="cursor-pointer select-none" OnSort="ToggleSort" />
+                                <SortableHeaderCell Label="Generated" Sort="sort" Column="generated" CssClass="cursor-pointer select-none hide-ipad" OnSort="ToggleSort" />
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var slip in filteredSlips)
+                            @foreach (var slip in PagedSlips)
                             {
                                 <tr class="order-row" role="button" tabindex="0" @onclick="() => OpenDetail(slip)" @onkeydown='(e) => { if(e.Key=="Enter"||e.Key==" ") OpenDetail(slip); }'>
                                     <td data-label="Order">
@@ -330,7 +329,10 @@
                                     </td>
                                     <td data-label="Actions" @onclick:stopPropagation>
                                         <div class="order-actions">
-                                            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="@OrderSlipPresentation.DetailsActionClass" OnClick="() => OpenDetail(slip)">Details</BbButton>
+                                            @if (isAdmin && CanCancel(slip))
+                                            {
+                                                <BbButton Variant="ButtonVariant.Destructive" Size="ButtonSize.Small" OnClick="() => OpenCancel(slip)">Cancel</BbButton>
+                                            }
                                             <AuthorizeView Roles="Admin">
                                                 @if (slip.Status == OrderSlipStatuses.Draft)
                                                 {
@@ -345,14 +347,6 @@
                                             {
                                                 <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" Class="@OrderSlipPresentation.ReceiveActionClass" OnClick="() => OpenDetailForReceive(slip)">Receive</BbButton>
                                             }
-                                            @if (HasSecondaryActions(slip))
-                                            {
-                                                <OrderSlipActionMenu Label="@MoreOptionsLabel(slip)"
-                                                                     ShowCloseRemaining="@(slip.Status == OrderSlipStatuses.PartiallyReceived)"
-                                                                     ShowCancel="@(isAdmin && CanCancel(slip))"
-                                                                     OnCloseRemaining="() => OpenCloseRemaining(slip)"
-                                                                     OnCancel="() => OpenCancel(slip)" />
-                                            }
                                         </div>
                                     </td>
                                 </tr>
@@ -360,6 +354,7 @@
                         </tbody>
                     </table>
                 </div>
+                <TablePaginator Page="currentPage" TotalItems="@filteredSlips.Count" PageSize="PageSize" OnPageChanged="OnPageChanged" />
             </div>
         }
     }
@@ -756,20 +751,16 @@
     private string closeRemainingAdminUserId = "", closeRemainingAdminPin = "";
     private bool isAdmin, isLoadingAdminOptions;
     private List<AdminOption> adminOptions = [];
-    private string sortColumn = "generated";
-    private bool sortAsc;
+    private readonly SortState sort = new() { Column = "generated" };
+    private int currentPage = 1;
+    private const int PageSize = 25;
 
     private void ToggleSort(string column)
     {
-        if (sortColumn == column) sortAsc = !sortAsc;
-        else { sortColumn = column; sortAsc = true; }
+        sort.Toggle(column);
+        currentPage = 1;
         ApplySort();
-    }
-
-    private string SortArrow(string column)
-    {
-        if (sortColumn != column) return "";
-        return sortAsc ? " ▲" : " ▼";
+        StateHasChanged();
     }
 
     private void ApplyFilter()
@@ -777,6 +768,7 @@
         filteredSlips = (slips ?? new())
             .Where(s => (string.IsNullOrEmpty(statusFilter) || s.Status == statusFilter) && MatchesSearch(s))
             .ToList();
+        currentPage = 1;
         ApplySort();
     }
 
@@ -790,7 +782,7 @@
 
     private void ApplySort()
     {
-        filteredSlips = (sortColumn, sortAsc) switch
+        filteredSlips = (sort.Column, sort.Ascending) switch
         {
             ("number", true) => filteredSlips.OrderBy(s => DisplayNumber(s)).ToList(),
             ("number", false) => filteredSlips.OrderByDescending(s => DisplayNumber(s)).ToList(),
@@ -804,6 +796,15 @@
             ("expected", false) => filteredSlips.OrderByDescending(s => s.ExpectedDeliveryDate ?? DateTime.MinValue).ToList(),
             _ => filteredSlips
         };
+    }
+
+    private IEnumerable<OrderSlip> PagedSlips =>
+        filteredSlips.Skip((currentPage - 1) * PageSize).Take(PageSize);
+
+    private void OnPageChanged(int page)
+    {
+        currentPage = page;
+        StateHasChanged();
     }
 
     protected override async Task OnInitializedAsync()

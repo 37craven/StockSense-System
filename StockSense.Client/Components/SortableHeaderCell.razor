@@ -1,0 +1,23 @@
+<th @onclick="OnClick"
+    class="cursor-pointer text-left px-4 py-3 text-muted-foreground select-none @CssClass">
+    @Label@(_arrow)
+</th>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public SortState? Sort { get; set; }
+    [Parameter] public string? Column { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public EventCallback<string> OnSort { get; set; }
+
+    private string _arrow => Sort is not null && Column is not null ? Sort.Arrow(Column) : "";
+
+    private async Task OnClick()
+    {
+        if (Sort is not null && Column is not null)
+        {
+            Sort.Toggle(Column);
+            await OnSort.InvokeAsync(Column);
+        }
+    }
+}

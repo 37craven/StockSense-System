@@ -7,6 +7,7 @@
 @using StockSense.Client.Layout
 @using System.Net.Http.Json
 @using BlazorBlueprint.Primitives.Services
+@using StockSense.Client.Components
 @inject HttpClient Http
 @inject ToastService Toast
 
@@ -214,13 +215,7 @@
 
     .txn-type-badge::before,
     .txn-voided-badge::before {
-        width: 6px;
-        height: 6px;
-        flex: 0 0 6px;
-        border-radius: 999px;
-        background: currentColor;
-        content: "";
-        opacity: .78;
+        display: none !important;
     }
 
     .txn-type-sale {
@@ -416,7 +411,7 @@
             <label class="txn-filter">
                 <LucideIcon Name="calendar" Size="14" />
                 <input id="txn-month" type="month" value="@selectedMonth"
-                       @onchange="e => selectedMonth = e.Value?.ToString()"
+                       @onchange="e => { selectedMonth = e.Value?.ToString(); currentPage = 1; }"
                        class="txn-month-input" aria-label="Filter by month" />
             </label>
             @if (!string.IsNullOrWhiteSpace(selectedMonth))
@@ -439,10 +434,11 @@
                     aria-pressed="@(daysFilter == 30)">Last 30 days</button>
         </div>
 
-        <div style="background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius);">
-            <div class="txn-desktop-table">
-                <table style="width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-sm);">
+        <div class="bg-card border border-border rounded-lg">
+            <div class="txn-desktop-table overflow-x-auto">
+                <table class="w-full border-collapse text-sm" style="table-layout: fixed;">
                     <colgroup>
+                        <col style="width:40px;" />
                         <col class="col-inv" />
                         <col class="col-date" />
                         <col class="col-type" />
@@ -451,46 +447,37 @@
                         <col class="col-items" />
                     </colgroup>
                     <thead>
-                        <tr style="border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.02);">
-                            <th @onclick="@(() => ToggleSort("invoice"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-inv">
-                                Invoice # @SortArrow("invoice")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("date"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-date">
-                                Date @SortArrow("date")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("type"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-type transaction-type-col">
-                                Type @SortArrow("type")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("payment"))" style="cursor: pointer; text-align: left; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-pay">
-                                Payment @SortArrow("payment")
-                            </th>
-                            <th @onclick="@(() => ToggleSort("total"))" style="cursor: pointer; text-align: right; padding: 12px 16px; color: var(--muted-foreground); user-select: none;" class="col-total">
-                                Total @SortArrow("total")
-                            </th>
-                            <th style="text-align: center; padding: 12px 16px; color: var(--muted-foreground);" class="col-items">Items</th>
+                        <tr class="border-b border-border bg-muted/5">
+                            <th class="px-4 py-3"><input type="checkbox" aria-label="Select all visible transactions" checked="@AllVisibleSelected" @onchange="ToggleAll" /></th>
+                            <SortableHeaderCell Label="Invoice #" Sort="sort" Column="invoice" CssClass="col-inv" OnSort="ToggleSort" />
+                            <SortableHeaderCell Label="Date" Sort="sort" Column="date" CssClass="col-date" OnSort="ToggleSort" />
+                            <SortableHeaderCell Label="Type" Sort="sort" Column="type" CssClass="col-type transaction-type-col" OnSort="ToggleSort" />
+                            <SortableHeaderCell Label="Payment" Sort="sort" Column="payment" CssClass="col-pay" OnSort="ToggleSort" />
+                            <SortableHeaderCell Label="Total" Sort="sort" Column="total" CssClass="col-total text-right" OnSort="ToggleSort" />
+                            <th class="text-center px-4 py-3 text-muted-foreground col-items">Items</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (!DisplayTransactions.Any())
                         {
-                            <tr><td colspan="6" style="padding: 0;"><EmptyState Description="No transactions found." Title="" /></td></tr>
+                            <tr><td colspan="6" class="p-0"><EmptyState Description="No transactions found." Title="" /></td></tr>
                         }
-                        @foreach (var txn in DisplayTransactions)
+                        @foreach (var txn in PagedTransactions)
                         {
                             <tr @onclick="() => OpenDetail(txn)"
-                                class="@(txn.IsVoided ? "txn-row-voided row-clickable" : "row-clickable")"
-                                style="cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;">
-                                <td style="padding: 12px 16px; color: var(--foreground); font-weight: 500;" class="col-inv">
+                                class="@(txn.IsVoided ? "txn-row-voided row-clickable" : "row-clickable") cursor-pointer border-b border-border transition-colors">
+                                <td class="px-4 py-3" @onclick:stopPropagation><input type="checkbox" aria-label="Select @txn.InvoiceNumber" checked="@selectedIds.Contains(txn.Id)" @onchange="e => Toggle(txn.Id, e)" /></td>
+                                <td class="px-4 py-3 text-foreground font-medium col-inv">
                                     @txn.InvoiceNumber
                                     @if (txn.IsVoided)
                                     {
                                         <span class="txn-voided-badge">Voided</span>
                                     }
                                 </td>
-                                <td style="padding: 12px 16px; color: var(--muted-foreground); font-size: var(--text-xs); white-space: nowrap;" class="col-date">
+                                <td class="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap col-date">
                                     @txn.TransactionDate.ToString("MMM dd, yyyy h:mm tt")
                                 </td>
-                                <td style="padding: 12px 16px;" class="col-type transaction-type-col">
+                                <td class="px-4 py-3 col-type transaction-type-col">
                                     @{
                                         var typeLabel = GetTypeLabel(txn);
                                     }
@@ -498,13 +485,13 @@
                                         @typeLabel
                                     </span>
                                 </td>
-                                <td style="padding: 12px 16px; color: var(--muted-foreground); font-size: var(--text-xs);" class="col-pay">
+                                <td class="px-4 py-3 text-muted-foreground text-xs col-pay">
                                     @txn.PaymentMethod
                                 </td>
-                                <td style="padding: 12px 16px; font-weight: bold; color: var(--foreground);" class="col-total transaction-total">
+                                <td class="px-4 py-3 font-bold text-foreground col-total transaction-total">
                                     ₱@txn.TotalAmount.ToString("N2")
                                 </td>
-                                <td style="padding: 12px 16px; text-align: center; color: var(--muted-foreground);" class="col-items">
+                                <td class="px-4 py-3 text-center text-muted-foreground col-items">
                                     @txn.ItemCount
                                 </td>
                             </tr>
@@ -517,7 +504,7 @@
                 {
                     <EmptyState Description="No transactions found." Title="" />
                 }
-                @foreach (var txn in DisplayTransactions)
+                @foreach (var txn in PagedTransactions)
                 {
                     var typeLabel = GetTypeLabel(txn);
                     <article class="txn-mobile-card @(txn.IsVoided ? "txn-mobile-card-voided" : "")"
@@ -525,9 +512,12 @@
                              @onclick="() => OpenDetail(txn)"
                              @onkeydown="args => OpenDetailOnKey(args, txn)">
                         <div class="txn-mobile-top">
-                            <div>
-                                <div class="txn-mobile-invoice">@txn.InvoiceNumber</div>
-                                <div class="txn-mobile-date">@txn.TransactionDate.ToString("MMM dd, yyyy h:mm tt")</div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" aria-label="Select @txn.InvoiceNumber" checked="@selectedIds.Contains(txn.Id)" @onchange="e => Toggle(txn.Id, e)" @onclick:stopPropagation />
+                                <div>
+                                    <div class="txn-mobile-invoice">@txn.InvoiceNumber</div>
+                                    <div class="txn-mobile-date">@txn.TransactionDate.ToString("MMM dd, yyyy h:mm tt")</div>
+                                </div>
                             </div>
                             <div class="txn-badge-stack">
                                 <span class="txn-type-badge @GetTypeClass(txn.TransactionType)">@typeLabel</span>
@@ -544,6 +534,14 @@
                     </article>
                 }
             </div>
+            @if (selectedIds.Count > 0)
+            {
+                <div class="flex items-center justify-between gap-4 border-t border-border px-4 py-3 text-sm bg-card">
+                    <span class="text-muted-foreground"><strong class="text-foreground">@selectedIds.Count</strong> selected</span>
+                    <span class="font-bold text-foreground">₱@SelectedSalesTotal.ToString("N2")</span>
+                </div>
+            }
+            <TablePaginator Page="currentPage" TotalItems="@DisplayTransactions.Count()" PageSize="PageSize" OnPageChanged="OnPageChanged" />
         </div>
     }
 </div>
@@ -697,8 +695,31 @@
     private string voidReason = string.Empty;
     private bool isProcessing;
     private TransactionHistoryDto? selectedTransaction;
-    private string sortColumn = "date";
-    private bool sortAsc;
+    private readonly SortState sort = new() { Column = "date" };
+    private int currentPage = 1;
+    private const int PageSize = 25;
+    private readonly HashSet<int> selectedIds = new();
+
+    private bool AllVisibleSelected => PagedTransactions.Any() && PagedTransactions.All(x => selectedIds.Contains(x.Id));
+
+    private decimal SelectedSalesTotal => allTransactions?
+        .Where(t => selectedIds.Contains(t.Id) && !t.IsVoided && t.TransactionType == "Sale")
+        .Sum(t => t.TotalAmount) ?? 0;
+
+    private void Toggle(int id, ChangeEventArgs e)
+    {
+        if (e.Value is true) selectedIds.Add(id); else selectedIds.Remove(id);
+        StateHasChanged();
+    }
+
+    private void ToggleAll(ChangeEventArgs e)
+    {
+        foreach (var txn in PagedTransactions)
+        {
+            if (e.Value is true) selectedIds.Add(txn.Id); else selectedIds.Remove(txn.Id);
+        }
+        StateHasChanged();
+    }
 
     private IEnumerable<TransactionHistoryDto> DisplayTransactions
     {
@@ -724,7 +745,7 @@
                 src = src.Where(t => t.TransactionDate.Date >= start && t.TransactionDate.Date <= today);
             }
 
-            return (sortColumn, sortAsc) switch
+            return (sort.Column, sort.Ascending) switch
             {
                 ("invoice", true) => src.OrderBy(t => t.InvoiceNumber),
                 ("invoice", false) => src.OrderByDescending(t => t.InvoiceNumber),
@@ -741,16 +762,20 @@
         }
     }
 
+    private IEnumerable<TransactionHistoryDto> PagedTransactions =>
+        DisplayTransactions.Skip((currentPage - 1) * PageSize).Take(PageSize);
+
     private void ToggleSort(string column)
     {
-        if (sortColumn == column) sortAsc = !sortAsc;
-        else { sortColumn = column; sortAsc = true; }
+        sort.Toggle(column);
+        currentPage = 1;
+        StateHasChanged();
     }
 
-    private string SortArrow(string column)
+    private void OnPageChanged(int page)
     {
-        if (sortColumn != column) return "";
-        return sortAsc ? "▲" : " ▼";
+        currentPage = page;
+        StateHasChanged();
     }
 
     protected override async Task OnInitializedAsync() => await LoadAllAsync();
@@ -770,6 +795,7 @@
     private async Task SetFilter(string? type)
     {
         filterType = type;
+        currentPage = 1;
         try
         {
             var endpoint = type == "StockCorrection" || string.IsNullOrWhiteSpace(type)
@@ -786,6 +812,7 @@
     private void SetDays(int? days)
     {
         daysFilter = days;
+        currentPage = 1;
     }
 
     private void OpenVoidConfirmation()
