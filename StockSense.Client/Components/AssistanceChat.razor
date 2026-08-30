@@ -31,7 +31,7 @@
                 <div class="chat-suggestions" aria-label="Suggested questions">
                     @foreach (var suggestion in suggestions)
                     {
-                        <button @onclick="() => Suggest(suggestion.Prompt)"
+                        <button @onclick="() => SuggestOrNavigate(suggestion)"
                                 type="button"
                                 class="chat-suggestion-card">
                             <div class="chat-suggestion-left">
@@ -97,7 +97,8 @@
                                         <ChatConfirmationUi WorkflowState="@activeWorkflowState"
                                                             OnConfirm="HandleConfirmAsync"
                                                             OnChange="HandleChangeAsync"
-                                                            OnCancelWorkflow="HandleCancelWorkflowAsync" />
+                                                            OnCancelWorkflow="HandleCancelWorkflowAsync"
+                                                            OnRemoveService="HandleRemoveServiceAsync" />
                                     }
                                     else if (isLastAssistant && msg.Actions is { Count: > 0 } && !isSending)
                                     {
@@ -706,85 +707,142 @@
         color: var(--primary);
     }
 
-    .chat-action-btn.chat-action-workflow {
-        border-color: var(--primary);
-        background: color-mix(in srgb, var(--primary) 8%, transparent);
-    }
-
-    /* Confirmation Card */
-    .chat-confirmation-card {
+    /* Review Card */
+    .chat-review-card {
         margin-top: 12px;
-        border: 1px solid var(--primary);
-        border-radius: 10px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
         overflow: hidden;
         background: var(--card);
     }
 
-    .chat-confirmation-header {
+    .chat-review-header {
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 10px 14px;
-        background: color-mix(in srgb, var(--primary) 8%, transparent);
-        font-size: 13px;
+        padding: 12px 16px;
+        font-size: 14px;
         font-weight: 600;
-        color: var(--primary);
+        color: var(--foreground);
         border-bottom: 1px solid var(--border);
     }
 
-    .chat-confirmation-body {
-        padding: 14px;
-        font-size: 13px;
-        line-height: 1.6;
-        color: var(--foreground);
-        white-space: pre-wrap;
+    .chat-review-body {
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
     }
 
-    .chat-confirmation-actions {
+    .chat-review-section {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .chat-review-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .chat-review-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        background: color-mix(in srgb, var(--primary) 8%, transparent);
+        color: var(--primary);
+        border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+    }
+
+    .chat-review-chip-remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: none;
+        background: transparent;
+        color: var(--primary);
+        cursor: pointer;
+        padding: 0;
+        opacity: 0.6;
+        transition: opacity 0.15s;
+    }
+
+    .chat-review-chip-remove:hover {
+        opacity: 1;
+        background: color-mix(in srgb, var(--destructive) 12%, transparent);
+        color: var(--destructive);
+    }
+
+    .chat-review-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+    }
+
+    .chat-review-label {
+        font-weight: 500;
+        color: var(--muted-foreground);
+    }
+
+    .chat-review-value {
+        color: var(--foreground);
+        font-weight: 500;
+    }
+
+    .chat-review-actions {
         display: flex;
         gap: 8px;
-        padding: 10px 14px;
+        padding: 12px 16px;
         border-top: 1px solid var(--border);
     }
 
-    .chat-confirm-btn {
+    .chat-review-btn {
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 7px 14px;
+        padding: 8px 16px;
         border-radius: 8px;
         border: 1px solid var(--border);
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.15s ease;
     }
 
-    .chat-confirm-yes {
+    .chat-review-confirm {
         background: var(--primary);
         color: var(--primary-foreground);
         border-color: var(--primary);
     }
 
-    .chat-confirm-yes:hover {
+    .chat-review-confirm:hover {
         opacity: 0.9;
     }
 
-    .chat-confirm-change {
+    .chat-review-change {
         background: var(--card);
         color: var(--foreground);
     }
 
-    .chat-confirm-change:hover {
+    .chat-review-change:hover {
         background: var(--accent);
     }
 
-    .chat-confirm-cancel {
+    .chat-review-cancel {
         background: var(--card);
         color: var(--muted-foreground);
     }
 
-    .chat-confirm-cancel:hover {
+    .chat-review-cancel:hover {
         background: color-mix(in srgb, var(--destructive) 10%, transparent);
         color: var(--destructive);
         border-color: var(--destructive);
@@ -875,6 +933,16 @@
         }
     }
 
+    private async Task SuggestOrNavigate(AssistanceSuggestion suggestion)
+    {
+        if (!string.IsNullOrEmpty(suggestion.Url))
+        {
+            NavigationManager.NavigateTo(suggestion.Url);
+            return;
+        }
+        await Suggest(suggestion.Prompt);
+    }
+
     private async Task Suggest(string text)
     {
         message = text;
@@ -949,6 +1017,7 @@
 
             messages.Add(new ChatMessage("assistant", result.Reply, result.Actions));
             activeWorkflowState = result.WorkflowState;
+            StateHasChanged();
 
             // Auto-execute book_appointment actions — the backend returns the
             // booking data and the frontend calls POST api/appointments directly.
@@ -1044,6 +1113,7 @@
                 ["cancel_appointment"] = "Cancel my appointment.",
                 ["get_quote"] = "Get a quote.",
                 ["custom_build"] = "Start a custom build.",
+                ["motorcycle_compatibility"] = "Check motorcycle compatibility.",
             };
             message = promptMap.TryGetValue(action.WorkflowType, out var wfPrompt)
                 ? wfPrompt
@@ -1125,7 +1195,24 @@
             else
             {
                 var errorMsg = response.Body?.Length > 300 ? response.Body[..300] : response.Body;
-                await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] Appointment API error: {errorMsg}");
+                await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] Appointment API error: status={response.Status} body={errorMsg}");
+
+                // Detect overlap error and ask chatbot to suggest alternative times
+                var isOverlap = response.Status == 409
+                    || (response.Body?.Contains("overlap", StringComparison.OrdinalIgnoreCase) == true);
+                if (isOverlap)
+                {
+                    // Start a new booking workflow with the same services/date
+                    // so the user only needs to pick a new time
+                    var newWfMsg = $"Book {serviceStr} on {dateStr}";
+                    messages.Add(new ChatMessage("assistant",
+                        $"The time slot {timeStr} is no longer available. Let me find you a new time..."));
+                    message = newWfMsg;
+                    activeWorkflowState = null;
+                    await SendAsync();
+                    return;
+                }
+
                 messages.Add(new ChatMessage("assistant",
                     $"I couldn't complete the booking. {errorMsg}\n\nPlease try booking from the appointment page or choose a different time."));
             }
@@ -1139,6 +1226,7 @@
         {
             isSending = false;
             StateHasChanged();
+            await ScrollToBottomAsync();
         }
     }
 
@@ -1160,6 +1248,12 @@
         await SendAsync();
     }
 
+    private async Task HandleRemoveServiceAsync(string serviceName)
+    {
+        message = $"Remove service: {serviceName}";
+        await SendAsync();
+    }
+
     private sealed record FailedAssistanceRequest(
         string Message,
         IReadOnlyList<ChatMessage> History);
@@ -1171,7 +1265,15 @@
 
         try
         {
-            await Task.Delay(20, componentLifetime.Token);
+            await Task.Delay(150, componentLifetime.Token);
+            if (!isDisposed && chatModule is not null)
+            {
+                await chatModule.InvokeVoidAsync(
+                    "scrollToBottom",
+                    componentLifetime.Token,
+                    messagesElement);
+            }
+            await Task.Delay(500, componentLifetime.Token);
             if (!isDisposed && chatModule is not null)
             {
                 await chatModule.InvokeVoidAsync(
