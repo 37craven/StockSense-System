@@ -23,6 +23,12 @@ public static class AssistanceRolePresentation
             "Check inventory attention items, appointment and build status, incoming orders, or part compatibility.",
             "Ask about today's operations...",
             "Operational results reflect the latest recorded system data."),
+        "Guest" => new(
+            "Sap Shop Assistant",
+            "Welcome! How can I help?",
+            "Browse services, check product availability, get compatibility info, or ask about appointments.",
+            "Ask about our services, products, or availability...",
+            "Log in to book appointments, view your bookings, or manage builds."),
         _ => new(
             "Sap Shop Assistant",
             "How can I help?",

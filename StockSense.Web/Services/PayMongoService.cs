@@ -24,6 +24,7 @@ public sealed class PayMongoService(HttpClient httpClient, ILogger<PayMongoServi
                 attributes = new
                 {
                     amount = amountCentavos,
+                    currency = "PHP",
                     description,
                     reference_number = referenceNumber
                 }

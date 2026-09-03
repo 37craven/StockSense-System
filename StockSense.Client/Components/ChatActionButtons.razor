@@ -1,9 +1,9 @@
 @using StockSense.Application.DTOs
 
-@if (Actions is { Count: > 0 })
+@if (FilteredActions is { Count: > 0 })
 {
     <div class="chat-action-buttons">
-        @foreach (var action in Actions)
+        @foreach (var action in FilteredActions)
         {
             <button @onclick="() => OnActionClick.InvokeAsync(action)"
                     type="button"
@@ -20,5 +20,9 @@
 
 @code {
     [Parameter] public IReadOnlyList<ChatAction>? Actions { get; set; }
+    [Parameter] public bool IsAuthenticated { get; set; } = true;
     [Parameter] public EventCallback<ChatAction> OnActionClick { get; set; }
+
+    private IReadOnlyList<ChatAction>? FilteredActions =>
+        Actions?.Where(a => IsAuthenticated || a.ActionType != "book_appointment").ToList();
 }

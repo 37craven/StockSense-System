@@ -14,6 +14,7 @@ namespace StockSense.Web.Controllers;
 
 [ApiController]
 [Authorize(Roles = "Customer,Employee,Admin")]
+[AllowAnonymous]
 [Route("api/assistance")]
 public sealed class AssistanceController(
     IAssistanceClient assistanceClient,
@@ -24,7 +25,8 @@ public sealed class AssistanceController(
         [FromBody] AssistanceRequest request,
         CancellationToken cancellationToken)
     {
-        var role = GetHighestRole(User);
+        var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+        var role = isAuthenticated ? GetHighestRole(User) : "Guest";
         var correlationId = string.IsNullOrWhiteSpace(HttpContext.TraceIdentifier)
             ? Guid.NewGuid().ToString("N")
             : HttpContext.TraceIdentifier;
@@ -83,9 +85,9 @@ public sealed class AssistanceController(
 
         try
         {
-            var customerName = User.FindFirstValue(ClaimTypes.Name) ?? "";
-            var customerEmail = User.FindFirstValue(ClaimTypes.Email) ?? "";
-            var customerId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var customerName = isAuthenticated ? User.FindFirstValue(ClaimTypes.Name) ?? "" : "";
+            var customerEmail = isAuthenticated ? User.FindFirstValue(ClaimTypes.Email) ?? "" : "";
+            var customerId = isAuthenticated ? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "" : "";
 
             var (reply, actions, workflowState) = await assistanceClient.AskAsync(
                 message,

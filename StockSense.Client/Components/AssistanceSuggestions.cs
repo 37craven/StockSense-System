@@ -21,6 +21,13 @@ public static class AssistanceSuggestions
             new("Incoming orders", "Show pending and partially received supplier orders.", "truck"),
             new("Compatibility lookup", "Help me identify compatible parts for a motorcycle.", "search")
         ],
+        "Guest" =>
+        [
+            new("Browse Services", "What services do you offer?", "cog"),
+            new("Check Availability", "Which products are currently available?", "search"),
+            new("Motorcycle Compatibility", "Check motorcycle part compatibility.", "bike"),
+            new("Book Appointment", "I want to book an appointment.", "calendar")
+        ],
         _ =>
         [
             new("Book Appointment", "I want to book an appointment.", "calendar"),
