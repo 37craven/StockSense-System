@@ -60,3 +60,12 @@ public static class WorkOrderStatuses
     public const string Cancelled = "Cancelled";
     public const string Expired = "Expired";
 }
+
+public static class PaymentStatuses
+{
+    public const string NotRequired = "NotRequired";
+    public const string AwaitingPayment = "AwaitingPayment";
+    public const string Paid = "Paid";
+    public const string Failed = "Failed";
+    public const string Expired = "Expired";
+}

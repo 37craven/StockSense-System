@@ -36,6 +36,7 @@ public class PreBuiltController : ControllerBase
     }
 
     [HttpGet("all")]
+    [AllowAnonymous]
     public async Task<ActionResult<List<PreBuiltPackageDto>>> GetAllPackages()
     {
         var packages = await _repo.GetAllAsync();

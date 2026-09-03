@@ -1,0 +1,792 @@
+@page "/admin/services"
+@layout AdminLayout
+@rendermode InteractiveServer
+@using StockSense.Application.DTOs
+@using StockSense.Domain.Entities
+@using StockSense.Infrastructure.Data.Repositories
+@using System.Text.Json
+@using StockSense.Client.Layout
+@using BlazorBlueprint.Primitives.Services
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject ToastService Toast
+@inject ProductRepository ProductRepo
+@inject StoreServiceRepository ServiceRepo
+
+<UnsavedChangesGuard IsDirty="@HasUnsavedChanges"
+                     Message="Your service changes have not been saved. If you leave now, they will be lost." />
+
+<div>
+    <PageHeader Title="Service Management"
+                Subtitle="Define generic parts needed per service and link them to inventory products."
+                Badge="@(services == null ? null : $"{services.Count} {(services.Count == 1 ? "service" : "services")}")">
+        <BbButton Variant="ButtonVariant.Default" OnClick="OpenCreateModal">
+            <LucideIcon Name="plus" Size="16"/>
+            Create Service
+        </BbButton>
+    </PageHeader>
+
+    @if (services == null)
+    {
+        <LoadingState Description="Loading Services..." />
+    }
+    else if (!services.Any())
+    {
+        <EmptyState Description="No services defined yet. Create one above." />
+    }
+    else
+    {
+        <div class="rounded-lg border border-border bg-card p-4 mb-5 flex flex-col gap-3" role="search" aria-label="Filter services">
+            <div class="flex flex-wrap items-end gap-3">
+                <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1">
+                    Services
+                    <input id="service-search"
+                           @bind="serviceSearch"
+                           @bind:event="oninput"
+                           placeholder="Search services or products..."
+                           autocomplete="off"
+                           class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground min-w-56 w-full" />
+                </label>
+                <div class="w-48 shrink-0">
+                    <DropdownSelect Id="service-category-filter" Value="@selectedCategory" ValueChanged="v => selectedCategory = v"
+                                    Label="All categories"
+                                    Options="@(ServiceCategories.Select(c => new DropdownSelect.DropdownOption { Value = c, Label = c }).ToList())" />
+                </div>
+                <SortDropdown SelectedColumn="@sortColumn" Ascending="@sortAscending"
+                              OnColumnChange="v => { sortColumn = v; }"
+                              OnDirectionChange="v => { sortAscending = v; }"
+                              Columns="@GetSortColumns()" />
+            </div>
+        </div>
+
+        @if (FilteredServices.Count == 0)
+        {
+            <EmptyState Icon="search-x" Title="No matching services" Description="Try another search or clear the category filter." Role="status" />
+        }
+        else
+        {
+        <div class="service-management-grid">
+            @foreach (var s in FilteredServices)
+            {
+                <article class="service-management-card" @onclick="() => OpenModal(s)" role="button" tabindex="0"
+                         @onkeydown="e => HandleCardKeydown(e, s)">
+                    <div>
+                        <div class="service-management-card__header">
+                            <div class="flex flex-col gap-1 min-w-0">
+                                <span class="service-management-card__title">@s.Name</span>
+                                <span class="service-management-card__category">@s.Category</span>
+                            </div>
+                        </div>
+                        <div class="service-management-card__body">
+                            @{
+                                var linkedProducts = s.RequiredProducts?.ToList() ?? new();
+                                var localItems = GetServiceItems(s.Id);
+                                var items = linkedProducts.Any() ? linkedProducts.Select(p => p.Name).ToList() :
+                                            localItems.Any() ? localItems.Select(i => i.Name).ToList() :
+                                            null;
+                            }
+                            @if (items != null)
+                            {
+                                <div class="service-management-card__products">
+                                    @foreach (var item in items)
+                                    {
+                                        <span class="service-management-card__product">@item</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="service-management-card__empty">
+                                    <LucideIcon Name="link-2-off" Size="14" />
+                                    No products linked
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="service-management-card__footer">
+                        <span class="service-management-card__price">₱@s.Price.ToString("N0")</span>
+                        <label class="service-toggle" @onclick:stopPropagation>
+                            <input type="checkbox" role="switch" class="service-toggle__input"
+                                   aria-label="Toggle @(s.Name) active status"
+                                   checked="@(string.Equals(s.Status, "Active", StringComparison.OrdinalIgnoreCase))"
+                                   disabled="@isTogglingStatus"
+                                   @onchange="() => ToggleServiceStatus(s)" />
+                            <span class="service-toggle__track">
+                                <span class="service-toggle__thumb"></span>
+                            </span>
+                        </label>
+                    </div>
+                </article>
+            }
+        </div>
+        }
+    }
+</div>
+
+@* ── Service Edit / Create Modal ── *@
+<BbDialog @bind-Open="modalOpen">
+    <BbDialogContent Class="p-0 overflow-hidden flex flex-col"
+                     Style="@($"width: {(isEditingGenericParts ? "98vw" : "min(96vw, 420px)")}; max-width: {(isEditingGenericParts ? "900px" : "420px")}; max-height: 95dvh; transition: width 0.3s ease, max-width 0.3s ease;")">
+
+        <div class="shrink-0 px-5 pt-5">
+            <BbDialogHeader>
+                <BbDialogTitle>@(isEditMode ? selectedService?.Name ?? "Service" : "Create Service")</BbDialogTitle>
+                <BbDialogDescription>@(isEditMode ? "Edit service details and manage linked products." : "Add a new service to the catalog.")</BbDialogDescription>
+            </BbDialogHeader>
+        </div>
+
+        <div class="sv-modal-body p-5 gap-5">
+
+            @* ── Panel: Service Details ── *@
+            <div class="sv-panel flex flex-col gap-4 @(isEditingGenericParts ? "sv-panel--side" : "")">
+
+                <div>
+                    <label class="sv-label">Service Name <span class="text-destructive" aria-hidden="true">*</span></label>
+                    <input type="text" @bind="editName" placeholder="e.g. Change Oil"
+                           class="sv-input" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="sv-label">Category</label>
+                        <input type="text" @bind="editCategory" placeholder="e.g. General"
+                               class="sv-input" />
+                    </div>
+                    <div>
+                        <label class="sv-label">Price (₱)</label>
+                        <input type="number" @bind="editPrice" placeholder="0"
+                               class="sv-input" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="sv-label">Est. Duration (dd/hh/mm)</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <input type="number" min="0" @bind="editDays" aria-label="Estimated days" placeholder="Days" class="sv-input" />
+                        <input type="number" min="0" @bind="editHours" aria-label="Estimated hours" placeholder="Hours" class="sv-input" />
+                        <input type="number" min="0" @bind="editMins" aria-label="Estimated minutes" placeholder="Mins" class="sv-input" />
+                    </div>
+                </div>
+
+                @* Generic Parts Card *@
+                <div class="sv-generic-card">
+                    <div class="sv-generic-card__header">
+                        <span class="sv-generic-card__title">Generic Parts</span>
+                    </div>
+
+                    <div class="sv-generic-card__add">
+                        <input @bind="newItemName" @bind:event="oninput" @onkeydown="HandleItemInputKey"
+                               placeholder="Add generic part..." class="sv-input flex-1" />
+                        <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" OnClick="AddGenericItem"
+                                  Disabled="@string.IsNullOrWhiteSpace(newItemName)">
+                            <LucideIcon Name="plus" Size="14" />
+                        </BbButton>
+                    </div>
+
+                    <div class="sv-generic-card__list">
+                        @if (editingItems.Any())
+                        {
+                            @foreach (var item in editingItems)
+                            {
+                                var isExpanded = expandedGenericItems.Contains(item.Name);
+                                var isEditingThis = isEditingGenericPartsFor(item);
+                                <div class="sv-generic-item @(isExpanded ? "sv-generic-item--expanded" : "")">
+                                    <div class="sv-generic-item__header" @onclick="() => ToggleExpandGenericItem(item.Name)">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <LucideIcon Name="@(isExpanded ? "chevron-down" : "chevron-right")" Size="14" Class="shrink-0 text-muted-foreground" />
+                                            <span class="sv-generic-item__name truncate">@item.Name</span>
+                                            @{
+                                                var count = isEditingThis ? editPartIds.Count : item.LinkedProductIds.Count;
+                                            }
+                                            @if (count > 0)
+                                            {
+                                                <span class="sv-generic-item__count">@count</span>
+                                            }
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <button class="sv-generic-item__edit" @onclick:stopPropagation
+                                                    @onclick="() => BeginEditGenericParts(item)"
+                                                    aria-label="Edit linked products for @item.Name" title="Edit linked products">
+                                                <LucideIcon Name="pencil" Size="13" />
+                                            </button>
+                                            <button class="sv-generic-item__remove" @onclick:stopPropagation
+                                                    @onclick="() => RemoveGenericItem(item)"
+                                                    aria-label="Remove @item.Name" title="Remove generic item">
+                                                <LucideIcon Name="trash-2" Size="13" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    @if (isExpanded)
+                                    {
+                                        <div class="sv-generic-item__body">
+                                            @{
+                                                var productIds = isEditingThis ? editPartIds : item.LinkedProductIds;
+                                            }
+                                            @if (productIds.Any())
+                                            {
+                                                @foreach (var pid in productIds)
+                                                {
+                                                    var product = allProducts?.FirstOrDefault(p => p.Id == pid);
+                                                    if (product != null)
+                                                    {
+                                                        <div class="sv-generic-item__product">
+                                                            <span class="truncate">@product.Name</span>
+                                                            <span class="text-muted-foreground text-[10px] shrink-0">₱@product.Price.ToString("N0")</span>
+                                                        </div>
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <div class="sv-generic-item__empty">No products linked</div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-xs text-muted-foreground italic p-3 text-center">No generic parts defined.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* ── Panel: Product Catalog (edit mode) ── *@
+            @if (isEditingGenericParts && editingGenericItem != null)
+            {
+                <div class="sv-catalog-panel">
+                    <div class="mb-2 flex items-center gap-2 shrink-0">
+                        <LucideIcon Name="link" Size="14" Class="text-primary" />
+                        <span class="text-xs font-semibold text-foreground">
+                            Editing: <span class="text-primary">@editingGenericItem.Name</span>
+                            <span class="text-muted-foreground font-normal">(@editPartIds.Count linked)</span>
+                        </span>
+                    </div>
+                    <div class="border border-border rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
+                        <ProductCatalog Columns="3"
+                                        Products="allProducts"
+                                        OnProductClick="p => ToggleProductForEditingItem(p)"
+                                        IsSelected="p => editPartIds.Contains(p.Id)"
+                                        ShowCheckbox="false"
+                                        IsDisabled="_ => false"
+                                        AllowDisabledClick="true" />
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* ── Footer ── *@
+        <div class="shrink-0 border-t border-border p-4 px-5 flex justify-between items-center gap-3 flex-wrap">
+            <div class="flex items-center">
+                <span class="text-xs text-muted-foreground">Price</span>
+                <span class="text-lg font-bold text-primary ml-2">₱@editPrice.ToString("N0")</span>
+            </div>
+            <div class="flex gap-2">
+                @if (isEditingGenericParts)
+                {
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelEditGenericParts">Cancel</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmEditGenericParts">
+                        Done
+                    </BbButton>
+                }
+                else
+                {
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestCloseModal">Cancel</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="SaveService" Disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <BbSpinner Size="SpinnerSize.Small" />
+                        }
+                        else
+                        {
+                            <span>@(isEditMode ? "Save Changes" : "Create Service")</span>
+                        }
+                    </BbButton>
+                }
+            </div>
+        </div>
+    </BbDialogContent>
+</BbDialog>
+
+@* Discard modals *@
+<BbDialog @bind-Open="showDiscardModal">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard service changes?</BbDialogTitle>
+            <BbDialogDescription>Your unsaved changes will be lost.</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardModal = false">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardAndCloseModal">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showDiscardCreateModal">
+    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
+        <BbDialogHeader>
+            <BbDialogTitle>Discard new service?</BbDialogTitle>
+            <BbDialogDescription>The service information you entered will be lost.</BbDialogDescription>
+        </BbDialogHeader>
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardCreateModal = false">Keep editing</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardAndCloseCreateModal">Discard changes</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private List<StoreServiceDto>? services;
+    private List<Product>? allProducts;
+    private StoreServiceDto? selectedService;
+
+    private bool _modalOpen;
+    private bool modalOpen
+    {
+        get => _modalOpen;
+        set
+        {
+            if (_modalOpen == value) return;
+            if (!value)
+            {
+                if (isEditMode && IsEditDirty) { showDiscardModal = true; return; }
+                if (!isEditMode && IsCreateDirty) { showDiscardCreateModal = true; return; }
+            }
+            _modalOpen = value;
+            if (!value) ResetModalState();
+        }
+    }
+    private bool isSaving = false;
+    private string newItemName = "";
+    private bool isEditMode = false;
+    private string serviceSearch = "";
+    private string selectedCategory = "";
+    private string sortColumn = "";
+    private bool sortAscending = true;
+    private bool isTogglingStatus;
+
+    private string editName = "";
+    private string editCategory = "General";
+    private decimal editPrice = 0;
+    private int editDays, editHours, editMins;
+    private int EditTotalMinutes => Math.Max(editDays, 0) * 1440 + Math.Max(editHours, 0) * 60 + Math.Max(editMins, 0);
+
+    private string editBaseline = "";
+    private bool showDiscardModal;
+    private bool showDiscardCreateModal;
+
+    private HashSet<string> expandedGenericItems = new();
+
+    private bool isEditingGenericParts;
+    private GenericItem? editingGenericItem;
+    private List<int> editPartIds = new();
+
+    private bool HasUnsavedChanges => (modalOpen && isEditMode && IsEditDirty) || (modalOpen && !isEditMode && IsCreateDirty);
+    private bool IsCreateDirty => !string.IsNullOrWhiteSpace(editName) ||
+        !string.Equals(editCategory, "General", StringComparison.Ordinal) || editPrice != 0 || EditTotalMinutes != 0;
+    private bool IsEditDirty => !string.Equals(editBaseline, EditorFingerprint(), StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(newItemName);
+
+    private IReadOnlyList<string> ServiceCategories => services?
+        .Select(service => service.Category)
+        .Where(category => !string.IsNullOrWhiteSpace(category))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(category => category)
+        .ToList() ?? [];
+
+    private IReadOnlyList<StoreServiceDto> FilteredServices
+    {
+        get
+        {
+            var filtered = services?
+                .Where(service =>
+                    (string.IsNullOrWhiteSpace(selectedCategory) ||
+                     string.Equals(service.Category, selectedCategory, StringComparison.OrdinalIgnoreCase)) &&
+                    ServiceMatchesSearch(service))
+                .ToList() ?? [];
+
+            return (sortColumn, sortAscending) switch
+            {
+                ("name", true) => filtered.OrderBy(s => s.Name).ToList(),
+                ("name", false) => filtered.OrderByDescending(s => s.Name).ToList(),
+                ("category", true) => filtered.OrderBy(s => s.Category).ToList(),
+                ("category", false) => filtered.OrderByDescending(s => s.Category).ToList(),
+                ("price", true) => filtered.OrderBy(s => s.Price).ToList(),
+                ("price", false) => filtered.OrderByDescending(s => s.Price).ToList(),
+                _ => filtered
+            };
+        }
+    }
+
+    private bool ServiceMatchesSearch(StoreServiceDto service)
+    {
+        if (string.IsNullOrWhiteSpace(serviceSearch))
+            return true;
+
+        var search = serviceSearch.Trim();
+        return service.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               service.Category.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               service.RequiredProducts?.Any(product => product.Name.Contains(search, StringComparison.OrdinalIgnoreCase)) == true ||
+               GetServiceItems(service.Id).Any(item => item.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private List<SortDropdown.SortOption> GetSortColumns() => new()
+    {
+        new() { Value = "name", Label = "Name" },
+        new() { Value = "category", Label = "Category" },
+        new() { Value = "price", Label = "Price" }
+    };
+
+    private void HandleCardKeydown(KeyboardEventArgs e, StoreServiceDto service)
+    {
+        if (e.Key == "Enter" || e.Key == " ") OpenModal(service);
+    }
+
+    private Dictionary<int, List<GenericItem>> serviceItemsMap = new();
+    private List<GenericItem> editingItems = new();
+
+    public class GenericItem
+    {
+        public string Name { get; set; } = "";
+        public List<int> LinkedProductIds { get; set; } = new();
+        public string SearchQuery { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            services = await Http.GetFromJsonAsync<List<StoreServiceDto>>("api/services");
+            allProducts = (await ProductRepo.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Load error: {ex.Message}");
+        }
+
+        await LoadFromLocalStorage();
+    }
+
+    private async Task ToggleServiceStatus(StoreServiceDto service)
+    {
+        if (isTogglingStatus) return;
+        var target = string.Equals(service.Status, "Active", StringComparison.OrdinalIgnoreCase) ? "Inactive" : "Active";
+        isTogglingStatus = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/services/{service.Id}/status", new UpdateServiceStatusDto { Status = target });
+            if (response.IsSuccessStatusCode)
+            {
+                service.Status = target;
+                Toast.Success(target == "Active"
+                    ? $"\"{service.Name}\" is now bookable by customers."
+                    : $"\"{service.Name}\" is now hidden from customer booking.",
+                    target == "Active" ? "Service activated" : "Service deactivated");
+            }
+            else
+            {
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not update the service status. Reload the page and try again."), "Update failed");
+            }
+        }
+        catch (Exception exception)
+        {
+            Toast.Error(ApiErrorMessage.FromException(exception, "Could not update the service status. Check your connection and reload."), "Update failed");
+        }
+        finally
+        {
+            isTogglingStatus = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        isEditMode = false;
+        selectedService = null;
+        editName = "";
+        editCategory = "General";
+        editPrice = 0;
+        editDays = editHours = editMins = 0;
+        editingItems = new();
+        newItemName = "";
+        expandedGenericItems = new();
+        isEditingGenericParts = false;
+        editingGenericItem = null;
+        editBaseline = "";
+        modalOpen = true;
+    }
+
+    private void OpenModal(StoreServiceDto service)
+    {
+        isEditMode = true;
+        selectedService = service;
+        editName = service.Name;
+        editCategory = service.Category;
+        editPrice = service.Price;
+
+        var totalMin = service.EstimatedMinutes;
+        editDays = totalMin / 1440;
+        editHours = (totalMin % 1440) / 60;
+        editMins = totalMin % 60;
+
+        var localItems = GetServiceItems(service.Id);
+        if (localItems.Any())
+        {
+            editingItems = localItems
+                .Select(i => new GenericItem
+                {
+                    Name = i.Name,
+                    LinkedProductIds = new List<int>(i.LinkedProductIds)
+                }).ToList();
+        }
+        else if (service.RequiredProducts?.Any() == true)
+        {
+            editingItems = service.RequiredProducts
+                .GroupBy(p => p.Category)
+                .Select(g => new GenericItem
+                {
+                    Name = g.Key,
+                    LinkedProductIds = g.Select(p => p.Id).ToList()
+                }).ToList();
+        }
+        else
+        {
+            editingItems = new();
+        }
+
+        newItemName = "";
+        expandedGenericItems = new();
+        isEditingGenericParts = false;
+        editingGenericItem = null;
+        editBaseline = EditorFingerprint();
+        modalOpen = true;
+    }
+
+    private void ResetModalState()
+    {
+        selectedService = null;
+        editingItems = new();
+        newItemName = "";
+        expandedGenericItems = new();
+        isEditingGenericParts = false;
+        editingGenericItem = null;
+        editPartIds = new();
+    }
+
+    private string EditorFingerprint() => JsonSerializer.Serialize(new
+    {
+        Name = editName,
+        Category = editCategory,
+        Price = editPrice,
+        Minutes = EditTotalMinutes,
+        Items = editingItems.Select(item => new { item.Name, ProductIds = item.LinkedProductIds.OrderBy(id => id).ToArray() }).ToArray()
+    });
+
+    private void RequestCloseModal()
+    {
+        if (isEditMode && IsEditDirty) { showDiscardModal = true; return; }
+        if (!isEditMode && IsCreateDirty) { showDiscardCreateModal = true; return; }
+        modalOpen = false;
+    }
+
+    private void DiscardAndCloseModal()
+    {
+        showDiscardModal = false;
+        modalOpen = false;
+    }
+
+    private void DiscardAndCloseCreateModal()
+    {
+        showDiscardCreateModal = false;
+        modalOpen = false;
+    }
+
+    private async Task SaveService()
+    {
+        if (isEditMode) await SaveEditService();
+        else await CreateService();
+    }
+
+    private async Task SaveEditService()
+    {
+        if (selectedService == null) return;
+        isSaving = true;
+
+        serviceItemsMap[selectedService.Id] = editingItems
+            .Select(i => new GenericItem
+            {
+                Name = i.Name,
+                LinkedProductIds = new List<int>(i.LinkedProductIds)
+            }).ToList();
+        await SaveToLocalStorage();
+
+        var allLinkedProductIds = editingItems
+            .SelectMany(i => i.LinkedProductIds)
+            .Distinct()
+            .ToList();
+
+        var dto = new UpdateServiceProductsDto
+        {
+            ServiceId = selectedService.Id,
+            Price = editPrice,
+            ProductIds = allLinkedProductIds
+        };
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/services/update-products", dto);
+            if (response.IsSuccessStatusCode)
+            {
+                selectedService.Price = editPrice;
+                Toast.Success($"\"{selectedService.Name}\" updated.", "Service saved");
+            }
+            else
+            {
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not save the service. Check the price and linked products, then try again."), "Save failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(ApiErrorMessage.FromException(ex, "Could not save the service. Check your connection and try again."), "Save failed");
+        }
+
+        isSaving = false;
+        editBaseline = EditorFingerprint();
+        modalOpen = false;
+    }
+
+    private async Task CreateService()
+    {
+        if (string.IsNullOrWhiteSpace(editName)) return;
+        isSaving = true;
+        try
+        {
+            var dto = new CreateStoreServiceDto
+            {
+                Name = editName.Trim(),
+                Category = editCategory.Trim(),
+                Price = editPrice,
+                EstimatedMinutes = EditTotalMinutes
+            };
+            var response = await Http.PostAsJsonAsync("api/services", dto);
+            if (response.IsSuccessStatusCode)
+            {
+                services = await Http.GetFromJsonAsync<List<StoreServiceDto>>("api/services");
+                Toast.Success($"\"{editName.Trim()}\" created.", "Service created");
+                modalOpen = false;
+            }
+            else
+            {
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not create the service. Check the name, category, and price, then try again."), "Create failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(ApiErrorMessage.FromException(ex, "Could not create the service. Check your connection and try again."), "Create failed");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task LoadFromLocalStorage()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "serviceItemsMap");
+            if (!string.IsNullOrEmpty(json))
+            {
+                var loaded = JsonSerializer.Deserialize<Dictionary<int, List<GenericItem>>>(json);
+                if (loaded != null)
+                    serviceItemsMap = loaded;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LocalStorage load error: {ex.Message}");
+        }
+    }
+
+    private async Task SaveToLocalStorage()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(serviceItemsMap);
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "serviceItemsMap", json);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LocalStorage save error: {ex.Message}");
+        }
+    }
+
+    private List<GenericItem> GetServiceItems(int serviceId)
+    {
+        return serviceItemsMap.TryGetValue(serviceId, out var items) ? items : new();
+    }
+
+    private void AddGenericItem()
+    {
+        if (string.IsNullOrWhiteSpace(newItemName)) return;
+        if (editingItems.Any(i => i.Name.Equals(newItemName.Trim(), StringComparison.OrdinalIgnoreCase))) return;
+        editingItems.Add(new GenericItem { Name = newItemName.Trim() });
+        newItemName = "";
+    }
+
+    private void HandleItemInputKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddGenericItem();
+    }
+
+    private void RemoveGenericItem(GenericItem item)
+    {
+        editingItems.Remove(item);
+        expandedGenericItems.Remove(item.Name);
+    }
+
+    private void ToggleExpandGenericItem(string name)
+    {
+        if (!expandedGenericItems.Remove(name))
+            expandedGenericItems.Add(name);
+    }
+
+    private void BeginEditGenericParts(GenericItem item)
+    {
+        editingGenericItem = item;
+        editPartIds = new List<int>(item.LinkedProductIds);
+        isEditingGenericParts = true;
+        expandedGenericItems.Add(item.Name);
+    }
+
+    private void ToggleProductForEditingItem(Product product)
+    {
+        if (editingGenericItem == null) return;
+        if (editPartIds.Contains(product.Id))
+        {
+            editPartIds.Remove(product.Id);
+        }
+        else
+        {
+            editPartIds.Add(product.Id);
+        }
+    }
+
+    private void ConfirmEditGenericParts()
+    {
+        if (editingGenericItem == null) return;
+        editingGenericItem.LinkedProductIds = new List<int>(editPartIds);
+        isEditingGenericParts = false;
+        editingGenericItem = null;
+        editPartIds = new();
+    }
+
+    private void CancelEditGenericParts()
+    {
+        isEditingGenericParts = false;
+        editingGenericItem = null;
+        editPartIds = new();
+    }
+
+    private bool isEditingGenericPartsFor(GenericItem item) => isEditingGenericParts && editingGenericItem == item;
+}

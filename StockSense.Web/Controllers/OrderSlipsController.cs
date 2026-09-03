@@ -74,6 +74,55 @@ public sealed class OrderSlipsController : ControllerBase
         return Ok(new { token });
     }
 
+    [HttpGet("export")]
+    public async Task<IActionResult> ExportOrderSlips(CancellationToken cancellationToken)
+    {
+        var slips = await _context.OrderSlips.AsNoTracking()
+            .Include(x => x.Supplier).Include(x => x.Items)
+            .OrderByDescending(x => x.GeneratedAt)
+            .ToListAsync(cancellationToken);
+
+        var records = slips.Select(s => new OrderSlipExportRecord
+        {
+            SlipNumber = string.IsNullOrWhiteSpace(s.SlipNumber) ? s.OrderSlipNumber : s.SlipNumber,
+            SupplierName = s.Supplier?.Name ?? "Unknown",
+            Status = s.Status,
+            GeneratedAt = s.GeneratedAt.ToString("yyyy-MM-dd HH:mm"),
+            ApprovedAt = s.ApprovedAt?.ToString("yyyy-MM-dd HH:mm"),
+            OrderedAt = s.OrderedAt?.ToString("yyyy-MM-dd HH:mm"),
+            CompletedAt = s.CompletedAt?.ToString("yyyy-MM-dd HH:mm"),
+            TotalEstimatedCost = s.TotalEstimatedCost,
+            Remarks = s.Remarks
+        }).ToList();
+
+        var bytes = CsvService.ExportToCsv(records, new OrderSlipExportMap());
+        return File(bytes, "text/csv", $"orderslips_{DateTime.Now:yyyyMMdd}.csv");
+    }
+
+    [HttpGet("export/items")]
+    public async Task<IActionResult> ExportOrderSlipItems(CancellationToken cancellationToken)
+    {
+        var slips = await _context.OrderSlips.AsNoTracking()
+            .Include(x => x.Supplier).Include(x => x.Items)
+            .OrderByDescending(x => x.GeneratedAt)
+            .ToListAsync(cancellationToken);
+
+        var records = slips.SelectMany(s => s.Items.Select(item => new OrderSlipItemExportRecord
+        {
+            SlipNumber = string.IsNullOrWhiteSpace(s.SlipNumber) ? s.OrderSlipNumber : s.SlipNumber,
+            ProductName = item.ProductName,
+            Brand = item.Brand,
+            Quantity = item.Quantity,
+            OrderedQuantity = item.OrderedQuantity,
+            ReceivedQuantity = item.ReceivedQuantity,
+            UnitCostSnapshot = item.UnitCostSnapshot,
+            EstimatedLineTotal = item.EstimatedLineTotal
+        })).ToList();
+
+        var bytes = CsvService.ExportToCsv(records, new OrderSlipItemExportMap());
+        return File(bytes, "text/csv", $"orderslip_items_{DateTime.Now:yyyyMMdd}.csv");
+    }
+
     [HttpGet("preview")]
     public async Task<IActionResult> Preview(CancellationToken cancellationToken) =>
         ToActionResult(await _workflow.PreviewAsync(InventoryDefaults.LocationId, cancellationToken));

@@ -35,6 +35,7 @@ style="@(scannerEnabled ? "padding-bottom: 360px" : "padding-bottom: 56px")">
 Products="catalogProducts"
 ActiveOnly="true"
 ResponsiveColumns="true"
+ShowImageToggle="true"
 OnProductClick="AddToCart"
 IsSelected="p => cart.Any(i => i.ProductId == p.Id)" />
 </div>
@@ -66,12 +67,6 @@ else
     @if (cart.Any())
     {
     <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
-    @if (!string.IsNullOrEmpty(statusMessage))
-    {
-    <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
-    @statusMessage
-    </div>
-    }
     <div class="grid gap-2">
     <div class="flex justify-between text-muted-foreground text-sm">
     <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
@@ -167,12 +162,6 @@ else
     @if (cart.Any())
     {
     <div class="shrink-0 p-4 border-t border-border flex flex-col gap-3">
-    @if (!string.IsNullOrEmpty(statusMessage))
-    {
-    <div class="p-2 px-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
-    @statusMessage
-    </div>
-    }
     <div class="grid gap-2">
     <div class="flex justify-between text-muted-foreground text-sm">
     <span>Subtotal</span><span>₱@SubtotalAmount.ToString("N2")</span>
@@ -252,10 +241,6 @@ else
     ? "Percentage taken off the original unit price."
     : "Pesos taken off each unit's original price.")
     </p>
-    @if (DiscountValueError is not null)
-    {
-    <p role="alert" class="m-0 text-sm text-destructive">@DiscountValueError</p>
-    }
     <div class="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-1 text-sm" aria-live="polite">
     <div class="flex justify-between text-muted-foreground"><span>Regular unit price</span><span>₱@discountItem.OriginalPrice.ToString("N2")</span></div>
     <div class="flex justify-between text-muted-foreground"><span>Discounted unit price</span><span>₱@DiscountPreviewUnitPrice.ToString("N2")</span></div>
@@ -312,10 +297,6 @@ else
                            class="h-10 rounded-md border border-input bg-background px-3 text-sm" />
                     <span class="text-muted-foreground font-normal">Lost = requested − available (@stockoutAvailable). POS still sells only @stockoutAvailable.</span>
                 </label>
-                @if (StockoutValidationError is not null)
-                {
-                    <p role="alert" class="m-0 text-sm text-destructive">@StockoutValidationError</p>
-                }
             </div>
         }
         <BbDialogFooter>
@@ -389,6 +370,15 @@ else
     <p class="m-0 text-sm text-muted-foreground">
     @(completedTransaction.PaymentMethod) · @completedTransaction.TransactionDate.ToString("MM/dd/yyyy HH:mm")
     </p>
+    <p class="m-0 text-xs text-muted-foreground">View or download the receipt for this sale.</p>
+    <div class="flex items-center gap-2">
+    <BbButton Variant="ButtonVariant.Default" OnClick="ViewReceipt">
+    <LucideIcon Name="external-link" Size="16" /> View Receipt
+    </BbButton>
+    <BbButton Variant="ButtonVariant.Default" OnClick="DownloadReceipt">
+    <LucideIcon Name="download" Size="16" /> Download Receipt
+    </BbButton>
+    </div>
     </div>
 
     <p class="w-full text-center text-xs text-muted-foreground m-0 px-6 pb-3">Closing in @(receiptCountdown)s…</p>
@@ -515,20 +505,7 @@ else
     <div id="@elementId" class="pos-camera-preview w-full bg-black rounded-lg overflow-hidden border-2 box-border @CameraClass">
     </div>
 
-    @if (!string.IsNullOrEmpty(scanErrorMessage))
-    {
-    <div class="flex flex-col gap-1 py-2 px-3 rounded-md text-xs bg-red-50 border border-red-200 text-red-800 dark:bg-red-950 dark:border-red-800 dark:text-red-200">
-    <div class="flex items-center gap-2">
-    <LucideIcon Name="camera-off" Size="14" />
-    <span>@scanErrorMessage</span>
-    </div>
-    @if (!string.IsNullOrEmpty(scanErrorDetail))
-    {
-    <span class="opacity-70 break-all">@scanErrorDetail</span>
-    }
-    </div>
-    }
-else if (scannedProduct != null)
+    @if (scannedProduct != null)
     {
     <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -569,7 +546,6 @@ else
     private List<Product> catalogProducts = [];
     private List<CartItemDto> cart = new();
     private bool isProcessing = false;
-    private string? statusMessage;
     private bool cartModalOpen = false;
     private bool discountOpen;
     private CartItemDto? discountItem;
@@ -615,7 +591,7 @@ else
         // Keep sold qty capped at available
         stockoutItem.Quantity = stockoutAvailable;
         stockoutOpen = false;
-        statusMessage = $"Logged lost sale for {stockoutItem.ProductName}: requested {requested}, sold {stockoutAvailable}, lost {stockoutItem.LostSalesQuantity}.";
+        Toast.Success($"Logged lost sale for {stockoutItem.ProductName}: requested {requested}, sold {stockoutAvailable}, lost {stockoutItem.LostSalesQuantity}.", "Lost Sale Logged");
         stockoutItem = null;
     }
     private void HandleQtyInput(CartItemDto item, ChangeEventArgs e)
@@ -643,10 +619,7 @@ else
     // --- Barcode scanner inline state ---
     private bool scannerEnabled = false;
     private Product? scannedProduct;
-    private string? scanErrorMessage;
-    private string? scanErrorDetail;
     private int scanQuantity = 1;
-    private CancellationTokenSource? _scanMessageCts;
     private string? _lastHandledBarcode;
     private DateTimeOffset _lastHandledAt;
     private DotNetObjectReference<CheckoutTerminal>? dotNetRef;
@@ -719,15 +692,12 @@ else
 
                 // Keep this as a developer-side warning only.
                 // Do not show a scanner error to the user if the camera itself still works.
-        scanErrorMessage = null;
         }
         }
 
         if (_scannerRestartPending && scannerEnabled)
             {
             _scannerRestartPending = false;
-            scanErrorMessage = null;
-            scanErrorDetail = null;
 
             dotNetRef?.Dispose();
             dotNetRef = DotNetObjectReference.Create(this);
@@ -745,8 +715,7 @@ else
             catch (Exception ex)
             {
             Logger.LogWarning(ex, "Scanner restart after rotation failed.");
-            scanErrorMessage =
-            "The camera could not restart after rotation. Toggle the scanner off and on.";
+            Toast.Warning("The camera could not restart after rotation. Toggle the scanner off and on.", "Camera Error");
             }
 
             return;
@@ -755,8 +724,6 @@ else
             if (scannerEnabled && dotNetRef == null && !_scannerStartAttempted)
                 {
                 _scannerStartAttempted = true;
-                scanErrorMessage = null;
-                scanErrorDetail = null;
                 dotNetRef = DotNetObjectReference.Create(this);
 
                 try
@@ -766,14 +733,12 @@ else
                 catch (JSException ex)
                 {
                 Logger.LogWarning(ex, "Barcode scanner JavaScript could not be started.");
-                scanErrorMessage =
-                "The barcode scanner could not load. Refresh the page, then turn the scanner on again.";
+                Toast.Error("The barcode scanner could not load. Refresh the page, then turn the scanner on again.", "Scanner Error");
                 }
                 catch (InvalidOperationException ex)
                 {
                 Logger.LogWarning(ex, "Barcode scanner could not start while the page was rendering.");
-                scanErrorMessage =
-                "The barcode scanner is temporarily unavailable. Refresh the page and try again.";
+                Toast.Warning("The barcode scanner is temporarily unavailable. Refresh the page and try again.", "Scanner Unavailable");
                 }
                 }
             else if (!scannerEnabled && (dotNetRef != null || _scannerStartAttempted))
@@ -842,8 +807,7 @@ else
                         catch (Exception ex)
                         {
                         Logger.LogWarning(ex, "Scanner preparation for layout change failed.");
-                        scanErrorMessage =
-                        "The camera could not restart after the layout changed. Toggle the scanner off and on.";
+                        Toast.Warning("The camera could not restart after the layout changed. Toggle the scanner off and on.", "Camera Error");
                         await InvokeAsync(StateHasChanged);
                         }
                         }
@@ -862,8 +826,7 @@ else
                             catch (Exception ex)
                             {
                             Logger.LogWarning(ex, "Camera switch failed.");
-                            scanErrorMessage =
-                            "The camera could not be switched. Try turning the scanner off and on again.";
+                            Toast.Warning("The camera could not be switched. Try turning the scanner off and on again.", "Camera Error");
                             }
                             }
 
@@ -873,8 +836,7 @@ else
                             {
                             if (!string.IsNullOrWhiteSpace(message))
                                 {
-                                scanErrorMessage = message;
-                                scanErrorDetail = null;
+                                Toast.Warning(message!, "Scanner Notice");
                                 await InvokeAsync(StateHasChanged);
                                 }
                                 }
@@ -890,8 +852,7 @@ else
 
                                 if (string.IsNullOrWhiteSpace(barcode))
                                     {
-                                    scanErrorMessage = "The scanner returned an empty value.";
-                                    scanErrorDetail = null;
+                                    Toast.Warning("The scanner returned an empty value.", "Scanner Error");
                                     scannedProduct = null;
 
                                     await InvokeAsync(StateHasChanged);
@@ -941,18 +902,15 @@ else
                                                 Console.WriteLine(
                                                 $"[BarcodeScanner] No product found for: '{barcode}'");
 
-                                                scanErrorMessage =
-                                                $"No product found for barcode \"{barcode}\".";
-
-                                                scanErrorDetail =
-                                                $"Decoded value: {barcode}";
+                                                Toast.Warning(
+                                                $"No product found for barcode \"{barcode}\".",
+                                                "Barcode Not Found");
 
                 // Keep the currently displayed product (if any) so a
                 // stray miss does not wipe the card mid-scan. The
                 // error banner auto-dismisses.
                                                 await InvokeAsync(StateHasChanged);
 
-                                                _ = AutoDismissScanMessageAsync(scanErrorMessage!, 4000);
                                                 return;
                                                 }
 
@@ -961,10 +919,10 @@ else
 
                                                 if (!product.IsActive)
                                                     {
-                                                    scanErrorMessage =
-                                                    $"Product \"{product.Name}\" is inactive.";
+                                                    Toast.Warning(
+                                                    $"Product \"{product.Name}\" is inactive.",
+                                                    "Inactive Product");
 
-                                                    scanErrorDetail = null;
                                                     scannedProduct = null;
 
                                                     await InvokeAsync(StateHasChanged);
@@ -973,10 +931,10 @@ else
 
                                                     if (product.CurrentStock <= 0)
                                                         {
-                                                        scanErrorMessage =
-                                                        $"Product \"{product.Name}\" is out of stock.";
+                                                        Toast.Warning(
+                                                        $"Product \"{product.Name}\" is out of stock.",
+                                                        "Out of Stock");
 
-                                                        scanErrorDetail = null;
                                                         scannedProduct = product;
                                                         scanQuantity = 1;
 
@@ -986,8 +944,6 @@ else
 
                                                         scannedProduct = product;
                                                         scanQuantity = 1;
-                                                        scanErrorMessage = null;
-                                                        scanErrorDetail = null;
 
                                                         await InvokeAsync(StateHasChanged);
                                                         }
@@ -997,11 +953,9 @@ else
                                                         ex,
                                                         "Error processing scanned barcode/QR value.");
 
-                                                        scanErrorMessage =
-                                                        "The scanned code could not be processed.";
-
-                                                        scanErrorDetail =
-                                                        ex.Message;
+                                                        Toast.Error(
+                                                        "The scanned code could not be processed.",
+                                                        "Scan Error");
 
                                                         scannedProduct = null;
                                                         scanQuantity = 1;
@@ -1014,35 +968,8 @@ else
                                                         [JSInvokable]
                                                         public async Task OnScannerStarted()
                                                         {
-                                                        scanErrorMessage = null;
-                                                        scanErrorDetail = null;
                                                         await InvokeAsync(StateHasChanged);
                                                         }
-
-                                                        private async Task AutoDismissScanMessageAsync(string message, int delayMs)
-                                                        {
-                                                        _scanMessageCts?.Cancel();
-                                                        _scanMessageCts?.Dispose();
-
-                                                        var cts = new CancellationTokenSource();
-                                                        _scanMessageCts = cts;
-
-                                                        try
-                                                        {
-                                                        await Task.Delay(delayMs, cts.Token);
-                                                        }
-                                                        catch (TaskCanceledException)
-                                                        {
-                                                        return;
-                                                        }
-
-                                                        if (scanErrorMessage == message)
-                                                            {
-                                                            scanErrorMessage = null;
-                                                            scanErrorDetail = null;
-                                                            await InvokeAsync(StateHasChanged);
-                                                            }
-                                                            }
 
     // Called from barcodeScanner.js if the camera fails to start.
                                                             [JSInvokable]
@@ -1050,38 +977,36 @@ else
                                                             {
                                                             Logger.LogWarning("Barcode scanner could not start: {ScannerMessage}", message);
 
-                                                            scanErrorDetail = null;
-
                                                             if (string.IsNullOrWhiteSpace(message))
                                                                 {
-                                                                scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
+                                                                Toast.Error("The camera could not start. Turn the scanner off and on, then try again.", "Camera Error");
                                                                 }
                                                             else if (message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
                                                                 message.Contains("NotAllowed", StringComparison.OrdinalIgnoreCase) ||
                                                                 message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
                                                                 message.Contains("blocked", StringComparison.OrdinalIgnoreCase))
                                                                 {
-                                                                scanErrorMessage = "Camera permission is blocked. Allow camera access in your browser settings and try again.";
+                                                                Toast.Error("Camera permission is blocked. Allow camera access in your browser settings and try again.", "Camera Permission");
                                                                 }
                                                             else if (message.Contains("NotFound", StringComparison.OrdinalIgnoreCase) ||
                                                                 message.Contains("No camera", StringComparison.OrdinalIgnoreCase))
                                                                 {
-                                                                scanErrorMessage = "No camera was found on this device.";
+                                                                Toast.Error("No camera was found on this device.", "No Camera");
                                                                 }
                                                             else if (message.Contains("NotReadable", StringComparison.OrdinalIgnoreCase) ||
                                                                 message.Contains("being used", StringComparison.OrdinalIgnoreCase) ||
                                                                 message.Contains("busy", StringComparison.OrdinalIgnoreCase))
                                                                 {
-                                                                scanErrorMessage = "The camera is busy or being used by another application. Wait a moment and try switching cameras again.";
+                                                                Toast.Warning("The camera is busy or being used by another application. Wait a moment and try switching cameras again.", "Camera Busy");
                                                                 }
                                                             else if (message.Contains("HTTPS", StringComparison.OrdinalIgnoreCase) ||
                                                                 message.Contains("secure", StringComparison.OrdinalIgnoreCase))
                                                                 {
-                                                                scanErrorMessage = "Camera access requires a secure HTTPS connection.";
+                                                                Toast.Error("Camera access requires a secure HTTPS connection.", "HTTPS Required");
                                                                 }
                                                             else
                                                                 {
-                                                                scanErrorMessage = "The camera could not start. Turn the scanner off and on, then try again.";
+                                                                Toast.Error("The camera could not start. Turn the scanner off and on, then try again.", "Camera Error");
                                                                 }
 
                                                                 await InvokeAsync(StateHasChanged);
@@ -1108,29 +1033,20 @@ else
                                                                         AddToCart(scannedProduct);
                                                                         }
 
-                                                                        statusMessage =
-                                                                        $"{scannedProduct.Name} added to the order.";
+                                                                        Toast.Success($"{scannedProduct.Name} added to the order.", "Item Added");
 
                                                                         scannedProduct = null;
                                                                         scanQuantity = 1;
-                                                                        scanErrorMessage = null;
-                                                                        scanErrorDetail = null;
                                                                         }
 
                                                                         private void DiscardScannedItem()
                                                                         {
                                                                         scannedProduct = null;
-                                                                        scanErrorMessage = null;
-                                                                        scanErrorDetail = null;
                                                                         scanQuantity = 1;
                                                                         }
 
                                                                         public async ValueTask DisposeAsync()
                                                                         {
-                                                                        _scanMessageCts?.Cancel();
-                                                                        _scanMessageCts?.Dispose();
-                                                                        _scanMessageCts = null;
-
                                                                         receiptCloseCts?.Cancel();
                                                                         receiptCloseCts?.Dispose();
                                                                         receiptCloseCts = null;
@@ -1233,10 +1149,9 @@ else
 
                                                                                                                 private void AddToCart(Product p)
                                                                                                                 {
-                                                                                                                if (!p.IsActive || p.CurrentStock <= 0) return;
-                                                                                                                    statusMessage = null;
+                                                                                                                 if (!p.IsActive || p.CurrentStock <= 0) return;
 
-                                                                                                                    var existing = cart.FirstOrDefault(i => i.ProductId == p.Id);
+                                                                                                                     var existing = cart.FirstOrDefault(i => i.ProductId == p.Id);
 
         if (existing != null)
         {
@@ -1329,10 +1244,8 @@ else
                                                                                                                                                                 authenticatedUserId,
                                                                                                                                                                 locationId);
 
-                                                                                                                                                                statusMessage = "Sale complete! Transaction summary generated.";
-
-                                                                                                                                                                StartReceiptCountdown();
-                                                                                                                                                                Toast.Success("Transaction Recorded");
+                                                                                                                                                                 StartReceiptCountdown();
+                                                                                                                                                                 Toast.Success("Sale complete! Transaction summary generated.", "Sale Complete");
 
                                                                                                                                                                 cart.Clear();
                                                                                                                                                                 cartModalOpen = false;
@@ -1345,8 +1258,8 @@ else
                                                                                                                                                                     }
                                                                                                                                                                     catch (Exception ex)
                                                                                                                                                                     {
-                                                                                                                                                                    Logger.LogError(ex, "Point-of-sale checkout failed.");
-                                                                                                                                                                    statusMessage = ApiErrorMessage.FromException(ex, "The sale could not be completed. Review the cart and try again.");
+                                                                                                                                                                     Logger.LogError(ex, "Point-of-sale checkout failed.");
+                                                                                                                                                                     Toast.Error(ApiErrorMessage.FromException(ex, "The sale could not be completed. Review the cart and try again."), "Checkout Error");
                                                                                                                                                                     }
                                                                                                                                                                     finally
                                                                                                                                                                     {
@@ -1384,15 +1297,28 @@ else
                                                                                                                                                                                 }
                                                                                                                                                                                 }
 
-                                                                                                                                                                                private void CloseCheckoutConfirmation()
-                                                                                                                                                                                {
-                                                                                                                                                                                receiptCloseCts?.Cancel();
-                                                                                                                                                                                receiptCloseCts = null;
-                                                                                                                                                                                checkoutConfirmationOpen = false;
-                                                                                                                                                                                completedTransaction = null;
-                                                                                                                                                                                if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
-                                                                                                                                                                                    StateHasChanged();
-                                                                                                                                                                                    }
+                                                                                                                                                                                     private void CloseCheckoutConfirmation()
+                                                                                                                                                                                     {
+                                                                                                                                                                                     receiptCloseCts?.Cancel();
+                                                                                                                                                                                     receiptCloseCts = null;
+                                                                                                                                                                                     checkoutConfirmationOpen = false;
+                                                                                                                                                                                     completedTransaction = null;
+                                                                                                                                                                                     if (checkoutConfirmationFromMobile && cart.Any()) cartModalOpen = true;
+                                                                                                                                                                                         StateHasChanged();
+                                                                                                                                                                                     }
+
+                                                                                                                                                                                     private async Task ViewReceipt()
+                                                                                                                                                                                     {
+                                                                                                                                                                                     if (completedTransaction is null) return;
+                                                                                                                                                                                     await JS.InvokeVoidAsync("open", $"api/transactions/{completedTransaction.Id}/receipt-pdf?inline=true", "_blank");
+                                                                                                                                                                                     }
+
+                                                                                                                                                                                     private async Task DownloadReceipt()
+                                                                                                                                                                                     {
+                                                                                                                                                                                     if (completedTransaction is null) return;
+                                                                                                                                                                                     var safeName = string.Concat(completedTransaction.InvoiceNumber.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
+                                                                                                                                                                                     await JS.InvokeVoidAsync("triggerDownload", $"api/transactions/{completedTransaction.Id}/receipt-pdf", $"Receipt_{safeName}.pdf");
+                                                                                                                                                                                     }
 
                                                                                                                                                                                     private Task OnCheckoutOpenChanged(bool open)
                                                                                                                                                                                     {

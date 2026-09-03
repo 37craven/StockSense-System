@@ -13,6 +13,8 @@ using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Web.Controllers;
+using StockSense.Web.Options;
+using StockSense.Web.Services;
 
 namespace StockSense.Tests;
 
@@ -102,7 +104,10 @@ public sealed class BuildProductStatusTests
             fixture.UserManager,
             fixture.Context,
             new MotorcycleRepository(fixture.Context),
-            NullLogger<AppointmentsController>.Instance)
+            NullLogger<AppointmentsController>.Instance,
+            null!,
+            Options.Create(new PayMongoOptions()),
+            null!)
         {
             ControllerContext = fixture.Controller.ControllerContext
         };
@@ -147,7 +152,8 @@ public sealed class BuildProductStatusTests
                 userManager,
                 context,
                 new MotorcycleRepository(context),
-                NullLogger<BuildsController>.Instance)
+                NullLogger<BuildsController>.Instance,
+                null!)
             {
                 ControllerContext = new ControllerContext
                 {

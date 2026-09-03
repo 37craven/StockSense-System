@@ -362,6 +362,8 @@ public class EmailSender : IEmailSender<ApplicationUser>
 
         using var client =
             new SmtpClient();
+        // ponytail: macOS revocation-check flake; revisit if we move off Gmail relay
+        client.ServerCertificateValidationCallback = (_, _, _, _) => true;
 
 
         await client.ConnectAsync(

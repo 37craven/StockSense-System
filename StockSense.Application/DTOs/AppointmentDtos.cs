@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using StockSense.Domain.Entities;
 
 namespace StockSense.Application.DTOs;
 
@@ -21,7 +22,8 @@ public class AppointmentDto
     public DateTime? CompletedAt { get; set; }
     public int? TransactionId { get; set; }
     public string? PaymentLinkId { get; set; }
-    public string PaymentStatus { get; set; } = "NotRequired";
+    public string PaymentStatus { get; set; } = PaymentStatuses.NotRequired;
+    public decimal? PaymentAmount { get; set; }
     public string? InvoiceNumber { get; set; }
     public int? MotorcycleId { get; set; }
     public MotorcycleOptionDto? Motorcycle { get; set; }

@@ -12,10 +12,6 @@
 @inject IJSRuntime JSRuntime
 @inject ToastService Toast
 
-@attribute [Authorize]
-
-<AuthorizeView>
-    <Authorized>
 
         <BbPortalHost />
         <BbDialogProvider />
@@ -145,7 +141,7 @@
                     }
                     else
                     {
-                        <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="HandleSubmit" Disabled="@(isProcessing || !CanProceed)">
+                        <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="HandleStep4Click" Disabled="@(isProcessing || !CanProceed)">
                             @if (isProcessing)
                             {
                                 <BbSpinner Size="SpinnerSize.Small" />
@@ -442,8 +438,13 @@
                             </div>
                             <div class="pt-2 p-4 rounded-lg bg-card border border-border lg:col-span-2">
                                 <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Contact Number</span>
-                                <input type="tel" @bind="newAppt.ContactNumber" placeholder="e.g., 09171234567"
+                                <input type="tel" @bind="newAppt.ContactNumber" @bind:event="oninput"
+                                       placeholder="e.g., 09171234567"
                                        class="w-full mt-1 p-2 rounded-md border border-border bg-background text-foreground text-sm box-border" />
+                                @if (!string.IsNullOrWhiteSpace(contactNumberError))
+                                {
+                                    <p class="text-xs text-destructive m-0 mt-1">@contactNumberError</p>
+                                }
                             </div>
                             <div class="pt-2 p-4 rounded-lg bg-card border border-border lg:col-span-2">
                                 <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Motorcycle</span>
@@ -607,21 +608,33 @@
                     <div class="w-full flex flex-col gap-2">
                         @if (successPaymentStatus == "AwaitingPayment" && lastBookedAppointmentId.HasValue)
                         {
-                            <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="CheckSuccessPaymentStatus" Disabled="@isCheckingPayment">
-                                @if (isCheckingPayment)
-                                {
-                                    <BbSpinner Size="SpinnerSize.Small" />
-                                }
-                                else
-                                {
-                                    <span>I've completed payment — check status</span>
-                                }
-                            </BbButton>
+                            <div class="flex gap-2">
+                                <BbButton Variant="ButtonVariant.Default" Class="flex-1" OnClick="PayFromSuccessDialog" Disabled="@isCheckingPayment">
+                                    @if (isCheckingPayment)
+                                    {
+                                        <BbSpinner Size="SpinnerSize.Small" />
+                                    }
+                                    else
+                                    {
+                                        <span>Pay Now</span>
+                                    }
+                                </BbButton>
+                                <BbButton Variant="ButtonVariant.Outline" Class="flex-1" OnClick="CheckSuccessPaymentStatus" Disabled="@isCheckingPayment">
+                                    @if (isCheckingPayment)
+                                    {
+                                        <BbSpinner Size="SpinnerSize.Small" />
+                                    }
+                                    else
+                                    {
+                                        <span>Check Status</span>
+                                    }
+                                </BbButton>
+                            </div>
                         }
-                        <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick='() => NavigationManager.NavigateTo("/my-bookings")'>
+                        <BbButton Variant="@(successPaymentStatus == "Paid" ? ButtonVariant.Default : ButtonVariant.Outline)" Class="w-full" OnClick='() => NavigationManager.NavigateTo("/my-bookings")'>
                             View My Bookings
                         </BbButton>
-                        <BbButton Variant="ButtonVariant.Ghost" Class="w-full" OnClick="CloseSuccessModal">
+                        <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="CloseSuccessModal">
                             Book Another
                         </BbButton>
                     </div>
@@ -629,17 +642,22 @@
             </BbDialogContent>
         </BbDialog>
 
-    </Authorized>
-
-    <NotAuthorized>
-        <div class="h-screen bg-background flex flex-col justify-center items-center gap-4">
-            <LucideIcon Name="lock" Size="40" />
-            <h2 class="font-bold text-xl text-foreground m-0">Access Restricted</h2>
-            <p class="text-muted-foreground text-sm m-0">Please sign in to book an appointment.</p>
-            <BbButton Variant="ButtonVariant.Default" OnClick='() => NavigationManager.NavigateTo("/login")'>Go to Login</BbButton>
-        </div>
-    </NotAuthorized>
-</AuthorizeView>
+        @* LOGIN PROMPT MODAL *@
+        <BbDialog @bind-Open="showLoginPrompt">
+            <BbDialogContent Class="w-[min(92vw,24rem)] p-5">
+                <BbDialogHeader>
+                    <BbDialogTitle>Sign in to continue</BbDialogTitle>
+                    <BbDialogDescription>Create an account or sign in to complete your booking.</BbDialogDescription>
+                </BbDialogHeader>
+                <div class="flex flex-col gap-2 mt-4">
+                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick='async () => { await SaveBookingState(); NavigationManager.NavigateTo("/Account/Login?returnUrl=/appointment", forceLoad: true); }'>Log In</BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick='async () => { await SaveBookingState(); NavigationManager.NavigateTo("/Account/Register?returnUrl=/appointment", forceLoad: true); }'>Register</BbButton>
+                </div>
+                <BbDialogFooter>
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showLoginPrompt = false">Cancel</BbButton>
+                </BbDialogFooter>
+            </BbDialogContent>
+        </BbDialog>
 
 <style>
     @@keyframes fadeIn {
@@ -660,8 +678,11 @@
     private ServiceOption? productModalService;
     private ProductDto? productModalPicked;
     private int? lastBookedAppointmentId;
+    private string? lastCheckoutUrl;
     private string successPaymentStatus = "NotRequired";
     private bool isCheckingPayment;
+    private bool isAuthenticated;
+    private bool showLoginPrompt;
     private bool HasUnsavedBooking => !showSuccessModal &&
         (SelectedServices.Any() || currentStep > 1 || newAppt.MotorcycleId.HasValue || !string.IsNullOrWhiteSpace(newAppt.TimeSlot));
 
@@ -678,8 +699,32 @@
         1 => SelectedServices.Any(),
         2 => !string.IsNullOrWhiteSpace(selectedMechanic),
         3 => !string.IsNullOrWhiteSpace(newAppt.TimeSlot),
+        4 => ValidateContactNumber(),
         _ => true
     };
+
+    private bool ValidateContactNumber()
+    {
+        var phone = newAppt.ContactNumber?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            contactNumberError = "Contact number is required.";
+            return false;
+        }
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        if (digits.Length == 11 && digits.StartsWith("09"))
+        {
+            contactNumberError = null;
+            return true;
+        }
+        if (digits.Length == 12 && digits.StartsWith("639"))
+        {
+            contactNumberError = null;
+            return true;
+        }
+        contactNumberError = "Enter a valid Philippine mobile number (09XXXXXXXXX).";
+        return false;
+    }
 
     private void NextStep()
     {
@@ -694,6 +739,15 @@
         {
             currentStep++;
         }
+    }
+    private void HandleStep4Click()
+    {
+        if (!isAuthenticated)
+        {
+            showLoginPrompt = true;
+            return;
+        }
+        HandleSubmit();
     }
     private void PrevStep() { if (currentStep > 1) currentStep--; }
     private void GoToStep(int step) { if (step < currentStep) currentStep = step; }
@@ -727,6 +781,7 @@
     private List<MotorcycleOptionDto> motorcycles = new();
     private bool isLoadingMotorcycles;
     private string? motorcycleLoadError;
+    private string? contactNumberError;
     private Dictionary<string, List<ProductDto>> allProductsByCategory = new();
     private List<ProductDto> allProductList = new();
     private Dictionary<int, List<GenericItem>> serviceItemsMap = new();
@@ -778,8 +833,19 @@
         try
         {
             isLoading = true;
+
+            if (AuthStateTask != null)
+            {
+                var authState = await AuthStateTask;
+                isAuthenticated = authState.User?.Identity?.IsAuthenticated == true;
+            }
+
             await LoadGenericItemsFromLocalStorage();
-            await Task.WhenAll(LoadUserProfile(), LoadServices(), LoadProducts(), LoadMechanics(), LoadMotorcycles(), FetchBookedSlots());
+
+            var tasks = new List<Task> { LoadServices(), LoadProducts(), LoadMechanics(), LoadMotorcycles(), FetchBookedSlots() };
+            if (isAuthenticated) tasks.Add(LoadUserProfile());
+            await Task.WhenAll(tasks);
+            await RestoreBookingState();
         }
         catch { Toast.Error("Connection error."); }
         finally
@@ -1170,8 +1236,10 @@
                     successPaymentStatus = psEl.GetString() ?? "AwaitingPayment";
 
                 lastBookedAppointmentId = appointmentId;
+                lastCheckoutUrl = checkoutUrl;
                 ResetBookingState();
                 showSuccessModal = true;
+                StateHasChanged();
 
                 if (!string.IsNullOrEmpty(checkoutUrl))
                 {
@@ -1179,12 +1247,33 @@
                     return;
                 }
             }
+            else
+            {
+                string errorMsg = "Payment could not be initialized.";
+                try
+                {
+                    using var errDoc = JsonDocument.Parse(pay.Body);
+                    if (errDoc.RootElement.TryGetProperty("error", out var errEl) && errEl.ValueKind == JsonValueKind.String)
+                        errorMsg = errEl.GetString() ?? errorMsg;
+                }
+                catch { }
+
+                lastBookedAppointmentId = appointmentId;
+                successPaymentStatus = "AwaitingPayment";
+                ResetBookingState();
+                showSuccessModal = true;
+                StateHasChanged();
+                Toast.Error(errorMsg, "Payment setup failed");
+                return;
+            }
         }
         catch { }
 
-        Toast.Info("Your appointment is booked. Complete payment from My Bookings.", "Payment pending");
+        lastBookedAppointmentId = appointmentId;
+        successPaymentStatus = "AwaitingPayment";
         ResetBookingState();
         showSuccessModal = true;
+        StateHasChanged();
     }
 
     private static string ToBookingErrorDescription(string error) =>
@@ -1228,6 +1317,89 @@
         public string Body { get; set; } = "";
     }
 
+    private async Task SaveBookingState()
+    {
+        var state = new
+        {
+            currentStep,
+            selectedServiceIds = availableServices.Where(s => s.IsSelected).Select(s => s.Id).ToList(),
+            pickedProducts = availableServices.Where(s => s.IsSelected).ToDictionary(
+                s => s.Id,
+                s => s.PickedProducts.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value?.Id
+                )
+            ),
+            motorcycleId = newAppt.MotorcycleId,
+            timeSlot = newAppt.TimeSlot,
+            appointmentDate = newAppt.AppointmentDate,
+            selectedMechanic
+        };
+        var json = JsonSerializer.Serialize(state);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "appointmentBookingState", json);
+    }
+
+    private async Task RestoreBookingState()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "appointmentBookingState");
+            if (string.IsNullOrEmpty(json)) return;
+
+            var state = JsonSerializer.Deserialize<JsonElement>(json);
+
+            if (state.TryGetProperty("currentStep", out var stepProp))
+                currentStep = stepProp.GetInt32();
+
+            if (state.TryGetProperty("selectedServiceIds", out var idsProp))
+            {
+                var selectedIds = idsProp.EnumerateArray().Select(e => e.GetInt32()).ToHashSet();
+                foreach (var svc in availableServices)
+                    svc.IsSelected = selectedIds.Contains(svc.Id);
+            }
+
+            if (state.TryGetProperty("pickedProducts", out var productsProp))
+            {
+                foreach (var svcProp in productsProp.EnumerateObject())
+                {
+                    if (int.TryParse(svcProp.Name, out var svcId))
+                    {
+                        var svc = availableServices.FirstOrDefault(s => s.Id == svcId);
+                        if (svc == null) continue;
+
+                        foreach (var prodProp in svcProp.Value.EnumerateObject())
+                        {
+                            if (prodProp.Value.ValueKind == JsonValueKind.Null) continue;
+                            if (prodProp.Value.TryGetInt32(out var prodId))
+                            {
+                                var product = allProductList.FirstOrDefault(p => p.Id == prodId);
+                                if (product != null)
+                                    svc.PickedProducts[prodProp.Name] = product;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (state.TryGetProperty("motorcycleId", out var mcProp) && mcProp.ValueKind != JsonValueKind.Null)
+                newAppt.MotorcycleId = mcProp.GetInt32();
+
+            if (state.TryGetProperty("timeSlot", out var tsProp) && tsProp.ValueKind != JsonValueKind.Null)
+                newAppt.TimeSlot = tsProp.GetString() ?? "";
+
+            if (state.TryGetProperty("appointmentDate", out var dateProp) && dateProp.ValueKind != JsonValueKind.Null)
+                newAppt.AppointmentDate = DateTime.Parse(dateProp.GetString()!);
+
+            if (state.TryGetProperty("selectedMechanic", out var mechProp) && mechProp.ValueKind != JsonValueKind.Null)
+                selectedMechanic = mechProp.GetString() ?? "Any Available";
+
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "appointmentBookingState");
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
     private void ResetBookingState()
     {
         currentStep = 1;
@@ -1251,6 +1423,7 @@
     {
         showSuccessModal = false;
         lastBookedAppointmentId = null;
+        lastCheckoutUrl = null;
         successPaymentStatus = "NotRequired";
         ResetBookingState();
     }
@@ -1273,6 +1446,41 @@
             }
         }
         catch { Toast.Error("Could not check payment status. Please try again."); }
+        finally { isCheckingPayment = false; }
+    }
+
+    private async Task PayFromSuccessDialog()
+    {
+        if (lastBookedAppointmentId is null || isCheckingPayment) return;
+        isCheckingPayment = true;
+        try
+        {
+            if (!string.IsNullOrEmpty(lastCheckoutUrl))
+            {
+                await JSRuntime.InvokeVoidAsync("window.open", lastCheckoutUrl, "_blank");
+                return;
+            }
+
+            var pay = await JSRuntime.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.postJson", $"api/appointments/{lastBookedAppointmentId}/create-payment", new { });
+            if (pay.Ok)
+            {
+                using var doc = JsonDocument.Parse(pay.Body);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("checkoutUrl", out var urlEl) && urlEl.ValueKind == JsonValueKind.String)
+                {
+                    var url = urlEl.GetString();
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        lastCheckoutUrl = url;
+                        await JSRuntime.InvokeVoidAsync("window.open", url, "_blank");
+                        return;
+                    }
+                }
+            }
+            Toast.Error("Could not initialize payment. Please try again from My Bookings.");
+        }
+        catch { Toast.Error("Could not reach the payment service. Please try again."); }
         finally { isCheckingPayment = false; }
     }
 

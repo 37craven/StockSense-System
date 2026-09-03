@@ -26,6 +26,7 @@ public class BuildsController : ControllerBase
     private readonly ILogger<BuildsController> _logger;
     private readonly MotorcycleRepository _motorcycleRepository;
     private readonly IAdminPinService? _adminPinService;
+    private readonly IWorkOrderEmailSender _workOrderEmail;
 
     public BuildsController(
         BuildRequestRepository buildRepo,
@@ -34,6 +35,7 @@ public class BuildsController : ControllerBase
         ApplicationDbContext context,
         MotorcycleRepository motorcycleRepository,
         ILogger<BuildsController> logger,
+        IWorkOrderEmailSender workOrderEmail,
         IAdminPinService? adminPinService = null)
     {
         _buildRepo = buildRepo;
@@ -43,6 +45,7 @@ public class BuildsController : ControllerBase
         _adminPinService = adminPinService;
         _motorcycleRepository = motorcycleRepository;
         _logger = logger;
+        _workOrderEmail = workOrderEmail;
     }
 
     [HttpPost]
@@ -196,6 +199,13 @@ public class BuildsController : ControllerBase
             build.Status = canonicalStatus;
             AddAudit("Build", id, "StatusChanged", previousStatus, canonicalStatus, reason, approval);
             await _context.SaveChangesAsync();
+
+            if (canonicalStatus == WorkOrderStatuses.Confirmed && !string.IsNullOrWhiteSpace(build.CustomerEmail))
+            {
+                var summary = $"Build: {build.BuildName}\nTotal: ₱{build.TotalPrice:N2}";
+                _ = _workOrderEmail.SendStatusEmailAsync(build.CustomerEmail, build.CustomerName, "Build", "Confirmed", id, summary);
+            }
+
             return Ok(new { message = "Status updated" });
         }
         catch (Exception ex)
@@ -309,12 +319,20 @@ public class BuildsController : ControllerBase
     {
         try
         {
+            var build = await _context.BuildRequests.FindAsync(id, cancellationToken);
             var receipt = await _checkoutService.CompleteBuildAsync(
                 id,
                 request,
                 User.FindFirstValue(ClaimTypes.NameIdentifier),
                 InventoryDefaults.LocationId,
                 cancellationToken);
+
+            if (build is not null && !string.IsNullOrWhiteSpace(build.CustomerEmail))
+            {
+                var summary = $"Build: {build.BuildName}\nTotal: ₱{receipt.TotalAmount:N2}\nPayment: {receipt.PaymentMethod}";
+                _ = _workOrderEmail.SendStatusEmailAsync(build.CustomerEmail, build.CustomerName, "Build", "Completed", id, summary, receipt);
+            }
+
             return Ok(receipt);
         }
         catch (KeyNotFoundException)

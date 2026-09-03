@@ -8,7 +8,7 @@ public static class AccountReturnUrl
         if (string.IsNullOrEmpty(value)
             || value.Contains('\\')
             || value.Any(char.IsControl)
-            || Uri.TryCreate(value, UriKind.Absolute, out _)
+            || (Uri.TryCreate(value, UriKind.Absolute, out var absoluteUri) && absoluteUri.Scheme is "http" or "https")
             || value.StartsWith("//", StringComparison.Ordinal))
         {
             return "/";

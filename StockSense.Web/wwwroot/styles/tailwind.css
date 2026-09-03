@@ -4423,3 +4423,8 @@
 .min-w-\[900px\] {
   min-width: 900px;
 }
+@media (min-width: 1024px) {
+  .lg\:flex-col {
+    flex-direction: column;
+  }
+}

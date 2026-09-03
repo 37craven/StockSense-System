@@ -3,6 +3,12 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using BlazorBlueprint.Primitives.Services
+
+<style>
+    @@media (min-width: 1024px) {
+        .safety-filters-wrap { flex-direction: column !important; align-items: start !important; }
+    }
+</style>
 @using StockSense.Client.Components
 @using StockSense.Client.Layout
 @inject HttpClient Http
@@ -14,16 +20,47 @@
 <UnsavedChangesGuard IsDirty="@HasUnsavedChanges"
 Message="Your inventory changes have not been saved. If you leave now, they will be lost." />
 
-<div class="flex flex-col min-h-full">
+<div class="flex flex-col min-h-full" @onclick="() => { if (bulkMenuOpen) bulkMenuOpen = false; }">
 <PageHeader Title="Safety Stock"
 Subtitle="Historical demand and inventory-policy calculations.">
-<BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateSelected" Disabled="@(ModalOperationLocked || selectedIds.Count == 0)">
-<LucideIcon Name="refresh-cw" Size="16" /> Recalculate selected
+<BbButton Variant="ButtonVariant.Outline" OnClick="ExportProductsCsv" Disabled="@busy">
+<LucideIcon Name="download" Size="16" /> Export CSV
 </BbButton>
-<BbButton Variant="ButtonVariant.Outline" OnClick="RequestRecalculateAll" Disabled="@(ModalOperationLocked || recalculateAllConfirmationOpen)">
-@if (busy) { <BbSpinner Size="SpinnerSize.Small" /> }
-<LucideIcon Name="calculator" Size="16" /> Recalculate all
+<BbButton Variant="ButtonVariant.Outline" OnClick="OpenImportModal" Disabled="@busy">
+<LucideIcon Name="upload" Size="16" /> Import CSV
 </BbButton>
+<div class="relative" @onclick:stopPropagation>
+<BbButton Variant="ButtonVariant.Outline" OnClick="() => bulkMenuOpen = !bulkMenuOpen" Disabled="@(ModalOperationLocked || recalculateAllConfirmationOpen)">
+<LucideIcon Name="menu" Size="16" /> Actions
+</BbButton>
+@if (bulkMenuOpen)
+{
+<div class="absolute right-0 top-full mt-1 z-50 w-72 rounded-lg border border-border bg-card shadow-lg py-1">
+<button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2 @(ModalOperationLocked || selectedIds.Count == 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer")" disabled="@(ModalOperationLocked || selectedIds.Count == 0)" @onclick="() => { bulkMenuOpen = false; RecalculateSelected(); }">
+<LucideIcon Name="refresh-cw" Size="14" /> Recalculate selected
+<span class="ml-auto text-xs text-muted-foreground">(@selectedIds.Count)</span>
+</button>
+<button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2 @(ModalOperationLocked || recalculateAllConfirmationOpen ? "opacity-50 cursor-not-allowed" : "cursor-pointer")" disabled="@(ModalOperationLocked || recalculateAllConfirmationOpen)" @onclick="() => { bulkMenuOpen = false; RequestRecalculateAll(); }">
+@if (busy) { <BbSpinner Size="SpinnerSize.Small" /> } else { <LucideIcon Name="calculator" Size="14" /> }
+Recalculate all
+</button>
+<div class="border-t border-border my-1"></div>
+<button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2 @(ModalOperationLocked || selectedIds.Count == 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer")" disabled="@(ModalOperationLocked || selectedIds.Count == 0)" @onclick="() => { bulkMenuOpen = false; DownloadBarcodesSelected(); }">
+<LucideIcon Name="barcode" Size="14" /> Download barcodes selected
+<span class="ml-auto text-xs text-muted-foreground">(@selectedIds.Count)</span>
+</button>
+<button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2 @(ModalOperationLocked || rows is null || rows.Count == 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer")" disabled="@(ModalOperationLocked || rows is null || rows.Count == 0)" @onclick="() => { bulkMenuOpen = false; DownloadBarcodesAll(); }">
+<LucideIcon Name="barcode" Size="14" /> Download barcodes all
+<span class="ml-auto text-xs text-muted-foreground">(@(rows?.Count ?? 0))</span>
+</button>
+<div class="border-t border-border my-1"></div>
+<button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2 @(ModalOperationLocked || selectedIds.Count == 0 ? "opacity-50 cursor-not-allowed" : "cursor-pointer")" disabled="@(ModalOperationLocked || selectedIds.Count == 0)" @onclick="() => { bulkMenuOpen = false; OpenBulkMapSupplierModal(); }">
+<LucideIcon Name="link" Size="14" /> Map suppliers to selected
+<span class="ml-auto text-xs text-muted-foreground">(@selectedIds.Count)</span>
+</button>
+</div>
+}
+</div>
 <AuthorizeView Roles="Admin">
 <BbButton Variant="ButtonVariant.Default" OnClick="OpenNewProductModal">
 <LucideIcon Name="package-plus" Size="16" /> New Product
@@ -69,37 +106,35 @@ Columns="@GetSortColumns()" />
 @if (filtersOpen || AnyFilterActive)
 {
 <div class="border-t border-border pt-3 flex flex-col gap-3">
-<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-<label class="flex flex-col gap-1 text-xs text-muted-foreground">Stage
-<select @bind="stage" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-<option value="">All stages</option><option>ColdStart</option><option>Learning</option><option>DataDriven</option><option>Manual</option><option>Not calculated</option>
-</select>
+<div class="flex flex-col lg:flex-row gap-3">
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 flex-1 min-w-0">
+<label class="flex flex-col gap-0.5 text-xs text-muted-foreground">Stage
+<DropdownSelect Value="@stage" ValueChanged="v => stage = v" Label="All stages" Options="@_stageOptions" Class="w-full" />
 </label>
-<label class="flex flex-col gap-1 text-xs text-muted-foreground">Confidence
-<select @bind="confidence" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-<option value="">All confidence</option><option>Low</option><option>Medium</option><option>High</option>
-</select>
+<label class="flex flex-col gap-0.5 text-xs text-muted-foreground">Confidence
+<DropdownSelect Value="@confidence" ValueChanged="v => confidence = v" Label="All confidence" Options="@_confidenceOptions" Class="w-full" />
 </label>
-<label class="flex flex-col gap-1 text-xs text-muted-foreground">Category
-<select @bind="category" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All categories</option>@foreach (var value in Categories) { <option>@value</option> }</select>
+<label class="flex flex-col gap-0.5 text-xs text-muted-foreground">Category
+<DropdownSelect Value="@category" ValueChanged="v => category = v" Label="All categories"
+Options="@(Categories.Select(c => new DropdownSelect.DropdownOption { Value = c, Label = c }).ToList())" Class="w-full" />
 </label>
-<label class="flex flex-col gap-1 text-xs text-muted-foreground">Brand
-<select @bind="brand" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All brands</option>@foreach (var value in Brands) { <option>@value</option> }</select>
+<label class="flex flex-col gap-0.5 text-xs text-muted-foreground">Brand
+<DropdownSelect Value="@brand" ValueChanged="v => brand = v" Label="All brands"
+Options="@(Brands.Select(b => new DropdownSelect.DropdownOption { Value = b, Label = b }).ToList())" Class="w-full" />
 </label>
-<label class="flex flex-col gap-1 text-xs text-muted-foreground">Supplier
-<select @bind="supplier" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="">All suppliers</option><option value="__missing">Missing supplier</option>@foreach (var value in Suppliers) { <option>@value</option> }</select>
+<label class="flex flex-col gap-0.5 text-xs text-muted-foreground">Supplier
+<DropdownSelect Value="@supplier" ValueChanged="v => supplier = v" Label="All suppliers" Options="@_supplierOptions" Class="w-full" />
 </label>
-<label class="flex flex-col gap-1 text-xs text-muted-foreground">Product status
-<select @bind="productStatus" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-<option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>
-</select>
+<label class="flex flex-col gap-0.5 text-xs text-muted-foreground">Product status
+<DropdownSelect Value="@productStatus" ValueChanged="v => productStatus = v" Label="All statuses" Options="@_productStatusOptions" Class="w-full" />
 </label>
 </div>
-<div class="rounded-md border border-border bg-muted/30 px-3 py-2 flex flex-wrap items-center gap-5">
-<span class="text-xs font-medium uppercase text-muted-foreground">Quick filters</span>
-<label class="flex items-center gap-2 h-9 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="belowReorder" /> Below reorder point</label>
-<label class="flex items-center gap-2 h-9 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="missingSupplier" /> Missing supplier</label>
-<label class="flex items-center gap-2 h-9 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="automaticOnly" /> Automatic only</label>
+<div class="safety-filters-wrap rounded-md border border-border bg-muted/30 px-3 py-2 flex flex-wrap items-center gap-2 lg:gap-3 lg:w-56 shrink-0">
+<span class="text-xs font-medium uppercase text-muted-foreground">Quick</span>
+<label class="flex items-center gap-2 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="belowReorder" /> Below reorder</label>
+<label class="flex items-center gap-2 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="missingSupplier" /> Missing supplier</label>
+<label class="flex items-center gap-2 text-sm text-foreground cursor-pointer"><input type="checkbox" class="w-4 h-4 shrink-0 m-0" @bind="automaticOnly" /> Auto only</label>
+</div>
 </div>
 </div>
 }
@@ -186,16 +221,25 @@ else
     <div class="detail-scroll" role="tabpanel" style="overflow-y:auto ">
     @if (detailTab == "overview")
     {
-    <section class="product-image-section" aria-labelledby="product-image-heading">
-    <div class="product-image-frame">
-    @if (string.IsNullOrWhiteSpace(CurrentImagePreview)) { <LucideIcon Name="image" Size="30" /> }
+<section class="product-image-section" aria-labelledby="product-image-heading">
+<div class="product-image-frame">
+@if (string.IsNullOrWhiteSpace(CurrentImagePreview)) { <LucideIcon Name="image" Size="30" /> }
 else { <img src="@CurrentImagePreview" alt="Product image for @selectedRow.ProductName" /> }
-    </div>
-    <div class="product-image-copy">
-    <h3 id="product-image-heading">Product image</h3>
-    <p class="text-xs text-muted-foreground">Image preview for this product.</p>
-    </div>
-    </section>
+</div>
+<div class="product-image-copy">
+<h3 id="product-image-heading">Product image</h3>
+<p class="text-xs text-muted-foreground">Image preview for this product.</p>
+</div>
+</section>
+<div class="rounded-lg border border-border bg-muted/30 p-3 flex items-center justify-between gap-3">
+<div class="flex items-center gap-2 min-w-0">
+<LucideIcon Name="barcode" Size="16" Class="text-muted-foreground shrink-0" />
+<span class="text-sm text-muted-foreground truncate">@(selectedRow.ProductId > 0 ? $"#{selectedRow.ProductId}" : "No barcode")</span>
+</div>
+<BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="() => DownloadBarcodePdf(selectedRow.ProductId, selectedRow.ProductName)" Disabled="@(ModalOperationLocked || selectedRow.ProductId == 0)">
+<LucideIcon Name="download" Size="14" /> Barcode PDF
+</BbButton>
+</div>
     <section aria-labelledby="stock-metrics-heading">
     <div class="section-heading"><div><h3 id="stock-metrics-heading">Inventory position</h3><p>Live stock and replenishment thresholds.</p></div><BbBadge Variant="BadgeVariant.Secondary">@selectedRow.CalculationStage · @selectedRow.ConfidenceLevel</BbBadge></div>
     <dl class="metric-grid">
@@ -234,7 +278,6 @@ else { <LucideIcon Name="@(editingProductIsActive ? "eye" : "eye-off")" Size="15
     @(editingProductIsActive ? "Active" : "Inactive")
     </button>
     </div>
-    @if (!string.IsNullOrWhiteSpace(productStatusError)) { <p role="alert" class="form-error">@productStatusError</p> }
     </section>
     <section aria-labelledby="product-image-edit-heading">
     <div class="section-heading"><div><h3 id="product-image-edit-heading">Product image</h3><p>Upload or replace the product image.</p></div></div>
@@ -274,7 +317,6 @@ else
     }
     </div>
     @if (imageUploading) { <progress aria-label="Uploading product image" class="image-progress"></progress> }
-    @if (!string.IsNullOrWhiteSpace(imageUploadError)) { <p role="alert" class="form-error">@imageUploadError</p> }
     <div class="section-actions" style="justify-content:space-between">
     @if (ModalOperationLocked)
     {
@@ -295,7 +337,6 @@ else
     <div class="section-heading"><div><h3 id="inventory-values-heading">Price and stock</h3><p>Changes are audited and require a reason.</p></div></div>
     <div class="editor-grid two-fields"><label for="edit-price"><span>Selling price <span class="text-destructive" aria-hidden="true">*</span></span><input id="edit-price" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock"><span>Current stock <span class="text-destructive" aria-hidden="true">*</span></span><input id="edit-stock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
     <label class="editor-label" for="stock-reason"><span>Reason for change <span class="text-destructive" aria-hidden="true">*</span></span><textarea id="stock-reason" class="w-full border border-input rounded-md bg-background text-foreground px-2 py-2 resize-none" rows="2" maxlength="500" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/500 characters</small></label>
-    @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="form-error">@productEditorError</p> }
     <div class="section-actions"><BbButton Class="min-h-11 max-sm:w-full" OnClick="RequestProductInventorySave" Disabled="@(ModalOperationLocked || inventoryConfirmationOpen)">Save inventory values</BbButton></div>
     </section>
     <section aria-labelledby="danger-zone-heading">
@@ -355,19 +396,17 @@ else
     <input id="new-supplier-mobile" type="tel" @bind="newSupplierMobile" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="09123456789" maxlength="50" />
     </label>
     </div>
-    @if (!string.IsNullOrWhiteSpace(newSupplierError)) { <p role="alert" class="form-error">@newSupplierError</p> }
     <div class="section-actions flex-wrap">
     <BbButton Class="min-h-11 max-sm:w-full" OnClick="AddNewSupplier" Disabled="@(string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier)">@if (addingSupplier) { <BbSpinner Size="SpinnerSize.Small" /> } Save supplier</BbButton>
     <BbButton Class="min-h-11 max-sm:w-full" Variant="ButtonVariant.Outline" OnClick="CancelAddSupplierForm" Disabled="addingSupplier">Cancel</BbButton>
     </div>
     }
-    @if (!string.IsNullOrWhiteSpace(supplierUpdateError)) { <p role="alert" class="form-error">@supplierUpdateError</p> }
     </section>
     <section aria-labelledby="policy-settings-heading">
     <div class="section-heading"><div><h3 id="policy-settings-heading">Safety-stock settings</h3><p>Saving recalculates this product immediately.</p></div></div>
     @if (settings == null)
     {
-    @if (string.IsNullOrWhiteSpace(settingsError)) { <LoadingState Description="Loading inventory settings…" /> } else { <p role="alert" class="form-error">@settingsError</p> }
+    <LoadingState Description="Loading inventory settings…" />
     }
 else
     {
@@ -382,7 +421,6 @@ else
     @if (settings.CalculationMode == "Manual") { <label>Manual safety stock<input type="number" min="0" @bind="settings.ManualSafetyStock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label><label>Manual reorder point<input type="number" min="0" @bind="settings.ManualReorderPoint" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" /></label> }
     </div>
     <label class="checkbox-label"><input type="checkbox" @bind="settings.IsAutomaticOrderEnabled" /> Automatic order recommendations enabled</label>
-    @if (!string.IsNullOrWhiteSpace(settingsError)) { <p role="alert" class="form-error">@settingsError</p> }
     <div class="section-actions"><BbButton Class="min-h-11 max-sm:w-full" OnClick="SaveSettings" Disabled="ModalOperationLocked">Save settings and recalculate</BbButton></div>
     }
     </section>
@@ -392,7 +430,7 @@ else
     <div class="section-heading"><div><h3 id="policy-readonly-heading">Safety-stock settings</h3><p>Policy settings are read-only for employees.</p></div></div>
     @if (settings == null)
     {
-    @if (string.IsNullOrWhiteSpace(settingsError)) { <LoadingState Description="Loading inventory settings…" /> } else { <p role="alert" class="form-error">@settingsError</p> }
+    <LoadingState Description="Loading inventory settings…" />
     }
 else
     {
@@ -411,7 +449,7 @@ else
     }
     </div>
     </div>
-    <div class="detail-footer flex-wrap gap-2"><BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateDetail" Disabled="ModalOperationLocked"><LucideIcon Name="refresh-cw" Size="14" /> Recalculate</BbButton><span class="footer-spacer"></span><BbButton Variant="ButtonVariant.Ghost" OnClick="() => DownloadBarcodePdf(selectedRow.ProductId, selectedRow.ProductName)" aria-label="Download barcode"><LucideIcon Name="barcode" Size="14" /></BbButton><BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDetails" Disabled="ModalOperationLocked">Close</BbButton></div>
+    <div class="detail-footer flex-wrap gap-2"><BbButton Variant="ButtonVariant.Outline" OnClick="RecalculateDetail" Disabled="ModalOperationLocked"><LucideIcon Name="refresh-cw" Size="14" /> Recalculate</BbButton><span class="footer-spacer"></span><BbButton Variant="ButtonVariant.Ghost" OnClick="CloseDetails" Disabled="ModalOperationLocked">Close</BbButton></div>
     }
     </BbDialogContent>
     </BbDialog>
@@ -436,7 +474,6 @@ else
     <p class="mb-1 mt-0 text-xs font-medium uppercase text-muted-foreground">Reason</p>
     <p class="m-0 whitespace-pre-wrap rounded-md border border-border p-3 text-sm">@stockCorrectionReason.Trim()</p>
     </div>
-    @if (!string.IsNullOrWhiteSpace(productEditorError)) { <p role="alert" class="text-sm text-destructive">@productEditorError</p> }
     </div>
     <BbDialogFooter>
     <BbButton Variant="ButtonVariant.Ghost" OnClick="() => inventoryConfirmationOpen = false" Disabled="productSaving">Go back</BbButton>
@@ -506,7 +543,6 @@ else
     <input @bind="deleteConfirmationText" placeholder="DELETE or @editingProductName"
     class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" autocomplete="off" />
     </label>
-    @if (!string.IsNullOrWhiteSpace(deleteProductError)) { <p role="alert" class="form-error">@deleteProductError</p> }
     </div>
     <BbDialogFooter>
     <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelDeleteProduct" Disabled="deletingProduct">Cancel</BbButton>
@@ -525,10 +561,6 @@ else
     <BbDialogDescription Class="text-sm text-muted-foreground mt-1">Add a new product to inventory.</BbDialogDescription>
     </BbDialogHeader>
     <div class="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
-    @if (!string.IsNullOrWhiteSpace(newProductFormError))
-    {
-    <p role="alert" class="form-error m-0">@newProductFormError</p>
-    }
     <div class="grid gap-4" style="grid-template-columns:1fr">
     <div>
     <label for="new-product-name" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Name <span class="text-destructive" aria-hidden="true">*</span></label>
@@ -604,10 +636,6 @@ else
     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="ClearNewProductImage" aria-label="Remove selected image">Remove</BbButton>
     </div>
     }
-    @if (!string.IsNullOrWhiteSpace(newProductImageError))
-    {
-    <p role="alert" class="form-error">@newProductImageError</p>
-    }
     </div>
     </div>
     </div>
@@ -627,16 +655,184 @@ else
     </BbDialogContent>
     </BbDialog>
 
+    <BbDialog @bind-Open="showImportModal">
+    <BbDialogContent Class="w-[min(94vw,480px)] p-0 overflow-hidden">
+        <div class="px-6 pt-5 pb-4 border-b border-border">
+            <div class="flex items-center gap-2 mb-1">
+                <LucideIcon Name="upload" Size="18" Class="text-primary" />
+                <BbDialogTitle Class="text-base font-semibold m-0">Import Products</BbDialogTitle>
+            </div>
+            <BbDialogDescription Class="text-sm text-muted-foreground mt-0">Upload a CSV file with product data to bulk-import into inventory.</BbDialogDescription>
+        </div>
+        @if (!importPreviewLoaded)
+        {
+            <div class="px-6 py-5">
+                @if (isImporting)
+                {
+                    <div class="flex items-center justify-center gap-3 py-8 text-sm text-muted-foreground">
+                        <BbSpinner Size="SpinnerSize.Small" />
+                        <span>Validating file...</span>
+                    </div>
+                }
+                else
+                {
+                    <label class="block border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors">
+                        <LucideIcon Name="file-up" Size="28" Class="mx-auto mb-2 text-muted-foreground" />
+                        <span class="block text-sm font-medium text-foreground mb-1">Choose CSV file</span>
+                        <span class="block text-xs text-muted-foreground">Accepted format: .csv</span>
+                        <InputFile OnChange="HandleImportFileSelected" accept=".csv" class="sr-only" />
+                    </label>
+                }
+            </div>
+        }
+        else if (importErrors.Any())
+        {
+            <div class="px-6 py-4 overflow-y-auto max-h-60">
+                <div class="flex items-center gap-2 text-sm font-medium text-destructive mb-3">
+                    <LucideIcon Name="circle-alert" Size="16" />
+                    @importErrors.Count validation error(s)
+                </div>
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 divide-y divide-border">
+                    @foreach (var err in importErrors.Take(15))
+                    {
+                        <div class="px-3 py-2 text-xs flex items-start gap-3">
+                            <span class="font-mono text-muted-foreground shrink-0 w-10 text-right">Row @err.Row</span>
+                            <span class="shrink-0 font-medium text-foreground w-20">@err.Field</span>
+                            <span class="text-destructive">@err.Message</span>
+                        </div>
+                    }
+                </div>
+                @if (importErrors.Count > 15)
+                {
+                    <p class="text-xs text-muted-foreground mt-2">+ @(importErrors.Count - 15) more error(s)</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="px-6 py-5 flex items-center gap-3">
+                <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <LucideIcon Name="circle-check" Size="20" Class="text-primary" />
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-foreground">@importValidCount product(s) ready to import</p>
+                    <p class="text-xs text-muted-foreground">All rows passed validation.</p>
+                </div>
+            </div>
+        }
+        <div class="px-6 py-4 border-t border-border flex justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showImportModal = false">Cancel</BbButton>
+            @if (importPreviewLoaded && !importErrors.Any())
+            {
+                <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmProductImport" Disabled="isImporting">
+                    @if (isImporting) { <BbSpinner Size="SpinnerSize.Small" /> }
+                    else { <LucideIcon Name="upload" Size="14" /> }
+                    Import @importValidCount Products
+                </BbButton>
+            }
+        </div>
+    </BbDialogContent>
+    </BbDialog>
+
+    <BbDialog @bind-Open="showBulkMapSupplierModal">
+    <BbDialogContent Class="w-[min(94vw,440px)] p-0 overflow-hidden flex flex-col max-h-[85dvh]">
+        <div class="px-6 pt-5 pb-4 border-b border-border shrink-0">
+            <div class="flex items-center gap-2 mb-1">
+                <LucideIcon Name="link" Size="18" Class="text-primary" />
+                <BbDialogTitle Class="text-base font-semibold m-0">Map Supplier</BbDialogTitle>
+            </div>
+            <BbDialogDescription Class="text-sm text-muted-foreground mt-0">Assign a supplier to @bulkMapSupplierIds.Count selected product(s).</BbDialogDescription>
+        </div>
+        <div class="px-6 overflow-y-auto flex-1 min-h-0">
+            <div class="rounded-md border border-border bg-muted/30 divide-y divide-border max-h-48 overflow-y-auto mb-4">
+                @foreach (var id in bulkMapSupplierIds)
+                {
+                    var name = rows?.FirstOrDefault(x => x.ProductId == id)?.ProductName ?? $"Product {id}";
+                    var cat = rows?.FirstOrDefault(x => x.ProductId == id)?.Category ?? "";
+                    <div class="px-3 py-2 flex items-center gap-2 text-sm">
+                        <LucideIcon Name="package" Size="14" Class="text-muted-foreground shrink-0" />
+                        <span class="font-medium text-foreground truncate">@name</span>
+                        @if (!string.IsNullOrWhiteSpace(cat))
+                        {
+                            <span class="text-xs text-muted-foreground ml-auto shrink-0">@cat</span>
+                        }
+                    </div>
+                }
+            </div>
+            <label class="flex flex-col gap-1.5 text-sm font-medium">
+                Supplier
+                <select @bind="bulkMapSupplierId" class="w-full h-10 rounded-md border border-input bg-background text-foreground px-3 text-sm">
+                    <option value="">Select a supplier...</option>
+                    @foreach (var s in supplierList)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                </select>
+            </label>
+        </div>
+        <div class="px-6 py-4 border-t border-border flex justify-end gap-2 shrink-0">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showBulkMapSupplierModal = false" Disabled="isBulkMapping">Cancel</BbButton>
+            <BbButton OnClick="ConfirmBulkMapSupplier" Disabled="@(isBulkMapping || string.IsNullOrWhiteSpace(bulkMapSupplierId))">
+                @if (isBulkMapping) { <BbSpinner Size="SpinnerSize.Small" /> }
+                else { <LucideIcon Name="link" Size="14" /> }
+                Map Supplier
+            </BbButton>
+        </div>
+    </BbDialogContent>
+    </BbDialog>
+
     @code {
     private List<InventoryDashboardRowDto>? rows;
     private readonly HashSet<int> selectedIds = [];
-    private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", productStatus = "", message = "", error = "", settingsError = "";
+    private string search = "", stage = "", confidence = "", category = "", brand = "", supplier = "", productStatus = "", message = "", error = "";
     private bool belowReorder, missingSupplier, automaticOnly, busy, _detailOpen, loadFailed, filtersOpen;
     private bool inventoryConfirmationOpen, recalculateAllConfirmationOpen, showDiscardDetails, showDiscardNewProduct;
+    private bool bulkMenuOpen;
+    private bool showBulkMapSupplierModal;
+    private bool isBulkMapping;
+    private string bulkMapSupplierId = "";
+    private List<int> bulkMapSupplierIds = new();
     private readonly SortState sort = new();
     private int currentPage = 1;
     private const int PageSize = 25;
     private string settingsBaseline = "";
+
+    private static readonly List<DropdownSelect.DropdownOption> _stageOptions = new()
+    {
+        new() { Value = "", Label = "All stages" },
+        new() { Value = "ColdStart", Label = "ColdStart" },
+        new() { Value = "Learning", Label = "Learning" },
+        new() { Value = "DataDriven", Label = "DataDriven" },
+        new() { Value = "Manual", Label = "Manual" },
+        new() { Value = "Not calculated", Label = "Not calculated" }
+    };
+    private static readonly List<DropdownSelect.DropdownOption> _confidenceOptions = new()
+    {
+        new() { Value = "", Label = "All confidence" },
+        new() { Value = "Low", Label = "Low" },
+        new() { Value = "Medium", Label = "Medium" },
+        new() { Value = "High", Label = "High" }
+    };
+    private List<DropdownSelect.DropdownOption> _supplierOptions
+    {
+        get
+        {
+            var list = new List<DropdownSelect.DropdownOption>
+            {
+                new() { Value = "", Label = "All suppliers" },
+                new() { Value = "__missing", Label = "Missing supplier" }
+            };
+            list.AddRange(Suppliers.Select(s => new DropdownSelect.DropdownOption { Value = s, Label = s }));
+            return list;
+        }
+    }
+    private static readonly List<DropdownSelect.DropdownOption> _productStatusOptions = new()
+    {
+        new() { Value = "", Label = "All statuses" },
+        new() { Value = "active", Label = "Active" },
+        new() { Value = "inactive", Label = "Inactive" }
+    };
+
     private bool detailOpen
     {
     get => _detailOpen;
@@ -658,7 +854,7 @@ else
                 private int editingProductId, originalStock, imageInputKey;
                 private decimal originalPrice;
                 private byte[] editingProductRowVersion = [];
-                private string editingProductName = "", editPriceText = "", editStockText = "", stockCorrectionReason = "", productEditorError = "", imagePreviewUrl = "", imageUploadError = "", supplierUpdateError = "", productStatusError = "", newSupplierName = "", newSupplierEmail = "", newSupplierMobile = "", newSupplierError = "";
+                private string editingProductName = "", editPriceText = "", editStockText = "", stockCorrectionReason = "", imagePreviewUrl = "", newSupplierName = "", newSupplierEmail = "", newSupplierMobile = "";
                 private bool editingProductIsActive;
                 private bool TryPrice(out decimal value) => decimal.TryParse(editPriceText, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, out value);
                 private bool TryStock(out int value) => int.TryParse(editStockText, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.CurrentCulture, out value);
@@ -819,6 +1015,52 @@ else
                         var safeName = string.Concat(productName.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
                         await JS.InvokeVoidAsync("triggerDownload", $"api/products/{productId}/barcode-pdf", $"Barcode_{safeName}.pdf");
                         }
+                        private async Task DownloadBarcodesSelected()
+                        {
+                        if (selectedIds.Count == 0) return;
+                        foreach (var id in selectedIds)
+                        {
+                            var name = rows?.FirstOrDefault(x => x.ProductId == id)?.ProductName ?? $"Product{id}";
+                            var safeName = string.Concat(name.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
+                            await JS.InvokeVoidAsync("triggerDownload", $"api/products/{id}/barcode-pdf", $"Barcode_{safeName}.pdf");
+                            await Task.Delay(200);
+                        }
+                        Toast.Success($"Downloading {selectedIds.Count} barcode(s).", "Barcodes");
+                        }
+                        private async Task DownloadBarcodesAll()
+                        {
+                        if (rows is null || rows.Count == 0) return;
+                        foreach (var row in rows)
+                        {
+                            var safeName = string.Concat(row.ProductName.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
+                            await JS.InvokeVoidAsync("triggerDownload", $"api/products/{row.ProductId}/barcode-pdf", $"Barcode_{safeName}.pdf");
+                            await Task.Delay(200);
+                        }
+                        Toast.Success($"Downloading {rows.Count} barcode(s).", "Barcodes");
+                        }
+                        private void OpenBulkMapSupplierModal()
+                        {
+                        if (selectedIds.Count == 0) return;
+                        bulkMapSupplierIds = selectedIds.ToList();
+                        bulkMapSupplierId = "";
+                        showBulkMapSupplierModal = true;
+                        }
+                        private async Task ConfirmBulkMapSupplier()
+                        {
+                        if (isBulkMapping || string.IsNullOrWhiteSpace(bulkMapSupplierId) || !bulkMapSupplierIds.Any()) return;
+                        isBulkMapping = true;
+                        try
+                        {
+                            var request = new { ProductIds = bulkMapSupplierIds, SupplierId = int.Parse(bulkMapSupplierId) };
+                            var response = await Http.PostAsJsonAsync("api/products/bulk-map-supplier", request);
+                            await EnsureSuccess(response);
+                            showBulkMapSupplierModal = false;
+                            await LoadAsync();
+                            Toast.Success($"Mapped {bulkMapSupplierIds.Count} product(s) to the selected supplier.", "Suppliers updated");
+                        }
+                        catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "Bulk supplier mapping failed."), "Update failed"); }
+                        finally { isBulkMapping = false; }
+                        }
                         private async Task OpenDetails(InventoryDashboardRowDto row)
                         {
                         if (ModalOperationLocked) return;
@@ -843,13 +1085,9 @@ else
                             editPriceText = row.Price.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture);
                             editStockText = row.CurrentStock.ToString(System.Globalization.CultureInfo.CurrentCulture);
                             stockCorrectionReason = "";
-                            productEditorError = "";
-                            supplierUpdateError = "";
-                            productStatusError = "";
                             detailSupplierId = row.SupplierId;
                             selectedImageFile = null;
                             imagePreviewUrl = "";
-                            imageUploadError = "";
                             imageInputKey++;
                             }
                             private void CloseDetails()
@@ -867,12 +1105,9 @@ else
                                 InvalidateSettingsLoad();
                                 selectedRow = null;
                                 settings = null;
-                                settingsError = "";
                                 showAddSupplierForm = false;
-                                newSupplierError = "";
                                 selectedImageFile = null;
                                 imagePreviewUrl = "";
-                                imageUploadError = "";
                                 imageInputKey++;
                                 detailTab = "overview";
                                 }
@@ -896,7 +1131,6 @@ else
 
                                     var targetProductId = selectedRow.ProductId;
                                     productSaving = true;
-                                    productEditorError = "";
                                     try
                                     {
                                     var command = new UpdateProductInventoryDto
@@ -920,7 +1154,7 @@ else
                                         }
                                         catch (Exception ex)
                                         {
-                                        productEditorError = ApiErrorMessage.FromException(ex, "The inventory values could not be saved. Please try again.");
+                                        Toast.Error(ApiErrorMessage.FromException(ex, "The inventory values could not be saved. Please try again."), "Save failed");
                                         }
                                         finally
                                         {
@@ -933,22 +1167,20 @@ else
                                             if (editPriceInvalid) { Toast.Error("Enter a valid selling price with up to 2 decimal places.", "Invalid price"); return; }
                                                 if (editStockInvalid) { Toast.Error("Enter a valid stock count between 0 and 999,999.", "Invalid stock"); return; }
                                                     if (reasonInvalid) { Toast.Error("Enter a reason for the price or stock change.", "Reason required"); return; }
-                                                        if (!ProductWillChange) { Toast.Error("Change the price or stock count before saving.", "Nothing to save"); return; }
-                                                            productEditorError = "";
+                                                            if (!ProductWillChange) { Toast.Error("Change the price or stock count before saving.", "Nothing to save"); return; }
                                                             inventoryConfirmationOpen = true;
                                                             }
                                                             private async Task ConfirmProductInventorySave()
                                                             {
                                                             if (productSaving) return;
-                                                                await SaveProductInventory();
-                                                                if (string.IsNullOrWhiteSpace(productEditorError)) inventoryConfirmationOpen = false;
+                                                            await SaveProductInventory();
+                                                            inventoryConfirmationOpen = false;
                                                                     }
                                                                     private async Task SaveProductSupplier()
                                                                     {
                                                                     if (ModalOperationLocked || selectedRow is null || selectedRow.ProductId != editingProductId) return;
                                                                         var targetProductId = selectedRow.ProductId;
                                                                         supplierSaving = true;
-                                                                        supplierUpdateError = "";
                                                                         try
                                                                         {
                                                                         var dto = new UpdateProductDto
@@ -966,7 +1198,7 @@ else
                                                                             }
                                                                             catch (Exception ex)
                                                                             {
-                                                                            supplierUpdateError = ApiErrorMessage.FromException(ex, "The supplier could not be updated. Please try again.");
+                                                                            Toast.Error(ApiErrorMessage.FromException(ex, "The supplier could not be updated. Please try again."), "Update failed");
                                                                             }
                                                                             finally
                                                                             {
@@ -980,7 +1212,6 @@ else
                                                                                 var targetProductId = selectedRow.ProductId;
                                                                                 var requestedStatus = !editingProductIsActive;
                                                                                 statusSaving = true;
-                                                                                productStatusError = "";
                                                                                 try
                                                                                 {
                                                                                 var dto = new UpdateProductStatusDto
@@ -1004,7 +1235,7 @@ else
                                                                                     }
                                                                                     catch (Exception ex)
                                                                                     {
-                                                                                    productStatusError = ApiErrorMessage.FromException(ex, "The product status could not be saved. Please try again.");
+                                                                                    Toast.Error(ApiErrorMessage.FromException(ex, "The product status could not be saved. Please try again."), "Status update failed");
                                                                                     }
                                                                                     finally
                                                                                     {
@@ -1017,7 +1248,6 @@ else
                                                                                         newSupplierName = "";
                                                                                         newSupplierEmail = "";
                                                                                         newSupplierMobile = "";
-                                                                                        newSupplierError = "";
                                                                                         showAddSupplierForm = true;
                                                                                         }
                                                                                         private void CancelAddSupplierForm()
@@ -1029,7 +1259,6 @@ else
                                                                                             {
                                                                                             if (string.IsNullOrWhiteSpace(newSupplierName) || addingSupplier) return;
                                                                                                 addingSupplier = true;
-                                                                                                newSupplierError = "";
                                                                                                 try
                                                                                                 {
                                                                                                 var dto = new CreateSupplierDto
@@ -1050,7 +1279,7 @@ else
                                                                                                 }
                                                                                                 catch (Exception ex)
                                                                                                 {
-                                                                                                newSupplierError = ApiErrorMessage.FromException(ex, "The supplier could not be created. Please try again.");
+                                                                                                Toast.Error(ApiErrorMessage.FromException(ex, "The supplier could not be created. Please try again."), "Supplier creation failed");
                                                                                                 }
                                                                                                 finally
                                                                                                 {
@@ -1061,16 +1290,15 @@ else
                                                                                                 {
                                                                                                 selectedImageFile = null;
                                                                                                 imagePreviewUrl = "";
-                                                                                                imageUploadError = "";
                                                                                                 var file = args.File;
-                                                                                                if (file.Size > MaxImageBytes)
+                                                                                                    if (file.Size > MaxImageBytes)
                                                                                                     {
-                                                                                                    imageUploadError = "The image cannot exceed 5 MB.";
+                                                                                                    Toast.Error("The image cannot exceed 5 MB.", "Upload failed");
                                                                                                     return;
                                                                                                     }
                                                                                                     if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
                                                                                                         {
-                                                                                                        imageUploadError = "Choose a JPEG, PNG, or WebP image.";
+                                                                                                        Toast.Error("Choose a JPEG, PNG, or WebP image.", "Upload failed");
                                                                                                         return;
                                                                                                         }
                                                                                                         try
@@ -1081,15 +1309,14 @@ else
                                                                                                         imagePreviewUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer.ToArray())}";
                                                                                                         selectedImageFile = file;
                                                                                                         }
-                                                                                                        catch (Exception ex) { imageUploadError = ApiErrorMessage.FromException(ex, "The image preview could not be loaded."); }
+                                                                                                         catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "The image preview could not be loaded."), "Preview failed"); }
                                                                                                         }
                                                                                                         private void ClearImageSelection()
                                                                                                         {
                                                                                                         if (ModalOperationLocked) return;
-                                                                                                            selectedImageFile = null;
-                                                                                                            imagePreviewUrl = "";
-                                                                                                            imageUploadError = "";
-                                                                                                            imageInputKey++;
+                                                                                                             selectedImageFile = null;
+                                                                                                             imagePreviewUrl = "";
+                                                                                                             imageInputKey++;
                                                                                                             }
                                                                                                             private async Task UploadProductImage()
                                                                                                             {
@@ -1097,9 +1324,8 @@ else
                                                                                                                 var productId = selectedRow.ProductId;
                                                                                                                 var rowVersion = selectedRow.ProductRowVersion.ToArray();
                                                                                                                 var file = selectedImageFile;
-                                                                                                                imageUploading = true;
-                                                                                                                imageUploadError = "";
-                                                                                                                try
+                                                                                                                 imageUploading = true;
+                                                                                                                 try
                                                                                                                 {
                                                                                                                 using var form = new MultipartFormDataContent();
                                                                                                                 using var imageContent = new StreamContent(file.OpenReadStream(MaxImageBytes));
@@ -1119,7 +1345,7 @@ else
                                                                                                                         imageInputKey++;
                                                                                                                         Toast.Success("The product image is now up to date.", "Image uploaded");
                                                                                                                         }
-                                                                                                                        catch (Exception ex) { imageUploadError = ApiErrorMessage.FromException(ex, "The image could not be uploaded. Please try again."); }
+                                                                                                                         catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "The image could not be uploaded. Please try again."), "Upload failed"); }
                                                                                                                         finally { imageUploading = false; }
                                                                                                                         }
                                                                                                                         private async Task RecalculateOne(int id) => await RecalculateIds([id]);
@@ -1186,10 +1412,9 @@ else
                                                                                                                                                             private async Task LoadSettingsAsync(int productId, long generation, CancellationToken cancellationToken)
                                                                                                                                                             {
                                                                                                                                                             if (!IsCurrentDetail(productId, generation, cancellationToken)) return;
-                                                                                                                                                                settings = null;
-                                                                                                                                                                settingsError = "";
+                                                                                                                                                             settings = null;
 
-                                                                                                                                                                try
+                                                                                                                                                             try
                                                                                                                                                                 {
                                                                                                                                                                 var settingsUrl = $"api/inventory/products/{productId}/settings";
                                                                                                                                                                 var response = await Http.GetAsync(settingsUrl, cancellationToken);
@@ -1220,16 +1445,16 @@ else
                                                                                                                                                                                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
                                                                                                                                                                                 catch (Exception ex)
                                                                                                                                                                                 {
-                                                                                                                                                                                if (IsCurrentDetail(productId, generation, cancellationToken)) settingsError = ApiErrorMessage.FromException(ex, "Inventory settings could not be loaded.");
+                                                                                                                                                                                 if (IsCurrentDetail(productId, generation, cancellationToken)) Toast.Error(ApiErrorMessage.FromException(ex, "Inventory settings could not be loaded."), "Settings load failed");
                                                                                                                                                                                     }
                                                                                                                                                                                     }
                                                                                                                                                                                     private async Task SaveSettings()
                                                                                                                                                                                     {
                                                                                                                                                                                     if (ModalOperationLocked || settings == null || selectedRow is null || settings.ProductId != selectedRow.ProductId) return;
                                                                                                                                                                                         var productId = selectedRow.ProductId;
-                                                                                                                                                                                        busy = true; settingsError = "";
+                                                                                                                                                                                         busy = true;
                                                                                                                                                                                         try { await EnsureSuccess(await Http.PutAsJsonAsync($"api/inventory/products/{productId}/settings", settings)); await LoadAsync(); if (!RefreshSelectedRow()) return; await LoadSettingsAsync(productId, detailGeneration, detailSettingsCts?.Token ?? CancellationToken.None); message = "Inventory settings saved and recalculated."; }
-                                                                                                                                                                                        catch (Exception ex) { settingsError = ApiErrorMessage.FromException(ex, "Inventory settings could not be saved. Please try again."); }
+                                                                                                                                                                                         catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "Inventory settings could not be saved. Please try again."), "Save failed"); }
                                                                                                                                                                                         finally { busy = false; }
                                                                                                                                                                                         }
                                                                                                                                                                                         private async Task RecalculateDetail()
@@ -1239,10 +1464,8 @@ else
                                                                                                                                                                                             var productName = selectedRow.ProductName;
                                                                                                                                                                                             var generation = detailGeneration;
                                                                                                                                                                                             var cancellationToken = detailSettingsCts?.Token ?? CancellationToken.None;
-                                                                                                                                                                                            busy = true;
-                                                                                                                                                                                            settingsError = "";
-                                                                                                                                                                                            productEditorError = "";
-                                                                                                                                                                                            try
+                                                                                                                                                                                             busy = true;
+                                                                                                                                                                                             try
                                                                                                                                                                                             {
                                                                                                                                                                                             using var response = await Http.PostAsync($"api/inventory/recalculate/{productId}", null, cancellationToken);
                                                                                                                                                                                             await EnsureSuccess(response);
@@ -1296,16 +1519,15 @@ else
                                                                                                                                                                                                                                     }
 
                                                                                                                                                                                                                                     private bool deleteProductOpen, deletingProduct;
-                                                                                                                                                                                                                                    private string deleteConfirmationText = "", deleteProductError = "";
+                                                                                                                                                                                                                                    private string deleteConfirmationText = "";
                                                                                                                                                                                                                                     private bool DeleteConfirmationValid => !string.IsNullOrWhiteSpace(deleteConfirmationText)
                                                                                                                                                                                                                                     && (string.Equals(deleteConfirmationText.Trim(), "DELETE", StringComparison.OrdinalIgnoreCase)
                                                                                                                                                                                                                                     || string.Equals(deleteConfirmationText.Trim(), editingProductName.Trim(), StringComparison.OrdinalIgnoreCase));
                                                                                                                                                                                                                                     private void RequestDeleteProduct()
                                                                                                                                                                                                                                     {
                                                                                                                                                                                                                                     if (ModalOperationLocked || selectedRow is null) return;
-                                                                                                                                                                                                                                        deleteConfirmationText = "";
-                                                                                                                                                                                                                                        deleteProductError = "";
-                                                                                                                                                                                                                                        deleteProductOpen = true;
+                                                                                                                                                                                                                                         deleteConfirmationText = "";
+                                                                                                                                                                                                                                         deleteProductOpen = true;
                                                                                                                                                                                                                                         }
                                                                                                                                                                                                                                         private void CancelDeleteProduct()
                                                                                                                                                                                                                                         {
@@ -1317,9 +1539,8 @@ else
                                                                                                                                                                                                                                             if (deletingProduct || selectedRow is null || !DeleteConfirmationValid) return;
                                                                                                                                                                                                                                                 var productId = selectedRow.ProductId;
                                                                                                                                                                                                                                                 var productName = selectedRow.ProductName;
-                                                                                                                                                                                                                                                deletingProduct = true;
-                                                                                                                                                                                                                                                deleteProductError = "";
-                                                                                                                                                                                                                                                try
+                                                                                                                                                                                                                                                 deletingProduct = true;
+                                                                                                                                                                                                                                                 try
                                                                                                                                                                                                                                                 {
                                                                                                                                                                                                                                                 using var response = await Http.DeleteAsync($"api/products/{productId}");
                                                                                                                                                                                                                                                 await EnsureSuccess(response);
@@ -1328,17 +1549,95 @@ else
                                                                                                                                                                                                                                                 await LoadAsync();
                                                                                                                                                                                                                                                 Toast.Success($"{productName} was permanently deleted.", "Product deleted");
                                                                                                                                                                                                                                                 }
-                                                                                                                                                                                                                                                catch (Exception ex)
-                                                                                                                                                                                                                                                {
-                                                                                                                                                                                                                                                deleteProductError = ApiErrorMessage.FromException(ex, "The product could not be deleted. Please try again.");
-                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                 catch (Exception ex)
+                                                                                                                                                                                                                                                 {
+                                                                                                                                                                                                                                                 Toast.Error(ApiErrorMessage.FromException(ex, "The product could not be deleted. Please try again."), "Delete failed");
+                                                                                                                                                                                                                                                 }
                                                                                                                                                                                                                                                 finally
                                                                                                                                                                                                                                                 {
                                                                                                                                                                                                                                                 deletingProduct = false;
                                                                                                                                                                                                                                                 }
                                                                                                                                                                                                                                                 }
 
-                                                                                                                                                                                                                                                public void Dispose() => InvalidateSettingsLoad();
+                                                                                                                                                                                                                                                                             // --- CSV Export / Import ---
+                                                                                                                                                                                                                                                                             private bool showImportModal = false;
+                                                                                                                                                                                                                                                                             private bool importPreviewLoaded = false;
+                                                                                                                                                                                                                                                                             private bool isImporting = false;
+                                                                                                                                                                                                                                                                             private int importValidCount = 0;
+                                                                                                                                                                                                                                                                             private List<CsvImportError> importErrors = new();
+                                                                                                                                                                                                                                                                             private List<ProductImportRecord> importValidRows = new();
+
+                                                                                                                                                                                                                                                                             private async Task ExportProductsCsv()
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                                 try
+                                                                                                                                                                                                                                                                                 {
+                                                                                                                                                                                                                     await JS.InvokeVoidAsync("triggerDownload", "api/products/export", "products.csv");
+                                                                                                                                                                                                                     Toast.Success("Products CSV download started.", "Export");
+                                                                                                                                                                                                                                                                                 }
+                                                                                                                                                                                                                                                                                 catch (Exception ex) { Toast.Error("Export failed: " + ex.Message, "Export"); }
+                                                                                                                                                                                                                                                                             }
+
+                                                                                                                                                                                                                                                                             private void OpenImportModal()
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                                 showImportModal = true;
+                                                                                                                                                                                                                                                                                 importPreviewLoaded = false;
+                                                                                                                                                                                                                                                                                 importErrors = new();
+                                                                                                                                                                                                                                                                                 importValidRows = new();
+                                                                                                                                                                                                                                                                             }
+
+                                                                                                                                                                                                                                                                             private async Task HandleImportFileSelected(InputFileChangeEventArgs e)
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                                 var file = e.File;
+                                                                                                                                                                                                                                                                                 if (file is null) return;
+                                                                                                                                                                                                                                                                                 isImporting = true;
+                                                                                                                                                                                                                                                                                 try
+                                                                                                                                                                                                                                                                                 {
+                                                                                                                                                                                                                     using var content = new MultipartFormDataContent();
+                                                                                                                                                                                                                     using var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024));
+                                                                                                                                                                                                                     content.Add(fileContent, "file", file.Name);
+                                                                                                                                                                                                                     var response = await Http.PostAsync("api/products/import", content);
+                                                                                                                                                                                                                     if (response.IsSuccessStatusCode)
+                                                                                                                                                                                                                     {
+                                                                                                                                                         var preview = await response.Content.ReadFromJsonAsync<ProductImportPreview>();
+                                                                                                                                                         if (preview is not null)
+                                                                                                                                                         {
+                                                                                                                                                             importValidRows = preview.ValidRows;
+                                                                                                                                                             importValidCount = preview.ValidCount;
+                                                                                                                                                             importErrors = preview.Errors;
+                                                                                                                                                             importPreviewLoaded = true;
+                                                                                                                                                         }
+                                                                                                                                                     }
+                                                                                                                                                     else { Toast.Error("Import failed: " + await response.Content.ReadAsStringAsync(), "Import"); }
+                                                                                                                                                 }
+                                                                                                                                                 catch (Exception ex) { Toast.Error("Import failed: " + ex.Message, "Import"); }
+                                                                                                                                                 finally { isImporting = false; }
+                                                                                                                                             }
+
+                                                                                                                                                                                                                                                                             private async Task ConfirmProductImport()
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                                 isImporting = true;
+                                                                                                                                                                                                                                                                                 try
+                                                                                                                                                                                                                                                                                 {
+                                                                                                                                                                                                                     var response = await Http.PostAsJsonAsync("api/products/import/confirm", importValidRows);
+                                                                                                                                                                                                                     if (response.IsSuccessStatusCode)
+                                                                                                                                                                                                                     {
+                                                                                                                                                         var result = await response.Content.ReadFromJsonAsync<ImportResult>();
+                                                                                                                                                         Toast.Success(result?.Message ?? "Import complete!", "Import");
+                                                                                                                                                         showImportModal = false;
+                                                                                                                                                         await LoadAsync();
+                                                                                                                                                     }
+                                                                                                                                                     else { Toast.Error("Import failed.", "Import"); }
+                                                                                                                                                 }
+                                                                                                                                                 catch (Exception ex) { Toast.Error("Import failed: " + ex.Message, "Import"); }
+                                                                                                                                                 finally { isImporting = false; }
+                                                                                                                                             }
+
+                                                                                                                                                                                                                                                                             private sealed class ProductImportPreview { public List<ProductImportRecord> ValidRows { get; set; } = new(); public List<CsvImportError> Errors { get; set; } = new(); public int ValidCount => ValidRows.Count; }
+                                                                                                                                                                                                                                                                             private sealed class ImportResult { public string? Message { get; set; } }
+                                                                                                                                                                                                                                                                             private sealed class CsvImportError { public int Row { get; set; } public string Field { get; set; } = ""; public string Message { get; set; } = ""; }
+                                                                                                                                                                                                                                                                             private sealed class ProductImportRecord { public string Name { get; set; } = ""; public string Category { get; set; } = ""; public string Brand { get; set; } = ""; public string Barcode { get; set; } = ""; public decimal Price { get; set; } public decimal UnitCost { get; set; } public int CurrentStock { get; set; } public int ReorderTarget { get; set; } public string SupplierName { get; set; } = ""; public bool IsActive { get; set; } = true; }
+
+                                                                                                                                                                                                                                                                             public void Dispose() => InvalidateSettingsLoad();
 
                                                                                                                                                                                                                                                 private bool _newProductOpen;
                                                                                                                                                                                                                                                 private bool isSavingNewProduct;
@@ -1347,8 +1646,7 @@ else
                                                                                                                                                                                                                                                 (rows ?? []).Where(x => x.SupplierId.HasValue).Select(x => (Id: x.SupplierId!.Value, x.SupplierName)).Distinct().OrderBy(x => x.SupplierName);
                                                                                                                                                                                                                                                 private IBrowserFile? newProductImageFile;
                                                                                                                                                                                                                                                 private string newProductImagePreview = "";
-                                                                                                                                                                                                                                                private string newProductImageError = "";
-                                                                                                                                                                                                                                                private string newProductFormError = "";
+
                                                                                                                                                                                                                                                 private int newProductImageInputKey;
 
                                                                                                                                                                                                                                                 private bool newProductOpen
@@ -1364,12 +1662,10 @@ else
 
                                                                                                                                                                                                                                                         private void OpenNewProductModal()
                                                                                                                                                                                                                                                         {
-                                                                                                                                                                                                                                                        newProduct = new();
-                                                                                                                                                                                                                                                        newProductImageFile = null;
-                                                                                                                                                                                                                                                        newProductImagePreview = "";
-                                                                                                                                                                                                                                                        newProductImageError = "";
-                                                                                                                                                                                                                                                        newProductFormError = "";
-                                                                                                                                                                                                                                                        newProductImageInputKey++;
+                                                                                                                                                                                                                                                         newProduct = new();
+                                                                                                                                                                                                                                                         newProductImageFile = null;
+                                                                                                                                                                                                                                                         newProductImagePreview = "";
+                                                                                                                                                                                                                                                         newProductImageInputKey++;
                                                                                                                                                                                                                                                         newProductOpen = true;
                                                                                                                                                                                                                                                         }
 
@@ -1391,9 +1687,8 @@ else
                                                                                                                                                                                                                                                             }
 
                                                                                                                                                                                                                                                             private async Task SaveNewProduct()
-                                                                                                                                                                                                                                                            {
-                                                                                                                                                                                                                                                            newProductFormError = "";
-                                                                                                                                                                                                                                                            if (string.IsNullOrWhiteSpace(newProduct.Name) ||
+                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                             if (string.IsNullOrWhiteSpace(newProduct.Name) ||
                                                                                                                                                                                                                                                                 string.IsNullOrWhiteSpace(newProduct.Brand) ||
                                                                                                                                                                                                                                                                 string.IsNullOrWhiteSpace(newProduct.Category) ||
                                                                                                                                                                                                                                                                 !newProduct.SupplierId.HasValue ||
@@ -1401,10 +1696,10 @@ else
                                                                                                                                                                                                                                                                 newProduct.InitialStock < 0 ||
                                                                                                                                                                                                                                                                 newProduct.ReorderTarget < 0 ||
                                                                                                                                                                                                                                                                 newProductImageFile is null)
-                                                                                                                                                                                                                                                                {
-                                                                                                                                                                                                                                                                newProductFormError = "Complete all required fields and select a product image before adding the product.";
-                                                                                                                                                                                                                                                                return;
-                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                 {
+                                                                                                                                                                                                                                                                     Toast.Warning("Complete all required fields and select a product image before adding the product.", "Validation error");
+                                                                                                                                                                                                                                                                     return;
+                                                                                                                                                                                                                                                                 }
                                                                                                                                                                                                                                                                 isSavingNewProduct = true;
                                                                                                                                                                                                                                                                 try
                                                                                                                                                                                                                                                                 {
@@ -1426,14 +1721,14 @@ else
                                                                                                                                                                                                                                                                             }
                                                                                                                                                                                                                                                                             }
                                                                                                                                                                                                                                                                         else
-                                                                                                                                                                                                                                                                            {
-                                                                                                                                                                                                                                                                            newProductFormError = await ApiErrorMessage.FromResponseAsync(response, "The product could not be created. Please try again.");
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "The product could not be created. Please try again."), "Creation failed");
+                                                                                                                                                                                                                                                                             }
                                                                                                                                                                                                                                                                             }
-                                                                                                                                                                                                                                                                            }
-                                                                                                                                                                                                                                                                            catch (Exception ex)
-                                                                                                                                                                                                                                                                            {
-                                                                                                                                                                                                                                                                            newProductFormError = ApiErrorMessage.FromException(ex, "The product could not be created. Please try again.");
-                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                             catch (Exception ex)
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             Toast.Error(ApiErrorMessage.FromException(ex, "The product could not be created. Please try again."), "Creation failed");
+                                                                                                                                                                                                                                                                             }
                                                                                                                                                                                                                                                                             isSavingNewProduct = false;
                                                                                                                                                                                                                                                                             }
 
@@ -1456,28 +1751,26 @@ else
 
                                                                                                                                                                                                                                                                             private void ClearNewProductImage()
                                                                                                                                                                                                                                                                             {
-                                                                                                                                                                                                                                                                            newProductImageFile = null;
-                                                                                                                                                                                                                                                                            newProductImagePreview = "";
-                                                                                                                                                                                                                                                                            newProductImageError = "";
-                                                                                                                                                                                                                                                                            newProductImageInputKey++;
+                                                                                                                                                                                                                                                                             newProductImageFile = null;
+                                                                                                                                                                                                                                                                             newProductImagePreview = "";
+                                                                                                                                                                                                                                                                             newProductImageInputKey++;
                                                                                                                                                                                                                                                                             }
 
                                                                                                                                                                                                                                                                             private async Task HandleNewProductImageSelected(InputFileChangeEventArgs args)
                                                                                                                                                                                                                                                                             {
-                                                                                                                                                                                                                                                                            newProductImageFile = null;
-                                                                                                                                                                                                                                                                            newProductImagePreview = "";
-                                                                                                                                                                                                                                                                            newProductImageError = "";
-                                                                                                                                                                                                                                                                            var file = args.File;
-                                                                                                                                                                                                                                                                            if (file.Size > MaxImageBytes)
-                                                                                                                                                                                                                                                                                {
-                                                                                                                                                                                                                                                                                newProductImageError = "The image cannot exceed 5 MB.";
-                                                                                                                                                                                                                                                                                return;
-                                                                                                                                                                                                                                                                                }
-                                                                                                                                                                                                                                                                                if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
-                                                                                                                                                                                                                                                                                    {
-                                                                                                                                                                                                                                                                                    newProductImageError = "Choose a JPEG, PNG, or WebP image.";
-                                                                                                                                                                                                                                                                                    return;
-                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                             newProductImageFile = null;
+                                                                                                                                                                                                                                                                             newProductImagePreview = "";
+                                                                                                                                                                                                                                                                             var file = args.File;
+                                                                                                                                                                                                                                                                             if (file.Size > MaxImageBytes)
+                                                                                                                                                                                                                                                                                 {
+                                                                                                                                                                                                                                                                                 Toast.Error("The image cannot exceed 5 MB.", "Upload failed");
+                                                                                                                                                                                                                                                                                 return;
+                                                                                                                                                                                                                                                                                 }
+                                                                                                                                                                                                                                                                                     if (file.ContentType is not ("image/jpeg" or "image/png" or "image/webp"))
+                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                     Toast.Error("Choose a JPEG, PNG, or WebP image.", "Upload failed");
+                                                                                                                                                                                                                                                                                     return;
+                                                                                                                                                                                                                                                                                     }
                                                                                                                                                                                                                                                                                     try
                                                                                                                                                                                                                                                                                     {
                                                                                                                                                                                                                                                                                     await using var source = file.OpenReadStream(MaxImageBytes);
@@ -1486,6 +1779,6 @@ else
                                                                                                                                                                                                                                                                                     newProductImagePreview = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer.ToArray())}";
                                                                                                                                                                                                                                                                                     newProductImageFile = file;
                                                                                                                                                                                                                                                                                     }
-                                                                                                                                                                                                                                                                                    catch (Exception ex) { newProductImageError = ApiErrorMessage.FromException(ex, "The image preview could not be loaded."); }
+                                                                                                                                                                                                                                                                                     catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "The image preview could not be loaded."), "Preview failed"); }
                                                                                                                                                                                                                                                                                     }
                                                                                                                                                                                                                                                                                     }

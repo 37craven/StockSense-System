@@ -25,6 +25,7 @@
 
         <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
             <DataAnnotationsValidator />
+            <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
 
             <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-bottom: var(--space-4); color: var(--muted-foreground);">Create a new account.</h2>
             <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
@@ -166,11 +167,18 @@
     private IEnumerable<IdentityError>? identityErrors;
     private bool isSubmitting = false;
 
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
 
-    [SupplyParameterFromQuery]
-    private string? ReturnUrl { get; set; }
+    private string? ReturnUrl;
+
+    protected override void OnInitialized()
+    {
+        ReturnUrl = HttpContext.Request.Query["returnUrl"].FirstOrDefault();
+    }
 
     private string? Message => identityErrors is null
         ? null
@@ -281,10 +289,12 @@
     private sealed class InputModel
     {
         [Required(ErrorMessage = "First name is required.")]
+        [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "First name can only contain letters, spaces, hyphens, and apostrophes.")]
         [Display(Name = "First Name")]
         public string FirstName { get; set; } = "";
 
         [Required(ErrorMessage = "Last name is required.")]
+        [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "Last name can only contain letters, spaces, hyphens, and apostrophes.")]
         [Display(Name = "Last Name")]
         public string LastName { get; set; } = "";
 

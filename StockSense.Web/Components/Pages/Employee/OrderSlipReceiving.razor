@@ -14,6 +14,7 @@
 @inject IOrderSlipWorkflowService Workflow
 @inject AuthenticationStateProvider AuthenticationState
 @inject NavigationManager Navigation
+@inject ToastService Toast
 @attribute [Authorize(Roles = "Admin, Employee")]
 
 <BbPortalHost />
@@ -28,10 +29,6 @@ else
     <PageHeader Title="@("Record receipt · " + Number)"
                 Subtitle="Enter quantities received in this delivery. Partial receipts remain open."
                 BackHref="@("/admin/order-slips/" + Id)" />
-    @if (!string.IsNullOrWhiteSpace(error))
-    {
-        <div role="alert" class="rounded-md border border-destructive bg-destructive/5 p-3 text-sm text-destructive">@error</div>
-    }
     <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
         <label class="flex flex-col gap-1.5 text-sm font-medium" for="receiving-date">Received date<input id="receiving-date" type="date" @bind="receivedAt" @bind:format="yyyy-MM-dd" class="h-10 rounded-md border-2 border-input bg-background px-3 text-sm shadow-sm transition-colors hover:border-primary/60 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20" /></label>
         <label class="flex flex-col gap-1.5 text-sm font-medium" for="receiving-reference">Supplier reference<input id="receiving-reference" @bind="reference" maxlength="100" placeholder="Optional" class="h-10 rounded-md border-2 border-input bg-background px-3 text-sm shadow-sm transition-colors hover:border-primary/60 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20" /></label>
@@ -90,7 +87,6 @@ else
                 <dt class="text-muted-foreground">Received date</dt><dd class="m-0 text-right font-medium">@receivedAt.ToString("MMM dd, yyyy")</dd>
                 <dt class="text-muted-foreground">Supplier reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(reference) ? "None" : reference)</dd>
             </dl>
-            @if (!string.IsNullOrWhiteSpace(error)) { <p role="alert" class="text-sm text-destructive">@error</p> }
         </div>
         <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Ghost" OnClick="() => confirmationOpen = false" Disabled="busy">Go back</BbButton>
@@ -103,7 +99,7 @@ else
 </BbDialog>
 @code {
     [Parameter] public int Id { get; set; }
-    private OrderSlip? slip; private Dictionary<int,int> quantities=[]; private DateTime receivedAt=DateTime.Today; private string? reference,remarks; private string error=""; private bool busy, confirmationOpen, receiptSaved;
+    private OrderSlip? slip; private Dictionary<int,int> quantities=[]; private DateTime receivedAt=DateTime.Today; private string? reference,remarks; private bool busy, confirmationOpen, receiptSaved;
     private string receiptBaseline = "";
     protected override async Task OnParametersSetAsync() { slip=await Db.OrderSlips.AsNoTracking().Include(x=>x.Items).SingleOrDefaultAsync(x=>x.Id==Id); quantities=slip?.Items.ToDictionary(x=>x.Id,x=>Math.Max(0, (x.OrderedQuantity == 0 ? x.Quantity : x.OrderedQuantity) - x.ReceivedQuantity)) ?? []; receiptBaseline=ReceiptFingerprint(); receiptSaved=false; }
     private string ReceiptFingerprint() => System.Text.Json.JsonSerializer.Serialize(new { receivedAt, reference, remarks, Quantities = quantities.OrderBy(x => x.Key).ToArray() });
@@ -118,9 +114,9 @@ else
     }
     private bool ValidateReceipt()
     {
-        if (slip==null) return false; error="";
-        foreach(var item in slip.Items) if(quantities[item.Id] < 0 || quantities[item.Id] > Ordered(item)-item.ReceivedQuantity) { error=$"Invalid received quantity for {item.ProductName}."; return false; }
-        if(ReceiptLines.Count==0) { error="Enter at least one received quantity."; return false; }
+        if (slip==null) return false;
+        foreach(var item in slip.Items) if(quantities[item.Id] < 0 || quantities[item.Id] > Ordered(item)-item.ReceivedQuantity) { Toast.Warning($"Invalid received quantity for {item.ProductName}.", "Validation"); return false; }
+        if(ReceiptLines.Count==0) { Toast.Warning("Enter at least one received quantity.", "Validation"); return false; }
         return true;
     }
     private async Task Save()
@@ -129,7 +125,7 @@ else
         var received=quantities.Where(x=>x.Value>0).ToList();
         busy=true;
         try { var user=(await AuthenticationState.GetAuthenticationStateAsync()).User.FindFirstValue(ClaimTypes.NameIdentifier); var result=await Workflow.ReceiveAsync(new ReceiveOrderSlipCommand { OrderSlipId=Id, LocationId=InventoryDefaults.LocationId, ReceivedAt=receivedAt, ReferenceNumber=reference, Remarks=remarks, ReceivedByUserId=user, RowVersion=slip.RowVersion, Items=received.Select(x=>new ReceiveOrderSlipItemCommand { OrderSlipItemId=x.Key, QuantityReceived=x.Value }).ToList() }); if(!result.IsSuccess || result.Value==null) throw new UserFacingApiException(result.ErrorMessage ?? "The receipt could not be saved."); receiptSaved=true; Navigation.NavigateTo($"/admin/order-slips/{Id}"); }
-        catch(Exception ex) { error=ApiErrorMessage.FromException(ex, "The receipt could not be saved. Please try again."); }
+        catch(Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "The receipt could not be saved. Please try again."), "Save failed"); }
         finally { busy=false; }
     }
     private sealed record ReceiptLine(string Name, int Quantity);

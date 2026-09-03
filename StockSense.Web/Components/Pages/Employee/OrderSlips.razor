@@ -10,6 +10,7 @@
 @inject IOrderSlipWorkflowService Workflow
 @inject AuthenticationStateProvider AuthenticationState
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @inject ToastService Toast
 @attribute [Authorize(Roles = "Admin, Employee")]
 
@@ -27,6 +28,12 @@
                            OnSelect="HandleModeChange"
                            AriaLabel="Order creation mode"
                            Options="@ModeOptions" />
+        <BbButton Variant="ButtonVariant.Outline" OnClick="ExportOrderSlipsCsv" Disabled="@busy">
+            <LucideIcon Name="download" Size="16" /> Export CSV
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="ExportOrderSlipItemsCsv" Disabled="@busy">
+            <LucideIcon Name="download" Size="16" /> Export Items
+        </BbButton>
         <BbButton Variant="ButtonVariant.Outline" OnClick='() => Navigation.NavigateTo("/admin/order-history")'>
             View Order History
         </BbButton>
@@ -41,25 +48,6 @@
             </BbButton>
         }
     </PageHeader>
-
-    @* NOTICES *@
-    @if (!string.IsNullOrWhiteSpace(message))
-    {
-        <div role="status" class="p-3 mb-3 rounded-lg text-sm" style="border:1px solid var(--success-muted-foreground);background:var(--success-muted);color:var(--success-muted-foreground)">@message</div>
-    }
-    @if (!string.IsNullOrWhiteSpace(error))
-    {
-        <div role="alert" class="p-3 mb-3 rounded-lg text-sm" style="border:1px solid var(--destructive-muted-foreground);background:var(--destructive-muted);color:var(--destructive-muted-foreground)">@error</div>
-    }
-    @if (preview is { Warnings.Count: > 0 })
-    {
-        <div role="alert" class="p-3 mb-3 rounded-lg text-sm flex flex-wrap items-center justify-between gap-3" style="border:1px solid var(--warning-muted-foreground);background:var(--warning-muted);color:var(--warning-muted-foreground)">
-            <span>@preview.Warnings.Count inventory warning@(preview.Warnings.Count == 1 ? "" : "s") — review before creating drafts.</span>
-            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="() => warningsOpen = true">
-                <LucideIcon Name="circle-alert" Size="14" /> View warnings
-            </BbButton>
-        </div>
-    }
 
     @* AUTOMATIC MODE *@
     @if (mode == CreationMode.Automatic)
@@ -113,10 +101,6 @@
                                         <td class="text-center">
                                             <input id="qty-@item.ProductId" type="number" min="1" step="@item.PackageSize" @bind="item.FinalQuantity"
                                                    class="w-16 py-1 px-1.5 rounded text-xs text-center" style="border:1px solid var(--border);background:var(--background);color:var(--foreground)" />
-                                            @if (item.IsSelected && errors.TryGetValue(item.ProductId, out var itemError))
-                                            {
-                                                <div style="font-size:10px;color:var(--destructive-muted-foreground);margin-top:2px">@itemError</div>
-                                            }
                                         </td>
                                     </tr>
                                 }
@@ -147,10 +131,6 @@
                                                    class="w-12 py-0.5 px-1 rounded text-xs text-center" style="border:1px solid var(--border);background:var(--background);color:var(--foreground)" />
                                         </div>
                                     </div>
-                                    @if (item.IsSelected && errors.TryGetValue(item.ProductId, out var itemErrorM))
-                                    {
-                                        <div style="font-size:10px;color:var(--destructive-muted-foreground)">@itemErrorM</div>
-                                    }
                                 </div>
                             </div>
                         }
@@ -307,12 +287,12 @@
     private OrderSlipPreviewDto? preview;
     private ManualOrderSlipCatalogDto? manualCatalog;
     private readonly List<ManualLine> manualLines = [];
-    private readonly Dictionary<int, string> errors = [];
+    private readonly HashSet<int> validationErrorProductIds = [];
     private bool busy, manualLoading;
     private int manualSupplierId;
-    private string manualReason = "", message = "", error = "";
+    private string manualReason = "";
     private bool warningsOpen;
-    private bool CanCreateAutomatic => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && !SelectedAutomaticItems.Any(x => errors.ContainsKey(x.ProductId));
+    private bool CanCreateAutomatic => preview?.SupplierGroups.SelectMany(x => x.Items).Any(x => x.IsSelected) == true && !SelectedAutomaticItems.Any(x => validationErrorProductIds.Contains(x.ProductId));
     private IEnumerable<OrderSlipPreviewItemDto> SelectedAutomaticItems => preview?.SupplierGroups.SelectMany(x => x.Items).Where(x => x.IsSelected) ?? [];
     private bool HasUnsavedDraft => mode == CreationMode.Automatic
         ? preview is not null && SelectedAutomaticItems.Any()
@@ -324,22 +304,19 @@
         if (value == "Automatic") ShowAutomatic(); else ShowManual();
     }
 
-    private void ShowAutomatic() { mode = CreationMode.Automatic; error = message = ""; }
-    private async Task ShowManual() { mode = CreationMode.Manual; error = message = ""; if (manualCatalog == null) await LoadManualCatalog(); }
+    private void ShowAutomatic() { mode = CreationMode.Automatic; }
+    private async Task ShowManual() { mode = CreationMode.Manual; if (manualCatalog == null) await LoadManualCatalog(); }
 
     private async Task LoadManualCatalog()
     {
         manualLoading = true;
         try { var result = await Workflow.GetManualCatalogAsync(InventoryDefaults.LocationId); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The product catalog could not be loaded."); manualCatalog = result.Value; }
-        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The product catalog could not be loaded."); }
+        catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "The product catalog could not be loaded."), "Load failed"); }
         finally { manualLoading = false; }
     }
     private async Task LoadPreview()
     {
         busy = true;
-        error = "";
-        message = "";
-        errors.Clear();
 
         try
         {
@@ -353,7 +330,7 @@
 
             preview = result.Value;
 
-            message = $"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations.";
+            Toast.Success($"Preview contains {preview.SupplierGroups.Sum(x => x.Items.Count)} recommendations.", "Preview loaded");
 
             if (preview.Warnings.Count > 0)
             {
@@ -370,9 +347,7 @@
         catch (Exception ex)
         {
             preview = null;
-            error = ApiErrorMessage.FromException(
-                ex,
-                "The order preview could not be prepared.");
+            Toast.Error(ApiErrorMessage.FromException(ex, "The order preview could not be prepared."), "Preview failed");
         }
         finally
         {
@@ -381,23 +356,23 @@
     }
     private void Validate(OrderSlipPreviewItemDto item)
     {
-        errors.Remove(item.ProductId);
-        if (item.FinalQuantity < item.MinimumOrderQuantity) errors[item.ProductId] = $"Minimum order quantity is {item.MinimumOrderQuantity}.";
-        else if (item.FinalQuantity % item.PackageSize != 0) errors[item.ProductId] = $"Quantity must be a multiple of package size {item.PackageSize}.";
-        else if (item.MaximumStockLevel.HasValue && item.InventoryPosition + item.FinalQuantity > item.MaximumStockLevel) errors[item.ProductId] = $"Projected stock exceeds maximum {item.MaximumStockLevel}.";
+        validationErrorProductIds.Remove(item.ProductId);
+        if (item.FinalQuantity < item.MinimumOrderQuantity) { validationErrorProductIds.Add(item.ProductId); Toast.Warning($"Minimum order quantity is {item.MinimumOrderQuantity}.", "Item error"); }
+        else if (item.FinalQuantity % item.PackageSize != 0) { validationErrorProductIds.Add(item.ProductId); Toast.Warning($"Quantity must be a multiple of package size {item.PackageSize}.", "Item error"); }
+        else if (item.MaximumStockLevel.HasValue && item.InventoryPosition + item.FinalQuantity > item.MaximumStockLevel) { validationErrorProductIds.Add(item.ProductId); Toast.Warning($"Projected stock exceeds maximum {item.MaximumStockLevel}.", "Item error"); }
     }
     private async Task CreateDrafts()
     {
         if (preview == null) return;
-        errors.Clear(); foreach (var item in SelectedAutomaticItems) Validate(item); if (errors.Count > 0) return;
-        busy = true; error = "";
+        validationErrorProductIds.Clear(); foreach (var item in SelectedAutomaticItems) Validate(item); if (validationErrorProductIds.Count > 0) return;
+        busy = true;
         try
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
             var command = new CreateOrderSlipDraftsCommand { LocationId = InventoryDefaults.LocationId, CreatedByUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier), SupplierGroups = preview.SupplierGroups.Select(group => new CreateDraftOrderSlipGroupCommand { SupplierId = group.SupplierId, Items = group.Items.Where(item => item.IsSelected).Select(item => new CreateDraftOrderSlipItemCommand { ProductId = item.ProductId, OrderedQuantity = item.FinalQuantity }).ToList() }).Where(group => group.Items.Count > 0).ToList() };
-            var result = await Workflow.CreateDraftsAsync(command); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slips could not be created."); message = $"Created {result.Value.OrderSlips.Count} draft order slips."; preview = null;
+            var result = await Workflow.CreateDraftsAsync(command); if (!result.IsSuccess || result.Value == null) throw new UserFacingApiException(result.ErrorMessage ?? "The draft order slips could not be created."); Toast.Success($"Created {result.Value.OrderSlips.Count} draft order slips.", "Drafts created"); preview = null;
         }
-        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slips could not be created."); }
+        catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "The draft order slips could not be created."), "Creation failed"); }
         finally { busy = false; }
     }
     private Task SupplierChanged() { manualLines.Clear(); return Task.CompletedTask; }
@@ -412,7 +387,7 @@
         if (manualLines.Count == 0 || !manualLines.All(x => x.ProductId > 0 && x.Quantity > 0)) { Toast.Error("Add at least one product with a quantity greater than zero.", "Items required"); return; }
         if (manualLines.Select(x => x.ProductId).Distinct().Count() != manualLines.Count) { Toast.Error("Each product can appear only once in the order.", "Duplicate product"); return; }
         if (string.IsNullOrWhiteSpace(manualReason)) { Toast.Error("Enter a reason for this manual order.", "Reason required"); return; }
-        busy = true; error = message = "";
+        busy = true;
         try
         {
             var state = await AuthenticationState.GetAuthenticationStateAsync();
@@ -424,7 +399,27 @@
             manualLines.Clear();
             manualReason = "";
         }
-        catch (Exception ex) { error = ApiErrorMessage.FromException(ex, "The draft order slip could not be created."); }
+        catch (Exception ex) { Toast.Error(ApiErrorMessage.FromException(ex, "The draft order slip could not be created."), "Creation failed"); }
         finally { busy = false; }
+    }
+
+    private async Task ExportOrderSlipsCsv()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("triggerDownload", "api/order-slips/export", "order-slips.csv");
+            Toast.Success("Order slips CSV download started.", "Export");
+        }
+        catch (Exception ex) { Toast.Error("Export failed: " + ex.Message, "Export"); }
+    }
+
+    private async Task ExportOrderSlipItemsCsv()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("triggerDownload", "api/order-slips/export/items", "order-slip-items.csv");
+            Toast.Success("Order slip items CSV download started.", "Export");
+        }
+        catch (Exception ex) { Toast.Error("Export failed: " + ex.Message, "Export"); }
     }
 }

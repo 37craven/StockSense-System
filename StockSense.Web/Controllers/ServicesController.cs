@@ -21,6 +21,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetServices()
     {
         var services = await _serviceRepo.GetAllWithProductsAsync();

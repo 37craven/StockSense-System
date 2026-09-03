@@ -121,6 +121,19 @@ public class DocumentService
                     if (!string.IsNullOrWhiteSpace(receipt.ReferenceNumber))
                         col.Item().Text($"Reference: {receipt.ReferenceNumber}").FontSize(8);
                     col.Item().PaddingVertical(3).LineHorizontal(0.5f).LineColor(Colors.Grey.Darken1);
+                    if (receipt.ServiceAmount > 0)
+                    {
+                        var serviceLabel = string.IsNullOrWhiteSpace(receipt.ServiceDescription)
+                            ? "Service Fee"
+                            : $"Service Fee ({receipt.ServiceDescription})";
+                        col.Item().Text(serviceLabel).FontSize(8).SemiBold();
+                        col.Item().Row(row =>
+                        {
+                            row.RelativeItem().Text("").FontSize(8);
+                            row.ConstantItem(42).AlignRight().Text(receipt.ServiceAmount.ToString("N2")).FontSize(8);
+                        });
+                        col.Item().PaddingVertical(3).LineHorizontal(0.5f).LineColor(Colors.Grey.Darken1);
+                    }
                     foreach (var item in receipt.Items)
                     {
                         col.Item().Text(item.ProductName).FontSize(8).SemiBold();

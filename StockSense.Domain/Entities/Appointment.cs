@@ -27,7 +27,9 @@ public class Appointment
     public int? TransactionId { get; set; }
     public Transaction? Transaction { get; set; }
     public string? PaymentLinkId { get; set; }
-    public string PaymentStatus { get; set; } = "NotRequired";
+    public string PaymentStatus { get; set; } = PaymentStatuses.NotRequired;
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? PaymentAmount { get; set; }
     public int? BuildRequestId { get; set; }
     public BuildRequest? BuildRequest { get; set; }
     public int? MotorcycleId { get; set; }

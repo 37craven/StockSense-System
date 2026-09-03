@@ -30,6 +30,45 @@ public class TransactionController : ControllerBase
         return Ok(dtos);
     }
 
+    [HttpGet("export")]
+    public async Task<IActionResult> ExportTransactions([FromQuery] string? type)
+    {
+        var transactions = await _repo.GetFilteredAsync(type);
+        var records = transactions.Select(t => new TransactionExportRecord
+        {
+            InvoiceNumber = t.InvoiceNumber,
+            TransactionDate = t.TransactionDate.ToString("yyyy-MM-dd HH:mm"),
+            TransactionType = t.TransactionType,
+            SaleSource = GetSaleSource(t.InvoiceNumber),
+            PaymentMethod = t.PaymentMethod,
+            TotalAmount = t.TotalAmount,
+            DiscountAmount = t.DiscountAmount,
+            ServiceAmount = t.ServiceAmount,
+            IsVoided = t.IsVoided,
+            Remarks = t.Remarks
+        }).ToList();
+
+        var bytes = CsvService.ExportToCsv(records, new TransactionExportMap());
+        return File(bytes, "text/csv", $"transactions_{DateTime.Now:yyyyMMdd}.csv");
+    }
+
+    [HttpGet("export/items")]
+    public async Task<IActionResult> ExportTransactionItems([FromQuery] string? type)
+    {
+        var transactions = await _repo.GetFilteredAsync(type);
+        var records = transactions.SelectMany(t => t.Items.Select(i => new TransactionItemExportRecord
+        {
+            InvoiceNumber = t.InvoiceNumber,
+            ProductName = i.ProductName,
+            Quantity = i.Quantity,
+            UnitPrice = i.UnitPrice,
+            LineTotal = i.LineTotal
+        })).ToList();
+
+        var bytes = CsvService.ExportToCsv(records, new TransactionItemExportMap());
+        return File(bytes, "text/csv", $"transaction_items_{DateTime.Now:yyyyMMdd}.csv");
+    }
+
     [HttpPost("{id:int}/void")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> VoidTransaction(int id, [FromBody] VoidTransactionRequest request)
@@ -108,6 +147,13 @@ public class TransactionController : ControllerBase
             StockBefore = i.StockBefore,
             StockAfter = i.StockAfter
         }).ToList()
+    };
+
+    private static string GetSaleSource(string invoice) => invoice switch
+    {
+        { Length: > 3 } when invoice.StartsWith("APT", StringComparison.OrdinalIgnoreCase) => "Appointment",
+        { Length: > 3 } when invoice.StartsWith("BLD", StringComparison.OrdinalIgnoreCase) => "Build",
+        _ => "POS"
     };
 }
 

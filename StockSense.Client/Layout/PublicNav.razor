@@ -7,9 +7,18 @@
 @inject AuthenticationStateProvider AuthStateProvider
 
 <style>
-    .register-btn:hover { background-color: #8B0000 !important; }
+    a.register-btn {
+        background-color: var(--primary) !important;
+        color: var(--primary-foreground) !important;
+        min-height: 0;
+        height: auto;
+    }
+    a.register-btn:hover {
+        background-color: color-mix(in srgb, var(--primary) 80%, black) !important;
+        color: var(--primary-foreground) !important;
+    }
 </style>
-<header class="@(IsActive("/") ? "home-public-nav" : null)" style="position: sticky; top: 0; z-index: 50; width: 100%; border-bottom: 1px solid var(--border); background-color: var(--background); backdrop-filter: blur(8px); box-sizing: border-box;">
+<header style="position: sticky; top: 0; z-index: 50; width: 100%; border-bottom: 1px solid var(--border); background-color: var(--background); backdrop-filter: blur(8px); box-sizing: border-box;">
     <div class="header-wrapper" style="display: flex; height: 3.5rem; width: 100%; align-items: center; justify-content: space-between; box-sizing: border-box;">
 
         <div style="display: flex; align-items: center; gap: 1rem; min-width: 0;">
@@ -23,11 +32,7 @@
                 <a href="/" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Home</a>
                 <a href="/appointment" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/appointment") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Appointment</a>
                 <a href="/build" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActive("/build") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Build</a>
-                <AuthorizeView Roles="Customer">
-                    <Authorized>
-                        <a href="/assistance" aria-current="@(IsActiveRoute("/assistance") ? "page" : null)" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActiveRoute("/assistance") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Assistance</a>
-                    </Authorized>
-                </AuthorizeView>
+                <a href="/assistance" aria-current="@(IsActiveRoute("/assistance") ? "page" : null)" class="navbar-btn" style="display: inline-flex; align-items: center; border-radius: var(--radius); font-size: 0.875rem; font-weight: 500; font-family: var(--font-sans); cursor: pointer; padding: 0.5rem 0.75rem; color: var(--foreground); background-color: @(IsActiveRoute("/assistance") ? "var(--secondary)" : "transparent"); text-decoration: none; white-space: nowrap;">Assistance</a>
             </nav>
         </div>
 
@@ -73,11 +78,7 @@
             <a href="/" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/") ? "var(--secondary)" : "transparent");">Home</a>
             <a href="/appointment" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/appointment") ? "var(--secondary)" : "transparent");">Appointment</a>
             <a href="/build" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActive("/build") ? "var(--secondary)" : "transparent");">Build</a>
-            <AuthorizeView Roles="Customer">
-                <Authorized>
-                    <a href="/assistance" aria-current="@(IsActiveRoute("/assistance") ? "page" : null)" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActiveRoute("/assistance") ? "var(--secondary)" : "transparent");">Assistance</a>
-                </Authorized>
-            </AuthorizeView>
+            <a href="/assistance" aria-current="@(IsActiveRoute("/assistance") ? "page" : null)" @onclick="CloseMobileMenu" style="display: block; padding: var(--space-2) var(--space-3); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground); text-decoration: none; background-color: @(IsActiveRoute("/assistance") ? "var(--secondary)" : "transparent");">Assistance</a>
             <div style="border-top: 1px solid var(--border); margin: var(--space-1) 0;"></div>
             <AuthorizeView Context="authCtx">
                 <Authorized>

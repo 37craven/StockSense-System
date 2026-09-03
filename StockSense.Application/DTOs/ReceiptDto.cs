@@ -11,6 +11,7 @@ public class ReceiptDto
     public string? Remarks { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal ServiceAmount { get; set; }
+    public string? ServiceDescription { get; set; }
     public decimal TotalAmount { get; set; }
     public List<ReceiptItemDto> Items { get; set; } = new();
 }

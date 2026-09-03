@@ -43,6 +43,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<ProductDto>>> GetProducts()
     {
         try
@@ -529,6 +530,129 @@ public class ProductsController : ControllerBase
         }
     }
 
+    [HttpGet("export")]
+    [Authorize(Roles = "Admin,Employee")]
+    public async Task<IActionResult> ExportProducts()
+    {
+        var products = await _productRepo.GetAllAsync();
+        var records = products.Select(p => new ProductExportRecord
+        {
+            Name = p.Name,
+            Category = p.Category,
+            Brand = p.Brand ?? "",
+            Barcode = p.Barcode ?? "",
+            Price = p.Price,
+            UnitCost = p.UnitCost,
+            CurrentStock = p.CurrentStock,
+            ReorderTarget = p.ReorderTarget,
+            SupplierName = p.Supplier?.Name ?? "",
+            IsActive = p.IsActive
+        }).ToList();
+
+        var bytes = CsvService.ExportToCsv(records, new ProductExportMap());
+        return File(bytes, "text/csv", $"products_{DateTime.Now:yyyyMMdd}.csv");
+    }
+
+    [HttpPost("import")]
+    [Authorize(Roles = "Admin")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> ImportProducts(IFormFile file)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse.Error("Upload a CSV file."));
+
+        using var stream = file.OpenReadStream();
+        var result = CsvService.ReadCsv<ProductImportRecord>(stream, new ProductImportMap());
+
+        if (!result.IsValid)
+            return BadRequest(new { errors = result.Errors, totalRows = result.TotalRows });
+
+        var preview = new CsvImportPreview<ProductImportRecord> { TotalRows = result.TotalRows };
+
+        var suppliers = await _context.Suppliers.ToListAsync();
+        var supplierLookup = suppliers.ToDictionary(s => s.Name.Trim().ToUpper(), s => s.Id);
+
+        for (int i = 0; i < result.Records.Count; i++)
+        {
+            var record = result.Records[i];
+            var row = i + 2;
+            var rowErrors = new List<CsvImportError>();
+
+            if (string.IsNullOrWhiteSpace(record.Name))
+                rowErrors.Add(new CsvImportError { Row = row, Field = "Name", Message = "Name is required." });
+            if (string.IsNullOrWhiteSpace(record.Category))
+                rowErrors.Add(new CsvImportError { Row = row, Field = "Category", Message = "Category is required." });
+            if (record.Price <= 0)
+                rowErrors.Add(new CsvImportError { Row = row, Field = "Price", Message = "Price must be greater than 0." });
+
+            var duplicateCount = result.Records.Count(r => r.Name.Trim().Equals(record.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (duplicateCount > 1)
+                rowErrors.Add(new CsvImportError { Row = row, Field = "Name", Message = $"Duplicate product name \"{record.Name}\" in CSV." });
+
+            if (await _productRepo.NameExistsAsync(record.Name.Trim()))
+                rowErrors.Add(new CsvImportError { Row = row, Field = "Name", Message = $"Product \"{record.Name}\" already exists." });
+
+            if (!string.IsNullOrWhiteSpace(record.SupplierName))
+            {
+                var key = record.SupplierName.Trim().ToUpper();
+                if (!supplierLookup.ContainsKey(key))
+                    rowErrors.Add(new CsvImportError { Row = row, Field = "Supplier", Message = $"Supplier \"{record.SupplierName}\" not found." });
+            }
+
+            if (rowErrors.Any())
+                preview.Errors.AddRange(rowErrors);
+            else
+                preview.ValidRows.Add(record);
+        }
+
+        return Ok(preview);
+    }
+
+    [HttpPost("import/confirm")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ConfirmImportProducts([FromBody] List<ProductImportRecord> records)
+    {
+        if (records == null || !records.Any())
+            return BadRequest(ApiResponse.Error("No valid rows to import."));
+
+        var suppliers = await _context.Suppliers.ToListAsync();
+        var supplierLookup = suppliers.ToDictionary(s => s.Name.Trim().ToUpper(), s => s.Id);
+        var created = 0;
+
+        foreach (var record in records)
+        {
+            var product = new Product
+            {
+                Name = record.Name.Trim(),
+                Brand = (record.Brand ?? "").Trim(),
+                Category = record.Category.Trim(),
+                Price = record.Price,
+                UnitCost = record.UnitCost,
+                ReorderTarget = record.ReorderTarget,
+                IsActive = record.IsActive
+            };
+
+            if (!string.IsNullOrWhiteSpace(record.SupplierName))
+            {
+                var key = record.SupplierName.Trim().ToUpper();
+                if (supplierLookup.TryGetValue(key, out var supplierId))
+                    product.SupplierId = supplierId;
+            }
+
+            if (record.CurrentStock > 0)
+                product.AddStock(record.CurrentStock);
+
+            await _productRepo.AddAsync(product);
+            await _productRepo.SaveChangesAsync();
+
+            product.Barcode = BarcodeService.GenerateBarcodeValue(product.Id);
+            await _productRepo.SaveChangesAsync();
+            created++;
+        }
+
+        return Ok(new { message = $"Successfully imported {created} products.", count = created });
+    }
+
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteProduct(int id, [FromServices] IWebHostEnvironment environment)
@@ -558,6 +682,32 @@ public class ProductsController : ControllerBase
             _logger.LogError(ex, "Deleting product {ProductId} failed.", id);
             return StatusCode(500, ApiResponse.Error("The product could not be deleted. Please try again."));
         }
+    }
+
+    [HttpPost("bulk-map-supplier")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> BulkMapSupplier([FromBody] BulkMapSupplierRequest request)
+    {
+        if (request.ProductIds == null || !request.ProductIds.Any())
+            return BadRequest(ApiResponse.Error("No products selected."));
+
+        var products = await _context.Products
+            .Where(p => request.ProductIds.Contains(p.Id))
+            .ToListAsync();
+
+        foreach (var product in products)
+        {
+            product.SupplierId = request.SupplierId;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = $"Updated {products.Count} product(s) to supplier ID {request.SupplierId}.", count = products.Count });
+    }
+
+    public class BulkMapSupplierRequest
+    {
+        public List<int> ProductIds { get; set; } = new();
+        public int? SupplierId { get; set; }
     }
 
     public class EmailQuoteRequest

@@ -19,6 +19,7 @@ public class MechanicsController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<MechanicDto>>> GetActiveMechanics()
     {
         var mechanics = await _repo.GetActiveAsync();

@@ -11,6 +11,7 @@ namespace StockSense.Web.Controllers;
 public sealed class MotorcyclesController(MotorcycleRepository repository) : ControllerBase
 {
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<MotorcycleOptionDto>>> GetSelectable(CancellationToken cancellationToken)
     {
         var motorcycles = await repository.GetSelectableAsync(cancellationToken);

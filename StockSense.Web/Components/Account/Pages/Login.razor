@@ -101,22 +101,50 @@
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
 
-    [SupplyParameterFromQuery]
-    private string? ReturnUrl { get; set; }
+    private string? ReturnUrl;
 
     protected override async Task OnInitializedAsync()
     {
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
+            ReturnUrl = HttpContext.Request.Query["returnUrl"].FirstOrDefault();
+            Console.WriteLine($"[LOGIN-GET] returnUrl from query: '{ReturnUrl}'");
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
         }
+        else
+        {
+            Console.WriteLine($"[LOGIN-POST] ReturnUrl field: '{ReturnUrl}'");
+            Console.WriteLine($"[LOGIN-POST] Query returnUrl: '{HttpContext.Request.Query["returnUrl"].FirstOrDefault()}'");
+            Console.WriteLine($"[LOGIN-POST] HasFormContentType: {HttpContext.Request.HasFormContentType}");
+            if (HttpContext.Request.HasFormContentType)
+                Console.WriteLine($"[LOGIN-POST] Form ReturnUrl: '{HttpContext.Request.Form["ReturnUrl"].FirstOrDefault()}'");
+        }
+    }
+
+    private string? GetReturnUrl()
+    {
+        var result = ReturnUrl
+            ?? HttpContext.Request.Query["returnUrl"].FirstOrDefault()
+            ?? (HttpContext.Request.HasFormContentType ? HttpContext.Request.Form["ReturnUrl"].FirstOrDefault() : null);
+        Console.WriteLine($"[LOGIN] GetReturnUrl() returning: '{result}'");
+        return result;
     }
 
     public async Task LoginUser()
     {
-        // Load the account once, then pass that instance to Identity. The string
-        // overload performs its own lookup, and the previous success path queried
-        // the same account and its roles again.
+        var returnUrl = GetReturnUrl();
+        Console.WriteLine($"[LOGIN] Raw returnUrl: '{returnUrl}'");
+
+        // Safe redirect: only allow local relative paths
+        if (string.IsNullOrEmpty(returnUrl)
+            || returnUrl.StartsWith("//")
+            || returnUrl.Contains('\\')
+            || Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+        {
+            returnUrl = "/";
+        }
+        Console.WriteLine($"[LOGIN] Final returnUrl: '{returnUrl}'");
+
         var user = await UserManager.FindByEmailAsync(Input.Email);
         var result = user is null
             ? SignInResult.Failed
@@ -128,16 +156,22 @@
 
         if (result.Succeeded)
         {
-            // Role controls only the landing page. Identity roles/claims still
-            // enforce authorization after navigation.
-            if (string.Equals(user!.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(user.Role, "Employee", StringComparison.OrdinalIgnoreCase))
+            Console.WriteLine($"[LOGIN] Login succeeded. returnUrl='{returnUrl}', is redirect: {returnUrl != "/"}");
+            if (returnUrl != "/" && !string.IsNullOrEmpty(returnUrl))
+            {
+                Console.WriteLine($"[LOGIN] Redirecting to: {returnUrl}");
+                HttpContext.Response.Redirect(returnUrl);
+                return;
+            }
+
+            if (await UserManager.IsInRoleAsync(user!, "Admin") ||
+                await UserManager.IsInRoleAsync(user!, "Employee"))
             {
                 RedirectManager.RedirectTo("/dashboard");
             }
             else
             {
-                RedirectManager.RedirectTo(AccountReturnUrl.Normalize(ReturnUrl));
+                RedirectManager.RedirectTo("/");
             }
         }
         else if (result.IsLockedOut)

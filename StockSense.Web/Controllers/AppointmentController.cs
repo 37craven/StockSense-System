@@ -4,12 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StockSense.Application.DTOs;
 using StockSense.Application.Exceptions;
 using StockSense.Application.Interfaces;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Infrastructure.Data;
+using StockSense.Web.Options;
 using StockSense.Web.Services;
 
 namespace StockSense.Web.Controllers;
@@ -27,7 +29,9 @@ public class AppointmentsController : ControllerBase
     private readonly MotorcycleRepository _motorcycleRepository;
     private readonly ILogger<AppointmentsController> _logger;
     private readonly PayMongoService _payMongo;
+    private readonly PayMongoOptions _payMongoOptions;
     private readonly IAdminPinService? _adminPinService;
+    private readonly IWorkOrderEmailSender _workOrderEmail;
     private static TimeZoneInfo PhZone
     {
         get
@@ -47,6 +51,8 @@ public class AppointmentsController : ControllerBase
         MotorcycleRepository motorcycleRepository,
         ILogger<AppointmentsController> logger,
         PayMongoService payMongo,
+        IOptions<PayMongoOptions> payMongoOptions,
+        IWorkOrderEmailSender workOrderEmail,
         IAdminPinService? adminPinService = null)
     {
         _repo = repo;
@@ -58,6 +64,8 @@ public class AppointmentsController : ControllerBase
         _motorcycleRepository = motorcycleRepository;
         _logger = logger;
         _payMongo = payMongo;
+        _payMongoOptions = payMongoOptions.Value;
+        _workOrderEmail = workOrderEmail;
     }
 
     [HttpPost]
@@ -183,8 +191,24 @@ public class AppointmentsController : ControllerBase
         if (appointment is null) return NotFound(ApiResponse.NotFound("Appointment"));
         if (appointment.CustomerEmail != customer.Email) return Forbid();
 
-        if (appointment.PaymentStatus == "Paid")
-            return Ok(new { checkoutUrl = (string?)null, paymentStatus = "Paid" });
+        if (appointment.PaymentStatus == PaymentStatuses.Paid)
+            return Ok(new { checkoutUrl = (string?)null, paymentStatus = PaymentStatuses.Paid });
+
+        if (appointment.PaymentStatus == PaymentStatuses.AwaitingPayment
+            && !string.IsNullOrEmpty(appointment.PaymentLinkId))
+        {
+            var (existingStatus, existingCheckoutUrl) = await _payMongo.GetLinkDetailsAsync(appointment.PaymentLinkId);
+            if (existingStatus is not null)
+            {
+                var mapped = PayMongoService.MapLinkStatus(existingStatus);
+                if (mapped != appointment.PaymentStatus)
+                {
+                    appointment.PaymentStatus = mapped;
+                    await _context.SaveChangesAsync();
+                }
+                return Ok(new { checkoutUrl = existingCheckoutUrl, paymentStatus = appointment.PaymentStatus });
+            }
+        }
 
         var serviceNames = appointment.ServicesRequested
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -194,10 +218,13 @@ public class AppointmentsController : ControllerBase
 
         if (serviceTotal <= 0)
         {
-            appointment.PaymentStatus = "NotRequired";
+            appointment.PaymentStatus = PaymentStatuses.NotRequired;
             await _context.SaveChangesAsync();
-            return Ok(new { checkoutUrl = (string?)null, paymentStatus = "NotRequired" });
+            return Ok(new { checkoutUrl = (string?)null, paymentStatus = PaymentStatuses.NotRequired });
         }
+
+        if (!_payMongoOptions.Enabled)
+            return StatusCode(503, ApiResponse.Error("Online payments are currently unavailable. Please try again later."));
 
         try
         {
@@ -206,9 +233,15 @@ public class AppointmentsController : ControllerBase
                 $"Appointment #{id} service fee",
                 $"appt-{id}-{DateTime.UtcNow:yyyyMMddHHmmssfff}");
             appointment.PaymentLinkId = linkId;
-            appointment.PaymentStatus = "AwaitingPayment";
+            appointment.PaymentStatus = PaymentStatuses.AwaitingPayment;
+            appointment.PaymentAmount = serviceTotal;
             await _context.SaveChangesAsync();
-            return Ok(new { checkoutUrl, paymentStatus = "AwaitingPayment" });
+            return Ok(new { checkoutUrl, paymentStatus = PaymentStatuses.AwaitingPayment });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "PayMongo configuration error for appointment {AppointmentId}.", id);
+            return StatusCode(502, ApiResponse.Error(ex.Message));
         }
         catch (Exception ex)
         {
@@ -227,23 +260,95 @@ public class AppointmentsController : ControllerBase
         if (appointment is null) return NotFound(ApiResponse.NotFound("Appointment"));
         if (appointment.CustomerEmail != customer.Email) return Forbid();
 
-        if (appointment.PaymentStatus is "Paid" or "NotRequired")
+        if (appointment.PaymentStatus is PaymentStatuses.Paid or PaymentStatuses.NotRequired)
             return Ok(new { paymentStatus = appointment.PaymentStatus });
 
         if (string.IsNullOrEmpty(appointment.PaymentLinkId))
             return Ok(new { paymentStatus = appointment.PaymentStatus });
 
         var status = await _payMongo.GetLinkStatusAsync(appointment.PaymentLinkId);
-        if (string.Equals(status, "paid", StringComparison.OrdinalIgnoreCase))
+        var mapped = PayMongoService.MapLinkStatus(status);
+        if (mapped != appointment.PaymentStatus)
         {
-            appointment.PaymentStatus = "Paid";
+            appointment.PaymentStatus = mapped;
             await _context.SaveChangesAsync();
         }
 
         return Ok(new { paymentStatus = appointment.PaymentStatus });
     }
 
+    [HttpPost("webhook")]
+    [AllowAnonymous]
+    public async Task<IActionResult> PayMongoWebhook()
+    {
+        var payload = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
+        var signatureHeader = HttpContext.Request.Headers["PayMongo-Signature"].FirstOrDefault();
+
+        if (string.IsNullOrEmpty(_payMongoOptions.WebhookSecret))
+        {
+            _logger.LogWarning("PayMongo webhook received but WebhookSecret is not configured.");
+            return Ok();
+        }
+
+        if (!PayMongoService.VerifyWebhookSignature(payload, signatureHeader, _payMongoOptions.WebhookSecret))
+        {
+            _logger.LogWarning("PayMongo webhook signature verification failed.");
+            return Unauthorized();
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            var eventType = document.RootElement.GetProperty("data").GetProperty("attributes").GetProperty("type").GetString();
+
+            if (eventType != "link.paid")
+                return Ok();
+
+            var linkId = document.RootElement.GetProperty("data").GetProperty("attributes")
+                .GetProperty("data").GetProperty("id").GetString();
+
+            if (string.IsNullOrEmpty(linkId))
+                return Ok();
+
+            var appointment = await _context.Appointments
+                .FirstOrDefaultAsync(a => a.PaymentLinkId == linkId);
+
+            if (appointment is null)
+            {
+                _logger.LogInformation("Webhook received for unknown link {LinkId}.", linkId);
+                return Ok();
+            }
+
+            if (appointment.PaymentStatus != PaymentStatuses.Paid)
+            {
+                appointment.PaymentStatus = PaymentStatuses.Paid;
+                _context.WorkOrderAudits.Add(new WorkOrderAudit
+                {
+                    WorkOrderType = "Appointment",
+                    WorkOrderId = appointment.Id,
+                    Action = "PaymentConfirmed",
+                    PreviousValue = appointment.PaymentStatus,
+                    NewValue = PaymentStatuses.Paid,
+                    ActorUserId = "system",
+                    ActorRole = "System",
+                    Reason = "PayMongo webhook",
+                    CreatedAt = DateTime.Now
+                });
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Appointment {AppointmentId} payment confirmed via webhook.", appointment.Id);
+            }
+
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Processing PayMongo webhook failed.");
+            return Ok();
+        }
+    }
+
     [HttpGet("booked-slots")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetBookedSlots([FromQuery] DateTime date, [FromQuery] string? mechanic)
     {
         try
@@ -372,6 +477,14 @@ public class AppointmentsController : ControllerBase
             AddAudit("Appointment", id, "MechanicAssigned", previousMechanic, newMechanic, reason, approval);
 
         await _context.SaveChangesAsync();
+
+        if (!string.Equals(previousSchedule, newSchedule, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(appointment.CustomerEmail))
+        {
+            _ = _workOrderEmail.SendRescheduleEmailAsync(
+                appointment.CustomerEmail, appointment.CustomerName, id,
+                previousSchedule, newSchedule, newMechanic);
+        }
+
         return Ok(new { message = "Appointment details updated." });
     }
 
@@ -444,6 +557,13 @@ public class AppointmentsController : ControllerBase
             appointment.Status = canonicalStatus;
             AddAudit("Appointment", id, "StatusChanged", previousStatus, canonicalStatus, reason, approval);
             await _context.SaveChangesAsync();
+
+            if (canonicalStatus == WorkOrderStatuses.Confirmed && !string.IsNullOrWhiteSpace(appointment.CustomerEmail))
+            {
+                var summary = $"Service: {appointment.ServicesRequested}\nDate: {appointment.AppointmentDate:MMMM dd, yyyy} at {appointment.TimeSlot}\nMechanic: {appointment.MechanicName}\nTotal: ₱{appointment.TotalAmount:N2}";
+                _ = _workOrderEmail.SendStatusEmailAsync(appointment.CustomerEmail, appointment.CustomerName, "Appointment", "Confirmed", id, summary);
+            }
+
             return Ok(new { message = "Status updated" });
         }
         catch (Exception ex)
@@ -595,6 +715,15 @@ public class AppointmentsController : ControllerBase
         {
             var appointment = await _context.Appointments.FindAsync(id, cancellationToken);
             if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
+
+            if (appointment.PaymentStatus == PaymentStatuses.Paid
+                && string.Equals(request.PaymentMethod, "Cash", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Completing appointment {AppointmentId} with Cash but payment was already received via PayMongo.",
+                    id);
+            }
+
             if (appointment.Status == WorkOrderStatuses.Confirmed)
                 await ReleaseAppointmentReservations(appointment);
 
@@ -604,6 +733,21 @@ public class AppointmentsController : ControllerBase
                 User.FindFirstValue(ClaimTypes.NameIdentifier),
                 InventoryDefaults.LocationId,
                 cancellationToken);
+
+            if (appointment.PaymentStatus != PaymentStatuses.Paid
+                && appointment.PaymentStatus != PaymentStatuses.NotRequired)
+            {
+                appointment.PaymentStatus = PaymentStatuses.Paid;
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            if (!string.IsNullOrWhiteSpace(appointment.CustomerEmail))
+            {
+                receipt.ServiceDescription = appointment.ServicesRequested;
+                var summary = $"Service: {appointment.ServicesRequested}\nDate: {appointment.AppointmentDate:MMMM dd, yyyy}\nTotal: ₱{receipt.TotalAmount:N2}\nPayment: {receipt.PaymentMethod}";
+                _ = _workOrderEmail.SendStatusEmailAsync(appointment.CustomerEmail, appointment.CustomerName, "Appointment", "Completed", id, summary, receipt);
+            }
+
             return Ok(receipt);
         }
         catch (KeyNotFoundException)
@@ -698,7 +842,8 @@ public class AppointmentsController : ControllerBase
         MotorcycleId = a.MotorcycleId,
         Motorcycle = MapMotorcycle(a.Motorcycle),
         PaymentLinkId = a.PaymentLinkId,
-        PaymentStatus = a.PaymentStatus
+        PaymentStatus = a.PaymentStatus,
+        PaymentAmount = a.PaymentAmount
     };
 
     private static MotorcycleOptionDto? MapMotorcycle(Motorcycle? motorcycle) => motorcycle is null
@@ -743,13 +888,15 @@ public class AppointmentsController : ControllerBase
             .Where(appointment =>
                 (appointment.Status == WorkOrderStatuses.Pending || appointment.Status == WorkOrderStatuses.Confirmed)
                 && appointment.AppointmentDate < today
-                && appointment.PaymentStatus != "Paid")
+                && appointment.PaymentStatus != PaymentStatuses.Paid)
             .ToListAsync();
 
         foreach (var appointment in pastDue)
         {
             var previousStatus = appointment.Status;
             appointment.Status = WorkOrderStatuses.Expired;
+            if (appointment.PaymentStatus == PaymentStatuses.AwaitingPayment)
+                appointment.PaymentStatus = PaymentStatuses.Expired;
             _context.WorkOrderAudits.Add(new WorkOrderAudit
             {
                 WorkOrderType = "Appointment",

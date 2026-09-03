@@ -5,7 +5,7 @@
     {
         <button type="button"
                 @onclick="() => OnSelect.InvokeAsync(option.Value)"
-                class="min-h-[36px] px-3 py-1 rounded-md text-sm font-medium cursor-pointer border-none @(option.Value == Selected ? "bg-secondary text-foreground" : "bg-transparent text-muted-foreground")">
+                class="min-h-[36px] px-3 py-1 rounded-md text-sm cursor-pointer border-transparent @(option.Value == Selected ? "bg-secondary text-foreground font-semibold" : "bg-transparent text-muted-foreground")">
             @option.Label@if (option.Count.HasValue)
             {
                 <span> (@option.Count.Value)</span>

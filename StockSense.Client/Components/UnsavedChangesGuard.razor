@@ -32,8 +32,16 @@
             return;
         }
 
+        var target = context.TargetLocation;
+        if (target.Contains("/Account/Login", StringComparison.OrdinalIgnoreCase) ||
+            target.Contains("/Account/Register", StringComparison.OrdinalIgnoreCase))
+        {
+            allowNextNavigation = true;
+            return;
+        }
+
         context.PreventNavigation();
-        pendingLocation = context.TargetLocation;
+        pendingLocation = target;
         confirmationOpen = true;
     }
 

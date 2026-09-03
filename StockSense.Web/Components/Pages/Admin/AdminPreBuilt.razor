@@ -15,7 +15,9 @@
 
 @attribute [Authorize(Roles = "Admin")]
 
-@* ── Page Header ── *@
+<UnsavedChangesGuard IsDirty="@(showCreateModal && PackageEditorDirty)"
+                     Message="Your pre-built package changes have not been saved. If you leave now, they will be lost." />
+
 <PageHeader Title="Pre-Built Packages"
             Subtitle="Create and manage guided motor build packages.">
     <BbButton Variant="ButtonVariant.Outline" OnClick="() => showMotorcycleModal = true">
@@ -28,7 +30,6 @@
     </BbButton>
 </PageHeader>
 
-@* ── Package List ── *@
 @if (isLoading)
 {
     <LoadingState Description="Loading Packages..." />
@@ -39,77 +40,113 @@ else if (!existingPackages.Any())
 }
 else
 {
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4);">
-        @foreach (var pkg in existingPackages)
-        {
-            <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2);">
+    <div class="rounded-lg border border-border bg-card p-4 mb-5 flex flex-col gap-3" role="search" aria-label="Filter packages">
+        <div class="flex flex-wrap items-end gap-3">
+            <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1 min-w-56">
+                Packages
+                <input id="prebuilt-search"
+                       @bind="packageSearch"
+                       @bind:event="oninput"
+                       placeholder="Search packages or products..."
+                       autocomplete="off"
+                       class="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground w-full" />
+            </label>
+            <div class="flex flex-col gap-1 text-xs text-muted-foreground shrink-0">
+                <span>Motor</span>
+                <DropdownSelect Label="All motors"
+                                 Multiple="true"
+                                 SelectedValues="@selectedMotorFilters"
+                                 SelectedValuesChanged="v => selectedMotorFilters = v"
+                                 Options="@filterMotorOptions" />
+            </div>
+            <SortDropdown SelectedColumn="@sortColumn" Ascending="@sortAscending"
+                          OnColumnChange="v => { sortColumn = v; }"
+                          OnDirectionChange="v => { sortAscending = v; }"
+                          Columns="@GetSortColumns()" />
+        </div>
+    </div>
 
-                @* Card Header *@
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2);">
-                    <div style="min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
-                            <h1 style="font-size: var(--text-base); font-weight: bold; margin: 0; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@pkg.Name</h1>
-                            @if (!pkg.IsActive)
+    @if (FilteredPackages.Count == 0)
+    {
+        <EmptyState Icon="search-x" Title="No matching packages" Description="Try another search or clear the filter." Role="status" />
+    }
+    else
+    {
+    <div class="service-management-grid">
+        @foreach (var pkg in FilteredPackages)
+        {
+            <article class="service-management-card" @onclick="() => OpenEditModal(pkg)" role="button" tabindex="0"
+                     @onkeydown="e => HandleCardKeydown(e, pkg)">
+                <div>
+                    <div class="service-management-card__header">
+                        <div class="flex flex-col gap-1 min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="service-management-card__title truncate">@pkg.Name</span>
+                            </div>
+                            @if (pkg.CompatibleMotors.Any())
                             {
-                                <span style="font-size: 10px; background: var(--muted); color: var(--muted-foreground); padding: 2px 6px; border-radius: 4px; white-space: nowrap;">Inactive</span>
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach (var motor in pkg.CompatibleMotors.Take(3))
+                                    {
+                                        <span class="service-management-card__category">@motor.Brand · @motor.Model</span>
+                                    }
+                                    @if (pkg.CompatibleMotors.Count > 3)
+                                    {
+                                        <span class="service-management-card__category">+@(pkg.CompatibleMotors.Count - 3)</span>
+                                    }
+                                </div>
                             }
                         </div>
-                        <span style="font-size: var(--text-sm); font-weight: 900; color: var(--accent-link);">₱@pkg.TotalPrice.ToString("N0")</span>
-                    </div>
-
-                    @* Action Buttons *@
-                    <div style="display: flex; gap: 4px; flex-shrink: 0;">
-                        <button @onclick="() => RequestToggleActive(pkg)" title="@(pkg.IsActive ? "Deactivate" : "Activate")"
-                                style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--border); background: @(pkg.IsActive ? "color-mix(in oklch, var(--success) 12%, transparent)" : "var(--muted)"); color: @(pkg.IsActive ? "var(--success)" : "var(--muted-foreground)"); cursor: pointer;">
-                            <LucideIcon Name="@(pkg.IsActive ? "eye" : "eye-off")" Size="14"/>
-                        </button>
-                        <button @onclick="() => OpenEditModal(pkg)" title="Edit"
-                                style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--border); background: color-mix(in oklch, var(--accent-link) 10%, transparent); color: var(--accent-link); cursor: pointer;">
-                            <LucideIcon Name="pencil" Size="14"/>
-                        </button>
-                        <button @onclick="() => OpenDeleteConfirm(pkg)" title="Delete"
-                                style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--destructive-muted-foreground); background: var(--destructive-muted); color: var(--destructive-muted-foreground); cursor: pointer;">
-                            <LucideIcon Name="trash-2" Size="14"/>
-                        </button>
-                    </div>
-                </div>
-
-                <p style="font-size: var(--text-xs); color: var(--muted-foreground); margin: 0;">@pkg.Description</p>
-
-                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                    @foreach (var motor in pkg.CompatibleMotors.Take(3))
-                    {
-                        <span style="font-size: 10px; background: var(--muted); padding: 2px 6px; border-radius: 4px; color: var(--foreground);">@motor.Brand · @motor.Model · @motor.StockCC</span>
-                    }
-                    @if (pkg.CompatibleMotors.Count > 3)
-                    {
-                        <span style="font-size: 10px; background: var(--muted); padding: 2px 6px; border-radius: 4px; color: var(--muted-foreground);">+@(pkg.CompatibleMotors.Count - 3) more</span>
-                    }
-                    @if (pkg.MinAddedCC > 0)
-                    {
-                        <span style="font-size: 10px; background: var(--info-muted); border: 1px solid var(--info); padding: 2px 6px; border-radius: 4px; color: var(--info-muted-foreground); font-weight: bold;">+@pkg.MinAddedCC–@pkg.MaxAddedCC CC</span>
-                    }
-                </div>
-
-                <div>
-                    <p style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 4px 0;">
-                        Includes @pkg.IncludedProducts.Count Parts:</p>
-                    <ul style="margin: 0; padding-left: 16px; font-size: var(--text-xs); color: var(--muted-foreground);">
-                        @foreach (var part in pkg.IncludedProducts.Take(3))
+                        @if (pkg.MinAddedCC > 0)
                         {
-                            <li>@part.Name</li>
+                            <span class="apb-cc-badge">+@pkg.MinAddedCC–@pkg.MaxAddedCC CC</span>
                         }
-                        @if (pkg.IncludedProducts.Count > 3)
+                    </div>
+                    <div class="service-management-card__body">
+                        @if (!string.IsNullOrWhiteSpace(pkg.Description))
                         {
-                            <li style="list-style: none; font-style: italic; margin-top: 2px;">
-                                + @(pkg.IncludedProducts.Count - 3) more items
-                            </li>
+                            <p class="text-xs text-muted-foreground mb-2 line-clamp-1">@pkg.Description</p>
+                            <div class="border-t border-border mb-2"></div>
                         }
-                    </ul>
+                        <div class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Package Parts</div>
+                        @{
+                            var partNames = pkg.IncludedProducts.Select(p => p.Name).ToList();
+                        }
+                        @if (partNames.Any())
+                        {
+                            <div class="service-management-card__products">
+                                @foreach (var name in partNames)
+                                {
+                                    <span class="service-management-card__product">@name</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="service-management-card__empty">
+                                <LucideIcon Name="package-x" Size="14" />
+                                No parts included
+                            </div>
+                        }
+                    </div>
                 </div>
-            </div>
+                <div class="service-management-card__footer">
+                    <span class="service-management-card__price">₱@pkg.TotalPrice.ToString("N0")</span>
+                    <label class="service-toggle" @onclick:stopPropagation>
+                        <input type="checkbox" role="switch" class="service-toggle__input"
+                               aria-label="Toggle @(pkg.Name) active status"
+                               checked="@pkg.IsActive"
+                               disabled="@isProcessing"
+                               @onchange="() => RequestToggleActive(pkg)" />
+                        <span class="service-toggle__track">
+                            <span class="service-toggle__thumb"></span>
+                        </span>
+                    </label>
+                </div>
+            </article>
         }
     </div>
+    }
 }
 
 @* ── Manage Motorcycles Dialog ── *@
@@ -131,10 +168,6 @@ else
                 <LucideIcon Name="plus" Size="14"/>
             </BbButton>
         </div>
-        @if (!string.IsNullOrEmpty(motorErrorMessage))
-        {
-            <div style="margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background-color: var(--destructive-muted); border: 1px solid var(--destructive-border); color: var(--destructive-muted-foreground); font-size: var(--text-xs);">@motorErrorMessage</div>
-        }
 
         <div style="flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius);">
             @if (!motorcycles.Any())
@@ -171,7 +204,6 @@ else
             <BbDialogTitle>Delete @packageToDelete?.Name?</BbDialogTitle>
             <BbDialogDescription>This permanently removes the package. This action cannot be undone.</BbDialogDescription>
         </BbDialogHeader>
-        
         <div class="space-y-3">
             <label class="flex flex-col gap-1 text-sm font-medium">
                 Type DELETE or @packageToDelete?.Name to confirm.
@@ -179,14 +211,10 @@ else
                        class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" />
             </label>
         </div>
-        
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDeleteConfirm = false" Disabled="isProcessing">Cancel</BbButton>
             <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmDelete" Disabled="@(!CanDeletePackage || isProcessing)">
-                @if (isProcessing)
-                {
-                    <BbSpinner Size="SpinnerSize.Small"/>
-                }
+                @if (isProcessing) { <BbSpinner Size="SpinnerSize.Small"/> }
                 Delete
             </BbButton>
         </BbDialogFooter>
@@ -205,7 +233,6 @@ else
                 <input @bind="motorcycleDeleteConfirmation" placeholder="DELETE or @MotorcycleDeleteName" autocomplete="off"
                        class="w-full h-9 border border-input rounded-md bg-background text-foreground px-2" />
             </label>
-            @if (!string.IsNullOrWhiteSpace(motorErrorMessage)) { <p role="alert" class="m-0 text-sm text-destructive">@motorErrorMessage</p> }
         </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseMotorcycleDeleteConfirm" Disabled="isMotorProcessing">Cancel</BbButton>
@@ -232,123 +259,146 @@ else
 </BbDialog>
 
 @* ── Create / Edit Package Modal ── *@
-<UnsavedChangesGuard IsDirty="@(showCreateModal && PackageEditorDirty)"
-                     Message="Your pre-built package changes have not been saved. If you leave now, they will be lost." />
-
 <BbDialog Open="showCreateModal" OpenChanged="OnCreateModalOpenChanged">
-    <BbDialogContent class="flex flex-col overflow-hidden p-0" Style="max-height: 90dvh; width: 98vw; max-width: 900px;">
+    <BbDialogContent Class="p-0 overflow-hidden flex flex-col"
+                     Style="@($"width: {(showProductCatalog ? "98vw" : "min(96vw, 420px)")}; max-width: {(showProductCatalog ? "900px" : "420px")}; max-height: 95dvh; transition: width 0.3s ease, max-width 0.3s ease;")">
 
         <div class="shrink-0 px-5 pt-5">
             <BbDialogHeader>
-                <BbDialogTitle>@(isEditMode ? "Edit Package" : "Create Pre-Built Package")</BbDialogTitle>
-                <BbDialogDescription>Combine existing inventory products into a single guided package.</BbDialogDescription>
+                <BbDialogTitle>@(isEditMode ? "Edit Package" : "Create Package")</BbDialogTitle>
+                <BbDialogDescription>@(isEditMode ? "Edit package details and manage products." : "Combine existing inventory products into a package.")</BbDialogDescription>
             </BbDialogHeader>
         </div>
 
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div class="shrink-0 mx-5 mt-3 p-2 px-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-xs dark:bg-red-950 dark:border-red-800 dark:text-red-200">
-                @errorMessage
-            </div>
-        }
+        <div class="sv-modal-body flex p-5 gap-5 min-w-0 flex-1 overflow-hidden">
 
-        <div class="apb-modal-body flex p-5 gap-5 min-w-0">
-
-            @* ── Left Panel: Package Details ── *@
-            <div class="apb-left-panel overflow-y-auto flex flex-col gap-4 min-h-0">
+            @* ── Panel: Package Details ── *@
+            <div class="sv-panel overflow-y-auto flex flex-col gap-4 min-h-0 @(showProductCatalog ? "sv-panel--side" : "")">
 
                 <div>
-                    <label class="text-xs font-semibold mb-1 block text-foreground">Package Name <span class="text-destructive" aria-hidden="true">*</span></label>
-                    <input type="text" @bind="newPackage.Name" placeholder="e.g., Touring Spec Setup"
-                           class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm box-border outline-none"/>
+                    <label class="sv-label">Package Name <span class="text-destructive" aria-hidden="true">*</span></label>
+                    <input type="text" @bind="newPackage.Name" placeholder="e.g. Touring Spec Setup" class="sv-input" />
                 </div>
 
                 <div>
-                    <label class="text-xs font-semibold mb-1 block text-foreground">Description</label>
-                    <textarea @bind="newPackage.Description" rows="3" placeholder="Describe who this build is for..."
-                              class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm resize-none box-border outline-none"></textarea>
+                    <label class="sv-label">Description</label>
+                    <textarea @bind="newPackage.Description" rows="2" placeholder="Describe who this build is for..." class="sv-input resize-none"></textarea>
                 </div>
 
                 <div>
-                    <label class="text-xs font-semibold mb-1 block text-foreground">CC Gain Range</label>
+                    <label class="sv-label">CC Gain Range</label>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <span class="text-[10px] text-muted-foreground">Min</span>
-                            <input type="number" @bind="newPackage.MinAddedCC" placeholder="20"
-                                   class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm box-border outline-none"/>
+                            <input type="number" @bind="newPackage.MinAddedCC" placeholder="20" class="sv-input" />
                         </div>
                         <div>
                             <span class="text-[10px] text-muted-foreground">Max</span>
-                            <input type="number" @bind="newPackage.MaxAddedCC" placeholder="30"
-                                   class="w-full p-2 rounded-md border border-border bg-background text-foreground text-sm box-border outline-none"/>
+                            <input type="number" @bind="newPackage.MaxAddedCC" placeholder="30" class="sv-input" />
                         </div>
                     </div>
-                    <p class="text-[10px] text-muted-foreground mt-1 mb-0">Estimated displacement gain for the customer&rsquo;s stock engine.</p>
                 </div>
 
-                <div class="apb-motor-section flex-1 flex flex-col min-h-0">
-                    <label class="text-xs font-semibold mb-1 block text-foreground">Compatible Motors <span class="font-normal text-muted-foreground">(@newPackage.CompatibleMotors.Count selected)</span></label>
-                    <div class="apb-motor-list flex-1 overflow-y-auto border border-border rounded-md min-h-0">
-                        @if (!motorcycles.Any())
+                @* Compatible Motors Dropdown *@
+                <div>
+                    <label class="sv-label">Compatible Motors <span class="font-normal text-muted-foreground">(@newPackage.CompatibleMotors.Count)</span></label>
+                    <DropdownSelect Label="Select all compatible motors"
+                                     Multiple="true"
+                                     SelectedValues="@selectedMotorValues"
+                                     SelectedValuesChanged="OnMotorSelectionChanged"
+                                     Options="@motorDropdownOptions" />
+                </div>
+
+                @* Selected Products List *@
+                <div class="sv-generic-card">
+                    <div class="sv-generic-card__header">
+                        <span class="sv-generic-card__title">Selected Parts <span class="font-normal text-muted-foreground">(@newPackage.SelectedProductIds.Count)</span></span>
+                    </div>
+                    <div class="sv-generic-card__list" style="min-height: 100px;">
+                        @if (newPackage.SelectedProductIds.Any() && allProducts != null)
                         {
-                            <div class="p-6 px-3 text-center text-muted-foreground text-xs">
-                                No motorcycles yet.<br/>Add them under &ldquo;Manage Motorcycles.&rdquo;
-                            </div>
+                            @foreach (var pid in newPackage.SelectedProductIds.ToList())
+                            {
+                                var product = allProducts.FirstOrDefault(p => p.Id == pid);
+                                if (product != null)
+                                {
+                                    <div class="sv-generic-item__product">
+                                        <span class="truncate text-xs">@product.Name</span>
+                                        <div class="flex items-center gap-2 shrink-0">
+                                            <span class="text-muted-foreground text-[10px]">₱@product.Price.ToString("N0")</span>
+                                            <button class="sv-generic-item__remove" style="opacity:1" @onclick="() => newPackage.SelectedProductIds.Remove(pid)"
+                                                    aria-label="Remove @product.Name" title="Remove">
+                                                <LucideIcon Name="x" Size="12" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            }
                         }
                         else
                         {
-                            @foreach (var motor in motorcycles)
-                            {
-                                var isSelected = IsMotorSelected(motor);
-                                <label class="flex items-center gap-2 p-2 px-3 border-b border-border cursor-pointer" style="background: @(isSelected ? "color-mix(in oklch, var(--primary) 8%, transparent)" : "transparent")">
-                                    <input type="checkbox" checked="@isSelected" @onchange="() => ToggleMotor(motor)"
-                                           class="accent-primary shrink-0 w-4 h-4 cursor-pointer"/>
-                                    <div class="min-w-0">
-                                        <div class="text-xs font-medium text-foreground truncate">@motor.Brand @motor.Model</div>
-                                        <div class="text-[10px] text-muted-foreground">@motor.BaseCC</div>
-                                    </div>
-                                </label>
-                            }
+                            <div class="text-xs text-muted-foreground italic p-3 text-center">No parts selected. Use the catalog to add.</div>
                         }
                     </div>
                 </div>
+
+                <BbButton Variant="ButtonVariant.Outline" Class="w-full mt-1" OnClick="() => showProductCatalog = !showProductCatalog">
+                    <LucideIcon Name="@(showProductCatalog ? "panel-right-close" : "panel-right-open")" Size="14" />
+                    @(showProductCatalog ? "Hide Catalog" : "Browse Catalog")
+                </BbButton>
             </div>
 
-            @* ── Right Panel: Product Catalog ── *@
-            <div class="apb-right-panel flex-1 min-w-0 flex flex-col">
-                <label class="text-xs font-semibold mb-1 block text-foreground shrink-0">Select Products <span class="font-normal text-muted-foreground">(@newPackage.SelectedProductIds.Count selected)</span></label>
-                <div class="overflow-hidden border border-border rounded-md flex flex-col">
-                    <ProductCatalog Columns="3"
-                                    Products="allProducts"
-                                    OnProductClick="p => ToggleProductSelection(p.Id)"
-                                    IsSelected="p => newPackage.SelectedProductIds.Contains(p.Id)"
-                                    ShowCheckbox="false"
-                                    IsDisabled="_ => false"
-                                    AllowDisabledClick="true" />
+            @* ── Panel: Product Catalog ── *@
+            @if (showProductCatalog)
+            {
+                <div class="sv-catalog-panel">
+                    <div class="mb-2 flex items-center gap-2 shrink-0">
+                        <LucideIcon Name="package" Size="14" Class="text-primary" />
+                        <span class="text-xs font-semibold text-foreground">
+                            Product Catalog
+                            <span class="text-muted-foreground font-normal">(@newPackage.SelectedProductIds.Count selected)</span>
+                        </span>
+                    </div>
+                    <div class="border border-border rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
+                        <ProductCatalog Columns="3"
+                                        Products="allProducts"
+                                        OnProductClick="p => ToggleProductSelection(p.Id)"
+                                        IsSelected="p => newPackage.SelectedProductIds.Contains(p.Id)"
+                                        ShowCheckbox="false"
+                                        IsDisabled="_ => false"
+                                        AllowDisabledClick="true" />
+                    </div>
                 </div>
-            </div>
+            }
         </div>
 
         @* ── Footer ── *@
         <div class="shrink-0 border-t border-border p-4 px-5 flex justify-between items-center gap-3 flex-wrap">
             <div class="flex items-center">
-                <span class="text-xs text-muted-foreground">Total Price</span>
+                <span class="text-xs text-muted-foreground">Total</span>
                 <span class="text-lg font-bold text-primary ml-2">₱@CalculateCurrentTotal().ToString("N0")</span>
             </div>
             <div class="flex gap-2">
-                <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestClosePackageEditor">Cancel</BbButton>
-                <BbButton Variant="ButtonVariant.Default" OnClick="SubmitPackage" Disabled="isProcessing">
-                    @if (isProcessing)
-                    {
-                        <BbSpinner Size="SpinnerSize.Small"/>
-                        <span>@(isEditMode ? "Saving..." : "Creating...")</span>
-                    }
-                    else
-                    {
-                        <LucideIcon Name="@(isEditMode ? "save" : "package-plus")" Size="14"/>
-                        <span>@(isEditMode ? "Save Changes" : "Create Package")</span>
-                    }
-                </BbButton>
+                @if (showProductCatalog)
+                {
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showProductCatalog = false">Done</BbButton>
+                }
+                else
+                {
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestClosePackageEditor">Cancel</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="SubmitPackage" Disabled="isProcessing">
+                        @if (isProcessing)
+                        {
+                            <BbSpinner Size="SpinnerSize.Small"/>
+                            <span>@(isEditMode ? "Saving..." : "Creating...")</span>
+                        }
+                        else
+                        {
+                            <LucideIcon Name="@(isEditMode ? "save" : "package-plus")" Size="14"/>
+                            <span>@(isEditMode ? "Save Changes" : "Create Package")</span>
+                        }
+                    </BbButton>
+                }
             </div>
         </div>
 
@@ -376,9 +426,11 @@ else
     private string packageEditorBaseline = "";
     private bool showDeleteConfirm = false;
     private bool isEditMode = false;
-    private string errorMessage = string.Empty;
 
     private List<PreBuiltPackageDto> existingPackages = new();
+    private string packageSearch = "";
+    private string sortColumn = "";
+    private bool sortAscending = true;
     private List<Product>? allProducts;
     private List<Motorcycle> motorcycles = new();
     private CreatePreBuiltDto newPackage = new();
@@ -388,9 +440,14 @@ else
     private bool showDeactivateConfirm;
     private int editingPackageId;
 
+    private bool showProductCatalog;
+    private HashSet<string> selectedMotorValues = new();
+    private List<DropdownSelect.DropdownOption> motorDropdownOptions = new();
+    private HashSet<string> selectedMotorFilters = new();
+    private List<DropdownSelect.DropdownOption> filterMotorOptions = new();
+
     private bool showMotorcycleModal = false;
     private bool isMotorProcessing = false;
-    private string motorErrorMessage = string.Empty;
     private string newMotorBrand = string.Empty;
     private string newMotorModel = string.Empty;
     private string newMotorBaseCC = string.Empty;
@@ -410,6 +467,54 @@ else
     });
 
     protected override async Task OnInitializedAsync() => await LoadData();
+
+    private void HandleCardKeydown(KeyboardEventArgs e, PreBuiltPackageDto pkg)
+    {
+        if (e.Key is "Enter" or " ") OpenEditModal(pkg);
+    }
+
+    private IReadOnlyList<PreBuiltPackageDto> FilteredPackages
+    {
+        get
+        {
+            var filtered = existingPackages
+                .Where(pkg => PackageMatchesSearch(pkg))
+                .Where(pkg => !selectedMotorFilters.Any() ||
+                              pkg.CompatibleMotors.Any(m => m.MotorcycleId.HasValue && selectedMotorFilters.Contains(m.MotorcycleId.Value.ToString())))
+                .ToList();
+
+            return (sortColumn, sortAscending) switch
+            {
+                ("name", true) => filtered.OrderBy(s => s.Name).ToList(),
+                ("name", false) => filtered.OrderByDescending(s => s.Name).ToList(),
+                ("price", true) => filtered.OrderBy(s => s.TotalPrice).ToList(),
+                ("price", false) => filtered.OrderByDescending(s => s.TotalPrice).ToList(),
+                ("cc", true) => filtered.OrderBy(s => s.MaxAddedCC).ToList(),
+                ("cc", false) => filtered.OrderByDescending(s => s.MaxAddedCC).ToList(),
+                _ => filtered
+            };
+        }
+    }
+
+    private bool PackageMatchesSearch(PreBuiltPackageDto pkg)
+    {
+        if (string.IsNullOrWhiteSpace(packageSearch))
+            return true;
+
+        var search = packageSearch.Trim();
+        return pkg.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               (pkg.Description?.Contains(search, StringComparison.OrdinalIgnoreCase) == true) ||
+               pkg.IncludedProducts?.Any(p => p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)) == true ||
+               pkg.CompatibleMotors?.Any(m => m.Brand.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                               m.Model.Contains(search, StringComparison.OrdinalIgnoreCase)) == true;
+    }
+
+    private List<SortDropdown.SortOption> GetSortColumns() => new()
+    {
+        new() { Value = "name", Label = "Name" },
+        new() { Value = "price", Label = "Price" },
+        new() { Value = "cc", Label = "CC Range" }
+    };
 
     private async Task LoadData()
     {
@@ -433,6 +538,10 @@ else
             allProducts = products.ToList();
 
             motorcycles = CollapseDuplicateMotorcycles(await MotorcycleRepo.GetAllAsync());
+            motorDropdownOptions = motorcycles
+                .Select(m => new DropdownSelect.DropdownOption { Value = m.Id.ToString(), Label = $"{m.Brand} {m.Model} ({m.BaseCC})" })
+                .ToList();
+            filterMotorOptions = new List<DropdownSelect.DropdownOption>(motorDropdownOptions);
         }
         catch (Exception ex)
         {
@@ -465,7 +574,8 @@ else
         isEditMode = false;
         editingPackageId = 0;
         newPackage = new CreatePreBuiltDto();
-        errorMessage = string.Empty;
+        showProductCatalog = false;
+        selectedMotorValues = new();
         packageEditorBaseline = PackageEditorFingerprint();
         showCreateModal = true;
     }
@@ -494,7 +604,11 @@ else
             .GroupBy(m => m.MotorcycleId?.ToString() ?? string.Join('|', MotorKey(m.Brand, m.Model, m.StockCC)))
             .Select(g => g.First()).ToList();
 
-        errorMessage = string.Empty;
+        showProductCatalog = false;
+        selectedMotorValues = newPackage.CompatibleMotors
+            .Where(m => m.MotorcycleId.HasValue)
+            .Select(m => m.MotorcycleId!.Value.ToString())
+            .ToHashSet();
         packageEditorBaseline = PackageEditorFingerprint();
         showCreateModal = true;
     }
@@ -532,7 +646,6 @@ else
     private async Task ConfirmDelete()
     {
         if (packageToDelete == null || !CanDeletePackage) return;
-        
         isProcessing = true;
         try
         {
@@ -595,27 +708,20 @@ else
         await ToggleActive(package);
     }
 
-    private bool IsMotorSelected(Motorcycle motor)
-        => newPackage.CompatibleMotors.Any(m => m.MotorcycleId == motor.Id ||
-            (m.MotorcycleId is null && MotorKey(m.Brand, m.Model, m.StockCC) == MotorKey(motor.Brand, motor.Model, motor.BaseCC)));
-
-    private void ToggleMotor(Motorcycle motor)
+    private void OnMotorSelectionChanged(HashSet<string> values)
     {
-        var existing = newPackage.CompatibleMotors
-            .FirstOrDefault(m => m.MotorcycleId == motor.Id ||
-                (m.MotorcycleId is null && MotorKey(m.Brand, m.Model, m.StockCC) == MotorKey(motor.Brand, motor.Model, motor.BaseCC)));
-        if (existing != null)
-            newPackage.CompatibleMotors.Remove(existing);
-        else
-            newPackage.CompatibleMotors.Add(new CompatibleMotorDto { MotorcycleId = motor.Id, Brand = motor.Brand, Model = motor.Model, StockCC = motor.BaseCC });
+        selectedMotorValues = values;
+        newPackage.CompatibleMotors = motorcycles
+            .Where(m => values.Contains(m.Id.ToString()))
+            .Select(m => new CompatibleMotorDto { MotorcycleId = m.Id, Brand = m.Brand, Model = m.Model, StockCC = m.BaseCC })
+            .ToList();
     }
 
     private async Task AddMotorcycle()
     {
-        motorErrorMessage = string.Empty;
         if (string.IsNullOrWhiteSpace(newMotorBrand) || string.IsNullOrWhiteSpace(newMotorModel) || string.IsNullOrWhiteSpace(newMotorBaseCC))
         {
-            motorErrorMessage = "Brand, Model, and Base CC are all required.";
+            Toast.Warning("Brand, Model, and Base CC are all required.", "Validation");
             return;
         }
         isMotorProcessing = true;
@@ -626,7 +732,7 @@ else
             var baseCC = newMotorBaseCC.Trim();
             if (await MotorcycleRepo.ExistsAsync(brand, model, baseCC))
             {
-                motorErrorMessage = $"{brand} {model} ({baseCC}) already exists.";
+                Toast.Warning($"{brand} {model} ({baseCC}) already exists.", "Duplicate");
                 return;
             }
 
@@ -636,7 +742,7 @@ else
         }
         catch (Exception ex)
         {
-            motorErrorMessage = ApiErrorMessage.FromException(ex, "The motorcycle could not be added. Please try again.");
+            Toast.Error(ApiErrorMessage.FromException(ex, "The motorcycle could not be added. Please try again."), "Add failed");
         }
         finally
         {
@@ -672,7 +778,6 @@ else
         var motor = motorcycleToDelete;
         if (motor is null || !CanDeleteMotorcycle) return;
         isMotorProcessing = true;
-        motorErrorMessage = string.Empty;
         try
         {
             await MotorcycleRepo.DeleteAsync(motor.Id);
@@ -683,7 +788,7 @@ else
         }
         catch (Exception)
         {
-            motorErrorMessage = $"\"{motor.Brand} — {motor.Model}\" is used by existing packages and cannot be deleted.";
+            Toast.Error($"\"{motor.Brand} — {motor.Model}\" is used by existing packages and cannot be deleted.", "Delete failed");
         }
         finally
         {
@@ -694,13 +799,9 @@ else
     private void ToggleProductSelection(int productId)
     {
         if (newPackage.SelectedProductIds.Contains(productId))
-        {
             newPackage.SelectedProductIds.Remove(productId);
-        }
         else
-        {
             newPackage.SelectedProductIds.Add(productId);
-        }
     }
 
     private decimal CalculateCurrentTotal()
@@ -711,11 +812,9 @@ else
 
     private async Task SubmitPackage()
     {
-        errorMessage = string.Empty;
-        
         if (string.IsNullOrWhiteSpace(newPackage.Name))
         {
-            errorMessage = "Package Name is required.";
+            Toast.Warning("Package Name is required.", "Validation");
             return;
         }
 
@@ -724,7 +823,7 @@ else
             .ToList();
         if (!validMotors.Any())
         {
-            errorMessage = "Add at least one compatible motor (brand, model, and CC).";
+            Toast.Warning("Add at least one compatible motor (brand, model, and CC).", "Validation");
             return;
         }
 
@@ -738,7 +837,7 @@ else
                 : motorLookup.GetValueOrDefault(MotorKey(m.Brand, m.Model, m.StockCC));
             if (motorcycleId == 0)
             {
-                errorMessage = $"Motorcycle \"{m.Brand} — {m.Model} ({m.StockCC})\" does not exist in the database. Add it under Manage Motorcycles first.";
+                Toast.Warning($"Motorcycle \"{m.Brand} — {m.Model} ({m.StockCC})\" does not exist in the database. Add it under Manage Motorcycles first.", "Validation");
                 return;
             }
             resolvedMotors.Add((m, motorcycleId));
@@ -747,13 +846,13 @@ else
 
         if (newPackage.MaxAddedCC < newPackage.MinAddedCC)
         {
-            errorMessage = "Max estimated CC must be greater than or equal to Min estimated CC.";
+            Toast.Warning("Max estimated CC must be greater than or equal to Min estimated CC.", "Validation");
             return;
         }
 
         if (!newPackage.SelectedProductIds.Any())
         {
-            errorMessage = "You must select at least one product.";
+            Toast.Warning("You must select at least one product.", "Validation");
             return;
         }
 
@@ -763,7 +862,7 @@ else
             if (isEditMode)
             {
                 var package = await PreBuiltRepo.GetByIdAsync(editingPackageId);
-                if (package == null) { errorMessage = "Package not found."; return; }
+                if (package == null) { Toast.Warning("Package not found.", "Validation"); return; }
                 package.Name = newPackage.Name;
                 package.Description = newPackage.Description;
                 package.MinAddedCC = newPackage.MinAddedCC;
@@ -802,7 +901,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = ApiErrorMessage.FromException(ex, "The package could not be saved. Please try again.");
+            Toast.Error(ApiErrorMessage.FromException(ex, "The package could not be saved. Please try again."), "Save failed");
         }
         finally
         {

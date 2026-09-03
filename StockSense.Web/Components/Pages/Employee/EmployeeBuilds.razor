@@ -22,6 +22,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IBuildWorkOrderMutationService BuildMutationService
 @inject ToastService Toast
+@inject IJSRuntime JS
 
 @attribute [Authorize(Roles = "Employee, Admin")]
 
@@ -325,6 +326,22 @@
         .col-act {
             width: 50%;
         }
+    }
+
+    .receipt-countdown-track {
+        height: 4px;
+        background: var(--muted);
+    }
+
+    .receipt-countdown-bar {
+        height: 100%;
+        background: var(--destructive);
+        animation: receipt-countdown-shrink 10s linear forwards;
+    }
+
+    @@keyframes receipt-countdown-shrink {
+        from { width: 100%; }
+        to { width: 0%; }
     }
 
 </style>
@@ -632,10 +649,6 @@
                 <dt class="font-semibold">Total</dt><dd class="m-0 text-right text-lg font-bold text-primary">₱@completionBuild.TotalPrice.ToString("N2")</dd>
             </dl>
         }
-        @if (!string.IsNullOrWhiteSpace(checkoutError))
-        {
-            <p role="alert" class="text-sm text-destructive">@checkoutError</p>
-        }
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseCompletionConfirmation" Disabled="@isCheckingOut">Go back</BbButton>
             <BbButton Variant="ButtonVariant.Default" Class="build-dialog-action build-action--positive" OnClick="ConfirmCompletion" Disabled="@(isCheckingOut || completionBuild is null)">
@@ -643,6 +656,37 @@
                 @(isCheckingOut ? "Completing..." : "Complete build")
             </BbButton>
         </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog Open="completedReceipt is not null" OpenChanged="_ => CloseReceiptModal()">
+    <BbDialogContent Style="width: 99vw; max-width: 400px;" class="flex max-h-[90dvh] sm:!w-[34rem] sm:!max-w-[34rem] flex-col overflow-hidden">
+        <BbDialogHeader>
+            <BbDialogTitle>Build completed</BbDialogTitle>
+            <BbDialogDescription>Transaction @completedReceipt?.InvoiceNumber has been recorded.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="min-h-0 overflow-y-auto flex flex-col items-center gap-3 py-4 text-center" role="status" aria-live="polite">
+            <span class="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                <LucideIcon Name="check" Size="24" />
+            </span>
+            <p class="m-0 text-2xl font-bold text-foreground">₱@completedReceipt?.TotalAmount.ToString("N2")</p>
+            <p class="m-0 text-sm text-muted-foreground">
+                @(completedReceipt?.PaymentMethod) · @completedReceipt?.TransactionDate.ToString("MM/dd/yyyy HH:mm")
+            </p>
+            <p class="m-0 text-xs text-muted-foreground">View or download the receipt for this build.</p>
+            <div class="flex items-center gap-2">
+                <BbButton Variant="ButtonVariant.Default" OnClick="ViewReceipt">
+                    <LucideIcon Name="external-link" Size="16" /> View Receipt
+                </BbButton>
+                <BbButton Variant="ButtonVariant.Default" OnClick="DownloadReceipt">
+                    <LucideIcon Name="download" Size="16" /> Download Receipt
+                </BbButton>
+            </div>
+        </div>
+        <p class="w-full text-center text-xs text-muted-foreground m-0 px-6 pb-3">Closing in @(receiptCountdown)s…</p>
+        <div class="receipt-countdown-track w-full shrink-0" aria-hidden="true">
+            <div class="receipt-countdown-bar"></div>
+        </div>
     </BbDialogContent>
 </BbDialog>
 
@@ -712,10 +756,6 @@
         <textarea id="build-change-reason" @bind="restrictedReason" rows="4" maxlength="500"
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   aria-required="true" placeholder="Explain why this change is needed"></textarea>
-        @if (!string.IsNullOrWhiteSpace(restrictedActionError))
-        {
-            <p role="alert" class="text-sm text-destructive">@restrictedActionError</p>
-        }
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseReasonDialog">Cancel</BbButton>
             <BbButton Variant="ButtonVariant.Default" Class="@($"build-dialog-action {GetRestrictedActionClass()}")" OnClick="ConfirmRestrictedStatusChange"
@@ -740,7 +780,6 @@
     private const int PageSize = 25;
     private string checkoutPaymentMethod = "Cash";
     private string? checkoutReference;
-    private string? checkoutError;
     private bool isCheckingOut;
     private bool showCompletionConfirmation;
     private BuildRequestDto? completionBuild;
@@ -761,7 +800,9 @@
     private List<AdminOption> adminOptions = [];
     private bool isLoadingAdminOptions;
     private bool restrictedPartsChange;
-    private string? restrictedActionError;
+    private ReceiptDto? completedReceipt;
+    private int receiptCountdown;
+    private CancellationTokenSource? receiptCloseCts;
 
     // Edit-parts state
     private bool isEditingParts;
@@ -862,7 +903,7 @@
                 new UpdateBuildPartsDto { ProductIds = editPartIds, Quantities = editQuantities, AdminUserId = NullIfAdmin(restrictedAdminUserId), AdminPin = NullIfAdmin(restrictedAdminPin), Reason = RestrictedReasonOrNull() }, currentUser);
             if (!result.Succeeded)
             {
-                checkoutError = result.Message;
+                Toast.Error(result.Message, "Update failed");
                 return;
             }
 
@@ -875,7 +916,7 @@
         }
         catch
         {
-            checkoutError = "Failed to save parts.";
+            Toast.Error("Failed to save parts.", "Save failed");
         }
         finally { isProcessing = false; }
     }
@@ -986,7 +1027,7 @@
         catch
         {
             adminOptions = [];
-            restrictedActionError = "The admin list could not be loaded. Please refresh the page and try again.";
+            Toast.Error("The admin list could not be loaded. Please refresh the page and try again.", "Load failed");
         }
         finally
         {
@@ -1019,14 +1060,13 @@
     private async Task<bool> UpdateStatus(BuildRequestDto build, string newStatus, string? reason = null,
         string? adminUserId = null, string? adminPin = null)
     {
-        checkoutError = null;
         var result = await BuildMutationService.UpdateStatusAsync(
             build.Id,
             new UpdateWorkOrderStatusDto { Status = newStatus, Reason = reason, AdminUserId = adminUserId, AdminPin = adminPin },
             currentUser);
         if (!result.Succeeded)
         {
-            checkoutError = result.Message;
+            Toast.Error(result.Message, "Update failed");
             return false;
         }
 
@@ -1049,7 +1089,6 @@
         restrictedReason = "";
         restrictedAdminUserId = "";
         restrictedAdminPin = "";
-        restrictedActionError = null;
         showReasonDialog = true;
     }
 
@@ -1061,7 +1100,6 @@
         restrictedAdminUserId = "";
         restrictedAdminPin = "";
         restrictedPartsChange = false;
-        restrictedActionError = null;
     }
 
     private void OnReasonDialogOpenChanged()
@@ -1085,7 +1123,6 @@
             return;
         }
         isChangingRestrictedStatus = true;
-        restrictedActionError = null;
         bool changed;
         if (restrictedPartsChange)
         {
@@ -1104,10 +1141,6 @@
             showDetailModal = false;
             CloseReasonDialog();
         }
-        else
-        {
-            restrictedActionError = checkoutError;
-        }
     }
 
     private void RequestRestrictedPartsChange(string title)
@@ -1117,7 +1150,6 @@
         restrictedPartsChange = true;
         restrictedActionTitle = title;
         restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
-        restrictedActionError = null;
         showReasonDialog = true;
     }
 
@@ -1172,7 +1204,6 @@
 
     private async Task Complete(BuildRequestDto build)
     {
-        checkoutError = null;
         isCheckingOut = true;
         try
         {
@@ -1197,11 +1228,13 @@
             showCompletionConfirmation = false;
             completionBuild = null;
             showDetailModal = false;
+            completedReceipt = receipt;
+            StartReceiptCountdown();
         }
         catch (Exception exception)
         {
-            checkoutError = ApiErrorMessage.FromException(exception,
-                "The build could not be completed. Review stock and try again.");
+            Toast.Error(ApiErrorMessage.FromException(exception,
+                "The build could not be completed. Review stock and try again."), "Checkout failed");
         }
         finally
         {
@@ -1212,7 +1245,6 @@
     private void RequestCompletion(BuildRequestDto build)
     {
         if (isCheckingOut || build.Status != "Confirmed") return;
-        checkoutError = null;
         completionBuild = build;
         showCompletionConfirmation = true;
     }
@@ -1220,7 +1252,6 @@
     private void CloseCompletionConfirmation()
     {
         if (isCheckingOut) return;
-        checkoutError = null;
         showCompletionConfirmation = false;
         completionBuild = null;
     }
@@ -1267,7 +1298,6 @@
         selectedBuild = build;
         checkoutPaymentMethod = "Cash";
         checkoutReference = null;
-        checkoutError = null;
         isEditingParts = false;
         editPartIds.Clear();
         editedPrices.Clear();
@@ -1428,10 +1458,6 @@
                 <input @bind="checkoutReference" maxlength="100" aria-label="Payment reference" placeholder="Ref (optional)"
                        style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-xs); flex: 1; min-width: 0;" />
             </div>
-            @if (!string.IsNullOrWhiteSpace(checkoutError))
-            {
-                <span role="alert" style="color: var(--destructive-muted-foreground); font-size: var(--text-xs);">@checkoutError</span>
-            }
         }
 
     </text>;
@@ -1484,5 +1510,50 @@
         return string.IsNullOrWhiteSpace(name)
             ? entry.ActorRole
             : $"{name} ({entry.ActorRole})";
+    }
+
+    private async Task ViewReceipt()
+    {
+        if (completedReceipt is null) return;
+        await JS.InvokeVoidAsync("open", $"api/transactions/{completedReceipt.Id}/receipt-pdf?inline=true", "_blank");
+    }
+
+    private async Task DownloadReceipt()
+    {
+        if (completedReceipt is null) return;
+        var safeName = string.Concat(completedReceipt.InvoiceNumber.Where(c => !Path.GetInvalidFileNameChars().Contains(c)));
+        await JS.InvokeVoidAsync("triggerDownload", $"api/transactions/{completedReceipt.Id}/receipt-pdf", $"Receipt_{safeName}.pdf");
+    }
+
+    private void StartReceiptCountdown()
+    {
+        receiptCloseCts?.Cancel();
+        receiptCloseCts = new CancellationTokenSource();
+        receiptCountdown = 10;
+        _ = RunReceiptCountdownAsync(receiptCloseCts.Token);
+    }
+
+    private async Task RunReceiptCountdownAsync(CancellationToken token)
+    {
+        try
+        {
+            while (receiptCountdown > 0)
+            {
+                await Task.Delay(1000, token);
+                if (token.IsCancellationRequested) return;
+                receiptCountdown--;
+                StateHasChanged();
+            }
+            CloseReceiptModal();
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void CloseReceiptModal()
+    {
+        receiptCloseCts?.Cancel();
+        receiptCloseCts = null;
+        completedReceipt = null;
+        StateHasChanged();
     }
 }

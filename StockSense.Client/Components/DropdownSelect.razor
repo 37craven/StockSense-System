@@ -1,0 +1,88 @@
+<div class="@Class" style="position: relative; display: inline-flex; width: 100%;">
+    <button @onclick="() => Open = !Open" id="@Id"
+            style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--muted-foreground); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; white-space: nowrap; min-height: 36px; width: 100%;">
+        @(Multiple ? MultiSelectLabel : (SelectedLabel ?? Label))
+        <LucideIcon Name="chevron-down" Size="14" />
+    </button>
+    @if (Open)
+    {
+        <div style="position: fixed; inset: 0; z-index: 40;" @onclick="() => Open = false"></div>
+        <div style="position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; min-width: 180px; max-height: 260px; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,.12); padding: 4px; display: flex; flex-direction: column;">
+            @if (Multiple)
+            {
+                <button @onclick="ToggleAll"
+                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--radius) - 2px); border: none; background: transparent; color: var(--muted-foreground); font-size: var(--text-xs); font-weight: var(--font-medium); cursor: pointer; text-align: left; width: 100%; border-bottom: 1px solid var(--border); margin-bottom: 4px;">
+                    @(SelectedValues.Count == Options.Count ? "Deselect all" : "Select all")
+                </button>
+            }
+            @foreach (var opt in Options)
+            {
+                var isSelected = Multiple ? SelectedValues.Contains(opt.Value) : opt.Value == Value;
+                <button @onclick="() => Multiple ? ToggleMulti(opt.Value) : Select(opt.Value)"
+                        style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: calc(var(--radius) - 2px); border: none; background: @(isSelected ? "var(--info-muted)" : "transparent"); color: @(isSelected ? "var(--info-muted-foreground)" : "var(--foreground)"); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; text-align: left; width: 100%;">
+                    @if (Multiple)
+                    {
+                        <span style="width: 14px; height: 14px; border: 1px solid var(--border); border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; background: @(isSelected ? "var(--info)" : "transparent"); flex-shrink: 0;">
+                            @if (isSelected)
+                            {
+                                <LucideIcon Name="check" Size="10" Class="text-white" />
+                            }
+                        </span>
+                    }
+                    @opt.Label
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Select";
+    [Parameter] public List<DropdownOption> Options { get; set; } = new();
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public bool Multiple { get; set; }
+    [Parameter] public HashSet<string> SelectedValues { get; set; } = new();
+    [Parameter] public EventCallback<HashSet<string>> SelectedValuesChanged { get; set; }
+
+    private bool Open;
+
+    private string? SelectedLabel => Options.FirstOrDefault(o => o.Value == Value)?.Label;
+
+    private string MultiSelectLabel => SelectedValues.Count switch
+    {
+        0 => Label,
+        1 => Options.FirstOrDefault(o => o.Value == SelectedValues.First())?.Label ?? $"{SelectedValues.Count} selected",
+        _ => $"{SelectedValues.Count} selected"
+    };
+
+    private async Task Select(string value)
+    {
+        Open = false;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    private async Task ToggleMulti(string value)
+    {
+        var newSet = new HashSet<string>(SelectedValues);
+        if (newSet.Contains(value)) newSet.Remove(value);
+        else newSet.Add(value);
+        await SelectedValuesChanged.InvokeAsync(newSet);
+    }
+
+    private async Task ToggleAll()
+    {
+        var newSet = SelectedValues.Count == Options.Count
+            ? new HashSet<string>()
+            : new HashSet<string>(Options.Select(o => o.Value));
+        await SelectedValuesChanged.InvokeAsync(newSet);
+    }
+
+    public class DropdownOption
+    {
+        public string Value { get; set; } = "";
+        public string Label { get; set; } = "";
+    }
+}

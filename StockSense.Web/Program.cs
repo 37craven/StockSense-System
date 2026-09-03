@@ -183,6 +183,8 @@ builder.Services.AddScoped<StoreServiceRepository>();
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<BarcodeService>();
 builder.Services.AddScoped<IOrderEmailSender, OrderEmailSender>();
+builder.Services.AddScoped<OrderEmailSender>();
+builder.Services.AddScoped<IWorkOrderEmailSender, WorkOrderEmailSender>();
 builder.Services.AddSingleton<PdfDownloadCache>();
 builder.Services.AddScoped<ISafetyStockCalculationService, SafetyStockCalculationService>();
 builder.Services.AddScoped<IOrderSlipWorkflowService, OrderSlipWorkflowService>();

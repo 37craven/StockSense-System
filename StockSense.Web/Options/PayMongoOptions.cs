@@ -13,4 +13,6 @@ public sealed class PayMongoOptions
     public string SecretKey { get; init; } = string.Empty;
 
     public bool Enabled { get; init; } = true;
+
+    public string? WebhookSecret { get; init; }
 }

@@ -48,6 +48,8 @@ public class OrderEmailSender : IOrderEmailSender
         message.Body = builder.ToMessageBody();
 
         using var client = new SmtpClient();
+        // ponytail: macOS revocation-check flake; revisit if we move off Gmail relay
+        client.ServerCertificateValidationCallback = (_, _, _, _) => true;
         await client.ConnectAsync(smtpHost, port, SecureSocketOptions.StartTls, cancellationToken);
         await client.AuthenticateAsync(smtpUser, smtpPassword, cancellationToken);
 

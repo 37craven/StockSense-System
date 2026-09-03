@@ -3,11 +3,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using StockSense.Application.DTOs;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Web.Controllers;
+using StockSense.Web.Options;
+using StockSense.Web.Services;
 
 namespace StockSense.Tests;
 
@@ -202,11 +205,12 @@ public sealed class WorkOrderPermissionTests
 
     private static BuildsController Builds(ApplicationDbContext db, string role) => WithUser(new BuildsController(
         new BuildRequestRepository(db), null!, null!, db, new MotorcycleRepository(db),
-        NullLogger<BuildsController>.Instance), role);
+        NullLogger<BuildsController>.Instance, null!), role);
 
     private static AppointmentsController Appointments(ApplicationDbContext db, string role) => WithUser(new AppointmentsController(
         new AppointmentRepository(db), new StoreServiceRepository(db), null!, null!, db,
-        new MotorcycleRepository(db), NullLogger<AppointmentsController>.Instance), role);
+        new MotorcycleRepository(db), NullLogger<AppointmentsController>.Instance,
+        null!, Options.Create(new PayMongoOptions()), null!), role);
 
     private static T WithUser<T>(T controller, string role) where T : ControllerBase
     {

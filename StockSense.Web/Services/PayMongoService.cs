@@ -1,5 +1,7 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StockSense.Domain.Entities;
 
 namespace StockSense.Web.Services;
 
@@ -33,7 +35,19 @@ public sealed class PayMongoService(HttpClient httpClient, ILogger<PayMongoServi
             Content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json")
         };
         using var response = await httpClient.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            logger.LogWarning(
+                "PayMongo link creation returned {StatusCode}: {Body}",
+                (int)response.StatusCode, errorBody);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                throw new InvalidOperationException("PayMongo API key is invalid or expired. Update the key in appsettings.");
+
+            response.EnsureSuccessStatusCode();
+        }
 
         var rawJson = await response.Content.ReadAsStringAsync(ct);
         using var document = JsonDocument.Parse(rawJson);
@@ -67,4 +81,51 @@ public sealed class PayMongoService(HttpClient httpClient, ILogger<PayMongoServi
             return null;
         }
     }
+
+    public async Task<(string? Status, string? CheckoutUrl)> GetLinkDetailsAsync(string linkId, CancellationToken ct = default)
+    {
+        try
+        {
+            using var response = await httpClient.GetAsync($"links/{linkId}", ct);
+            response.EnsureSuccessStatusCode();
+
+            var rawJson = await response.Content.ReadAsStringAsync(ct);
+            using var document = JsonDocument.Parse(rawJson);
+
+            var attrs = document.RootElement.GetProperty("data").GetProperty("attributes");
+            var status = attrs.GetProperty("status").GetString();
+            var checkoutUrl = attrs.TryGetProperty("checkout_url", out var urlEl) ? urlEl.GetString() : null;
+            return (status, checkoutUrl);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or KeyNotFoundException or OperationCanceledException or InvalidOperationException)
+        {
+            logger.LogWarning(exception, "Failed to fetch PayMongo link details for {LinkId}.", linkId);
+            return (null, null);
+        }
+    }
+
+    /// <summary>
+    /// Verifies a PayMongo webhook signature using HMAC-SHA256.
+    /// Returns true if the signature is valid; false otherwise.
+    /// </summary>
+    public static bool VerifyWebhookSignature(string payload, string? headerSignature, string webhookSecret)
+    {
+        if (string.IsNullOrWhiteSpace(headerSignature) || string.IsNullOrWhiteSpace(webhookSecret))
+            return false;
+
+        using var hmac = new HMACSHA256(System.Text.Encoding.UTF8.GetBytes(webhookSecret));
+        var computed = Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload)));
+        return string.Equals(computed, headerSignature, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Maps a PayMongo link status string to an internal PaymentStatuses constant.
+    /// </summary>
+    public static string MapLinkStatus(string? paymongoStatus) => paymongoStatus?.ToLowerInvariant() switch
+    {
+        "paid" => PaymentStatuses.Paid,
+        "expired" => PaymentStatuses.Expired,
+        "failed" => PaymentStatuses.Failed,
+        _ => PaymentStatuses.AwaitingPayment
+    };
 }

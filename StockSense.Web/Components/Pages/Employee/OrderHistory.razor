@@ -238,15 +238,6 @@
         </BbButton>
     </PageHeader>
 
-    @if (!string.IsNullOrEmpty(message))
-    {
-        <div role="status" class="notice mb-4">@message</div>
-    }
-    @if (!string.IsNullOrEmpty(error))
-    {
-        <div role="alert" class="notice error mb-4">@error</div>
-    }
-
     @if (slips == null)
     {
         <LoadingState Description="Loading order slips…" />
@@ -265,16 +256,10 @@
                            autocomplete="off"
                            class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground min-w-56 w-full" />
                 </label>
-                <div class="relative">
-                    <select @bind="statusFilter" @bind:after="ApplyFilter" aria-label="Filter order slips by status"
-                            class="h-9 w-40 appearance-none rounded-md border border-input bg-background px-4 pr-9 text-sm text-foreground">
-                        <option value="">All statuses</option>
-                        @foreach (var value in Statuses)
-                        {
-                            <option value="@value">@ShortStatus(value)</option>
-                        }
-                    </select>
-                    <LucideIcon Name="chevron-down" Size="14" Class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <div class="w-48 shrink-0">
+                    <DropdownSelect Value="@statusFilter" ValueChanged="v => { statusFilter = v; ApplyFilter(); }"
+                                    Label="All statuses"
+                                    Options="@(Statuses.Select(s => new DropdownSelect.DropdownOption { Value = s, Label = ShortStatus(s) }).ToList())" />
                 </div>
                 <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
                               OnColumnChange="v => { sort.Toggle(v); currentPage = 1; ApplySort(); }"
@@ -499,7 +484,6 @@
         {
             <div class="flex-1 min-h-0 space-y-4 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3" style="-webkit-overflow-scrolling:touch;">
                 @TransitionSummary(transitioningSlip)
-                @TransitionError()
             </div>
         }
         <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
@@ -538,7 +522,6 @@
                     <input id="history-expected-delivery" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="expectedDeliveryDate" @bind:format="yyyy-MM-dd" aria-describedby="history-expected-delivery-help"
                            class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground" />
                 </div>
-                @TransitionError()
             </div>
         }
         <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
@@ -605,10 +588,6 @@
                     </div>
                 }
             }
-            @if (!string.IsNullOrWhiteSpace(closeRemainingError))
-            {
-                <p role="alert" class="m-0 text-sm text-destructive">@closeRemainingError</p>
-            }
         </div>
         <BbDialogFooter class="flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="CloseRemainingDialog" Disabled="closeRemainingBusy">Cancel</BbButton>
@@ -643,7 +622,6 @@
                     <input id="history-receipt-remarks" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" @bind="receiveRemarks" maxlength="500" placeholder="Optional" />
                 </label>
             </div>
-            @if (!string.IsNullOrWhiteSpace(receiveError)) { <div role="alert" class="notice error mx-4 sm:mx-6 shrink-0">@receiveError</div> }
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-border mx-4 sm:mx-6" style="-webkit-overflow-scrolling:touch;">
                     <table class="receive-table">
                         <thead><tr><th>Product</th><th>Ordered</th><th>Previously Received</th><th>Receive Now</th></tr></thead>
@@ -698,7 +676,6 @@
                 <dt class="text-muted-foreground">Received date</dt><dd class="m-0 text-right font-medium">@receiveDate.ToString("MMM dd, yyyy")</dd>
                 <dt class="text-muted-foreground">Supplier reference</dt><dd class="m-0 break-words text-right font-medium">@(string.IsNullOrWhiteSpace(receiveRef) ? "None" : receiveRef)</dd>
             </dl>
-            @if (!string.IsNullOrWhiteSpace(receiveError)) { <p role="alert" class="text-sm text-destructive">@receiveError</p> }
         </div>
         <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="() => receiveConfirmationOpen = false" Disabled="receiveBusy">Go back</BbButton>
@@ -730,8 +707,6 @@
     private List<OrderSlip> filteredSlips = new();
     private string statusFilter = "";
     private string searchTerm = "";
-    private string message = "";
-    private string error = "";
     private string cancelReason = "";
     private bool cancelOpen;
     private OrderSlip? cancelling;
@@ -742,16 +717,15 @@
     private bool receiveOpen;
     private Dictionary<int, int> receiveQtys = [];
     private DateTime receiveDate = DateTime.Today;
-    private string receiveRef = "", receiveRemarks = "", receiveError = "";
+    private string receiveRef = "", receiveRemarks = "";
     private bool receiveBusy;
     private bool receiveConfirmationOpen;
     private bool approveOpen, markOrderedOpen, transitionBusy;
     private OrderSlip? transitioningSlip;
     private DateTime? expectedDeliveryDate;
-    private string transitionError = "";
     private bool closeRemainingOpen, closeRemainingBusy;
     private OrderSlip? closingSlip;
-    private string closeRemainingReason = "", closeRemainingError = "";
+    private string closeRemainingReason = "";
     private string closeRemainingAdminUserId = "", closeRemainingAdminPin = "";
     private bool isAdmin, isLoadingAdminOptions;
     private List<AdminOption> adminOptions = [];
@@ -856,7 +830,7 @@
         detailOpen = selectedSlip != null;
         if (selectedSlip == null)
         {
-            error = "That order slip could not be found.";
+            Toast.Error("That order slip could not be found.", "Not found");
         }
     }
 
@@ -873,7 +847,6 @@
             await Load();
             return;
         }
-        transitionError = "";
         approveOpen = true;
     }
 
@@ -894,7 +867,6 @@
             return;
         }
         expectedDeliveryDate = transitioningSlip.ExpectedDeliveryDate?.Date;
-        transitionError = "";
         markOrderedOpen = true;
     }
 
@@ -904,7 +876,6 @@
         approveOpen = false;
         markOrderedOpen = false;
         transitioningSlip = null;
-        transitionError = "";
     }
 
     private Task Approve() => SubmitTransition("approve", "Order approved", "The order slip is now ready to be placed with the supplier.", null);
@@ -913,7 +884,7 @@
     {
         if (expectedDeliveryDate.HasValue && expectedDeliveryDate.Value.Date < DateTime.Today)
         {
-            transitionError = "Choose today or a future date for the expected delivery.";
+            Toast.Warning("Choose today or a future date for the expected delivery.", "Invalid date");
             return Task.CompletedTask;
         }
         return SubmitTransition("send-to-supplier", "Order sent", "The supplier received the order email and attached PDF. You can now record deliveries.", expectedDeliveryDate);
@@ -933,7 +904,6 @@
         closeRemainingReason = "";
         closeRemainingAdminUserId = "";
         closeRemainingAdminPin = "";
-        closeRemainingError = "";
         closeRemainingOpen = true;
     }
 
@@ -945,7 +915,6 @@
         closeRemainingReason = "";
         closeRemainingAdminUserId = "";
         closeRemainingAdminPin = "";
-        closeRemainingError = "";
     }
 
     private void OnCloseRemainingOpenChanged()
@@ -956,7 +925,6 @@
             closeRemainingReason = "";
             closeRemainingAdminUserId = "";
             closeRemainingAdminPin = "";
-            closeRemainingError = "";
         }
     }
 
@@ -976,7 +944,6 @@
         }
 
         closeRemainingBusy = true;
-        closeRemainingError = "";
         var changedId = closingSlip.Id;
         try
         {
@@ -996,14 +963,14 @@
             {
                 if (response?.Status == 409 && ResponseCode(response) != "EMAIL_SENT_STATUS_CONFLICT")
                 {
-                    closeRemainingOpen = false;
-                    await Load();
-                    if (detailOpen) selectedSlip = await LoadSlip(changedId);
-                    closingSlip = null;
-                    Toast.Warning("Someone else updated this order. The latest information is now displayed.", "Order updated");
-                    return;
-                }
-                closeRemainingError = FriendlyTransitionError(response);
+                closeRemainingOpen = false;
+                await Load();
+                if (detailOpen) selectedSlip = await LoadSlip(changedId);
+                closingSlip = null;
+                Toast.Warning("Someone else updated this order. The latest information is now displayed.", "Order updated");
+                return;
+            }
+            Toast.Error(FriendlyTransitionError(response), "Close failed");
                 return;
             }
 
@@ -1016,7 +983,7 @@
         }
         catch
         {
-            closeRemainingError = "The remaining order could not be closed. Check your connection and try again.";
+            Toast.Error("The remaining order could not be closed. Check your connection and try again.", "Connection error");
         }
         finally
         {
@@ -1064,7 +1031,6 @@
     {
         if (transitioningSlip == null || transitionBusy) return;
         transitionBusy = true;
-        transitionError = "";
         try
         {
             var command = new OrderSlipTransitionCommand
@@ -1088,7 +1054,7 @@
                     Toast.Warning("Someone else updated this order slip. The latest information is now displayed.", "Order updated");
                     return;
                 }
-                transitionError = FriendlyTransitionError(response);
+                Toast.Error(FriendlyTransitionError(response), "Transition failed");
                 return;
             }
 
@@ -1102,7 +1068,7 @@
         }
         catch
         {
-            transitionError = "The order slip could not be updated. Check your connection and try again.";
+            Toast.Error("The order slip could not be updated. Check your connection and try again.", "Connection error");
         }
         finally { transitionBusy = false; }
     }
@@ -1148,8 +1114,6 @@
             </div>
         </div>
     </section>;
-
-    private RenderFragment TransitionError() => @<text>@if (!string.IsNullOrWhiteSpace(transitionError)) { <p role="alert" class="m-0 text-sm text-destructive">@transitionError</p> }</text>;
 
     private static string CompactReference(string value) =>
         value.Length <= 24 ? value : $"{value[..12]}…{value[^8..]}";
@@ -1207,7 +1171,6 @@
         receiveDate = DateTime.Today;
         receiveRef = "";
         receiveRemarks = "";
-        receiveError = "";
         receiveOpen = true;
     }
 
@@ -1226,7 +1189,6 @@
     private bool ValidateReceipt()
     {
         if (selectedSlip == null) return false;
-        receiveError = "";
         foreach (var item in selectedSlip.Items)
         {
             var ordered = item.OrderedQuantity == 0 ? item.Quantity : item.OrderedQuantity;
@@ -1234,13 +1196,13 @@
             var qty = receiveQtys.GetValueOrDefault(item.Id);
             if (qty < 0 || qty > remaining)
             {
-                receiveError = $"Invalid quantity for {item.ProductName}.";
+                Toast.Error($"Invalid quantity for {item.ProductName}.", "Invalid quantity");
                 return false;
             }
         }
         if (ReceiptLines.Count == 0)
         {
-            receiveError = "Enter at least one received quantity.";
+            Toast.Error("Enter at least one received quantity.", "No quantities entered");
             return false;
         }
         return true;
@@ -1266,7 +1228,7 @@
             });
             if (!result.IsSuccess || result.Value == null)
             {
-                receiveError = result.ErrorMessage ?? "The receipt could not be saved.";
+                Toast.Error(result.ErrorMessage ?? "The receipt could not be saved.", "Receipt error");
                 return;
             }
             receiveConfirmationOpen = false;
@@ -1278,7 +1240,7 @@
         }
         catch (Exception ex)
         {
-            receiveError = $"The receipt could not be saved: {ex.Message}";
+            Toast.Error($"The receipt could not be saved: {ex.Message}", "Receipt error");
         }
         finally { receiveBusy = false; }
     }
@@ -1305,21 +1267,20 @@
 
     private async Task Act(Func<Task<OperationResult<OrderSlipDto>>> action, string success)
     {
-        message = ""; error = "";
         try
         {
             var result = await action();
             if (!result.IsSuccess)
             {
-                error = result.ErrorMessage ?? "Action failed.";
+                Toast.Error(result.ErrorMessage ?? "Action failed.", "Error");
                 return;
             }
-            message = success;
+            Toast.Success(success, "Success");
             await Load();
         }
         catch (Exception ex)
         {
-            error = $"An unexpected error occurred: {ex.Message}";
+            Toast.Error($"An unexpected error occurred: {ex.Message}", "Unexpected error");
         }
     }
 

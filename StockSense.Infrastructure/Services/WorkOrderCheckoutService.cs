@@ -18,15 +18,18 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
 
     private readonly ApplicationDbContext _context;
     private readonly ISafetyStockCalculationService _calculationService;
+    private readonly IWorkOrderEmailSender _workOrderEmail;
     private readonly ILogger<WorkOrderCheckoutService> _logger;
 
     public WorkOrderCheckoutService(
         ApplicationDbContext context,
         ISafetyStockCalculationService calculationService,
+        IWorkOrderEmailSender workOrderEmail,
         ILogger<WorkOrderCheckoutService> logger)
     {
         _context = context;
         _calculationService = calculationService;
+        _workOrderEmail = workOrderEmail;
         _logger = logger;
     }
 
@@ -127,6 +130,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
     {
         var completedAt = DateTime.Now;
         var invoiceNumber = $"BLD-{completedAt:yyMMdd}-{completedAt:HHss}-{InvoiceHelper.ShortCode()}-{buildId}";
+        string? buildCustomerEmail = null, buildCustomerName = null, buildName = null;
         var result = await ExecuteAsync(async () =>
         {
             var build = await _context.BuildRequests
@@ -136,7 +140,12 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
                 ?? throw new KeyNotFoundException("Build not found.");
 
             if (build.Transaction is not null)
+            {
+                buildCustomerEmail = build.CustomerEmail;
+                buildCustomerName = build.CustomerName;
+                buildName = build.BuildName;
                 return new CompletionResult(ToReceipt(build.Transaction), [], false);
+            }
 
             EnsureReadyForCheckout(build.Status, "build");
             var requested = ParseBuildProducts(build.SelectedPartsJson);
@@ -161,10 +170,23 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
             build.Transaction = sale;
             build.TotalPrice = sale.TotalAmount;
             await _context.SaveChangesAsync(cancellationToken);
-            return new CompletionResult(ToReceipt(sale), requested.Keys.ToArray(), true);
+
+            buildCustomerEmail = build.CustomerEmail;
+            buildCustomerName = build.CustomerName;
+            buildName = build.BuildName;
+            var receiptDto = ToReceipt(sale);
+
+            return new CompletionResult(receiptDto, requested.Keys.ToArray(), true);
         }, cancellationToken);
 
         await RefreshSafetyStockAsync(result, locationId, cancellationToken);
+
+        if (result.Created && !string.IsNullOrWhiteSpace(buildCustomerEmail))
+        {
+            var summary = $"Build: {buildName}\nTotal: ₱{result.Receipt.TotalAmount:N2}\nPayment: {result.Receipt.PaymentMethod}";
+            await _workOrderEmail.SendStatusEmailAsync(buildCustomerEmail, buildCustomerName!, "Build", "Completed", buildId, summary, result.Receipt);
+        }
+
         return result.Receipt;
     }
 

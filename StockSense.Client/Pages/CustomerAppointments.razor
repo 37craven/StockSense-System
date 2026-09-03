@@ -94,7 +94,7 @@
                         <div class="flex items-center gap-1.5 shrink-0">
                             <span class="appointment-status-badge @GetStatusClass(appt.Status) shrink-0"
                                   aria-label="Status: @appt.Status">
-                                @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+                                @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : appt.PaymentStatus == "Failed" ? " · Payment Failed" : appt.PaymentStatus == "Expired" ? " · Payment Expired" : "")
                             </span>
                         </div>
 
@@ -115,6 +115,16 @@
                             <span class="text-sm font-bold text-primary whitespace-nowrap">
                                 ₱@appt.TotalAmount.ToString("N0")
                             </span>
+
+                            @if (appt.PaymentStatus is "AwaitingPayment" or "Failed" or "Expired")
+                            {
+                                <button type="button"
+                                        @onclick="() => PayFromCard(appt)"
+                                        @onclick:stopPropagation
+                                        class="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground shadow hover:bg-primary/90 whitespace-nowrap">
+                                    Pay Now
+                                </button>
+                            }
     
                         </div>
 
@@ -196,6 +206,28 @@
                     </div>
                 </div>
 
+                @if (ParseProductBreakdown(selectedAppointment.SelectedProductsJson) is { } breakdown && breakdown.Any(s => s.products.Any(p => p.selected)))
+                {
+                    <div class="p-3 rounded-lg bg-muted">
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Selected Parts</div>
+                        <div class="mt-2 flex flex-col gap-3">
+                            @foreach (var svc in breakdown.Where(s => s.products.Any(p => p.selected)))
+                            {
+                                <div>
+                                    <div class="text-xs font-semibold text-primary mb-1">@svc.serviceName</div>
+                                    @foreach (var part in svc.products.Where(p => p.selected))
+                                    {
+                                        <div class="flex justify-between text-sm py-0.5">
+                                            <span class="text-foreground">@part.name</span>
+                                            <span class="font-semibold text-foreground">₱@part.price.ToString("N0")</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
                 <div class="p-3 rounded-lg bg-muted">
                     <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
                     <span class="text-xl font-bold text-primary">₱@selectedAppointment.TotalAmount.ToString("N2")</span>
@@ -221,6 +253,16 @@
                                 Check status
                             </button>
                         </div>
+                    </div>
+                }
+                else if (selectedAppointment.PaymentStatus == "Failed" || selectedAppointment.PaymentStatus == "Expired")
+                {
+                    <div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300 flex flex-col gap-2">
+                        <p class="m-0">Payment @(selectedAppointment.PaymentStatus == "Failed" ? "failed" : "expired"). Please try again to secure your booking.</p>
+                        <button type="button" @onclick="PayNow" disabled="@isPaymentBusy"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 self-start">
+                            Retry Payment
+                        </button>
                     </div>
                 }
             }
@@ -347,7 +389,7 @@
                                     <div class="text-xs text-muted-foreground mt-0.5 truncate">@appt.ServicesRequested</div>
                                 </div>
                                 <span class="appointment-status-badge @GetStatusClass(appt.Status) shrink-0 ml-2">
-                                    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+                                    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : appt.PaymentStatus == "Failed" ? " · Payment Failed" : appt.PaymentStatus == "Expired" ? " · Payment Expired" : "")
                                 </span>
                             </div>
                         }
@@ -565,6 +607,32 @@
         finally { isPaymentBusy = false; }
     }
 
+    private async Task PayFromCard(AppointmentDto appt)
+    {
+        if (isPaymentBusy) return;
+        isPaymentBusy = true;
+        try
+        {
+            var response = await JSRuntime.InvokeAsync<BrowserApiResponse>(
+                "stockSenseApi.postJson", $"api/appointments/{appt.Id}/create-payment", new { });
+            if (response.Ok)
+            {
+                string? checkoutUrl = null;
+                using var doc = System.Text.Json.JsonDocument.Parse(response.Body);
+                if (doc.RootElement.TryGetProperty("checkoutUrl", out var urlEl) && urlEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                    checkoutUrl = urlEl.GetString();
+                if (!string.IsNullOrEmpty(checkoutUrl))
+                {
+                    await JSRuntime.InvokeVoidAsync("window.open", checkoutUrl, "_blank");
+                    return;
+                }
+            }
+            Toast.Info("Payment is already being processed or not required.", "No action needed");
+        }
+        catch { Toast.Error("Could not reach the payment service. Please try again."); }
+        finally { isPaymentBusy = false; }
+    }
+
     private async Task CheckPaymentStatus()
     {
         if (selectedAppointment is null || isPaymentBusy) return;
@@ -578,6 +646,8 @@
                 selectedAppointment.PaymentStatus = result.PaymentStatus;
                 if (result.PaymentStatus == "Paid" && previous != "Paid")
                     Toast.Success("Payment received! A staff member will confirm your appointment shortly.");
+                else if (result.PaymentStatus is "Failed" or "Expired")
+                    Toast.Error($"Payment {result.PaymentStatus.ToLowerInvariant()}. Please retry payment to secure your booking.");
                 else
                     Toast.Info($"Payment status: {result.PaymentStatus}.", "Status updated");
             }
@@ -615,5 +685,32 @@
     private sealed class PaymentStatusResponse
     {
         public string PaymentStatus { get; set; } = "NotRequired";
+    }
+
+    private static List<ProductBreakdownEntry>? ParseProductBreakdown(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<ProductBreakdownEntry>>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch { return null; }
+    }
+
+    private class ProductBreakdownEntry
+    {
+        public string serviceName { get; set; } = "";
+        public decimal servicePrice { get; set; }
+        public List<ProductItem> products { get; set; } = new();
+    }
+
+    private class ProductItem
+    {
+        public int id { get; set; }
+        public string name { get; set; } = "";
+        public decimal price { get; set; }
+        public bool selected { get; set; }
+        public string category { get; set; } = "";
+        public string brand { get; set; } = "";
     }
 }

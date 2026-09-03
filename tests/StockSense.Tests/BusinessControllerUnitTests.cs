@@ -3,11 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using StockSense.Application.DTOs;
 using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Web.Controllers;
+using StockSense.Web.Options;
+using StockSense.Web.Services;
 
 namespace StockSense.Tests;
 
@@ -309,7 +312,8 @@ public sealed class BusinessControllerUnitTests
 
     private static AppointmentsController Appointments(ApplicationDbContext db) => new(
         new AppointmentRepository(db), new StoreServiceRepository(db), null!, null!, db,
-        new MotorcycleRepository(db), NullLogger<AppointmentsController>.Instance);
+        new MotorcycleRepository(db), NullLogger<AppointmentsController>.Instance,
+        null!, Options.Create(new PayMongoOptions()), null!);
 
     private static Product Product(string name, decimal price) => new()
     { Name = name, Category = "Parts", Brand = "Brand", Price = price, IsActive = true };

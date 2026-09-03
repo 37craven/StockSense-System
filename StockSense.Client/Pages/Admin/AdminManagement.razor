@@ -6,21 +6,13 @@
 @using StockSense.Client.Layout
 @using StockSense.Domain.Entities
 @inject HttpClient Http
+@inject ToastService Toast
 
 @attribute [Authorize(Roles = "Admin")]
 
 
 <PageHeader Title="System Management"
                 Subtitle="Manage users, employees, and shop mechanics." />
-
-@if (!string.IsNullOrWhiteSpace(managementMessage))
-{
-    <div role="status" style="margin-bottom:var(--space-4);padding:var(--space-3);border:1px solid var(--border);border-radius:var(--radius);background:var(--card);">@managementMessage</div>
-}
-@if (!string.IsNullOrWhiteSpace(managementError))
-{
-    <div role="alert" style="margin-bottom:var(--space-4);padding:var(--space-3);border:1px solid var(--destructive);border-radius:var(--radius);color:var(--destructive);">@managementError</div>
-}
 
     @* --- TABS & PRIMARY ACTION --- *@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -188,22 +180,6 @@
                         </div>
                     </div>
 
-                    @if (!string.IsNullOrWhiteSpace(pinSuccess))
-                    {
-                        <div class="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300" role="status">
-                            <LucideIcon Name="circle-check" Size="18" Class="mt-0.5 shrink-0" />
-                            <span>@pinSuccess</span>
-                        </div>
-                    }
-
-                    @if (!string.IsNullOrWhiteSpace(pinError))
-                    {
-                        <div class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-                            <LucideIcon Name="circle-alert" Size="18" Class="mt-0.5 shrink-0" />
-                            <span>@pinError</span>
-                        </div>
-                    }
-
                     <form @onsubmit="SaveAdminPin" @onsubmit:preventDefault class="space-y-6" aria-busy="@isSavingPin">
                         <div class="max-w-xl space-y-3">
                             <label for="admin-current-password" class="text-sm font-medium text-foreground">Current account password <span class="text-destructive" aria-hidden="true">*</span></label>
@@ -359,31 +335,6 @@
         </BbDialogHeader>
 
         <div class="px-6 py-5 flex flex-col gap-3">
-            @if (!string.IsNullOrEmpty(modalError))
-            {
-                <div class="account-error-feedback" role="alert" aria-live="assertive">
-                    <span class="account-error-feedback__icon" aria-hidden="true">
-                        <LucideIcon Name="circle-alert" Size="18" />
-                    </span>
-                    <div>
-                        <strong>Account not created</strong>
-                        @if (ModalErrorMessages.Count > 1)
-                        {
-                            <ul class="account-error-feedback__list">
-                                @foreach (var error in ModalErrorMessages)
-                                {
-                                    <li>@error</li>
-                                }
-                            </ul>
-                        }
-                        else
-                        {
-                            <p>@ModalErrorMessages[0]</p>
-                        }
-                    </div>
-                </div>
-            }
-
             <div class="flex gap-3">
                 <div class="flex-1 flex flex-col gap-2">
                     <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">First Name <span aria-hidden="true" class="text-destructive">*</span></label>
@@ -450,13 +401,7 @@
         <div class="px-6 py-5 flex flex-col gap-2">
             <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Full Name</label>
             <input @bind="newMechanicName" placeholder="e.g. Juan dela Cruz"
-                   aria-invalid="@(!string.IsNullOrWhiteSpace(mechanicModalError))"
-                   aria-describedby="@(string.IsNullOrWhiteSpace(mechanicModalError) ? null : "mechanic-modal-error")"
                    style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
-            @if (!string.IsNullOrWhiteSpace(mechanicModalError))
-            {
-                <p id="mechanic-modal-error" role="alert" class="m-0 text-sm text-destructive">@mechanicModalError</p>
-            }
         </div>
 
         <BbDialogFooter Class="px-6 py-4 border-t border-border justify-end gap-2">
@@ -489,14 +434,9 @@
     private bool showEmployeeModal = false;
     private bool showMechanicModal = false;
     private bool showNewStaffPassword;
-    private string modalError = "";
-    private string managementMessage = "", managementError = "";
     private CreateEmployeeDto newEmp = new();
     private string newMechanicName = "";
-    private string mechanicModalError = "";
     private AdminPinForm pinForm = new();
-    private string pinError = "";
-    private string pinSuccess = "";
     private bool isSavingPin;
 
     protected override async Task OnInitializedAsync()
@@ -539,16 +479,16 @@
         {
         if (pendingDeleteTarget is UserDto user)
         {
-            if (user.IsCurrentUser) { managementError = "You cannot delete your own admin account."; pendingDeleteTarget = null; return; }
+            if (user.IsCurrentUser) { Toast.Error("You cannot delete your own admin account.", "Delete failed"); pendingDeleteTarget = null; return; }
             var res = await Http.DeleteAsync($"api/admin/users/{user.Id}");
-            if (res.IsSuccessStatusCode) { await LoadUsers(); managementMessage = $"Deleted {user.FullName}."; managementError = ""; }
-            else { managementError = await ApiErrorMessage.FromResponseAsync(res, "The user could not be deleted. Please try again."); }
+            if (res.IsSuccessStatusCode) { await LoadUsers(); Toast.Success($"Deleted {user.FullName}.", "Account deleted"); }
+            else { Toast.Error(await ApiErrorMessage.FromResponseAsync(res, "The user could not be deleted. Please try again."), "Delete failed"); }
         }
         else if (pendingDeleteTarget is Mechanic mech)
         {
             var res = await Http.DeleteAsync($"api/mechanics/{mech.Id}");
-            if (res.IsSuccessStatusCode) { await LoadMechanics(); managementMessage = $"Deleted {mech.Name}."; managementError = ""; }
-            else { managementError = await ApiErrorMessage.FromResponseAsync(res, "The mechanic could not be deleted."); }
+            if (res.IsSuccessStatusCode) { await LoadMechanics(); Toast.Success($"Deleted {mech.Name}.", "Mechanic deleted"); }
+            else { Toast.Error(await ApiErrorMessage.FromResponseAsync(res, "The mechanic could not be deleted."), "Delete failed"); }
         }
         showDeleteDialog = false;
         pendingDeleteTarget = null;
@@ -559,7 +499,7 @@
 
     private void OpenBlockConfirm(UserDto user)
     {
-        if (user.IsCurrentUser) { managementError = "You cannot change your own account status."; return; }
+        if (user.IsCurrentUser) { Toast.Error("You cannot change your own account status.", "Action blocked"); return; }
         userToToggleBlock = user;
         showBlockDialog = true;
     }
@@ -575,42 +515,22 @@
     {
         var user = userToToggleBlock;
         if (user is null || isChangingBlock) return;
-        if (user.IsCurrentUser) { managementError = "You cannot change your own account status."; return; }
+        if (user.IsCurrentUser) { Toast.Error("You cannot change your own account status.", "Action blocked"); return; }
         isChangingBlock = true;
         var response = await Http.PostAsync($"api/admin/toggle-block/{user.Id}", null);
-        if (response.IsSuccessStatusCode) { user.IsBlocked = !user.IsBlocked; managementMessage = $"Account status updated for {user.FullName}."; managementError = ""; }
-        else { managementError = await ApiErrorMessage.FromResponseAsync(response, "The account status could not be updated."); }
+        if (response.IsSuccessStatusCode) { user.IsBlocked = !user.IsBlocked; Toast.Success($"Account status updated for {user.FullName}.", "Status updated"); }
+        else { Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "The account status could not be updated."), "Update failed"); }
         isChangingBlock = false;
         showBlockDialog = false;
         userToToggleBlock = null;
     }
 
-    private void OpenEmployeeModal() { newEmp = new() { Role = "Employee" }; modalError = ""; showNewStaffPassword = false; showEmployeeModal = true; }
+    private void OpenEmployeeModal() { newEmp = new() { Role = "Employee" }; showNewStaffPassword = false; showEmployeeModal = true; }
 
     private void ToggleNewStaffPassword() => showNewStaffPassword = !showNewStaffPassword;
 
-    private IReadOnlyList<string> ModalErrorMessages
-    {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(modalError))
-                return [];
-
-            return System.Text.RegularExpressions.Regex
-                .Split(
-                    modalError,
-                    @"(?:\r?\n)+|(?=Passwords?\s+must\b)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-                .Select(message => message.Trim())
-                .Where(message => !string.IsNullOrWhiteSpace(message))
-                .ToList();
-        }
-    }
-
     private async Task CreateEmployee()
     {
-        modalError = "";
-
         var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
         var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(newEmp);
         if (!System.ComponentModel.DataAnnotations.Validator.TryValidateObject(
@@ -619,26 +539,23 @@
                 validationResults,
                 validateAllProperties: true))
         {
-            modalError = string.Join(
-                Environment.NewLine,
-                validationResults
-                    .Select(result => result.ErrorMessage)
-                    .Where(message => !string.IsNullOrWhiteSpace(message))
-                    .Distinct());
+            foreach (var error in validationResults.Select(r => r.ErrorMessage).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct())
+            {
+                Toast.Warning(error!, "Validation");
+            }
             return;
         }
 
         var response = await Http.PostAsJsonAsync("api/admin/create-employee", newEmp);
-        if (response.IsSuccessStatusCode) { showEmployeeModal = false; await LoadUsers(); }
-        else { modalError = await ApiErrorMessage.FromResponseAsync(response, "The employee account could not be created."); }
+        if (response.IsSuccessStatusCode) { showEmployeeModal = false; await LoadUsers(); Toast.Success($"Account created for {newEmp.Email}.", "Employee created"); }
+        else { Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "The employee account could not be created."), "Create failed"); }
     }
 
-    private void OpenMechanicModal() { newMechanicName = ""; mechanicModalError = ""; showMechanicModal = true; }
+    private void OpenMechanicModal() { newMechanicName = ""; showMechanicModal = true; }
 
     private async Task CreateMechanic()
     {
         if (string.IsNullOrWhiteSpace(newMechanicName)) return;
-        mechanicModalError = "";
         try
         {
             var response = await Http.PostAsJsonAsync(
@@ -646,20 +563,21 @@
                 new Mechanic { Name = newMechanicName.Trim(), IsActive = true });
             if (!response.IsSuccessStatusCode)
             {
-                mechanicModalError = await ApiErrorMessage.FromResponseAsync(
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(
                     response,
-                    "The mechanic could not be added. Please try again.");
+                    "The mechanic could not be added. Please try again."), "Create failed");
                 return;
             }
 
             showMechanicModal = false;
             await LoadMechanics();
+            Toast.Success($"{newMechanicName.Trim()} added.", "Mechanic created");
         }
         catch (Exception ex)
         {
-            mechanicModalError = ApiErrorMessage.FromException(
+            Toast.Error(ApiErrorMessage.FromException(
                 ex,
-                "The mechanic could not be added. Please try again.");
+                "The mechanic could not be added. Please try again."), "Create failed");
         }
     }
 
@@ -672,30 +590,25 @@
     private void SelectTab(string tab)
     {
         currentTab = tab;
-        pinError = "";
-        pinSuccess = "";
     }
 
     private async Task SaveAdminPin()
     {
-        pinError = "";
-        pinSuccess = "";
-
         if (string.IsNullOrWhiteSpace(pinForm.CurrentPassword))
         {
-            pinError = "Enter your current account password.";
+            Toast.Error("Enter your current account password.", "Validation");
             return;
         }
 
         if (pinForm.NewPin.Length != 6 || pinForm.NewPin.Any(character => !char.IsDigit(character)))
         {
-            pinError = "Your new PIN must contain exactly 6 numbers.";
+            Toast.Warning("Your new PIN must contain exactly 6 numbers.", "Validation");
             return;
         }
 
         if (!string.Equals(pinForm.NewPin, pinForm.ConfirmPin, StringComparison.Ordinal))
         {
-            pinError = "The new PIN and confirmation do not match.";
+            Toast.Warning("The new PIN and confirmation do not match.", "Validation");
             return;
         }
 
@@ -705,16 +618,16 @@
             var response = await Http.PostAsJsonAsync("api/admin/my-pin", pinForm);
             if (!response.IsSuccessStatusCode)
             {
-                pinError = await ApiErrorMessage.FromResponseAsync(response, "Your Admin PIN could not be saved. Check your password and try again.");
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Your Admin PIN could not be saved. Check your password and try again."), "Save failed");
                 return;
             }
 
             pinForm = new();
-            pinSuccess = "Your Admin PIN has been saved.";
+            Toast.Success("Your Admin PIN has been saved.", "PIN updated");
         }
         catch (HttpRequestException)
         {
-            pinError = "We could not connect to the server. Please try again.";
+            Toast.Error("We could not connect to the server. Please try again.", "Connection error");
         }
         finally
         {

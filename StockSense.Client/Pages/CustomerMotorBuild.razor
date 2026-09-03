@@ -15,12 +15,7 @@
 @inject NavigationManager Nav
 @inject ToastService Toast
 
-@attribute [Authorize]
-
-
-<AuthorizeView>
-    <Authorized>
-        <BbPortalHost />
+<BbPortalHost />
         <BbDialogProvider />
         <BbToastProvider Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
         <UnsavedChangesGuard IsDirty="@(selectedParts.Any() || showBookingModal)"
@@ -457,17 +452,24 @@
             </BbDialogContent>
         </BbDialog>
 
-        @* ── End of layout ── *@
-    </Authorized>
+        @* ── Login Prompt ── *@
+        <BbDialog @bind-Open="showLoginPrompt">
+            <BbDialogContent Class="w-[min(92vw,24rem)] p-5">
+                <BbDialogHeader>
+                    <BbDialogTitle>Sign in to continue</BbDialogTitle>
+                    <BbDialogDescription>Create an account or sign in to submit your build.</BbDialogDescription>
+                </BbDialogHeader>
+                <div class="flex flex-col gap-2 mt-4">
+                    <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="LoginWithSave">Log In</BbButton>
+                    <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="RegisterWithSave">Register</BbButton>
+                </div>
+                <BbDialogFooter>
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showLoginPrompt = false">Cancel</BbButton>
+                </BbDialogFooter>
+            </BbDialogContent>
+        </BbDialog>
 
-    <NotAuthorized>
-        <div class="h-screen bg-background flex flex-col justify-center items-center text-foreground gap-4">
-            <BbSpinner Size="SpinnerSize.Large" />
-            <h2 class="text-destructive font-bold tracking-[0.1em]">SESSION EXPIRED</h2>
-            <p class="text-muted-foreground text-sm">Redirecting to Home.</p>
-        </div>
-    </NotAuthorized>
-</AuthorizeView>
+        @* ── End of layout ── *@
 
 <style>
     .build-cart-fab { display: none; }
@@ -538,6 +540,9 @@
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private bool isAuthenticated;
+    private bool showLoginPrompt;
 
     private List<ProductDto>? products = new();
     private List<ProductDto> selectedParts = new();
@@ -616,6 +621,10 @@
         try
         {
             isLoading = true;
+
+            var authState = AuthStateTask is not null ? await AuthStateTask : null;
+            isAuthenticated = authState?.User?.Identity?.IsAuthenticated == true;
+
             var loadedProducts = await BrowserGetAsync<List<ProductDto>>("api/products") ?? [];
             products = CustomerBuildCatalogPolicy.SelectProducts(loadedProducts);
             catalogProducts = products.Select(ToCatalogEntity).ToList();
@@ -625,6 +634,7 @@
 
             // Preload motorcycles for build submit (moved from appointment booking)
             await LoadMotorcycles();
+            await RestoreBuildState();
         }
         catch (Exception ex)
         {
@@ -655,6 +665,56 @@
         {
             isLoadingMotorcycles = false;
         }
+    }
+
+    private async Task SaveBuildState()
+    {
+        var state = new
+        {
+            selectedPartIds = selectedParts.Select(p => p.Id).ToList(),
+            selectedPackageIds
+        };
+        var json = JsonSerializer.Serialize(state);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "motorBuildState", json);
+    }
+
+    private async Task RestoreBuildState()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "motorBuildState");
+            if (string.IsNullOrEmpty(json)) return;
+
+            var state = JsonSerializer.Deserialize<JsonElement>(json);
+
+            if (state.TryGetProperty("selectedPartIds", out var idsProp))
+            {
+                var partIds = idsProp.EnumerateArray().Select(e => e.GetInt32()).ToHashSet();
+                selectedParts = products?.Where(p => partIds.Contains(p.Id)).ToList() ?? new();
+            }
+
+            if (state.TryGetProperty("selectedPackageIds", out var pkgProp))
+            {
+                selectedPackageIds = pkgProp.EnumerateArray().Select(e => e.GetInt32()).ToList();
+            }
+
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "motorBuildState");
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private async Task LoginWithSave()
+    {
+        await SaveBuildState();
+        Nav.NavigateTo("/Account/Login?returnUrl=/build", forceLoad: true);
+    }
+
+    private async Task RegisterWithSave()
+    {
+        await SaveBuildState();
+        Nav.NavigateTo("/Account/Register?returnUrl=/build", forceLoad: true);
     }
 
     private void SelectPackage(PreBuiltPackageDto pkg)
@@ -737,6 +797,7 @@
 
     private async Task SendEmailQuote()
     {
+        if (!isAuthenticated) { showLoginPrompt = true; return; }
         if (!selectedParts.Any()) { Toast.Warning("Please select parts first."); return; }
         isProcessing = true;
         try
@@ -753,6 +814,7 @@
 
     private async Task SubmitBuildToAdmin()
     {
+        if (!isAuthenticated) { showLoginPrompt = true; return; }
         if (!selectedParts.Any()) { Toast.Warning("Please select parts first."); return; }
         isProcessing = true;
         try

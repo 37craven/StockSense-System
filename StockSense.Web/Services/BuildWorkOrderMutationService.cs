@@ -8,7 +8,10 @@ using StockSense.Infrastructure.Data;
 
 namespace StockSense.Web.Services;
 
-public sealed class BuildWorkOrderMutationService(ApplicationDbContext context, IAdminPinService adminPinService) : IBuildWorkOrderMutationService
+public sealed class BuildWorkOrderMutationService(
+    ApplicationDbContext context,
+    IAdminPinService adminPinService,
+    IWorkOrderEmailSender workOrderEmail) : IBuildWorkOrderMutationService
 {
     public async Task<WorkOrderMutationResult> UpdateStatusAsync(
         int id, UpdateWorkOrderStatusDto request, ClaimsPrincipal actor, CancellationToken cancellationToken = default)
@@ -49,6 +52,13 @@ public sealed class BuildWorkOrderMutationService(ApplicationDbContext context, 
         build.Status = target;
         AddAudit(actor, id, "StatusChanged", previous, target, reason, approval);
         await context.SaveChangesAsync(cancellationToken);
+
+        if (target == WorkOrderStatuses.Confirmed && !string.IsNullOrWhiteSpace(build.CustomerEmail))
+        {
+            var summary = $"Build: {build.BuildName}\nTotal: ₱{build.TotalPrice:N2}";
+            await workOrderEmail.SendStatusEmailAsync(build.CustomerEmail, build.CustomerName, "Build", "Confirmed", id, summary);
+        }
+
         return new(true, 200, "Status updated.");
     }
 

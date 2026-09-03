@@ -9,6 +9,7 @@
 @using BlazorBlueprint.Primitives.Services
 @using StockSense.Client.Components
 @inject HttpClient Http
+@inject IJSRuntime JS
 @inject ToastService Toast
 
 @attribute [Authorize(Roles = "Admin")]
@@ -212,8 +213,7 @@
         white-space: nowrap;
     }
 
-    .txn-type-badge::before,
-    .txn-voided-badge::before {
+    .txn-type-badge::before {
         display: none !important;
     }
 
@@ -242,20 +242,10 @@
         color: var(--muted-foreground);
     }
 
-    .txn-voided-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        margin-left: 8px;
-        padding: 2px 7px;
-        border: 1px solid var(--destructive);
-        border-radius: 999px;
+    .txn-type-voided {
+        border-color: var(--destructive);
         background: var(--destructive-muted);
         color: var(--destructive-muted-foreground);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: .02em;
-        text-transform: uppercase;
     }
 
     .txn-voided-notice {
@@ -420,8 +410,7 @@
             align-items: start;
         }
 
-        .txn-mobile-top .txn-type-badge,
-        .txn-mobile-top .txn-voided-badge {
+        .txn-mobile-top .txn-type-badge {
             width: fit-content;
             max-width: 100%;
             min-width: 0;
@@ -451,6 +440,12 @@
 <div>
     <PageHeader Title="Transaction History"
                 Subtitle="Review sales and stock correction records.">
+        <BbButton Variant="ButtonVariant.Outline" OnClick="ExportTransactionsCsv">
+            <LucideIcon Name="download" Size="16" /> Export CSV
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" OnClick="ExportTransactionItemsCsv">
+            <LucideIcon Name="download" Size="16" /> Export Items
+        </BbButton>
         <button @onclick='() => mobileMenuOpen = true'
                 class="md:hidden ml-auto"
                 style="padding: 6px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); cursor: pointer; color: var(--foreground); align-self: center;"
@@ -670,10 +665,6 @@
                                 <td class="px-4 py-3" @onclick:stopPropagation><input type="checkbox" aria-label="Select @txn.InvoiceNumber" checked="@selectedIds.Contains(txn.Id)" @onchange="e => Toggle(txn.Id, e)" /></td>
                                 <td class="px-4 py-3 text-foreground font-medium col-inv">
                                     @txn.InvoiceNumber
-                                    @if (txn.IsVoided)
-                                    {
-                                        <span class="txn-voided-badge">Voided</span>
-                                    }
                                 </td>
                                 <td class="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap col-date">
                                     @txn.TransactionDate.ToString("MMM dd, yyyy h:mm tt")
@@ -682,7 +673,7 @@
                                     @{
                                         var typeLabel = GetTypeLabel(txn);
                                     }
-                                    <span class="transaction-type-pill txn-type-badge @GetTypeClass(txn.TransactionType)">
+                                    <span class="transaction-type-pill txn-type-badge @GetTypeClass(txn.TransactionType, txn.IsVoided)">
                                         @typeLabel
                                     </span>
                                 </td>
@@ -721,11 +712,7 @@
                                 </div>
                             </div>
                             <div class="txn-badge-stack">
-                                <span class="txn-type-badge @GetTypeClass(txn.TransactionType)">@typeLabel</span>
-                                @if (txn.IsVoided)
-                                {
-                                    <span class="txn-voided-badge">Voided</span>
-                                }
+                                <span class="txn-type-badge @GetTypeClass(txn.TransactionType, txn.IsVoided)">@typeLabel</span>
                             </div>
                         </div>
                         <div class="txn-mobile-bottom">
@@ -755,7 +742,7 @@
                 <BbDialogTitle>Transaction Details</BbDialogTitle>
                 @if (selectedTransaction != null)
                 {
-                    <span class="txn-type-badge @GetTypeClass(selectedTransaction.TransactionType)">
+                    <span class="txn-type-badge @GetTypeClass(selectedTransaction.TransactionType, selectedTransaction.IsVoided)">
                         @GetTypeLabel(selectedTransaction)
                     </span>
                 }
@@ -1120,24 +1107,50 @@
             OpenDetail(txn);
     }
 
-    private static string GetSaleSource(string invoice) =>
-        "Sale: POS";
-
-    private static string GetTypeLabel(TransactionHistoryDto transaction) => transaction.TransactionType switch
+    private async Task ExportTransactionsCsv()
     {
-        "Sale" => GetSaleSource(transaction.InvoiceNumber),
-        "StockCorrection" => "Stock Correction",
-        "PurchaseReceipt" => "Purchase Receipt",
-        "Adjustment" => "Inventory Adjustment",
+        try
+        {
+            await JS.InvokeVoidAsync("triggerDownload", "api/transactions/export", "transactions.csv");
+            Toast.Success("Transactions CSV download started.", "Export");
+        }
+        catch (Exception ex) { Toast.Error("Export failed: " + ex.Message, "Export"); }
+    }
+
+    private async Task ExportTransactionItemsCsv()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("triggerDownload", "api/transactions/export/items", "transaction-items.csv");
+            Toast.Success("Transaction items CSV download started.", "Export");
+        }
+        catch (Exception ex) { Toast.Error("Export failed: " + ex.Message, "Export"); }
+    }
+
+    private static string GetSaleSource(string invoice) => invoice switch
+    {
+        { Length: > 3 } when invoice.StartsWith("APT", StringComparison.OrdinalIgnoreCase) => "Sale: Appointment",
+        { Length: > 3 } when invoice.StartsWith("BLD", StringComparison.OrdinalIgnoreCase) => "Sale: Build",
+        _ => "Sale: POS"
+    };
+
+    private static string GetTypeLabel(TransactionHistoryDto transaction) => (transaction.TransactionType, transaction.IsVoided) switch
+    {
+        ("Sale", true) => "Voided Sale",
+        ("Sale", _) => GetSaleSource(transaction.InvoiceNumber),
+        ("StockCorrection", _) => "Stock Correction",
+        ("PurchaseReceipt", _) => "Purchase Receipt",
+        ("Adjustment", _) => "Inventory Adjustment",
         _ => string.IsNullOrWhiteSpace(transaction.TransactionType) ? "Other" : transaction.TransactionType
     };
 
-    private static string GetTypeClass(string type) => type switch
+    private static string GetTypeClass(string type, bool isVoided) => (type, isVoided) switch
     {
-        "Sale" => "txn-type-sale",
-        "StockCorrection" => "txn-type-correction",
-        "Adjustment" => "txn-type-adjustment",
-        "PurchaseReceipt" => "txn-type-receipt",
+        ("Sale", true) => "txn-type-voided",
+        ("Sale", _) => "txn-type-sale",
+        ("StockCorrection", _) => "txn-type-correction",
+        ("Adjustment", _) => "txn-type-adjustment",
+        ("PurchaseReceipt", _) => "txn-type-receipt",
         _ => "txn-type-neutral"
     };
 }

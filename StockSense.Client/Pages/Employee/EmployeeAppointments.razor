@@ -14,6 +14,7 @@
 @inject HttpClient Http
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ToastService Toast
+@inject IJSRuntime JSRuntime
 
 @attribute [Authorize(Roles = "Employee, Admin")]
 
@@ -397,6 +398,19 @@ flex: none;
 height: 150vh;
 }
 }
+.receipt-countdown-track {
+height: 4px;
+background: var(--muted);
+}
+.receipt-countdown-bar {
+height: 100%;
+background: var(--destructive);
+animation: receipt-countdown-shrink 10s linear forwards;
+}
+@@keyframes receipt-countdown-shrink {
+from { width: 100%; }
+to { width: 0%; }
+}
 </style>
 
 <div class="page-wrapper">
@@ -567,7 +581,7 @@ else
     </td>
     <td data-label="Total" class="px-4 py-3 font-bold text-foreground col-total">
     <span class="inline-flex items-center gap-1.5">
-    <span class="inline-block w-2 h-2 rounded-full shrink-0 @(appt.PaymentStatus == "Paid" ? "bg-green-500" : appt.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : "bg-muted-foreground/40")" aria-hidden="true"></span>
+    <span class="inline-block w-2 h-2 rounded-full shrink-0 @(appt.PaymentStatus == "Paid" ? "bg-green-500" : appt.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : appt.PaymentStatus == "Failed" || appt.PaymentStatus == "Expired" ? "bg-red-500" : "bg-muted-foreground/40")" aria-hidden="true"></span>
     ₱@appt.TotalAmount.ToString("N2")
     </span>
     </td>
@@ -1009,10 +1023,7 @@ else if (calView == "next7")
                     <span style="font-size: var(--text-xs); color: var(--muted-foreground);">Select a time slot.</span>
                     }
                     }
-                    @if (!string.IsNullOrWhiteSpace(scheduleError))
-                    {
-                    <span role="alert" style="color: var(--destructive); font-size: var(--text-xs);">@scheduleError</span>
-                    }
+
                     </div>
                     }
                 else
@@ -1054,11 +1065,12 @@ else if (calView == "next7")
                     <div style="margin-top: 4px; display: flex; flex-direction: column; gap: var(--space-3);">
                     @{
                     var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
-                    var allProdItems = (breakdown ?? new()).SelectMany(s => s.products.Where(p => p.selected)).ToList();
+                    var allProdItems = (breakdown ?? new()).SelectMany(s => s.products.Where(p => p.selected)).DistinctBy(p => p.id).ToList();
+                    var productToGenericPart = serviceItemsMap.SelectMany(kv => kv.Value.SelectMany(gi => gi.LinkedProductIds.Select(pid => (pid, gi.Name)))).ToDictionary(x => x.pid, x => x.Name);
                     }
                     @if (allProdItems.Any())
                     {
-                    foreach (var group in allProdItems.GroupBy(p => p.category ?? "Parts"))
+                    foreach (var group in allProdItems.GroupBy(p => productToGenericPart.TryGetValue(p.id, out var gn) ? gn : (p.category ?? "Parts")))
                         {
                         <div>
                         <div style="font-size: 10px; color: var(--primary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">@group.Key</div>
@@ -1068,6 +1080,14 @@ else if (calView == "next7")
                         <div style="display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); margin-bottom: 4px;">
                         <span style="font-size: var(--text-sm); color: var(--foreground);">@part.name</span>
                         <div style="display: flex; align-items: center; gap: 2px;">
+                        @if (isEditingAppointment)
+                            {
+                            <button type="button" @onclick="() => EditPartQuantity(part.id, -1)" aria-label="Decrease quantity of @part.name"
+                            style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">−</button>
+                            <span style="min-width: 18px; text-align: center; font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--foreground);">@GetEditQuantity(part.id)</span>
+                            <button type="button" @onclick="() => EditPartQuantity(part.id, 1)" aria-label="Increase quantity of @part.name"
+                            style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">+</button>
+                            }
                         <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
                         <input type="number" step="1" class="price-input"
                         value="@price.ToString("F0")"
@@ -1097,9 +1117,9 @@ else if (calView == "next7")
                         <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); display: flex; justify-content: space-between; align-items: center;">
                         <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Payment Status</div>
                         <span class="inline-flex items-center gap-2">
-                        <span class="inline-block w-2.5 h-2.5 rounded-full @(selectedAppointment.PaymentStatus == "Paid" ? "bg-green-500" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : "bg-muted-foreground/40")" aria-hidden="true"></span>
+                        <span class="inline-block w-2.5 h-2.5 rounded-full @(selectedAppointment.PaymentStatus == "Paid" ? "bg-green-500" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : selectedAppointment.PaymentStatus == "Failed" || selectedAppointment.PaymentStatus == "Expired" ? "bg-red-500" : "bg-muted-foreground/40")" aria-hidden="true"></span>
                         <span style="font-size: var(--text-sm); font-weight: 600; color: var(--foreground);">
-                        @(selectedAppointment.PaymentStatus == "Paid" ? "Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "Awaiting Payment" : "N/A")
+                        @(selectedAppointment.PaymentStatus == "Paid" ? "Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "Awaiting Payment" : selectedAppointment.PaymentStatus == "Failed" ? "Payment Failed" : selectedAppointment.PaymentStatus == "Expired" ? "Payment Expired" : "N/A")
                         </span>
                         </span>
                         </div>
@@ -1115,10 +1135,6 @@ else if (calView == "next7")
                         <input @bind="checkoutReference" maxlength="100" aria-label="Payment reference" placeholder="Ref (optional)"
                         style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-xs); flex: 1; min-width: 0;" />
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(checkoutError))
-                        {
-                        <span role="alert" style="color: var(--destructive); font-size: var(--text-xs);">@checkoutError</span>
-                        }
                         }
 
                         }
@@ -1132,6 +1148,10 @@ else if (calView == "next7")
                         OnProductClick="p => ToggleEditPart(p)"
                         IsSelected="p => editPartIds.Contains(p.Id)"
                         ShowCheckbox="false"
+                        ShowQuantityStepper="true"
+                        GetQuantity="p => GetEditQuantity(p.Id)"
+                        OnQuantityDecrease="p => EditPartQuantity(p.Id, -1)"
+                        OnQuantityIncrease="p => EditPartQuantity(p.Id, 1)"
                         IsDisabled="_ => false"
                         AllowDisabledClick="true" />
                         </div>
@@ -1217,10 +1237,6 @@ else if (calView == "next7")
                         <dt class="font-semibold">Total</dt><dd class="m-0 text-right text-lg font-bold text-primary">₱@completionAppointment.TotalAmount.ToString("N2")</dd>
                         </dl>
                         }
-                        @if (!string.IsNullOrWhiteSpace(checkoutError))
-                        {
-                        <p role="alert" class="text-sm text-destructive">@checkoutError</p>
-                        }
                         <BbDialogFooter>
                         <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseCompletionConfirmation" Disabled="@isCheckingOut">Go back</BbButton>
                         <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--positive" OnClick="ConfirmCompletion" Disabled="@(isCheckingOut || completionAppointment is null)">
@@ -1228,6 +1244,37 @@ else if (calView == "next7")
                         @(isCheckingOut ? "Completing..." : "Complete appointment")
                         </BbButton>
                         </BbDialogFooter>
+                        </BbDialogContent>
+                        </BbDialog>
+
+                        <BbDialog Open="completedReceipt is not null" OpenChanged="_ => CloseReceiptModal()">
+                        <BbDialogContent Style="width: 99vw; max-width: 400px;" class="flex max-h-[90dvh] sm:!w-[34rem] sm:!max-w-[34rem] flex-col overflow-hidden">
+                        <BbDialogHeader>
+                        <BbDialogTitle>Appointment completed</BbDialogTitle>
+                        <BbDialogDescription>Transaction @completedReceipt?.InvoiceNumber has been recorded.</BbDialogDescription>
+                        </BbDialogHeader>
+                        <div class="min-h-0 overflow-y-auto flex flex-col items-center gap-3 py-4 text-center" role="status" aria-live="polite">
+                        <span class="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                        <LucideIcon Name="check" Size="24" />
+                        </span>
+                        <p class="m-0 text-2xl font-bold text-foreground">₱@completedReceipt?.TotalAmount.ToString("N2")</p>
+                        <p class="m-0 text-sm text-muted-foreground">
+                        @(completedReceipt?.PaymentMethod) · @completedReceipt?.TransactionDate.ToString("MM/dd/yyyy HH:mm")
+                        </p>
+                        <p class="m-0 text-xs text-muted-foreground">View or download the receipt for this appointment.</p>
+                        <div class="flex items-center gap-2">
+                        <BbButton Variant="ButtonVariant.Default" OnClick="ViewReceipt">
+                        <LucideIcon Name="external-link" Size="16" /> View Receipt
+                        </BbButton>
+                        <BbButton Variant="ButtonVariant.Default" OnClick="DownloadReceipt">
+                        <LucideIcon Name="download" Size="16" /> Download Receipt
+                        </BbButton>
+                        </div>
+                        </div>
+                        <p class="w-full text-center text-xs text-muted-foreground m-0 px-6 pb-3">Closing in @(receiptCountdown)s…</p>
+                        <div class="receipt-countdown-track w-full shrink-0" aria-hidden="true">
+                        <div class="receipt-countdown-bar"></div>
+                        </div>
                         </BbDialogContent>
                         </BbDialog>
 
@@ -1297,10 +1344,6 @@ else if (calView == "next7")
                         <textarea id="appointment-change-reason" @bind="restrictedReason" rows="4" maxlength="500"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         aria-required="true" placeholder="Explain why this change is needed"></textarea>
-                        @if (!string.IsNullOrWhiteSpace(restrictedActionError))
-                        {
-                        <p role="alert" class="text-sm text-destructive">@restrictedActionError</p>
-                        }
                         <BbDialogFooter>
                         <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseReasonDialog">Cancel</BbButton>
                         <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmRestrictedStatusChange"
@@ -1325,7 +1368,9 @@ else if (calView == "next7")
                         private const int PageSize = 25;
                         private string checkoutPaymentMethod = "Cash";
                         private string? checkoutReference;
-                        private string? checkoutError;
+                        private ReceiptDto? completedReceipt;
+                        private int receiptCountdown;
+                        private CancellationTokenSource? receiptCloseCts;
 
                         private string displayMode = "table";
                         private bool mobileMenuOpen = false;
@@ -1369,17 +1414,18 @@ else if (calView == "next7")
                         private List<int> editPartIds = new();
                         private decimal editPartsTotal;
                         private Dictionary<int, decimal> editedPrices = new();
+                        private Dictionary<int, int> editQuantities = new();
                         private bool isProcessingParts;
                         private bool isEditingSchedule;
                         private DateTime editAppointmentDate;
                         private string editTimeSlot = "";
                         private string editMechanicName = "";
                         private List<MechanicDto> mechanics = [];
-                        private string? scheduleError;
                         private bool isSavingSchedule;
                         private bool isLoadingSlots;
                         private List<(TimeSpan Start, TimeSpan End)> bookedIntervals = [];
                         private bool isAdmin;
+                        private Dictionary<int, List<ServiceGenericItem>> serviceItemsMap = new();
                         private bool showReasonDialog;
                         private bool isChangingRestrictedStatus;
                         private AppointmentDto? restrictedAppointment;
@@ -1392,7 +1438,6 @@ else if (calView == "next7")
                         private bool isLoadingAdminOptions;
                         private bool restrictedPartsChange;
                         private bool restrictedScheduleChange;
-                        private string? restrictedActionError;
 
                         private List<SortDropdown.SortOption> GetSortColumns() => new()
                         {
@@ -1417,8 +1462,35 @@ else if (calView == "next7")
                         if (decimal.TryParse(e.Value?.ToString(), out var v))
                             {
                             editedPrices[productId] = v;
-                            editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0));
+                            editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
                             }
+                            }
+
+                            private int GetEditQuantity(int productId) => editQuantities.GetValueOrDefault(productId, 1);
+
+                            private void EditPartQuantity(int productId, int delta)
+                            {
+                            var current = GetEditQuantity(productId);
+                            if (delta < 0)
+                                {
+                                if (current <= 1)
+                                    {
+                                    editPartIds.Remove(productId);
+                                    editedPrices.Remove(productId);
+                                    editQuantities.Remove(productId);
+                                    }
+                                else
+                                    {
+                                    editQuantities[productId] = current - 1;
+                                    }
+                                }
+                            else
+                                {
+                                var stock = allProducts?.FirstOrDefault(p => p.Id == productId)?.AvailableStock ?? 1;
+                                editQuantities[productId] = Math.Min(Math.Max(1, stock), current + 1);
+                                }
+                            editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
+                            StateHasChanged();
                             }
 
                             private async Task BeginEditAppointment()
@@ -1429,11 +1501,12 @@ else if (calView == "next7")
                                     var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
                                     var allParts = (breakdown ?? new())
                                     .SelectMany(s => s.products.Where(p => p.selected))
-                                    .DistinctBy(p => p.name)
+                                    .Where(p => p.id > 0)
                                     .ToList();
-                                    editPartIds = allParts.Where(p => p.id > 0).Select(p => p.id).Distinct().ToList();
-                                    editedPrices = allParts.Where(p => p.id > 0).ToDictionary(p => p.id, p => p.price);
-                                    editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0));
+                                    editPartIds = allParts.Select(p => p.id).Distinct().ToList();
+                                    editedPrices = allParts.GroupBy(p => p.id).ToDictionary(g => g.Key, g => g.First().price);
+                                    editQuantities = allParts.GroupBy(p => p.id).ToDictionary(g => g.Key, g => g.Count());
+                                    editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
                                     isEditingAppointment = true;
                                     StateHasChanged();
                                     }
@@ -1442,17 +1515,17 @@ else if (calView == "next7")
                                     {
                                     if (editPartIds.Contains(product.Id))
                                         {
-                                        var price = GetPartPrice(product.Id, product.Price);
                                         editPartIds.Remove(product.Id);
                                         editedPrices.Remove(product.Id);
-                                        editPartsTotal -= price;
+                                        editQuantities.Remove(product.Id);
                                         }
                                     else
                                         {
                                         editPartIds.Add(product.Id);
                                         editedPrices[product.Id] = product.Price;
-                                        editPartsTotal += product.Price;
+                                        editQuantities[product.Id] = 1;
                                         }
+                                    editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
                                         }
 
                                         private void CancelEditAppointment()
@@ -1460,6 +1533,7 @@ else if (calView == "next7")
                                         isEditingAppointment = false;
                                         editPartIds.Clear();
                                         editedPrices.Clear();
+                                        editQuantities.Clear();
                                         }
 
                                         private async Task BeginEditSchedule()
@@ -1470,7 +1544,6 @@ else if (calView == "next7")
                                                 editTimeSlot = selectedAppointment.TimeSlot ?? "";
                                                 editMechanicName = string.Equals(selectedAppointment.MechanicName, "Any Available", StringComparison.OrdinalIgnoreCase)
                                                 ? "" : selectedAppointment.MechanicName ?? "";
-                                                scheduleError = null;
                                                 if (mechanics.Count == 0)
                                                     await LoadMechanics();
                                                     await FetchBookedSlots();
@@ -1481,7 +1554,6 @@ else if (calView == "next7")
                                                     private void CancelEditSchedule()
                                                     {
                                                     isEditingSchedule = false;
-                                                    scheduleError = null;
                                                     }
 
                                                     private async Task LoadMechanics()
@@ -1597,14 +1669,13 @@ else if (calView == "next7")
                                                                                                             private async Task SaveEditScheduleCore()
                                                                                                             {
                                                                                                             if (selectedAppointment == null) return;
-                                                                                                                if (string.IsNullOrWhiteSpace(editTimeSlot))
-                                                                                                                    {
-                                                                                                                    scheduleError = "Select a time slot.";
-                                                                                                                    return;
-                                                                                                                    }
-                                                                                                                    isSavingSchedule = true;
-                                                                                                                    scheduleError = null;
-                                                                                                                    try
+                                                                                                    if (string.IsNullOrWhiteSpace(editTimeSlot))
+                                                                                                        {
+                                                                                                        Toast.Error("Select a time slot.", "Validation");
+                                                                                                        return;
+                                                                                                        }
+                                                                                                        isSavingSchedule = true;
+                                                                                                        try
                                                                                                                     {
                                                                                                                     var response = await Http.PutAsJsonAsync($"api/appointments/{selectedAppointment.Id}/details",
                                                                                                                     new { AppointmentDate = editAppointmentDate, TimeSlot = editTimeSlot, DurationMinutes = selectedAppointment.DurationMinutes, MechanicName = editMechanicName, AdminUserId = NullIfAdmin(restrictedAdminUserId), AdminPin = NullIfAdmin(restrictedAdminPin), Reason = RestrictedReasonOrNull() });
@@ -1619,12 +1690,12 @@ else if (calView == "next7")
                                                                                                                         }
                                                                                                                     else
                                                                                                                         {
-                                                                                                                        scheduleError = await ApiErrorMessage.FromResponseAsync(response, "The appointment details could not be updated. Check the admin approval and try again.");
+                                                                                                                        Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "The appointment details could not be updated. Check the admin approval and try again."), "Schedule update failed");
                                                                                                                         }
                                                                                                                         }
                                                                                                                         catch (Exception exception)
                                                                                                                         {
-                                                                                                                        scheduleError = ApiErrorMessage.FromException(exception, "The appointment details could not be updated. Please try again.");
+                                                                                                                        Toast.Error(ApiErrorMessage.FromException(exception, "The appointment details could not be updated. Please try again."), "Schedule update failed");
                                                                                                                         }
                                                                                                                         finally { isSavingSchedule = false; }
                                                                                                                         }
@@ -1658,15 +1729,15 @@ else if (calView == "next7")
 
                                                                                                                                         var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson) ?? new();
                                                                                                                                         var serviceNames = breakdown.Select(s => s.serviceName).ToList();
-                                                                                                                                        var updatedBreakdown = serviceNames.Select(sn => new
-                                                                                                                                        {
-                                                                                                                                        serviceName = sn,
-                                                                                                                                        servicePrice = breakdown.FirstOrDefault(s => s.serviceName == sn)?.servicePrice ?? 0,
-                                                                                                                                        products = products.Select(p => new { id = p.Id, name = p.Name, price = p.Price, selected = true, category = p.Category, brand = p.Brand }).ToList()
-                                                                                                                                        }).ToList();
+                                                                                                                                         var updatedBreakdown = serviceNames.Select((sn, idx) => new
+                                                                                                                                         {
+                                                                                                                                         serviceName = sn,
+                                                                                                                                         servicePrice = breakdown.FirstOrDefault(s => s.serviceName == sn)?.servicePrice ?? 0,
+                                                                                                                                         products = idx == 0 ? products.SelectMany(p => Enumerable.Repeat(new { id = p.Id, name = p.Name, price = p.Price, selected = true, category = p.Category, brand = p.Brand }, GetEditQuantity(p.Id))).ToList() : new()
+                                                                                                                                         }).ToList();
 
-                                                                                                                                        var updatedJson = JsonSerializer.Serialize(updatedBreakdown);
-                                                                                                                                        var newTotal = products.Sum(p => p.Price) + breakdown.Sum(s => s.servicePrice);
+                                                                                                                                         var updatedJson = JsonSerializer.Serialize(updatedBreakdown);
+                                                                                                                                         var newTotal = products.Sum(p => p.Price * GetEditQuantity(p.Id)) + breakdown.Sum(s => s.servicePrice);
 
                                                                                                                                         var response = await Http.PutAsJsonAsync($"api/appointments/{selectedAppointment.Id}/products",
                                                                                                                                         new { SelectedProductsJson = updatedJson, TotalAmount = newTotal, AdminUserId = NullIfAdmin(restrictedAdminUserId), AdminPin = NullIfAdmin(restrictedAdminPin), Reason = RestrictedReasonOrNull() });
@@ -1678,17 +1749,17 @@ else if (calView == "next7")
                                                                                                                                             isEditingAppointment = false;
                                                                                                                                             await LoadAuditTrail(selectedAppointment.Id);
                                                                                                                                             }
-                                                                                                                                        else
-                                                                                                                                            {
-                                                                                                                                            restrictedActionError = await ApiErrorMessage.FromResponseAsync(response,
-                                                                                                                                            "The parts could not be updated. Check the admin approval and try again.");
+                                                                                                                                         else
+                                                                                                                                             {
+                                                                                                                                             Toast.Error(await ApiErrorMessage.FromResponseAsync(response,
+                                                                                                                                             "The parts could not be updated. Check the admin approval and try again."), "Parts update failed");
+                                                                                                                                             }
                                                                                                                                             }
-                                                                                                                                            }
-                                                                                                                                            catch (Exception exception)
-                                                                                                                                            {
-                                                                                                                                            restrictedActionError = ApiErrorMessage.FromException(exception,
-                                                                                                                                            "The parts could not be updated. Please try again.");
-                                                                                                                                            }
+                                                                                                                                             catch (Exception exception)
+                                                                                                                                             {
+                                                                                                                                             Toast.Error(ApiErrorMessage.FromException(exception,
+                                                                                                                                             "The parts could not be updated. Please try again."), "Parts update failed");
+                                                                                                                                             }
                                                                                                                                             finally { isProcessingParts = false; }
                                                                                                                                             }
 
@@ -1733,11 +1804,56 @@ else if (calView == "next7")
                                                                                                                                                  ("status", true) => src.OrderBy(a => a.Status),
                                                                                                                                                  ("status", false) => src.OrderByDescending(a => a.Status),
                                                                                                                                                  _ => src.OrderByDescending(a => a.CreatedAt)
-                                                                                                                                                 };
-                                                                                                                                                 }
-                                                                                                                                                 }
+                                                                                                                                                                                                                                                                                 };
+                                                                                                                                                                                                                                                                                 }
+                                                                                                                                                                                                                                                                                 }
 
-                                                                                                                                                 private IEnumerable<AppointmentDto> PagedAppointments =>
+                                                                                                                                                                                                                                                                                private async Task ViewReceipt()
+                                                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                                if (completedReceipt is null) return;
+                                                                                                                                                                                                                                                                                await JSRuntime.InvokeVoidAsync("open", $"api/transactions/{completedReceipt.Id}/receipt-pdf?inline=true", "_blank");
+                                                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                                                private async Task DownloadReceipt()
+                                                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                                if (completedReceipt is null) return;
+                                                                                                                                                                                                                                                                                var safeName = string.Concat(completedReceipt.InvoiceNumber.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)));
+                                                                                                                                                                                                                                                                                await JSRuntime.InvokeVoidAsync("triggerDownload", $"api/transactions/{completedReceipt.Id}/receipt-pdf", $"Receipt_{safeName}.pdf");
+                                                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                                                private void StartReceiptCountdown()
+                                                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                                receiptCloseCts?.Cancel();
+                                                                                                                                                                                                                                                                                receiptCloseCts = new CancellationTokenSource();
+                                                                                                                                                                                                                                                                                receiptCountdown = 10;
+                                                                                                                                                                                                                                                                                _ = RunReceiptCountdownAsync(receiptCloseCts.Token);
+                                                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                                                private async Task RunReceiptCountdownAsync(CancellationToken token)
+                                                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                                try
+                                                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                                while (receiptCountdown > 0)
+                                                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                                await Task.Delay(1000, token);
+                                                                                                                                                                                                                                                                                if (token.IsCancellationRequested) return;
+                                                                                                                                                                                                                                                                                receiptCountdown--;
+                                                                                                                                                                                                                                                                                StateHasChanged();
+                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                CloseReceiptModal();
+                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                catch (OperationCanceledException) { }
+                                                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                                                private void CloseReceiptModal()
+                                                                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                                                                receiptCloseCts?.Cancel();
+                                                                                                                                                                                                                                                                                receiptCloseCts = null;
+                                                                                                                                                                                                                                                                                completedReceipt = null;
+                                                                                                                                                                                                                                                                                StateHasChanged();
+                                                                                                                                                                                                                                                                                 }
+
+                                                                                                                                                  private IEnumerable<AppointmentDto> PagedAppointments =>
                                                                                                                                                      DisplayAppointments.Skip((currentPage - 1) * PageSize).Take(PageSize);
 
                                                                                                                                                  private void ToggleSort(string column)
@@ -1753,14 +1869,15 @@ else if (calView == "next7")
                                                                                                                                                      StateHasChanged();
                                                                                                                                                  }
 
-                                                                                                                                                        protected override async Task OnInitializedAsync()
-                                                                                                                                                        {
-                                                                                                                                                        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-                                                                                                                                                        isAdmin = authState.User.IsInRole("Admin");
-                                                                                                                                                        if (!isAdmin)
-                                                                                                                                                            await LoadAdminOptions();
-                                                                                                                                                            await LoadAppointments();
-                                                                                                                                                            }
+                        protected override async Task OnInitializedAsync()
+                        {
+                        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                        isAdmin = authState.User.IsInRole("Admin");
+                        if (!isAdmin)
+                            await LoadAdminOptions();
+                            await LoadAppointments();
+                            await LoadServiceItemsMap();
+                            }
 
                                                                                                                                                             private async Task LoadAdminOptions()
                                                                                                                                                             {
@@ -1772,7 +1889,7 @@ else if (calView == "next7")
                                                                                                                                                             catch
                                                                                                                                                             {
                                                                                                                                                             adminOptions = [];
-                                                                                                                                                            restrictedActionError = "The admin list could not be loaded. Please refresh the page and try again.";
+                                                                                                                                                            Toast.Error("The admin list could not be loaded. Please refresh the page and try again.", "Admin list error");
                                                                                                                                                             }
                                                                                                                                                             finally
                                                                                                                                                             {
@@ -1788,22 +1905,31 @@ else if (calView == "next7")
                                                                                                                                                             }
                                                                                                                                                             catch (Exception ex)
                                                                                                                                                             {
-                                                                                                                                                            Console.WriteLine($"Error: {ex.Message}");
-                                                                                                                                                            }
-                                                                                                                                                            }
+                            Console.WriteLine($"Error: {ex.Message}");
+                            }
+                            }
 
-                                                                                                                                                            private async Task OpenDetail(AppointmentDto appt)
+                            private async Task LoadServiceItemsMap()
+                            {
+                            try
+                            {
+                            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "serviceItemsMap");
+                            if (!string.IsNullOrWhiteSpace(json))
+                                serviceItemsMap = System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, List<ServiceGenericItem>>>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                            }
+                            catch { serviceItemsMap = new(); }
+                            }
+
+                            private async Task OpenDetail(AppointmentDto appt)
                                                                                                                                                             {
                                                                                                                                                             selectedAppointment = appt;
                                                                                                                                                             checkoutPaymentMethod = "Cash";
                                                                                                                                                             checkoutReference = null;
-                                                                                                                                                            checkoutError = null;
                                                                                                                                                             isEditingAppointment = false;
                                                                                                                                                             isEditingSchedule = false;
                                                                                                                                                             editPartIds.Clear();
                                                                                                                                                             editedPrices.Clear();
                                                                                                                                                             editTimeSlot = "";
-                                                                                                                                                            scheduleError = null;
                                                                                                                                                             showDetailModal = true;
                                                                                                                                                             await LoadAuditTrail(appt.Id);
                                                                                                                                                             }
@@ -1905,11 +2031,10 @@ else if (calView == "next7")
                                                                                                                                                                                 restrictedScheduleChange = false;
                                                                                                                                                                                 restrictedTargetStatus = targetStatus;
                                                                                                                                                                                 restrictedActionTitle = title;
-                                                                                                                                                                                restrictedReason = "";
-                                                                                                                                                                                restrictedAdminUserId = "";
-                                                                                                                                                                                restrictedAdminPin = "";
-                                                                                                                                                                                restrictedActionError = null;
-                                                                                                                                                                                showReasonDialog = true;
+                                                                                                                                                                                 restrictedReason = "";
+                                                                                                                                                                                 restrictedAdminUserId = "";
+                                                                                                                                                                                 restrictedAdminPin = "";
+                                                                                                                                                                                 showReasonDialog = true;
                                                                                                                                                                                 }
 
                                                                                                                                                                                 private void CloseReasonDialog()
@@ -1919,10 +2044,9 @@ else if (calView == "next7")
                                                                                                                                                                                 restrictedReason = "";
                                                                                                                                                                                 restrictedAdminUserId = "";
                                                                                                                                                                                 restrictedAdminPin = "";
-                                                                                                                                                                                restrictedPartsChange = false;
-                                                                                                                                                                                restrictedScheduleChange = false;
-                                                                                                                                                                                restrictedActionError = null;
-                                                                                                                                                                                }
+                                                                                                                                                                                 restrictedPartsChange = false;
+                                                                                                                                                                                 restrictedScheduleChange = false;
+                                                                                                                                                                                 }
 
                                                                                                                                                                                 private void OnReasonDialogOpenChanged()
                                                                                                                                                                                 {
@@ -1944,9 +2068,8 @@ else if (calView == "next7")
                                                                                                                                                                                                 Toast.Error("Select the approving admin and enter their 6-digit PIN.", "Approval required");
                                                                                                                                                                                                 return;
                                                                                                                                                                                                 }
-                                                                                                                                                                                                isChangingRestrictedStatus = true;
-                                                                                                                                                                                                restrictedActionError = null;
-                                                                                                                                                                                                bool changed;
+                                                                                                                                                                                                 isChangingRestrictedStatus = true;
+                                                                                                                                                                                                 bool changed;
                                                                                                                                                                                                 if (restrictedPartsChange)
                                                                                                                                                                                                     {
                                                                                                                                                                                                     await SaveEditAppointmentCore();
@@ -1969,10 +2092,10 @@ else if (calView == "next7")
                                                                                                                                                                                                         showDetailModal = false;
                                                                                                                                                                                                         CloseReasonDialog();
                                                                                                                                                                                                         }
-                                                                                                                                                                                                    else
-                                                                                                                                                                                                        {
-                                                                                                                                                                                                        restrictedActionError ??= "The change was not approved. Check the details and try again.";
-                                                                                                                                                                                                        }
+                                                                                                                                                                                                     else
+                                                                                                                                                                                                         {
+                                                                                                                                                                                                         Toast.Error("The change was not approved. Check the details and try again.", "Change failed");
+                                                                                                                                                                                                         }
                                                                                                                                                                                                         }
 
                                                                                                                                                                                                         private void RequestRestrictedPartsChange(string title)
@@ -1982,9 +2105,8 @@ else if (calView == "next7")
                                                                                                                                                                                                             restrictedPartsChange = true;
                                                                                                                                                                                                             restrictedScheduleChange = false;
                                                                                                                                                                                                             restrictedActionTitle = title;
-                                                                                                                                                                                                            restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
-                                                                                                                                                                                                            restrictedActionError = null;
-                                                                                                                                                                                                            showReasonDialog = true;
+                                                                                                                                                                                                             restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
+                                                                                                                                                                                                             showReasonDialog = true;
                                                                                                                                                                                                             }
 
                                                                                                                                                                                                             private void RequestRestrictedScheduleChange(string title)
@@ -1994,9 +2116,8 @@ else if (calView == "next7")
                                                                                                                                                                                                                 restrictedPartsChange = false;
                                                                                                                                                                                                                 restrictedScheduleChange = true;
                                                                                                                                                                                                                 restrictedActionTitle = title;
-                                                                                                                                                                                                                restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
-                                                                                                                                                                                                                restrictedActionError = null;
-                                                                                                                                                                                                                showReasonDialog = true;
+                                                                                                                                                                                                                 restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
+                                                                                                                                                                                                                 showReasonDialog = true;
                                                                                                                                                                                                                 }
 
                                                                                                                                                                                                                 private string? NullIfAdmin(string value) => isAdmin ? null : value.Trim();
@@ -2004,59 +2125,58 @@ else if (calView == "next7")
 
                                                                                                                                                                                                                 private sealed record AdminOption(string Id, string DisplayName);
 
-                                                                                                                                                                                                                private async Task Complete(AppointmentDto appointment)
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                checkoutError = null;
-                                                                                                                                                                                                                isCheckingOut = true;
-                                                                                                                                                                                                                try
+                                                                                                                                                                                                                 private async Task Complete(AppointmentDto appointment)
+                                                                                                                                                                                                                 {
+                                                                                                                                                                                                                 isCheckingOut = true;
+                                                                                                                                                                                                                 try
                                                                                                                                                                                                                 {
                                                                                                                                                                                                                 var response = await Http.PostAsJsonAsync(
                                                                                                                                                                                                                 $"api/appointments/{appointment.Id}/complete",
                                                                                                                                                                                                                 new CompleteWorkOrderDto { PaymentMethod = checkoutPaymentMethod, ReferenceNumber = checkoutReference });
-                                                                                                                                                                                                                if (!response.IsSuccessStatusCode)
-                                                                                                                                                                                                                    {
-                                                                                                                                                                                                                    checkoutError = await ApiErrorMessage.FromResponseAsync(
-                                                                                                                                                                                                                    response,
-                                                                                                                                                                                                                    "The appointment could not be completed. Review stock and try again.");
-                                                                                                                                                                                                                    return;
-                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                     if (!response.IsSuccessStatusCode)
+                                                                                                                                                                                                                         {
+                                                                                                                                                                                                                         Toast.Error(await ApiErrorMessage.FromResponseAsync(
+                                                                                                                                                                                                                         response,
+                                                                                                                                                                                                                         "The appointment could not be completed. Review stock and try again."), "Completion failed");
+                                                                                                                                                                                                                         return;
+                                                                                                                                                                                                                         }
 
-                                                                                                                                                                                                                    var receipt = await response.Content.ReadFromJsonAsync<ReceiptDto>();
-                                                                                                                                                                                                                    appointment.Status = "Completed";
-                                                                                                                                                                                                                    appointment.CompletedAt = receipt?.TransactionDate;
-                                                                                                                                                                                                                    appointment.TransactionId = receipt?.Id;
-                                                                                                                                                                                                                    appointment.InvoiceNumber = receipt?.InvoiceNumber;
-                                                                                                                                                                                                                    appointment.TotalAmount = receipt?.TotalAmount ?? appointment.TotalAmount;
-                                                                                                                                                                                                                    showCompletionConfirmation = false;
-                                                                                                                                                                                                                    completionAppointment = null;
-                                                                                                                                                                                                                    showDetailModal = false;
+                                                                                                                                                                                                                     var receipt = await response.Content.ReadFromJsonAsync<ReceiptDto>();
+                                                                                                                                                                                                                     appointment.Status = "Completed";
+                                                                                                                                                                                                                     appointment.CompletedAt = receipt?.TransactionDate;
+                                                                                                                                                                                                                     appointment.TransactionId = receipt?.Id;
+                                                                                                                                                                                                                     appointment.InvoiceNumber = receipt?.InvoiceNumber;
+                                                                                                                                                                                                                     appointment.TotalAmount = receipt?.TotalAmount ?? appointment.TotalAmount;
+                                                                                                                                                                                                                     showCompletionConfirmation = false;
+                                                                                                                                                                                                                     completionAppointment = null;
+                                                                                                                                                                                                                     showDetailModal = false;
+                                                                                                                                                                                                                     completedReceipt = receipt;
+                                                                                                                                                                                                                     StartReceiptCountdown();
                                                                                                                                                                                                                     }
-                                                                                                                                                                                                                    catch (Exception exception)
-                                                                                                                                                                                                                    {
-                                                                                                                                                                                                                    checkoutError = ApiErrorMessage.FromException(
-                                                                                                                                                                                                                    exception,
-                                                                                                                                                                                                                    "The appointment could not be completed. Please try again.");
-                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                     catch (Exception exception)
+                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                     Toast.Error(ApiErrorMessage.FromException(
+                                                                                                                                                                                                                     exception,
+                                                                                                                                                                                                                     "The appointment could not be completed. Please try again."), "Completion failed");
+                                                                                                                                                                                                                     }
                                                                                                                                                                                                                     finally
                                                                                                                                                                                                                     {
                                                                                                                                                                                                                     isCheckingOut = false;
                                                                                                                                                                                                                     }
                                                                                                                                                                                                                     }
 
-                                                                                                                                                                                                                    private void RequestCompletion(AppointmentDto appointment)
-                                                                                                                                                                                                                    {
-                                                                                                                                                                                                                    if (isCheckingOut || appointment.Status != "Confirmed") return;
-                                                                                                                                                                                                                        checkoutError = null;
-                                                                                                                                                                                                                        completionAppointment = appointment;
-                                                                                                                                                                                                                        showCompletionConfirmation = true;
+                                                                                                                                                                                                                     private void RequestCompletion(AppointmentDto appointment)
+                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                     if (isCheckingOut || appointment.Status != "Confirmed") return;
+                                                                                                                                                                                                                         completionAppointment = appointment;
+                                                                                                                                                                                                                         showCompletionConfirmation = true;
                                                                                                                                                                                                                         }
 
-                                                                                                                                                                                                                        private void CloseCompletionConfirmation()
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        if (isCheckingOut) return;
-                                                                                                                                                                                                                            checkoutError = null;
-                                                                                                                                                                                                                            showCompletionConfirmation = false;
-                                                                                                                                                                                                                            completionAppointment = null;
+                                                                                                                                                                                                                         private void CloseCompletionConfirmation()
+                                                                                                                                                                                                                         {
+                                                                                                                                                                                                                         if (isCheckingOut) return;
+                                                                                                                                                                                                                             showCompletionConfirmation = false;
+                                                                                                                                                                                                                             completionAppointment = null;
                                                                                                                                                                                                                             }
 
                                                                                                                                                                                                                             private async Task ConfirmCompletion()
@@ -2157,10 +2277,16 @@ else if (calView == "next7")
                                                                                                                                                                                                                                                                             public decimal price { get; set; }
                                                                                                                                                                                                                                                                             public bool selected { get; set; }
                                                                                                                                                                                                                                                                             public string category { get; set; } = "";
-                                                                                                                                                                                                                                                                            public string brand { get; set; } = "";
-                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                             public string brand { get; set; } = "";
+                                                                                                                                                                                                                                                                             }
 
-                                                                                                                                                                                                                                                                            private IEnumerable<DateTime> GetCalendarDays()
+                                                                                                                                                                                                                                                                             private class ServiceGenericItem
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             public string Name { get; set; } = "";
+                                                                                                                                                                                                                                                                             public List<int> LinkedProductIds { get; set; } = new();
+                                                                                                                                                                                                                                                                             }
+
+                                                                                                                                                                                                                                                                             private IEnumerable<DateTime> GetCalendarDays()
                                                                                                                                                                                                                                                                             {
                                                                                                                                                                                                                                                                             var firstDay = new DateTime(calMonth.Year, calMonth.Month, 1);
                                                                                                                                                                                                                                                                             int offset = ((int)firstDay.DayOfWeek + 6) % 7;

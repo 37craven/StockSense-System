@@ -35,6 +35,11 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
             .IsUnique()
             .HasFilter("[TransactionId] IS NOT NULL");
 
+        builder.HasIndex(appointment => appointment.PaymentLinkId)
+            .HasFilter("[PaymentLinkId] IS NOT NULL");
+
+        builder.Property(appointment => appointment.PaymentAmount).HasPrecision(18, 2);
+
         builder.HasOne(appointment => appointment.Transaction)
             .WithOne()
             .HasForeignKey<Appointment>(appointment => appointment.TransactionId)
