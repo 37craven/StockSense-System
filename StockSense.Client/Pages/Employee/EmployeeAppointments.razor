@@ -371,12 +371,6 @@ min-height: 0;
 }
 
 @@media (max-width: 1023px) {
-
-display: grid;
-grid-template-columns: repeat(7, 1fr);
-grid-template-rows: repeat(6, 1fr);
-flex: 1;
-min-height: 100vh;
 .page-wrapper {
 height: auto;
 }
@@ -410,6 +404,17 @@ animation: receipt-countdown-shrink 10s linear forwards;
 @@keyframes receipt-countdown-shrink {
 from { width: 100%; }
 to { width: 0%; }
+}
+.schedule-slots-grid {
+display: grid;
+grid-template-columns: repeat(3, minmax(0, 1fr));
+gap: 6px;
+}
+@@media (max-width: 1023px) {
+.schedule-slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@@media (max-width: 767px) {
+.schedule-slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
 
@@ -580,10 +585,7 @@ else
     <div class="text-muted-foreground text-sm truncate">@appt.ServicesRequested</div>
     </td>
     <td data-label="Total" class="px-4 py-3 font-bold text-foreground col-total">
-    <span class="inline-flex items-center gap-1.5">
-    <span class="inline-block w-2 h-2 rounded-full shrink-0 @(appt.PaymentStatus == "Paid" ? "bg-green-500" : appt.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : appt.PaymentStatus == "Failed" || appt.PaymentStatus == "Expired" ? "bg-red-500" : "bg-muted-foreground/40")" aria-hidden="true"></span>
     ₱@appt.TotalAmount.ToString("N2")
-    </span>
     </td>
     <td data-label="Status" class="px-4 py-3 col-stat">
     <span class="appointment-status-badge @GetStatusClass(appt.Status)" aria-label="Status: @appt.Status">
@@ -926,114 +928,64 @@ else if (calView == "next7")
 
                     @* DETAIL MODAL *@
                     <BbDialog @bind-Open="showDetailModal">
-                    <BbDialogContent Style="@($"display: flex; flex-direction: column; max-height: min(85dvh, 800px); min-height: 0; width: {(isEditingAppointment ? "98vw" : "min(96vw, 420px)")}; max-width: {(isEditingAppointment ? "900px" : "400px")}; padding: 0; overflow: hidden; transition: width 0.3s ease, max-width 0.3s ease;")" class="flex flex-col overflow-hidden p-0 min-h-0">
+                    <BbDialogContent Style="@($"display: flex; flex-direction: column; max-height: min(85dvh, 800px); min-height: 0; width: {(isEditingAppointment || isEditingServices || isEditingSchedule ? "98vw" : "min(96vw, 420px)")}; max-width: {(isEditingAppointment || isEditingServices || isEditingSchedule ? "900px" : "400px")}; padding: 0; overflow: hidden; transition: width 0.3s ease, max-width 0.3s ease;")" class="flex flex-col overflow-hidden p-0 min-h-0">
                     <div style="padding: var(--space-4) var(--space-4) 0 var(--space-4); flex-shrink: 0;">
-                    <BbDialogHeader>
-                    <div style="display:flex; flex-direction: row; align-items: center; gap: 6px;">
-                    <BbDialogTitle>Appointment Details</BbDialogTitle>
+                    <BbDialogHeader class="text-left">
+                    <BbDialogTitle class="text-left">Appointment Details</BbDialogTitle>
                     @if (selectedAppointment != null)
                     {
-                    <span class="appointment-status-badge @GetStatusClass(selectedAppointment.Status)" aria-label="Status: @selectedAppointment.Status">
-                    @selectedAppointment.Status@(selectedAppointment.PaymentStatus == "Paid" ? " · Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+                    <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                    <span class="appointment-status-badge @GetStatusClass(selectedAppointment.Status)" style="width: auto; min-width: 0; padding: 2px 8px; border-radius: 9999px; font-size: var(--text-xs); font-weight: 600; white-space: nowrap;" aria-label="Status: @selectedAppointment.Status">
+                    @selectedAppointment.Status
                     </span>
+                    @if (selectedAppointment.PaymentStatus == "Paid")
+                    {
+                    <span class="appointment-status-badge" style="width: auto; min-width: 0; padding: 2px 8px; border-radius: 9999px; font-size: var(--text-xs); font-weight: 600; white-space: nowrap; background: var(--success-muted); color: var(--success-muted-foreground);">Downpayment Paid</span>
+                    }
+                    else if (selectedAppointment.PaymentStatus == "AwaitingPayment")
+                    {
+                    <span class="appointment-status-badge" style="width: auto; min-width: 0; padding: 2px 8px; border-radius: 9999px; font-size: var(--text-xs); font-weight: 600; white-space: nowrap; background: var(--muted); color: var(--muted-foreground);">No Downpayment</span>
                     }
                     </div>
-                    <BbDialogDescription>Reference #@selectedAppointment?.Id</BbDialogDescription>
+                    }
+                    <BbDialogDescription class="text-left">Reference #@selectedAppointment?.Id</BbDialogDescription>
+                    @if (selectedAppointment != null)
+                    {
+                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">Booked @selectedAppointment.CreatedAt.ToString("MMM dd, yyyy 'at' h:mm tt")</div>
+                    }
                     </BbDialogHeader>
                     </div>
 
-                    <div style="flex: 1; overflow: hidden; padding: var(--space-4); display: flex; gap: var(--space-3); min-height: 0; max-height: calc(min(85dvh, 800px) - 160px);">
-                    <div class="@(isEditingAppointment ? "hidden md:flex" : "flex") min-h-0 flex-col gap-4 min-w-0 w-full overflow-y-auto overscroll-contain" style="-webkit-overflow-scrolling: touch;">
+                    <div style="flex: 1; overflow: hidden; padding: 0 var(--space-4); display: flex; gap: var(--space-3); min-height: 0; max-height: calc(min(85dvh, 800px) - 160px);">
+                    <div class="@((isEditingAppointment || isEditingServices || isEditingSchedule) ? "hidden md:flex" : "flex") min-h-0 flex-col gap-4 min-w-0 overflow-y-auto overscroll-contain" style="@((isEditingAppointment || isEditingServices || isEditingSchedule) ? "width: 320px; flex-shrink: 0; -webkit-overflow-scrolling: touch;" : "width: 100%; -webkit-overflow-scrolling: touch;")">
                     @if (selectedAppointment != null)
                     {
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);">
                     <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
                     <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Customer</div>
-                    <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin-top: 4px;">@selectedAppointment.CustomerName</div>
-                    @if (!string.IsNullOrWhiteSpace(selectedAppointment.CustomerEmail))
-                    {
-                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">@selectedAppointment.CustomerEmail</div>
-                    }
+                    <div style="font-size: var(--text-lg); font-weight: var(--font-bold); color: var(--foreground); margin-top: 4px; line-height: 1.3;">@selectedAppointment.CustomerName</div>
                     @if (!string.IsNullOrEmpty(selectedAppointment.ContactNumber))
                     {
-                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 2px;">@selectedAppointment.ContactNumber</div>
+                    <div style="display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: var(--text-sm); color: var(--muted-foreground);"><LucideIcon Name="phone" Size="14" /> <span style="font-weight: 600; color: var(--foreground);">@selectedAppointment.ContactNumber</span></div>
                     }
-                    </div>
-                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
-                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Mechanic</div>
-                    @if (isEditingSchedule)
-                    {
-                    <select @bind="editMechanicName" aria-label="Mechanic"
-                    style="margin-top: 4px; width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-sm);">
-                    <option value="">Any Available</option>
-                    @foreach (var mechanic in mechanics)
-                    {
-                    <option value="@mechanic.Name">@mechanic.Name</option>
-                    }
-                    </select>
-                    }
-                else
-                    {
-                    <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin-top: 4px;">@FormatMechanicName(selectedAppointment.MechanicName)</div>
-                    }
-                    </div>
                     </div>
 
-                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
+                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); @(hasScheduleChanges ? "border-left: 3px solid var(--primary);" : "")">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Schedule</div>
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Schedule @(hasScheduleChanges ? "•" : "")</div>
                     @if (selectedAppointment.Status is "Pending" or "Confirmed")
                     {
-                    <button @onclick="@(async () => { if (isEditingSchedule) CancelEditSchedule(); else await BeginEditSchedule(); })"
-                    style="padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px;">
+                    <button @onclick="@(async () => { if (isEditingSchedule) await SaveEditSchedule(); else await BeginEditSchedule(); })"
+                    style="padding: 4px 10px; border-radius: 4px; @(isEditingSchedule ? "background: var(--primary); color: var(--primary-foreground); border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" : "background: transparent; color: var(--foreground); border: 1px solid var(--border); font-weight: 500;") cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px;">
                     <LucideIcon Name="pencil" Size="12" /> @(isEditingSchedule ? "Done" : "Edit")
                     </button>
                     }
                     </div>
-                    @if (isEditingSchedule)
-                    {
-                    <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: 6px;">
-                    <input type="date" value="@editAppointmentDate.ToString("yyyy-MM-dd")" min="@PhToday.ToString("yyyy-MM-dd")" @onchange="UpdateScheduleDate" aria-label="Appointment date"
-                    style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-sm);" />
-                    @if (isLoadingSlots)
-                    {
-                    <span style="font-size: var(--text-xs); color: var(--muted-foreground);">Loading available slots...</span>
-                    }
-                else
-                    {
-                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;">
-                    @foreach (var time in GenerateAllTimeSlots())
-                    {
-                    var isAvailable = IsTimeSlotAvailable(time);
-                    var isSelected = editTimeSlot == time;
-                    TimeSpan.TryParse(time, out var ts);
-                    var displayHour = ts.Hours > 12 ? ts.Hours - 12 : (ts.Hours == 0 ? 12 : ts.Hours);
-                    var displayTime = $"{displayHour}:{ts.Minutes:D2}";
-                    var ampm = ts.Hours >= 12 ? "PM" : "AM";
-                    <button type="button" @onclick="@(() => { if (isAvailable) editTimeSlot = time; })"
-                    disabled="@(!isAvailable)"
-                    aria-label="@($"{displayTime} {ampm} {(isAvailable ? "available" : "unavailable")}")"
-                    style="min-height: 34px; padding: 6px 4px; border-radius: 6px; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 2px; cursor: @(isAvailable ? "pointer" : "not-allowed"); border: 1px solid @(isSelected ? "var(--primary)" : "var(--border)"); background-color: @(isSelected ? "var(--primary)" : "var(--muted)"); color: @(isSelected ? "var(--primary-foreground)" : isAvailable ? "var(--foreground)" : "var(--muted-foreground)"); opacity: @(isAvailable ? "1" : "0.5");">
-                    <span style="text-decoration: @(isAvailable ? "none" : "line-through");">@displayTime @ampm</span>
-                    </button>
-                    }
-                    </div>
-                    @if (string.IsNullOrWhiteSpace(editTimeSlot))
-                    {
-                    <span style="font-size: var(--text-xs); color: var(--muted-foreground);">Select a time slot.</span>
-                    }
-                    }
-
-                    </div>
-                    }
-                else
-                    {
                     <div style="display: flex; align-items: center; gap: var(--space-3); margin-top: 4px;">
-                    <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground);">@selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy")</span>
-                    <span style="font-size: var(--text-sm); color: var(--info-muted-foreground); font-weight: bold;">@selectedAppointment.TimeSlot</span>
+                    <span style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground);">@(isEditingSchedule || hasScheduleChanges ? editAppointmentDate.ToString("MMMM dd, yyyy") : selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy"))</span>
+                    <span style="font-size: var(--text-sm); color: var(--info-muted-foreground); font-weight: bold;">@((isEditingSchedule || hasScheduleChanges) && !string.IsNullOrWhiteSpace(editTimeSlot) ? editTimeSlot : selectedAppointment.TimeSlot)</span>
                     <span style="font-size: var(--text-xs); color: var(--muted-foreground);">(~@DurationFormatting.Format(selectedAppointment.DurationMinutes))</span>
                     </div>
-                    }
+                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: 4px;"><span style="font-weight: 600;">Mechanic:</span> @((isEditingSchedule || hasScheduleChanges) && !string.IsNullOrWhiteSpace(editMechanicName) ? FormatMechanicName(editMechanicName) : FormatMechanicName(selectedAppointment.MechanicName))</div>
                     </div>
 
                     <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
@@ -1041,87 +993,168 @@ else if (calView == "next7")
                     <div style="font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--foreground); margin-top: 4px;">@(selectedAppointment.Motorcycle?.DisplayName ?? "Not recorded")</div>
                     </div>
 
-                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
-                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Services</div>
-                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
-                    @foreach (var svc in selectedAppointment.ServicesRequested.Split(", ", StringSplitOptions.RemoveEmptyEntries))
+                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); @(hasServiceChanges ? "border-left: 3px solid var(--primary);" : "")">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Selected Services @(hasServiceChanges ? "•" : "")</div>
+                    @if (selectedAppointment.Status is "Pending" or "Confirmed")
                     {
-                    <div style="font-size: var(--text-sm); color: var(--foreground);">• @svc</div>
+                    <button @onclick="@(async () => { if (isEditingServices) await SaveEditServices(); else await BeginEditServices(); })"
+                    style="padding: 4px 10px; border-radius: 4px; @(isEditingServices ? "background: var(--primary); color: var(--primary-foreground); border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" : "background: transparent; color: var(--foreground); border: 1px solid var(--border); font-weight: 500;") cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px;">
+                    <LucideIcon Name="pencil" Size="12" /> @(isEditingServices ? "Done" : "Edit")
+                    </button>
                     }
+                    </div>
+                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
+                    @{
+                    var displayServices = isEditingServices || hasServiceChanges
+                        ? editedServices
+                        : DeserializeServiceJson(selectedAppointment.SelectedServicesJson);
+                    }
+                    @foreach (var svc in displayServices)
+                    {
+                    <div style="display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); align-items: center;">
+                    <span style="font-size: var(--text-sm); color: var(--foreground); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@svc.Name</span>
+                    <div style="display: flex; align-items: center; gap: 2px;">
+                    @if (isEditingServices)
+                        {
+                        <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
+                        <input type="number" step="1"
+                        value="@svc.Price.ToString("F0")"
+                        @oninput="e => UpdateServicePrice(svc.Name, e)"
+                        style="width: 50px; text-align: right; font-weight: bold; color: var(--foreground); background: transparent; border: none; font-size: var(--text-sm); outline: none; padding: 0; border-bottom: 1px dashed var(--muted-foreground);" />
+                        <button type="button" @onclick="() => RemoveEditedService(svc.Name)" aria-label="Remove @svc.Name"
+                        style="min-width: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: none; background: transparent; color: var(--muted-foreground); cursor: pointer; font-size: var(--text-sm); margin-left: 4px;">×</button>
+                        }
+                    else
+                        {
+                        <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱@svc.Price.ToString("N2")</span>
+                        }
+                    </div>
+                    </div>
+                    }
+                    @if (!displayServices.Any())
+                    {
+                    <div style="padding: var(--space-4); display: flex; flex-direction: column; align-items: center; gap: var(--space-1); color: var(--muted-foreground); border: 1px dashed var(--border); border-radius: var(--radius);">
+                    <LucideIcon Name="package-search" Size="20" />
+                    <div style="font-size: var(--text-xs);">No services selected</div>
+                    </div>
+                    }
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border);">
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Services Subtotal</div>
+                    <span style="font-size: var(--text-sm); font-weight: bold; color: var(--foreground);">₱@(displayServices.Sum(s => s.Price).ToString("N2"))</span>
                     </div>
                     </div>
 
-                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
+                    <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); @(hasPartChanges ? "border-left: 3px solid var(--primary);" : "")">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Selected Parts</div>
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Selected Parts @(hasPartChanges ? "•" : "")</div>
                     @if (selectedAppointment.Status is "Pending" or "Confirmed")
                     {
-                    <button @onclick="@(async () => { if (isEditingAppointment) CancelEditAppointment(); else await BeginEditAppointment(); })"
-                    style="padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px;">
+                    <button @onclick="@(async () => { if (isEditingAppointment) await SaveEditAppointment(); else await BeginEditAppointment(); })"
+                    style="padding: 4px 10px; border-radius: 4px; @(isEditingAppointment ? "background: var(--primary); color: var(--primary-foreground); border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" : "background: transparent; color: var(--foreground); border: 1px solid var(--border); font-weight: 500;") cursor: pointer; font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 4px;">
                     <LucideIcon Name="pencil" Size="12" /> @(isEditingAppointment ? "Done" : "Edit")
                     </button>
                     }
                     </div>
-                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: var(--space-3);">
+                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
                     @{
-                    var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
-                    var allProdItems = (breakdown ?? new()).SelectMany(s => s.products.Where(p => p.selected)).DistinctBy(p => p.id).ToList();
                     var productToGenericPart = serviceItemsMap.SelectMany(kv => kv.Value.SelectMany(gi => gi.LinkedProductIds.Select(pid => (pid, gi.Name)))).ToDictionary(x => x.pid, x => x.Name);
-                    }
-                    @if (allProdItems.Any())
+                    List<dynamic> displayParts;
+                    if (isEditingAppointment || hasPartChanges)
                     {
-                    foreach (var group in allProdItems.GroupBy(p => productToGenericPart.TryGetValue(p.id, out var gn) ? gn : (p.category ?? "Parts")))
+                        displayParts = editPartIds
+                            .Select(id => {
+                                var prod = allProducts?.FirstOrDefault(p => p.Id == id);
+                                var qty = GetEditQuantity(id);
+                                var price = GetPartPrice(id, prod?.Price ?? 0);
+                                return (dynamic)new { id = id, name = prod?.Name ?? $"Product #{id}", price = price, qty = qty, category = prod?.Category ?? "Parts", brand = prod?.Brand ?? "" };
+                            })
+                            .ToList();
+                    }
+                    else
+                    {
+                        var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
+                        displayParts = (breakdown ?? new()).SelectMany(s => s.products.Where(p => p.selected)).DistinctBy(p => p.id)
+                            .Select(p => (dynamic)new { id = p.id, name = p.name, price = p.price, qty = 1, category = p.category ?? "Parts", brand = p.brand ?? "" })
+                            .ToList();
+                    }
+                    }
+                    @if (displayParts.Any())
+                    {
+                    @foreach (var part in displayParts)
+                    {
+                    var catLabel = productToGenericPart.TryGetValue((int)part.id, out var gn) ? gn : ((string)part.category ?? "Parts");
+                    <div style="display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); align-items: center;">
+                    <div style="flex: 1; min-width: 0; overflow: hidden;">
+                    <span style="font-size: var(--text-sm); color: var(--foreground);">@part.name</span>
+                    <span style="font-size: 10px; color: var(--primary); font-weight: bold; margin-left: 4px;">@catLabel</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 2px;">
+                    @if (isEditingAppointment)
                         {
-                        <div>
-                        <div style="font-size: 10px; color: var(--primary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">@group.Key</div>
-                        @foreach (var part in group)
+                        <button type="button" @onclick="() => EditPartQuantity((int)part.id, -1)" aria-label="Decrease quantity"
+                        style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">−</button>
+                        <span style="min-width: 18px; text-align: center; font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--foreground);">@((int)part.qty)</span>
+                        <button type="button" @onclick="() => EditPartQuantity((int)part.id, 1)" aria-label="Increase quantity"
+                        style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">+</button>
+                        }
+                    <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
+                    @if (isEditingAppointment)
                         {
-                        var price = GetPartPrice(part.id, part.price);
-                        <div style="display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); margin-bottom: 4px;">
-                        <span style="font-size: var(--text-sm); color: var(--foreground);">@part.name</span>
-                        <div style="display: flex; align-items: center; gap: 2px;">
-                        @if (isEditingAppointment)
-                            {
-                            <button type="button" @onclick="() => EditPartQuantity(part.id, -1)" aria-label="Decrease quantity of @part.name"
-                            style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">−</button>
-                            <span style="min-width: 18px; text-align: center; font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--foreground);">@GetEditQuantity(part.id)</span>
-                            <button type="button" @onclick="() => EditPartQuantity(part.id, 1)" aria-label="Increase quantity of @part.name"
-                            style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">+</button>
-                            }
-                        <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
                         <input type="number" step="1" class="price-input"
-                        value="@price.ToString("F0")"
-                        disabled="@(!isEditingAppointment)"
-                        @oninput="e => UpdatePartPrice(part.id, e)"
-                        style="@($"width: 50px; text-align: right; font-weight: bold; color: var(--foreground); background: transparent; border: none; font-size: var(--text-sm); outline: none; padding: 0; border-bottom: 1px {(isEditingAppointment ? "dashed" : "solid")} var(--muted-foreground);")" />
-                        </div>
-                        </div>
-                        }
-                        </div>
-                        }
+                        value="@(((decimal)part.price).ToString("F0"))"
+                        @oninput="e => UpdatePartPrice((int)part.id, e)"
+                        style="width: 50px; text-align: right; font-weight: bold; color: var(--foreground); background: transparent; border: none; font-size: var(--text-sm); outline: none; padding: 0; border-bottom: 1px dashed var(--muted-foreground);" />
                         }
                     else
                         {
-                        <div style="font-size: var(--text-sm); color: var(--muted-foreground); font-style: italic; margin-top: 4px;">No parts selected</div>
+                        <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">@(((decimal)part.price * (int)part.qty).ToString("N2"))</span>
                         }
+                    </div>
+                    </div>
+                    }
+                    }
+                    else
+                    {
+                    <div style="padding: var(--space-4); display: flex; flex-direction: column; align-items: center; gap: var(--space-1); color: var(--muted-foreground); border: 1px dashed var(--border); border-radius: var(--radius);">
+                    <LucideIcon Name="package-search" Size="20" />
+                    <div style="font-size: var(--text-xs);">No parts selected</div>
+                    </div>
+                    }
+                    </div>
+                    @{
+                    var partsSubtotal = isEditingAppointment
+                        ? editPartsTotal
+                        : (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0);
+                    var svcTotal = (isEditingServices || hasServiceChanges)
+                        ? editedServicesTotal
+                        : DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price);
+                    var appointmentSubtotal = svcTotal + partsSubtotal;
+                    var downpayment = selectedAppointment?.PaymentStatus == "Paid" ? (selectedAppointment?.PaymentAmount ?? 0) : 0;
+                    }
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border);">
+                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Parts Subtotal</div>
+                    <span style="font-size: var(--text-sm); font-weight: bold; color: var(--foreground);">₱@partsSubtotal.ToString("N2")</span>
+                    </div>
+                    </div>
+
+                        <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Appointment Subtotal</div>
+                        <span style="font-size: var(--text-sm); font-weight: bold; color: var(--foreground);">₱@appointmentSubtotal.ToString("N2")</span>
                         </div>
+
+                        @if (downpayment > 0)
+                        {
+                        <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Downpayment Credit</div>
+                        <span style="font-size: var(--text-sm); font-weight: bold; color: var(--foreground);">-₱@downpayment.ToString("N2")</span>
                         </div>
+                        }
 
                         <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); display: flex; justify-content: space-between; align-items: center;">
                         <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Total Amount</div>
-                        <span style="font-size: var(--text-xl); font-weight: 900; color: var(--primary);">
-                        ₱@((isEditingAppointment ? editPartsTotal + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.Sum(s => s.servicePrice) ?? 0) : selectedAppointment.TotalAmount).ToString("N2"))
-                        </span>
-                        </div>
-
-                        <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted); display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Payment Status</div>
-                        <span class="inline-flex items-center gap-2">
-                        <span class="inline-block w-2.5 h-2.5 rounded-full @(selectedAppointment.PaymentStatus == "Paid" ? "bg-green-500" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "bg-yellow-400" : selectedAppointment.PaymentStatus == "Failed" || selectedAppointment.PaymentStatus == "Expired" ? "bg-red-500" : "bg-muted-foreground/40")" aria-hidden="true"></span>
-                        <span style="font-size: var(--text-sm); font-weight: 600; color: var(--foreground);">
-                        @(selectedAppointment.PaymentStatus == "Paid" ? "Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? "Awaiting Payment" : selectedAppointment.PaymentStatus == "Failed" ? "Payment Failed" : selectedAppointment.PaymentStatus == "Expired" ? "Payment Expired" : "N/A")
-                        </span>
-                        </span>
+                        <span style="font-size: var(--text-xl); font-weight: 900; color: var(--primary);">₱@((appointmentSubtotal - downpayment).ToString("N2"))</span>
                         </div>
 
                         @if (selectedAppointment.Status == "Confirmed")
@@ -1139,10 +1172,20 @@ else if (calView == "next7")
 
                         }
                         </div>
+                        @if (isEditingAppointment || isEditingServices || isEditingSchedule)
+                        {
+                        <div style="min-width: 0; flex: 1; display: flex; flex-direction: column;">
+                        <div style="border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; flex: 1;">
+                        <div class="md:hidden" style="flex-shrink: 0; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: flex-end;">
+                        <button @onclick="@(async () => { if (isEditingAppointment) await SaveEditAppointment(); else if (isEditingServices) await SaveEditServices(); else if (isEditingSchedule) await SaveEditSchedule(); })"
+                        style="padding: 4px 12px; border-radius: 4px; background: var(--primary); color: var(--primary-foreground); border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.2); cursor: pointer; font-size: var(--text-xs); font-weight: 500;">
+                        Done
+                        </button>
+                        </div>
+                        </div>
                         @if (isEditingAppointment)
                         {
-                        <div style="min-width: 0; display: flex; flex-direction: column;">
-                        <div style="border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; flex: 1;">
                         <ProductCatalog Columns="3"
                         Products="allProducts"
                         OnProductClick="p => ToggleEditPart(p)"
@@ -1154,43 +1197,77 @@ else if (calView == "next7")
                         OnQuantityIncrease="p => EditPartQuantity(p.Id, 1)"
                         IsDisabled="_ => false"
                         AllowDisabledClick="true" />
+                        }
+                        else if (isEditingServices)
+                        {
+                        <ServiceCatalog Columns="3"
+                        Services="allStoreServices"
+                        OnServiceClick="s => ToggleEditService(s)"
+                        IsSelected="s => editedServices.Any(es => es.Name == s.Name)" />
+                        }
+                        else if (isEditingSchedule)
+                        {
+                        <div class="pc-catalog">
+                        <div style="flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4);">
+                        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Select Date</div>
+                        <input type="date" value="@editAppointmentDate.ToString("yyyy-MM-dd")" min="@PhToday.ToString("yyyy-MM-dd")" @onchange="UpdateScheduleDate" aria-label="Appointment date"
+                        style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-sm);" />
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Select Mechanic</div>
+                        <select @bind="editMechanicName" aria-label="Mechanic"
+                        style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-sm);">
+                        <option value="">Any Available</option>
+                        @foreach (var mechanic in mechanics)
+                        {
+                        <option value="@mechanic.Name">@mechanic.Name</option>
+                        }
+                        </select>
+                        </div>
+                        @if (isLoadingSlots)
+                        {
+                        <span style="font-size: var(--text-xs); color: var(--muted-foreground);">Loading available slots...</span>
+                        }
+                        else
+                        {
+                        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Select Time</div>
+                        <div class="schedule-slots-grid" style="max-height: 450px; overflow-y: auto; padding-bottom: 60px;">
+                        @foreach (var time in GenerateAllTimeSlots())
+                        {
+                        var isAvailable = IsTimeSlotAvailable(time);
+                        var isSelected = editTimeSlot == time;
+                        TimeSpan.TryParse(time, out var ts);
+                        var displayHour = ts.Hours > 12 ? ts.Hours - 12 : (ts.Hours == 0 ? 12 : ts.Hours);
+                        var displayTime = $"{displayHour}:{ts.Minutes:D2}";
+                        var ampm = ts.Hours >= 12 ? "PM" : "AM";
+                        <button type="button" @onclick="@(() => { if (isAvailable) editTimeSlot = time; })"
+                        disabled="@(!isAvailable)"
+                        aria-label="@($"{displayTime} {ampm} {(isAvailable ? "available" : "unavailable")}")"
+                        style="min-height: 42px; padding: 8px 4px; border-radius: 6px; font-size: var(--text-xs); display: inline-flex; align-items: center; justify-content: center; gap: 2px; cursor: @(isAvailable ? "pointer" : "not-allowed"); border: 1px solid @(isSelected ? "var(--primary)" : "var(--border)"); background-color: @(isSelected ? "var(--primary)" : "var(--muted)"); color: @(isSelected ? "var(--primary-foreground)" : isAvailable ? "var(--foreground)" : "var(--muted-foreground)"); opacity: @(isAvailable ? "1" : "0.5");">
+                        <span style="text-decoration: @(isAvailable ? "none" : "line-through");">@displayTime @ampm</span>
+                        </button>
+                        }
+                        </div>
+                        @if (string.IsNullOrWhiteSpace(editTimeSlot))
+                        {
+                        <span style="font-size: var(--text-xs); color: var(--muted-foreground);">Select a time slot.</span>
+                        }
+                        </div>
+                        }
+                        </div>
+                        </div>
+                        }
                         </div>
                         </div>
                         }
                         </div>
 
-                        @if (isEditingAppointment)
+                        @if (!isEditingAppointment && !isEditingServices && !isEditingSchedule && selectedAppointment != null)
                         {
-                        <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding: var(--space-3) var(--space-4); display: flex; justify-content: flex-end; gap: var(--space-2);">
-                        <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelEditAppointment">Cancel</BbButton>
-                        <BbButton Variant="ButtonVariant.Default" OnClick="SaveEditAppointment" Disabled="isProcessingParts">
-                        @if (isProcessingParts)
-                        {
-                        <BbSpinner Size="SpinnerSize.Small" />
-                        }
-                        Save Parts
-                        </BbButton>
-                        </div>
-                        }
-                    else if (isEditingSchedule)
-                        {
-                        <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding: var(--space-3) var(--space-4); display: flex; justify-content: flex-end; gap: var(--space-2);">
-                        <BbButton Variant="ButtonVariant.Ghost" OnClick="CancelEditSchedule">Cancel</BbButton>
-                        <BbButton Variant="ButtonVariant.Default" OnClick="SaveEditSchedule" Disabled="isSavingSchedule">
-                        @if (isSavingSchedule)
-                        {
-                        <BbSpinner Size="SpinnerSize.Small" />
-                        }
-                        Save Details
-                        </BbButton>
-                        </div>
-                        }
-                    else
-                        {
-                        <div style="display: flex; justify-content: end; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); flex-shrink: 0;">
-                        @if (selectedAppointment != null)
-                        {
-                        var s = selectedAppointment;
+                        <div style="display: flex; justify-content: end; align-items: center; gap: var(--space-2); @(HasAnyChanges ? "padding: var(--space-2) var(--space-4) 0;" : "padding: var(--space-3) var(--space-4);") border-top: 1px solid var(--border); flex-shrink: 0;">
+                        @{ var s = selectedAppointment; }
                         <div style="display: flex; gap: 6px;">
                         @if (s.Status == "Pending")
                         {
@@ -1201,7 +1278,7 @@ else if (calView == "next7")
                         Cancel
                         </BbButton>
                         }
-                    else if (s.Status == "Confirmed")
+                        else if (s.Status == "Confirmed")
                         {
                         <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--positive" OnClick="@(() => RequestCompletion(s))" Disabled="@(isCheckingOut || showCompletionConfirmation)">
                         @(isCheckingOut ? "Processing..." : "Complete")
@@ -1209,14 +1286,29 @@ else if (calView == "next7")
                         <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--warning" OnClick="@(() => RequestRestrictedStatusChange(s, "Pending", "Unconfirm appointment"))">Unconfirm</BbButton>
                         <BbButton Variant="ButtonVariant.Destructive" Class="appointment-action appointment-action--danger" OnClick="@(() => RequestRestrictedStatusChange(s, "Cancelled", "Cancel confirmed appointment"))">Cancel</BbButton>
                         }
-                    else if (s.Status is "Completed" or "Cancelled")
+                        else if (s.Status is "Completed" or "Cancelled")
                         {
                         <BbButton Variant="ButtonVariant.Default" Class="appointment-action appointment-action--primary" OnClick="@(() => RequestRestrictedStatusChange(s, "Pending", "Reopen appointment"))">
                         Reopen
                         </BbButton>
                         }
                         </div>
+                        </div>
                         }
+
+                        @if (HasAnyChanges && !isEditingAppointment && !isEditingServices && !isEditingSchedule && selectedAppointment != null)
+                        {
+                        <div style="position: sticky; bottom: 0; left: 0; right: 0; z-index: 10; background: var(--card); border-top: 1px solid var(--border); padding: var(--space-3) var(--space-4); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <span style="font-size: var(--text-sm); color: var(--muted-foreground);">
+                        @(new[] { hasPartChanges, hasServiceChanges, hasScheduleChanges }.Count(x => x)) change@(new[] { hasPartChanges, hasServiceChanges, hasScheduleChanges }.Count(x => x) == 1 ? "" : "s") staged
+                        </span>
+                        <div style="display: flex; gap: var(--space-2);">
+                        <BbButton Variant="ButtonVariant.Ghost" OnClick="DiscardStagedChanges">Discard</BbButton>
+                        <BbButton Variant="ButtonVariant.Default" OnClick="SaveAllChanges" Disabled="@(isSavingSchedule || isProcessingParts || isProcessingServices)">
+                        @if (isSavingSchedule || isProcessingParts || isProcessingServices) { <BbSpinner Size="SpinnerSize.Small" /> }
+                        Save Changes
+                        </BbButton>
+                        </div>
                         </div>
                         }
                         </BbDialogContent>
@@ -1416,6 +1508,11 @@ else if (calView == "next7")
                         private Dictionary<int, decimal> editedPrices = new();
                         private Dictionary<int, int> editQuantities = new();
                         private bool isProcessingParts;
+                        private bool isEditingServices;
+                        private List<StoreService> allStoreServices = new();
+                        private List<(string Name, decimal Price)> editedServices = new();
+                        private decimal editedServicesTotal;
+                        private bool isProcessingServices;
                         private bool isEditingSchedule;
                         private DateTime editAppointmentDate;
                         private string editTimeSlot = "";
@@ -1431,13 +1528,22 @@ else if (calView == "next7")
                         private AppointmentDto? restrictedAppointment;
                         private string restrictedTargetStatus = "";
                         private string restrictedActionTitle = "";
-                        private string restrictedReason = "";
+                                        private string restrictedReason = "";
                         private string restrictedAdminUserId = "";
                         private string restrictedAdminPin = "";
                         private List<AdminOption> adminOptions = [];
                         private bool isLoadingAdminOptions;
                         private bool restrictedPartsChange;
                         private bool restrictedScheduleChange;
+                        private bool restrictedServicesChange;
+                        private bool hasPartChanges;
+                        private bool hasServiceChanges;
+                        private bool hasScheduleChanges;
+                        private bool HasAnyChanges => hasPartChanges || hasServiceChanges || hasScheduleChanges;
+                        private string originalServicesJson = "";
+                        private DateTime originalDate;
+                        private string originalTimeSlot = "";
+                        private string originalMechanic = "";
 
                         private List<SortDropdown.SortOption> GetSortColumns() => new()
                         {
@@ -1497,6 +1603,7 @@ else if (calView == "next7")
                             {
                             if (selectedAppointment == null) return;
                                 if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
+                                isEditingServices = false; isEditingSchedule = false;
                                     allProducts = await Http.GetFromJsonAsync<List<Product>>("api/products");
                                     var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
                                     var allParts = (breakdown ?? new())
@@ -1528,22 +1635,147 @@ else if (calView == "next7")
                                     editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
                                         }
 
-                                        private void CancelEditAppointment()
+                                                                                                         private void CancelEditAppointment()
+                                                                                                         {
+                                                                                                         isEditingAppointment = false;
+                                                                                                         hasPartChanges = false;
+                                                                                                         editPartIds.Clear();
+                                                                                                         editedPrices.Clear();
+                                                                                                         editQuantities.Clear();
+                                                                                                         }
+
+                                                                                                         private void DiscardStagedChanges()
+                                                                                                         {
+                                                                                                         hasPartChanges = false;
+                                                                                                         hasServiceChanges = false;
+                                                                                                         hasScheduleChanges = false;
+                                                                                                         Toast.Success("Staged changes discarded.", "Discarded");
+                                                                                                         }
+
+                                        private async Task BeginEditServices()
                                         {
-                                        isEditingAppointment = false;
-                                        editPartIds.Clear();
-                                        editedPrices.Clear();
-                                        editQuantities.Clear();
+                                        if (selectedAppointment == null) return;
+                                        if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
+                                        isEditingAppointment = false; isEditingSchedule = false;
+                                        try
+                                        {
+                                        var dtos = await Http.GetFromJsonAsync<List<StoreServiceDto>>("api/services") ?? [];
+                                        allStoreServices = dtos.Select(d => new StoreService { Id = d.Id, Name = d.Name, Price = d.Price, Category = d.Category, EstimatedMinutes = d.EstimatedMinutes, Status = d.Status }).ToList();
                                         }
+                                        catch { allStoreServices = new(); }
+                                        var saved = DeserializeServiceJson(selectedAppointment.SelectedServicesJson);
+                                        editedServices = saved.ToList();
+                                        RecalcServiceTotal();
+                                        originalServicesJson = selectedAppointment.SelectedServicesJson ?? "";
+                                        isEditingServices = true;
+                                        StateHasChanged();
+                                        }
+
+                                        private void ToggleEditService(StoreService svc)
+                                        {
+                                        var idx = editedServices.FindIndex(es => es.Name == svc.Name);
+                                        if (idx >= 0) editedServices.RemoveAt(idx);
+                                        else editedServices.Add((svc.Name, svc.Price));
+                                        RecalcServiceTotal();
+                                        }
+
+                                        private void UpdateServicePrice(string name, ChangeEventArgs e)
+                                        {
+                                        if (decimal.TryParse(e.Value?.ToString(), out var v))
+                                        {
+                                        var idx = editedServices.FindIndex(es => es.Name == name);
+                                        if (idx >= 0) editedServices[idx] = (name, v);
+                                        RecalcServiceTotal();
+                                        }
+                                        }
+
+                                        private void RemoveEditedService(string name)
+                                        {
+                                        editedServices.RemoveAll(es => es.Name == name);
+                                        RecalcServiceTotal();
+                                        }
+
+                                        private void RecalcServiceTotal() =>
+                                        editedServicesTotal = editedServices.Sum(s => s.Price);
+
+                                                                                                         private async Task SaveEditServices()
+                                                                                                         {
+                                                                                                         if (selectedAppointment == null) return;
+                                                                                                         if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
+                                                                                                         if (selectedAppointment.Status == "Confirmed")
+                                                                                                         {
+                                                                                                         var currentJson = System.Text.Json.JsonSerializer.Serialize(editedServices.Select(s => new { Name = s.Name, Price = s.Price }));
+                                                                                                         if (currentJson == originalServicesJson)
+                                                                                                         {
+                                                                                                         isEditingServices = false;
+                                                                                                         Toast.Info("No changes detected.", "No changes");
+                                                                                                         return;
+                                                                                                         }
+                                                                                                         hasServiceChanges = true;
+                                                                                                         isEditingServices = false;
+                                                                                                         Toast.Success("Services changes staged. Click Save Changes to apply.", "Staged");
+                                                                                                         StateHasChanged();
+                                                                                                         return;
+                                                                                                         }
+                                                                                                         await SaveEditServicesCore();
+                                                                                                         }
+
+                                        private async Task SaveEditServicesCore()
+                                        {
+                                        if (selectedAppointment == null) return;
+                                        if (editedServices.Count == 0)
+                                        {
+                                        Toast.Error("At least one service is required.", "Validation");
+                                        return;
+                                        }
+                                        isProcessingServices = true;
+                                        try
+                                        {
+                                        var json = System.Text.Json.JsonSerializer.Serialize(editedServices.Select(s => new { Name = s.Name, Price = s.Price }));
+                                        var response = await Http.PutAsJsonAsync($"api/appointments/{selectedAppointment.Id}/services",
+                                        new { SelectedServicesJson = json, AdminUserId = NullIfAdmin(restrictedAdminUserId), AdminPin = NullIfAdmin(restrictedAdminPin), Reason = RestrictedReasonOrNull() });
+                                        if (response.IsSuccessStatusCode)
+                                        {
+                                        selectedAppointment.SelectedServicesJson = json;
+                                        selectedAppointment.ServicesRequested = string.Join(", ", editedServices.Select(s => s.Name));
+                                        var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                                        if (result != null && result.TryGetValue("totalAmount", out var ta) && ta is JsonElement te && te.TryGetDecimal(out var newTotal))
+                                            selectedAppointment.TotalAmount = newTotal;
+                                        isEditingServices = false;
+                                        await LoadAuditTrail(selectedAppointment.Id);
+                                        }
+                                        else
+                                        {
+                                        Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "The services could not be updated."), "Services update failed");
+                                        }
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                        Toast.Error(ApiErrorMessage.FromException(exception, "The services could not be updated. Please try again."), "Services update failed");
+                                        }
+                                        finally { isProcessingServices = false; }
+                                        }
+
+                                                                                                        private void CancelEditServices()
+                                                                                                        {
+                                                                                                        isEditingServices = false;
+                                                                                                        hasServiceChanges = false;
+                                                                                                        editedServices.Clear();
+                                                                                                        allStoreServices.Clear();
+                                                                                                        }
 
                                         private async Task BeginEditSchedule()
                                         {
                                         if (selectedAppointment == null) return;
                                             if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
+                                            isEditingAppointment = false; isEditingServices = false;
                                                 editAppointmentDate = selectedAppointment.AppointmentDate;
                                                 editTimeSlot = selectedAppointment.TimeSlot ?? "";
                                                 editMechanicName = string.Equals(selectedAppointment.MechanicName, "Any Available", StringComparison.OrdinalIgnoreCase)
                                                 ? "" : selectedAppointment.MechanicName ?? "";
+                                                originalDate = editAppointmentDate;
+                                                originalTimeSlot = editTimeSlot;
+                                                originalMechanic = editMechanicName;
                                                 if (mechanics.Count == 0)
                                                     await LoadMechanics();
                                                     await FetchBookedSlots();
@@ -1551,10 +1783,11 @@ else if (calView == "next7")
                                                     StateHasChanged();
                                                     }
 
-                                                    private void CancelEditSchedule()
-                                                    {
-                                                    isEditingSchedule = false;
-                                                    }
+                                                                                                        private void CancelEditSchedule()
+                                                                                                        {
+                                                                                                        isEditingSchedule = false;
+                                                                                                        hasScheduleChanges = false;
+                                                                                                        }
 
                                                     private async Task LoadMechanics()
                                                     {
@@ -1654,17 +1887,26 @@ else if (calView == "next7")
                                                                                                 return interval.Start == ownStart && interval.End == ownEnd;
                                                                                                 }
 
-                                                                                                private async Task SaveEditSchedule()
-                                                                                                {
-                                                                                                if (selectedAppointment == null) return;
-                                                                                                    if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
-                                                                                                        if (selectedAppointment.Status == "Confirmed")
-                                                                                                            {
-                                                                                                            RequestRestrictedScheduleChange("Approve appointment schedule change");
-                                                                                                            return;
-                                                                                                            }
-                                                                                                            await SaveEditScheduleCore();
-                                                                                                            }
+                                                                                                 private async Task SaveEditSchedule()
+                                                                                                 {
+                                                                                                 if (selectedAppointment == null) return;
+                                                                                                     if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
+                                                                                                         if (selectedAppointment.Status == "Confirmed")
+                                                                                                             {
+                                                                                                             if (editAppointmentDate == originalDate && editTimeSlot == originalTimeSlot && editMechanicName == originalMechanic)
+                                                                                                             {
+                                                                                                             isEditingSchedule = false;
+                                                                                                             Toast.Info("No changes detected.", "No changes");
+                                                                                                             return;
+                                                                                                             }
+                                                                                                             hasScheduleChanges = true;
+                                                                                                             isEditingSchedule = false;
+                                                                                                             Toast.Success("Schedule changes staged. Click Save Changes to apply.", "Staged");
+                                                                                                             StateHasChanged();
+                                                                                                             return;
+                                                                                                             }
+                                                                                                             await SaveEditScheduleCore();
+                                                                                                 }
 
                                                                                                             private async Task SaveEditScheduleCore()
                                                                                                             {
@@ -1700,17 +1942,29 @@ else if (calView == "next7")
                                                                                                                         finally { isSavingSchedule = false; }
                                                                                                                         }
 
-                                                                                                                        private async Task SaveEditAppointment()
-                                                                                                                        {
-                                                                                                                        if (selectedAppointment == null) return;
-                                                                                                                            if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
-                                                                                                                                if (selectedAppointment.Status == "Confirmed")
-                                                                                                                                    {
-                                                                                                                                    RequestRestrictedPartsChange("Approve appointment parts and prices");
-                                                                                                                                    return;
-                                                                                                                                    }
-                                                                                                                                    await SaveEditAppointmentCore();
-                                                                                                                                    }
+                                                                                                                          private async Task SaveEditAppointment()
+                                                                                                                          {
+                                                                                                                          if (selectedAppointment == null) return;
+                                                                                                                              if (selectedAppointment.Status is "Completed" or "Cancelled" or "Expired") return;
+                                                                                                                                  if (selectedAppointment.Status == "Confirmed")
+                                                                                                                                  {
+                                                                                                                                  var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson) ?? new();
+                                                                                                                                  var origParts = breakdown.SelectMany(s => s.products.Where(p => p.selected)).DistinctBy(p => p.id).Select(p => (id: p.id, price: p.price, qty: 1, category: p.category ?? "", brand: p.brand ?? "")).OrderBy(p => p.id).ToList();
+                                                                                                                                  var currentParts = editPartIds.Select(id => { var price = GetPartPrice(id, 0); return (id, price, qty: GetEditQuantity(id), category: "", brand: ""); }).OrderBy(p => p.id).ToList();
+                                                                                                                                  if (origParts.Count == currentParts.Count && origParts.Zip(currentParts).All(o => o.First.id == o.Second.id && o.First.price == o.Second.price && o.First.qty == o.Second.qty))
+                                                                                                                                  {
+                                                                                                                                  isEditingAppointment = false;
+                                                                                                                                  Toast.Info("No changes detected.", "No changes");
+                                                                                                                                  return;
+                                                                                                                                  }
+                                                                                                                                  hasPartChanges = true;
+                                                                                                                                  isEditingAppointment = false;
+                                                                                                                                  Toast.Success("Parts changes staged. Click Save Changes to apply.", "Staged");
+                                                                                                                                  StateHasChanged();
+                                                                                                                                  return;
+                                                                                                                                  }
+                                                                                                                                  await SaveEditAppointmentCore();
+                                                                                                                          }
 
                                                                                                                                     private async Task SaveEditAppointmentCore()
                                                                                                                                     {
@@ -2024,16 +2278,33 @@ else if (calView == "next7")
                                                                                                                                                                                 private static string RemoveStockQuantities(string value) =>
                                                                                                                                                                                 Regex.Replace(value, @"\s*\(available:\s*\d+,\s*(?:needed|requested):\s*\d+\)", "", RegexOptions.IgnoreCase);
 
+                                                                                                                                                                                private void SaveAllChanges()
+                                                                                                                                                                                {
+                                                                                                                                                                                if (selectedAppointment is null) return;
+                                                                                                                                                                                restrictedAppointment = selectedAppointment;
+                                                                                                                                                                                restrictedPartsChange = hasPartChanges;
+                                                                                                                                                                                restrictedScheduleChange = hasScheduleChanges;
+                                                                                                                                                                                restrictedServicesChange = hasServiceChanges;
+                                                                                                                                                                                restrictedTargetStatus = "";
+                                                                                                                                                                                restrictedActionTitle = "Approve all staged changes";
+                                                                                                                                                                                restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
+                                                                                                                                                                                showReasonDialog = true;
+                                                                                                                                                                                }
+
                                                                                                                                                                                 private void RequestRestrictedStatusChange(AppointmentDto appointment, string targetStatus, string title)
                                                                                                                                                                                 {
                                                                                                                                                                                 restrictedAppointment = appointment;
-                                                                                                                                                                                restrictedPartsChange = false;
-                                                                                                                                                                                restrictedScheduleChange = false;
-                                                                                                                                                                                restrictedTargetStatus = targetStatus;
+                                                                                                                                                                                 restrictedPartsChange = false;
+                                                                                                                                                                                 restrictedScheduleChange = false;
+                                                                                                                                                                                 restrictedServicesChange = false;
+                                                                                                                                                                                 restrictedTargetStatus = targetStatus;
                                                                                                                                                                                 restrictedActionTitle = title;
                                                                                                                                                                                  restrictedReason = "";
                                                                                                                                                                                  restrictedAdminUserId = "";
                                                                                                                                                                                  restrictedAdminPin = "";
+                                                                                                                                                                                 hasPartChanges = false;
+                                                                                                                                                                                 hasServiceChanges = false;
+                                                                                                                                                                                 hasScheduleChanges = false;
                                                                                                                                                                                  showReasonDialog = true;
                                                                                                                                                                                 }
 
@@ -2046,7 +2317,8 @@ else if (calView == "next7")
                                                                                                                                                                                 restrictedAdminPin = "";
                                                                                                                                                                                  restrictedPartsChange = false;
                                                                                                                                                                                  restrictedScheduleChange = false;
-                                                                                                                                                                                 }
+                                                                                                                                                                                 restrictedServicesChange = false;
+                                                                                                                                                                                }
 
                                                                                                                                                                                 private void OnReasonDialogOpenChanged()
                                                                                                                                                                                 {
@@ -2075,23 +2347,31 @@ else if (calView == "next7")
                                                                                                                                                                                                     await SaveEditAppointmentCore();
                                                                                                                                                                                                     changed = !isEditingAppointment;
                                                                                                                                                                                                     }
-                                                                                                                                                                                                else if (restrictedScheduleChange)
-                                                                                                                                                                                                    {
-                                                                                                                                                                                                    await SaveEditScheduleCore();
-                                                                                                                                                                                                    changed = !isEditingSchedule;
-                                                                                                                                                                                                    }
+                                                                 else if (restrictedScheduleChange)
+                                                                                                                                     {
+                                                                                                                                     await SaveEditScheduleCore();
+                                                                                                                                     changed = !isEditingSchedule;
+                                                                                                                                     }
+                                                                                                                                 else if (restrictedServicesChange)
+                                                                                                                                     {
+                                                                                                                                     await SaveEditServicesCore();
+                                                                                                                                     changed = !isEditingServices;
+                                                                                                                                     }
                                                                                                                                                                                                 else
                                                                                                                                                                                                     {
                                                                                                                                                                                                     changed = await UpdateStatus(restrictedAppointment, restrictedTargetStatus, restrictedReason.Trim(),
                                                                                                                                                                                                     NullIfAdmin(restrictedAdminUserId), NullIfAdmin(restrictedAdminPin));
                                                                                                                                                                                                     }
-                                                                                                                                                                                                    isChangingRestrictedStatus = false;
-                                                                                                                                                                                                    restrictedAdminPin = "";
-                                                                                                                                                                                                    if (changed)
-                                                                                                                                                                                                        {
-                                                                                                                                                                                                        showDetailModal = false;
-                                                                                                                                                                                                        CloseReasonDialog();
-                                                                                                                                                                                                        }
+                                                                                                                                                                                                     isChangingRestrictedStatus = false;
+                                                                                                                                                                                                     restrictedAdminPin = "";
+                                                                                                                                                                                                     if (changed)
+                                                                                                                                                                                                         {
+                                                                                                                                                                                                         hasPartChanges = false;
+                                                                                                                                                                                                         hasServiceChanges = false;
+                                                                                                                                                                                                         hasScheduleChanges = false;
+                                                                                                                                                                                                         showDetailModal = false;
+                                                                                                                                                                                                         CloseReasonDialog();
+                                                                                                                                                                                                         }
                                                                                                                                                                                                      else
                                                                                                                                                                                                          {
                                                                                                                                                                                                          Toast.Error("The change was not approved. Check the details and try again.", "Change failed");
@@ -2109,16 +2389,29 @@ else if (calView == "next7")
                                                                                                                                                                                                              showReasonDialog = true;
                                                                                                                                                                                                             }
 
-                                                                                                                                                                                                            private void RequestRestrictedScheduleChange(string title)
-                                                                                                                                                                                                            {
-                                                                                                                                                                                                            if (selectedAppointment is null) return;
-                                                                                                                                                                                                                restrictedAppointment = selectedAppointment;
-                                                                                                                                                                                                                restrictedPartsChange = false;
-                                                                                                                                                                                                                restrictedScheduleChange = true;
-                                                                                                                                                                                                                restrictedActionTitle = title;
-                                                                                                                                                                                                                 restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
-                                                                                                                                                                                                                 showReasonDialog = true;
-                                                                                                                                                                                                                }
+                                                                                                                                                                                                             private void RequestRestrictedScheduleChange(string title)
+                                                                                                                                                                                                             {
+                                                                                                                                                                                                             if (selectedAppointment is null) return;
+                                                                                                                                                                                                                 restrictedAppointment = selectedAppointment;
+                                                                                                                                                                                                                 restrictedPartsChange = false;
+                                                                                                                                                                                                                 restrictedScheduleChange = true;
+                                                                                                                                                                                                                 restrictedServicesChange = false;
+                                                                                                                                                                                                                 restrictedActionTitle = title;
+                                                                                                                                                                                                                  restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
+                                                                                                                                                                                                                  showReasonDialog = true;
+                                                                                                                                                                                                                 }
+
+                                                                                                                                                                                                                  private void RequestRestrictedServicesChange(string title)
+                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                  if (selectedAppointment is null) return;
+                                                                                                                                                                                                                      restrictedAppointment = selectedAppointment;
+                                                                                                                                                                                                                      restrictedPartsChange = false;
+                                                                                                                                                                                                                      restrictedScheduleChange = false;
+                                                                                                                                                                                                                      restrictedServicesChange = true;
+                                                                                                                                                                                                                      restrictedActionTitle = title;
+                                                                                                                                                                                                                       restrictedReason = restrictedAdminUserId = restrictedAdminPin = "";
+                                                                                                                                                                                                                      showReasonDialog = true;
+                                                                                                                                                                                                                     }
 
                                                                                                                                                                                                                 private string? NullIfAdmin(string value) => isAdmin ? null : value.Trim();
                                                                                                                                                                                                                 private string? RestrictedReasonOrNull() => string.IsNullOrWhiteSpace(restrictedReason) ? null : restrictedReason.Trim();
@@ -2252,16 +2545,34 @@ else if (calView == "next7")
                                                                                                                                                                                                                                                                         ? entry.ActorRole
                                                                                                                                                                                                                                                                         : $"{entry.ActorName} ({entry.ActorRole})";
 
-                                                                                                                                                                                                                                                                        private List<ProductBreakdownEntry>? ParseProductBreakdown(string? json)
-                                                                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                                                                        if (string.IsNullOrWhiteSpace(json)) return null;
+                                                                                                                                                                                                                                                                         private List<ProductBreakdownEntry>? ParseProductBreakdown(string? json)
+                                                                                                                                                                                                                                                                         {
+                                                                                                                                                                                                                                                                         if (string.IsNullOrWhiteSpace(json)) return null;
 
-                                                                                                                                                                                                                                                                            try
-                                                                                                                                                                                                                                                                            {
-                                                                                                                                                                                                                                                                            return JsonSerializer.Deserialize<List<ProductBreakdownEntry>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                                                                                                                                                                                                                                                                            }
-                                                                                                                                                                                                                                                                            catch { return null; }
-                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                             try
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             return JsonSerializer.Deserialize<List<ProductBreakdownEntry>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                                                                                                                                                                                                                                                                             }
+                                                                                                                                                                                                                                                                             catch { return null; }
+                                                                                                                                                                                                                                                                             }
+
+                                                                                                                                                                                                                                                                             private List<(string Name, decimal Price)> DeserializeServiceJson(string? json)
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             if (string.IsNullOrWhiteSpace(json)) return new();
+                                                                                                                                                                                                                                                                             try
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             using var doc = JsonDocument.Parse(json);
+                                                                                                                                                                                                                                                                             return doc.RootElement.EnumerateArray().Select(e =>
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             var name = e.TryGetProperty("Name", out var n) ? n.GetString() ?? "" :
+                                                                                                                                                                                                                                                                             e.TryGetProperty("Item1", out var i1) ? i1.GetString() ?? "" : "";
+                                                                                                                                                                                                                                                                             var price = e.TryGetProperty("Price", out var p) ? p.GetDecimal() :
+                                                                                                                                                                                                                                                                             e.TryGetProperty("Item2", out var i2) ? i2.GetDecimal() : 0m;
+                                                                                                                                                                                                                                                                             return (name, price);
+                                                                                                                                                                                                                                                                             }).ToList();
+                                                                                                                                                                                                                                                                             }
+                                                                                                                                                                                                                                                                             catch { return new(); }
+                                                                                                                                                                                                                                                                             }
 
                                                                                                                                                                                                                                                                             private class ProductBreakdownEntry
                                                                                                                                                                                                                                                                             {

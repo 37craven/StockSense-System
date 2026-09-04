@@ -67,9 +67,23 @@ namespace StockSense.Web.Controllers
                     FullName = $"{u.FirstName} {u.LastName}",
                     Role = u.Role,
                     IsBlocked = u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
-                    IsCurrentUser = u.Id == currentUserId
+                    IsCurrentUser = u.Id == currentUserId,
+                    IsTrusted = u.IsTrusted
                 })
                 .ToListAsync();
+
+            if (_context is not null)
+            {
+                var customerIds = users.Where(u => u.Role == "Customer").Select(u => u.Id).ToList();
+                var completionCounts = await _context.Appointments
+                    .Where(a => customerIds.Contains(a.CustomerUserId!) && a.Status == "Completed")
+                    .GroupBy(a => a.CustomerUserId)
+                    .Select(g => new { UserId = g.Key!, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.UserId, x => x.Count);
+                foreach (var u in users)
+                    u.CompletedAppointmentCount = completionCounts.GetValueOrDefault(u.Id, 0);
+            }
+
             return Ok(users);
         }
 
@@ -261,6 +275,19 @@ namespace StockSense.Web.Controllers
             if (result.Succeeded) return Ok();
             return BadRequest(ApiResponse.Error(
                 result.Errors.FirstOrDefault()?.Description ?? "The account status could not be changed."));
+        }
+
+        [HttpPost("toggle-trust/{id}")]
+        public async Task<IActionResult> ToggleTrust(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null) return NotFound(ApiResponse.NotFound("User"));
+
+            user.IsTrusted = !user.IsTrusted;
+            var result = await _userManager.UpdateAsync(user);
+            if (result.Succeeded) return Ok(new { isTrusted = user.IsTrusted });
+            return BadRequest(ApiResponse.Error(
+                result.Errors.FirstOrDefault()?.Description ?? "Could not update trust status."));
         }
 
         [HttpDelete("users/{id}")]

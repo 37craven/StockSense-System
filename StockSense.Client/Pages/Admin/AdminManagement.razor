@@ -17,13 +17,17 @@
     @* --- TABS & PRIMARY ACTION --- *@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex gap-2 overflow-x-auto">
-            <button @onclick='() => currentTab = "Users"'
-                    style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "Users" ? "var(--secondary)" : "transparent"); color: @(currentTab == "Users" ? "var(--foreground)" : "var(--muted-foreground)");">
-                Users & Employees
+            <button @onclick='() => currentTab = "Customers"'
+                    style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "Customers" ? "var(--secondary)" : "transparent"); color: @(currentTab == "Customers" ? "var(--foreground)" : "var(--muted-foreground)");">
+                Customers
+            </button>
+            <button @onclick='() => currentTab = "Staff"'
+                    style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "Staff" ? "var(--secondary)" : "transparent"); color: @(currentTab == "Staff" ? "var(--foreground)" : "var(--muted-foreground)");">
+                Staff
             </button>
             <button @onclick='() => currentTab = "Mechanics"'
                     style="padding: var(--space-2) var(--space-4); border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(currentTab == "Mechanics" ? "var(--secondary)" : "transparent"); color: @(currentTab == "Mechanics" ? "var(--foreground)" : "var(--muted-foreground)");">
-                Shop Mechanics
+                Mechanics
             </button>
             <button type="button"
                     @onclick='() => SelectTab("AdminPin")'
@@ -33,14 +37,13 @@
             </button>
         </div>
 
-        @if (currentTab == "Users")
+        @if (currentTab == "Staff")
         {
             <div class="flex flex-wrap items-center gap-2">
                 <select id="management-role-filter" aria-label="Filter accounts by role" @bind="roleFilter" class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                    <option value="All">All Roles</option>
+                    <option value="All">All Staff</option>
                     <option value="Admin">Admin</option>
                     <option value="Employee">Employee</option>
-                    <option value="Customer">Customer</option>
                 </select>
                 <BbButton Variant="ButtonVariant.Default" @onclick="OpenEmployeeModal" Class="shrink-0">
                     <LucideIcon Name="id-card-lanyard" Size="16" />
@@ -60,7 +63,7 @@
 
     <div style="overflow: auto; background-color: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4);">
 
-        @if (currentTab == "Users")
+        @if (currentTab == "Customers" || currentTab == "Staff")
         {
             @if (users == null)
             {
@@ -74,6 +77,10 @@
                             <th style="padding: 12px;">Name & Email</th>
                             <th style="padding: 12px;">Role</th>
                             <th style="padding: 12px; text-align: center; min-width: 100px;">Status</th>
+                                @if (currentTab == "Customers")
+                            {
+                                <th style="padding: 12px; text-align: center; min-width: 120px;">Trusted</th>
+                            }
                             <th style="padding: 12px; text-align: right;">Actions</th>
                         </tr>
                     </thead>
@@ -102,6 +109,28 @@
                                         </button>
                                     }
                                 </td>
+                            @if (currentTab == "Customers")
+                                {
+                                    <td style="padding: 12px; text-align: center; min-width: 120px;">
+                                        @if (user.IsTrusted)
+                                        {
+                                            <button @onclick="() => ToggleTrust(user)"
+                                                    style="padding: 2px 8px; font-size: 0.7rem; font-weight: bold; border: 1px solid var(--success-muted-foreground); border-radius: 4px; cursor: pointer; background: var(--success-muted-foreground); color: var(--card);">
+                                                Trusted &#x2713;
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                                <span style="font-size: 0.75rem; color: var(--muted-foreground);">@user.CompletedAppointmentCount/3</span>
+                                                <button @onclick="() => ToggleTrust(user)"
+                                                        style="padding: 2px 8px; font-size: 0.7rem; font-weight: bold; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: transparent; color: var(--foreground);">
+                                                    Trust
+                                                </button>
+                                            </div>
+                                        }
+                                    </td>
+                                }
                                 <td style="padding: 12px; text-align: right;">
                                     @if (user.IsCurrentUser)
                                     {
@@ -412,7 +441,7 @@
 </BbDialog>
 
 @code {
-    private string currentTab = "Users";
+    private string currentTab = "Customers";
     private string roleFilter = "All";
 
     private List<UserDto>? users;
@@ -428,7 +457,12 @@
     private bool isChangingBlock;
 
     private IEnumerable<UserDto> FilteredUsers => users?
-        .Where(user => roleFilter == "All" || user.Role.Equals(roleFilter, StringComparison.OrdinalIgnoreCase))
+        .Where(user => currentTab == "Customers"
+            ? user.Role == "Customer"
+            : user.Role == "Admin" || user.Role == "Employee")
+        .Where(user => currentTab == "Staff" && roleFilter != "All"
+            ? user.Role.Equals(roleFilter, StringComparison.OrdinalIgnoreCase)
+            : true)
         ?? Enumerable.Empty<UserDto>();
 
     private bool showEmployeeModal = false;
@@ -585,6 +619,23 @@
     {
         mech.IsActive = !mech.IsActive;
         await Http.PutAsJsonAsync($"api/mechanics/{mech.Id}", mech);
+    }
+
+    private async Task ToggleTrust(UserDto user)
+    {
+        var response = await Http.PostAsync($"api/admin/toggle-trust/{user.Id}", null);
+        if (response.IsSuccessStatusCode)
+        {
+            user.IsTrusted = !user.IsTrusted;
+            if (user.IsTrusted)
+                Toast.Success($"{user.FullName} is now trusted. Their new appointments will be auto-confirmed, skipping manual review.", "Trusted");
+            else
+                Toast.Success($"{user.FullName} trust revoked. New appointments will require manual confirmation.", "Trust Removed");
+        }
+        else
+        {
+            Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not update trust status."), "Update failed");
+        }
     }
 
     private void SelectTab(string tab)

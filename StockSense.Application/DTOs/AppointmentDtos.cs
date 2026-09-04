@@ -14,6 +14,7 @@ public class AppointmentDto
     public string TimeSlot { get; set; } = string.Empty;
     public string ServicesRequested { get; set; } = string.Empty;
     public string? SelectedProductsJson { get; set; }
+    public string? SelectedServicesJson { get; set; }
     public decimal TotalAmount { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
@@ -57,6 +58,8 @@ public partial class CreateAppointmentDto
     public string? MechanicName { get; set; }
 
     public string? SelectedProductsJson { get; set; }
+
+    public string? SelectedServicesJson { get; set; }
 
     public int? MotorcycleId { get; set; }
 }

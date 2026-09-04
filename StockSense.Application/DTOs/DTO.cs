@@ -10,6 +10,8 @@ namespace StockSense.Application.DTOs
         public string Role { get; set; } = "Customer";
         public bool IsBlocked { get; set; }
         public bool IsCurrentUser { get; set; }
+        public bool IsTrusted { get; set; }
+        public int CompletedAppointmentCount { get; set; }
     }
 
     public sealed class UserProfileDto

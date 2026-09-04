@@ -123,10 +123,10 @@ public class AppointmentsController : ControllerBase
                 return BadRequest(ApiResponse.Error("Time slot must be in HH:mm format (00:00-23:59)."));
 
             int totalDuration = matchedServices.Sum(s => s.EstimatedMinutes);
-            // Build Installation has fixed 120 min and no StoreService entry — handle separately
+            // Build Installation has fixed 60 min and no StoreService entry — handle separately
             var isBuildCategory = string.Equals(dto.Category?.Trim(), "Build", StringComparison.OrdinalIgnoreCase);
             if (isBuildCategory && totalDuration == 0)
-                totalDuration = 120;
+                totalDuration = 60;
             DateTime phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
             var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(Math.Max(totalDuration, 15)));
             var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
@@ -148,9 +148,10 @@ public class AppointmentsController : ControllerBase
                 Category = string.IsNullOrWhiteSpace(dto.Category) ? "General Service" : dto.Category,
                 ServicesRequested = flatServices,
                 SelectedProductsJson = dto.SelectedProductsJson,
-                Status = "Pending",
+                SelectedServicesJson = dto.SelectedServicesJson,
+                Status = customer.IsTrusted ? "Confirmed" : "Pending",
                 CreatedAt = phNow,
-                TotalAmount = serviceTotal + productTotal,
+                TotalAmount = isBuildCategory ? 0m : serviceTotal + productTotal,
                 DurationMinutes = totalDuration,
                 MechanicName = string.IsNullOrWhiteSpace(dto.MechanicName) ? "Any Available" : dto.MechanicName.Trim(),
                 MotorcycleId = motorcycle?.Id
@@ -165,14 +166,12 @@ public class AppointmentsController : ControllerBase
                 if (latestBuild != null)
                 {
                     appointment.BuildRequestId = latestBuild.Id;
-                    if (appointment.TotalAmount == 0)
-                        appointment.TotalAmount = latestBuild.TotalPrice;
-                    appointment.DurationMinutes = 120;
+                    appointment.DurationMinutes = 60;
                 }
             }
 
             var saved = await _repo.AddAsync(appointment);
-            return Ok(new { message = "Appointment booked successfully!", id = saved.Id });
+            return Ok(new { message = "Appointment booked successfully!", id = saved.Id, isTrusted = customer.IsTrusted });
         }
         catch (Exception ex)
         {
@@ -216,7 +215,10 @@ public class AppointmentsController : ControllerBase
         var services = await _serviceRepo.GetByNamesAsync(serviceNames);
         decimal serviceTotal = services.Sum(s => s.Price);
 
-        if (serviceTotal <= 0)
+        int slotCount = (int)Math.Ceiling(appointment.DurationMinutes / 30.0);
+        decimal reservationFee = 100m + Math.Max(0, slotCount - 2) * 25m;
+
+        if (reservationFee <= 0)
         {
             appointment.PaymentStatus = PaymentStatuses.NotRequired;
             await _context.SaveChangesAsync();
@@ -229,12 +231,12 @@ public class AppointmentsController : ControllerBase
         try
         {
             var (linkId, checkoutUrl) = await _payMongo.CreatePaymentLinkAsync(
-                serviceTotal,
-                $"Appointment #{id} service fee",
+                reservationFee,
+                $"Appointment #{id} reservation fee",
                 $"appt-{id}-{DateTime.UtcNow:yyyyMMddHHmmssfff}");
             appointment.PaymentLinkId = linkId;
             appointment.PaymentStatus = PaymentStatuses.AwaitingPayment;
-            appointment.PaymentAmount = serviceTotal;
+            appointment.PaymentAmount = reservationFee;
             await _context.SaveChangesAsync();
             return Ok(new { checkoutUrl, paymentStatus = PaymentStatuses.AwaitingPayment });
         }
@@ -271,6 +273,8 @@ public class AppointmentsController : ControllerBase
         if (mapped != appointment.PaymentStatus)
         {
             appointment.PaymentStatus = mapped;
+            if (mapped == PaymentStatuses.Paid && appointment.Status == "Pending")
+                appointment.Status = "Confirmed";
             await _context.SaveChangesAsync();
         }
 
@@ -322,6 +326,8 @@ public class AppointmentsController : ControllerBase
             if (appointment.PaymentStatus != PaymentStatuses.Paid)
             {
                 appointment.PaymentStatus = PaymentStatuses.Paid;
+                if (appointment.Status == "Pending")
+                    appointment.Status = "Confirmed";
                 _context.WorkOrderAudits.Add(new WorkOrderAudit
                 {
                     WorkOrderType = "Appointment",
@@ -695,13 +701,86 @@ public class AppointmentsController : ControllerBase
             product.Price = products[product.Id].Price;
         }
         var serviceNames = appointment.ServicesRequested.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        var services = await _serviceRepo.GetByNamesAsync(serviceNames);
+        decimal serviceTotal;
+        if (!string.IsNullOrWhiteSpace(appointment.SelectedServicesJson))
+        {
+            try
+            {
+                var svcList = JsonSerializer.Deserialize<List<ServiceItem>>(appointment.SelectedServicesJson, JsonOpts) ?? [];
+                serviceTotal = svcList.Sum(s => s.Price);
+            }
+            catch (JsonException)
+            {
+                var services = await _serviceRepo.GetByNamesAsync(serviceNames);
+                serviceTotal = services.Sum(s => s.Price);
+            }
+        }
+        else
+        {
+            var services = await _serviceRepo.GetByNamesAsync(serviceNames);
+            serviceTotal = services.Sum(s => s.Price);
+        }
         appointment.SelectedProductsJson = JsonSerializer.Serialize(breakdown);
-        appointment.TotalAmount = services.Sum(service => service.Price) + selectedIds.Sum(id => products[id].Price);
+        appointment.TotalAmount = serviceTotal + selectedIds.Sum(id => products[id].Price);
         AddAudit("Appointment", id, "ProductsChanged", null, string.Join(',', selectedIds), reason, approval);
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "Products updated" });
+    }
+
+    [HttpPut("{id}/services")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<IActionResult> UpdateServices(int id, [FromBody] UpdateAppointmentServicesDto dto)
+    {
+        var appointment = await _context.Appointments.FindAsync(id);
+        if (appointment == null) return NotFound(ApiResponse.NotFound("Appointment"));
+        if (appointment.Status is "Completed" or "Cancelled" or "Expired")
+            return Conflict(ApiResponse.Error("Cannot edit services for completed, cancelled, or expired appointments."));
+        AdminPinVerificationResult? approval = null;
+        if (appointment.Status != WorkOrderStatuses.Pending && !User.IsInRole("Admin"))
+        {
+            if (_adminPinService is null) return StatusCode(403, ApiResponse.Error("Admin approval is required."));
+            approval = !string.IsNullOrWhiteSpace(dto.AdminUserId)
+                ? await _adminPinService.VerifyByUserIdAsync(dto.AdminUserId, dto.AdminPin ?? "")
+                : await _adminPinService.VerifyAsync(dto.AdminEmail ?? "", dto.AdminPin ?? "");
+            if (!approval.Succeeded)
+                return StatusCode(approval.LockedUntil.HasValue ? 429 : 403, ApiResponse.Error(approval.Error ?? "Admin approval failed."));
+        }
+        var reason = dto.Reason?.Trim();
+        if (appointment.Status != WorkOrderStatuses.Pending && string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("Please provide a reason for this change."));
+
+        List<ServiceItem> services;
+        try
+        {
+            services = JsonSerializer.Deserialize<List<ServiceItem>>(dto.SelectedServicesJson, JsonOpts) ?? [];
+        }
+        catch (JsonException)
+        {
+            return BadRequest(ApiResponse.Error("The selected services are invalid."));
+        }
+        if (services.Count == 0)
+            return BadRequest(ApiResponse.Error("At least one service is required."));
+
+        var productTotal = 0m;
+        if (!string.IsNullOrWhiteSpace(appointment.SelectedProductsJson))
+        {
+            try
+            {
+                var breakdown = JsonSerializer.Deserialize<List<ServiceProductBreakdown>>(appointment.SelectedProductsJson, JsonOpts) ?? [];
+                productTotal = breakdown.SelectMany(item => item.Products).Where(p => p.Selected).Sum(p => p.Price);
+            }
+            catch (JsonException) { }
+        }
+
+        var previousServices = appointment.ServicesRequested;
+        appointment.SelectedServicesJson = JsonSerializer.Serialize(services, JsonOpts);
+        appointment.ServicesRequested = string.Join(", ", services.Select(s => s.Name));
+        appointment.TotalAmount = services.Sum(s => s.Price) + productTotal;
+        AddAudit("Appointment", id, "ServicesChanged", previousServices, appointment.ServicesRequested, reason, approval);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Services updated", totalAmount = appointment.TotalAmount });
     }
 
     [HttpPost("{id}/complete")]
@@ -835,6 +914,7 @@ public class AppointmentsController : ControllerBase
         AppointmentDate = a.AppointmentDate, CreatedAt = a.CreatedAt,
         TimeSlot = a.TimeSlot, ServicesRequested = a.ServicesRequested,
         SelectedProductsJson = a.SelectedProductsJson,
+        SelectedServicesJson = a.SelectedServicesJson,
         TotalAmount = a.TotalAmount, Status = a.Status, Category = a.Category,
         MechanicName = a.MechanicName, DurationMinutes = a.DurationMinutes,
         CompletedAt = a.CompletedAt, TransactionId = a.TransactionId,
@@ -970,6 +1050,21 @@ public class AppointmentsController : ControllerBase
     {
         public string SelectedProductsJson { get; set; } = "";
         public decimal TotalAmount { get; set; }
+        public string? AdminUserId { get; set; }
+        public string? AdminEmail { get; set; }
+        public string? AdminPin { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    private class ServiceItem
+    {
+        public string Name { get; set; } = "";
+        public decimal Price { get; set; }
+    }
+
+    public class UpdateAppointmentServicesDto
+    {
+        public string SelectedServicesJson { get; set; } = "";
         public string? AdminUserId { get; set; }
         public string? AdminEmail { get; set; }
         public string? AdminPin { get; set; }

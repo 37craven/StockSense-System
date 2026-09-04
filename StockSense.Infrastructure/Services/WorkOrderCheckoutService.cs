@@ -93,8 +93,28 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
             var requested = await ResolveAppointmentProductsAsync(selections, cancellationToken);
             var products = await LoadProductsAsync(requested.Keys, cancellationToken);
 
-            var quotedProductAmount = selections.Where(value => value.Selected).Sum(value => value.Price);
-            var serviceAmount = Math.Max(0m, appointment.TotalAmount - quotedProductAmount);
+            decimal serviceAmount;
+            if (!string.IsNullOrWhiteSpace(appointment.SelectedServicesJson))
+            {
+                var svcList = JsonSerializer.Deserialize<List<AppointmentServiceEntry>>(appointment.SelectedServicesJson, JsonOptions) ?? [];
+                serviceAmount = svcList.Sum(s => s.Price);
+            }
+            else
+            {
+                var quotedProductAmount = selections.Where(value => value.Selected).Sum(value => value.Price);
+                serviceAmount = Math.Max(0m, appointment.TotalAmount - quotedProductAmount);
+            }
+
+            var reservationFee = appointment.PaymentAmount ?? 0m;
+            var amountDue = Math.Max(0m, serviceAmount + selections.Where(value => value.Selected).Sum(value => value.Price) - reservationFee);
+
+            var remarks = $"Completed appointment #{appointment.Id} for {appointment.CustomerName}: {appointment.ServicesRequested}.";
+            if (reservationFee > 0 && amountDue == 0 && reservationFee > serviceAmount + selections.Where(value => value.Selected).Sum(value => value.Price))
+            {
+                var excess = reservationFee - serviceAmount - selections.Where(value => value.Selected).Sum(value => value.Price);
+                remarks += $" Reservation fee (₱{reservationFee:N2}) exceeded total. Excess of ₱{excess:N2} refunded in person.";
+            }
+
             var sale = CreateSale(
                 invoiceNumber,
                 completedAt,
@@ -103,7 +123,7 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
                 employeeUserId,
                 locationId,
                 serviceAmount,
-                $"Completed appointment #{appointment.Id} for {appointment.CustomerName}: {appointment.ServicesRequested}.");
+                remarks);
             AddInventoryLines(sale, products, requested);
             sale.TotalAmount = serviceAmount + sale.Items.Sum(value => value.LineTotal);
 
@@ -113,6 +133,21 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
             appointment.Transaction = sale;
             appointment.TotalAmount = sale.TotalAmount;
             await _context.SaveChangesAsync(cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(appointment.CustomerUserId))
+            {
+                var completedCount = await _context.Appointments
+                    .CountAsync(a => a.CustomerUserId == appointment.CustomerUserId
+                        && a.Status == WorkOrderStatuses.Completed
+                        && a.Id != appointment.Id, cancellationToken);
+                if (completedCount >= 2)
+                {
+                    var customer = await _context.Users
+                        .Where(u => u.Id == appointment.CustomerUserId && !u.IsTrusted)
+                        .ExecuteUpdateAsync(s => s.SetProperty(u => u.IsTrusted, true), cancellationToken);
+                }
+            }
+
             return new CompletionResult(ToReceipt(sale), requested.Keys.ToArray(), true);
         }, cancellationToken);
 
@@ -404,5 +439,10 @@ public sealed class WorkOrderCheckoutService : IWorkOrderCheckoutService
     private sealed class BuildPart
     {
         public int Id { get; set; }
+    }
+    private sealed class AppointmentServiceEntry
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
     }
 }

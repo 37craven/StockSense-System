@@ -152,7 +152,7 @@
                     @if (selectedAppointment != null)
                     {
                         <span class="appointment-status-badge @GetStatusClass(selectedAppointment.Status)" aria-label="Status: @selectedAppointment.Status">
-                            @selectedAppointment.Status@(selectedAppointment.PaymentStatus == "Paid" ? " · Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : "")
+                            @selectedAppointment.Status@(selectedAppointment.PaymentStatus == "Paid" ? " · Downpayment Paid" : selectedAppointment.PaymentStatus == "AwaitingPayment" ? " · No Downpayment" : "")
                         </span>
                     }
                 </div>
@@ -236,7 +236,7 @@
                 @if (selectedAppointment.PaymentStatus == "Paid")
                 {
                     <div class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-sm text-emerald-700 dark:text-emerald-300">
-                        Service payment received. Your slot will be confirmed by a staff member.
+                        Downpayment received. Your slot is confirmed.
                     </div>
                 }
                 else if (selectedAppointment.PaymentStatus == "AwaitingPayment")
@@ -389,7 +389,7 @@
                                     <div class="text-xs text-muted-foreground mt-0.5 truncate">@appt.ServicesRequested</div>
                                 </div>
                                 <span class="appointment-status-badge @GetStatusClass(appt.Status) shrink-0 ml-2">
-                                    @appt.Status@(appt.PaymentStatus == "Paid" ? " · Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · Unpaid" : appt.PaymentStatus == "Failed" ? " · Payment Failed" : appt.PaymentStatus == "Expired" ? " · Payment Expired" : "")
+@appt.Status@(appt.PaymentStatus == "Paid" ? " · Downpayment Paid" : appt.PaymentStatus == "AwaitingPayment" ? " · No Downpayment" : appt.PaymentStatus == "Failed" ? " · Payment Failed" : appt.PaymentStatus == "Expired" ? " · Payment Expired" : "")
                                 </span>
                             </div>
                         }
@@ -645,7 +645,7 @@
                 var previous = selectedAppointment.PaymentStatus;
                 selectedAppointment.PaymentStatus = result.PaymentStatus;
                 if (result.PaymentStatus == "Paid" && previous != "Paid")
-                    Toast.Success("Payment received! A staff member will confirm your appointment shortly.");
+                    Toast.Success("Payment received! Your slot is confirmed.");
                 else if (result.PaymentStatus is "Failed" or "Expired")
                     Toast.Error($"Payment {result.PaymentStatus.ToLowerInvariant()}. Please retry payment to secure your booking.");
                 else

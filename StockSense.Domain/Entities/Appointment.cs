@@ -19,6 +19,7 @@ public class Appointment
     [Column(TypeName = "decimal(18,2)")]
     public decimal TotalAmount { get; set; } // Stores the calculated P900
     public string? SelectedProductsJson { get; set; }
+    public string? SelectedServicesJson { get; set; }
     public string Status { get; set; } = "Pending";
     public string Category { get; set; } = "General";
     public string MechanicName { get; set; } = string.Empty;

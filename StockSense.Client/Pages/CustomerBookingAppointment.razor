@@ -117,6 +117,13 @@
                             }
                         </div>
 
+                        @if (SelectedServices.Any())
+                        {
+                            <div class="flex justify-between items-center py-2">
+                                <span class="text-xs text-muted-foreground">Optional Reservation Fee <span class="text-[10px]">(deducted at checkout)</span></span>
+                                <span class="text-xs font-bold text-foreground">₱@ReservationFee.ToString("N0")</span>
+                            </div>
+                        }
                         <div class="flex justify-between items-center border-t border-border pt-3">
                             <span class="text-sm font-bold text-foreground">Total Amount</span>
                             <span class="text-xl font-bold text-primary text-foreground tracking-tight">₱@TotalPrice.ToString("N0")</span>
@@ -148,7 +155,7 @@
                             }
                             else
                             {
-                                <span>Confirm & Pay Online</span>
+                                <span>Book Appointment</span>
                             }
                         </BbButton>
                     }
@@ -416,11 +423,6 @@
                         <p class="text-xs text-muted-foreground m-0 mb-5">Double-check everything before confirming.</p>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3 my-4">
-                            <div class="pt-2 p-4 rounded-lg bg-card border border-border lg:col-span-2">
-                                <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Downpayment Due Today</span>
-                                <p class="text-sm font-medium text-foreground mt-1 mb-0">₱@ServiceOnlyTotal.ToString("N0") <span class="text-xs text-muted-foreground">— 100% of service fees (parts are excluded and paid at the shop on completion)</span></p>
-                                <p class="text-xs text-muted-foreground mt-1 mb-0">Payment is required to book. Completing payment does not guarantee schedule confirmation — a staff member will confirm your slot.</p>
-                            </div>
                             <div class="pt-2 p-4 rounded-lg bg-card border border-border">
                                 <span class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Customer</span>
                                 <p class="text-sm font-medium text-foreground mt-1 mb-0">@newAppt.CustomerName</p>
@@ -463,6 +465,14 @@
                                     <p class="text-xs text-destructive m-0 mt-1">@motorcycleLoadError</p>
                                 }
                             </div>
+                        </div>
+
+                        <div class="flex flex-col gap-1 p-4 pb-5 rounded-lg bg-card border border-border mb-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-bold text-foreground">Reservation Fee <span class="text-xs font-normal text-muted-foreground">(deducted at checkout)</span></span>
+                                <span class="text-lg font-bold text-primary text-foreground">₱@ReservationFee.ToString("N0")</span>
+                            </div>
+                            <p class="text-xs text-muted-foreground m-0">Completing payment automatically confirms your slot. You may skip payment for now, but your booking will remain pending until paid or confirmed by staff.</p>
                         </div>
 
                         <p class="text-[10px] font-bold text-muted-foreground uppercase tracking-wider m-0 mb-2">Selected Services & Parts</p>
@@ -582,7 +592,7 @@
                         </div>
                         <BbDialogTitle>Booking Confirmed & Paid!</BbDialogTitle>
                         <BbDialogDescription class="mb-5">
-                            Your appointment has been successfully scheduled and your service payment has been received. A staff member will confirm your slot shortly.
+                            Your appointment has been successfully scheduled and your service payment has been received. Your slot is confirmed.
                         </BbDialogDescription>
                     }
                     else if (successPaymentStatus == "AwaitingPayment")
@@ -593,6 +603,16 @@
                         <BbDialogTitle>Booking Created!</BbDialogTitle>
                         <BbDialogDescription class="mb-5">
                             Your appointment has been saved. Complete your service payment to secure your booking.
+                        </BbDialogDescription>
+                    }
+                    else if (successPaymentStatus == "Confirmed")
+                    {
+                        <div class="w-[72px] h-[72px] rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-4">
+                            <LucideIcon Name="circle-check" Size="36" />
+                        </div>
+                        <BbDialogTitle>Booking Confirmed!</BbDialogTitle>
+                        <BbDialogDescription class="mb-5">
+                            Your appointment has been scheduled. No downpayment required.
                         </BbDialogDescription>
                     }
                     else
@@ -631,7 +651,7 @@
                                 </BbButton>
                             </div>
                         }
-                        <BbButton Variant="@(successPaymentStatus == "Paid" ? ButtonVariant.Default : ButtonVariant.Outline)" Class="w-full" OnClick='() => NavigationManager.NavigateTo("/my-bookings")'>
+                        <BbButton Variant="@(successPaymentStatus is "Paid" or "Confirmed" ? ButtonVariant.Default : ButtonVariant.Outline)" Class="w-full" OnClick='() => NavigationManager.NavigateTo("/my-bookings")'>
                             View My Bookings
                         </BbButton>
                         <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="CloseSuccessModal">
@@ -819,6 +839,7 @@
     private decimal TotalPrice => SelectedServices.Sum(s => s.TotalServicePrice);
     private decimal ServiceOnlyTotal => SelectedServices.Sum(s => s.Price);
     private int TotalDurationMinutes => SelectedServices.Sum(s => s.EstimatedMinutes);
+    private decimal ReservationFee => 100m + Math.Max(0, (int)Math.Ceiling(TotalDurationMinutes / 30.0) - 2) * 25m;
 
     [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
 
@@ -1175,22 +1196,36 @@
             }).ToList()
         }).ToList());
 
+        newAppt.SelectedServicesJson = JsonSerializer.Serialize(SelectedServices.Select(s => new { s.Name, s.Price }).ToList());
+
         try
         {
             var response = await JSRuntime.InvokeAsync<BrowserApiResponse>("stockSenseApi.postJson", "api/appointments", newAppt);
             if (response.Ok)
             {
                 int? appointmentId = null;
+                bool isTrusted = false;
                 try
                 {
                     using var bookingDoc = JsonDocument.Parse(response.Body);
                     var bookingRoot = bookingDoc.RootElement;
                     if (bookingRoot.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.Number)
                         appointmentId = idEl.GetInt32();
+                    if (bookingRoot.TryGetProperty("isTrusted", out var trustedEl) && trustedEl.ValueKind == JsonValueKind.True)
+                        isTrusted = true;
                 }
                 catch { }
 
-                if (appointmentId is null)
+                if (isTrusted)
+                    Toast.Success("You've been auto-confirmed as a trusted customer!", "Auto-confirmed");
+
+                if (isTrusted)
+                {
+                    successPaymentStatus = "Confirmed";
+                    showSuccessModal = true;
+                    ResetBookingState();
+                }
+                else if (appointmentId is null)
                 {
                     Toast.Info("Your appointment is booked. Complete payment from My Bookings.", "Payment not started");
                     ResetBookingState();
@@ -1198,7 +1233,11 @@
                 }
                 else
                 {
-                    await StartPaymentAsync(appointmentId.Value);
+                    lastBookedAppointmentId = appointmentId;
+                    successPaymentStatus = "AwaitingPayment";
+                    ResetBookingState();
+                    showSuccessModal = true;
+                    StateHasChanged();
                 }
             }
             else
