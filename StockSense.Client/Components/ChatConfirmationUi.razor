@@ -25,6 +25,20 @@
                     </div>
                 </div>
             }
+            @if (ProductList.Count > 0)
+            {
+                <div class="chat-review-section">
+                    <span class="chat-review-label">Products</span>
+                    <div class="chat-review-chips">
+                        @foreach (var prod in ProductList)
+                        {
+                            <span class="chat-review-chip">
+                                @prod
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
             @foreach (var line in DetailLines)
             {
                 <div class="chat-review-row">
@@ -55,6 +69,7 @@
     [Parameter] public EventCallback<string> OnRemoveService { get; set; }
 
     private List<string> ServiceList { get; set; } = new();
+    private List<string> ProductList { get; set; } = new();
     private List<DetailLine> DetailLines { get; set; } = new();
 
     private sealed record DetailLine(string Label, string Value);
@@ -62,6 +77,7 @@
     protected override void OnParametersSet()
     {
         ServiceList.Clear();
+        ProductList.Clear();
         DetailLines.Clear();
 
         if (WorkflowState?.ConfirmationSummary is not { Length: > 0 } summary)
@@ -84,6 +100,10 @@
             if (label.Equals("Services", StringComparison.OrdinalIgnoreCase))
             {
                 ServiceList = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            }
+            else if (label.Equals("Products", StringComparison.OrdinalIgnoreCase))
+            {
+                ProductList = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
             }
             else
             {

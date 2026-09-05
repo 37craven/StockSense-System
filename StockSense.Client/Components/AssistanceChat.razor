@@ -1196,6 +1196,9 @@
                 Category = "General",
                 MechanicName = string.IsNullOrWhiteSpace(mechanicStr) ? null : mechanicStr,
                 MotorcycleId = motorcycleId,
+                SelectedProductsJson = BuildSelectedProductsJson(activeWorkflowState, serviceList),
+                SelectedServicesJson = BuildSelectedServicesJson(activeWorkflowState, serviceList),
+                TotalAmount = CalculateTotalAmount(activeWorkflowState, serviceList),
             };
 
             // Pre-booking slot availability check — narrow the race window by
@@ -1254,6 +1257,62 @@
                 var motorcycleLine = string.IsNullOrWhiteSpace(motorcycleStr) ? "" : $"Motorcycle: {motorcycleStr}\n";
                 var serviceDisplay = string.Join(", ", serviceList);
 
+                // Build product display and total from workflow state
+                var productDisplay = "";
+                var grandTotal = 0m;
+                if (activeWorkflowState?.CollectedData is { } wfCollected)
+                {
+                    var productDetails = wfCollected.GetValueOrDefault("product_details");
+                    if (productDetails is not null)
+                    {
+                        try
+                        {
+                            var pdJson = JsonSerializer.Serialize(productDetails, new JsonSerializerOptions
+                            {
+                                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                            });
+                            using var pdDoc = JsonDocument.Parse(pdJson);
+                            if (pdDoc.RootElement.ValueKind == JsonValueKind.Array && pdDoc.RootElement.GetArrayLength() > 0)
+                            {
+                                var prodParts = new List<string>();
+                                foreach (var pd in pdDoc.RootElement.EnumerateArray())
+                                {
+                                    var name = pd.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? "" : "";
+                                    var price = pd.TryGetProperty("price", out var pEl) && pEl.TryGetDecimal(out var p) ? p : 0m;
+                                    grandTotal += price;
+                                    prodParts.Add(price > 0 ? $"{name} (₱{price:N0})" : name);
+                                }
+                                productDisplay = string.Join(", ", prodParts);
+                            }
+                        }
+                        catch { }
+                    }
+
+                    var servicePrices = wfCollected.GetValueOrDefault("service_prices");
+                    if (servicePrices is not null)
+                    {
+                        try
+                        {
+                            var spJson = JsonSerializer.Serialize(servicePrices, new JsonSerializerOptions
+                            {
+                                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                            });
+                            using var spDoc = JsonDocument.Parse(spJson);
+                            if (spDoc.RootElement.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var sp in spDoc.RootElement.EnumerateArray())
+                                {
+                                    if (sp.TryGetProperty("price", out var pEl) && pEl.TryGetDecimal(out var p))
+                                        grandTotal += p;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                var productLine = string.IsNullOrEmpty(productDisplay) ? "" : $"Products: {productDisplay}\n";
+                var totalLine = grandTotal > 0 ? $"Estimated Total: ₱{grandTotal:N0}\n" : "";
+
                 if (appointmentId.HasValue)
                 {
                     try
@@ -1286,10 +1345,12 @@
                                 messages.Add(new ChatMessage("assistant",
                                     $"Appointment booked successfully!\n\n" +
                                     $"Service: {serviceDisplay}\n" +
+                                    $"{productLine}" +
                                     $"Date: {dateStr}\n" +
                                     $"Time: {timeStr}\n" +
                                     $"Mechanic: {(string.IsNullOrWhiteSpace(mechanicStr) ? "Any Available" : mechanicStr)}\n" +
                                     $"{motorcycleLine}" +
+                                    $"{totalLine}" +
                                     $"Reservation Fee: ₱{reservationFee:N2}\n\n" +
                                     $"A payment page has been opened in a new tab. Complete your payment to confirm the booking.",
                                     postBookingActions));
@@ -1308,10 +1369,12 @@
                 messages.Add(new ChatMessage("assistant",
                     $"Appointment booked successfully!\n\n" +
                     $"Service: {serviceDisplay}\n" +
+                    $"{productLine}" +
                     $"Date: {dateStr}\n" +
                     $"Time: {timeStr}\n" +
                     $"Mechanic: {(string.IsNullOrWhiteSpace(mechanicStr) ? "Any Available" : mechanicStr)}\n" +
                     $"{motorcycleLine}" +
+                    $"{totalLine}" +
                     $"\nYou can view and manage your booking in My Appointments.",
                     fallbackActions));
                 activeWorkflowState = null;
@@ -1377,6 +1440,198 @@
     {
         message = $"Remove service: {serviceName}";
         await SendAsync();
+    }
+
+    private static string? BuildSelectedProductsJson(WorkflowState? workflowState, List<string> serviceList)
+    {
+        if (workflowState?.CollectedData is not { } collected)
+            return null;
+
+        var productDetails = collected.GetValueOrDefault("product_details");
+        if (productDetails is null)
+            return null;
+
+        var productsJson = JsonSerializer.Serialize(productDetails, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        });
+
+        try
+        {
+            using var doc = JsonDocument.Parse(productsJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0)
+                return null;
+
+            // Fetch service prices from collected data
+            var servicePrices = collected.GetValueOrDefault("service_prices");
+            var servicePriceMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            if (servicePrices is not null)
+            {
+                var spJson = JsonSerializer.Serialize(servicePrices, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                using var spDoc = JsonDocument.Parse(spJson);
+                if (spDoc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var sp in spDoc.RootElement.EnumerateArray())
+                    {
+                        var name = sp.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? "" : "";
+                        var price = sp.TryGetProperty("price", out var pEl) && pEl.TryGetDecimal(out var p) ? p : 0m;
+                        if (!string.IsNullOrEmpty(name))
+                            servicePriceMap[name] = price;
+                    }
+                }
+            }
+
+            // Build ServiceProductBreakdown format:
+            // [{serviceName, servicePrice, products: [{id, name, price, selected, category}]}]
+            var breakdown = new List<object>();
+            foreach (var svcName in serviceList)
+            {
+                var svcPrice = servicePriceMap.TryGetValue(svcName, out var sp) ? sp : 0m;
+                var svcProducts = new List<object>();
+                foreach (var prod in doc.RootElement.EnumerateArray())
+                {
+                    var cat = prod.TryGetProperty("category", out var catEl) ? catEl.GetString() ?? "" : "";
+                    var prodName = prod.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? "" : "";
+                    var prodId = prod.TryGetProperty("id", out var idEl) && idEl.TryGetInt32(out var id) ? id : 0;
+                    var prodPrice = prod.TryGetProperty("price", out var prEl) && prEl.TryGetDecimal(out var pr) ? pr : 0m;
+
+                    svcProducts.Add(new
+                    {
+                        id = prodId,
+                        name = prodName,
+                        price = prodPrice,
+                        selected = true,
+                        category = cat
+                    });
+                }
+
+                breakdown.Add(new
+                {
+                    serviceName = svcName,
+                    servicePrice = svcPrice,
+                    products = svcProducts
+                });
+            }
+
+            return JsonSerializer.Serialize(breakdown, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = false
+            });
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? BuildSelectedServicesJson(WorkflowState? workflowState, List<string> serviceList)
+    {
+        if (workflowState?.CollectedData is not { } collected)
+        {
+            // Fallback: build from service names only (no prices)
+            if (serviceList.Count == 0) return null;
+            return JsonSerializer.Serialize(serviceList.Select(s => new { name = s, price = 0m }).ToList(),
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        }
+
+        var servicePrices = collected.GetValueOrDefault("service_prices");
+        var servicePriceMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        if (servicePrices is not null)
+        {
+            try
+            {
+                var spJson = JsonSerializer.Serialize(servicePrices, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+                using var spDoc = JsonDocument.Parse(spJson);
+                if (spDoc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var sp in spDoc.RootElement.EnumerateArray())
+                    {
+                        var name = sp.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? "" : "";
+                        var price = sp.TryGetProperty("price", out var pEl) && pEl.TryGetDecimal(out var p) ? p : 0m;
+                        if (!string.IsNullOrEmpty(name))
+                            servicePriceMap[name] = price;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        var result = serviceList.Select(s => new
+        {
+            name = s,
+            price = servicePriceMap.TryGetValue(s, out var pr) ? pr : 0m
+        }).ToList();
+
+        return JsonSerializer.Serialize(result, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        });
+    }
+
+    private static decimal CalculateTotalAmount(WorkflowState? workflowState, List<string> serviceList)
+    {
+        decimal serviceTotal = 0m;
+        decimal productTotal = 0m;
+
+        if (workflowState?.CollectedData is { } collected)
+        {
+            // Service total
+            var servicePrices = collected.GetValueOrDefault("service_prices");
+            if (servicePrices is not null)
+            {
+                try
+                {
+                    var spJson = JsonSerializer.Serialize(servicePrices, new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    });
+                    using var spDoc = JsonDocument.Parse(spJson);
+                    if (spDoc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var sp in spDoc.RootElement.EnumerateArray())
+                        {
+                            if (sp.TryGetProperty("price", out var pEl) && pEl.TryGetDecimal(out var p))
+                                serviceTotal += p;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Product total
+            var productDetails = collected.GetValueOrDefault("product_details");
+            if (productDetails is not null)
+            {
+                try
+                {
+                    var pdJson = JsonSerializer.Serialize(productDetails, new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    });
+                    using var pdDoc = JsonDocument.Parse(pdJson);
+                    if (pdDoc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var pd in pdDoc.RootElement.EnumerateArray())
+                        {
+                            if (pd.TryGetProperty("price", out var pEl) && pEl.TryGetDecimal(out var p))
+                                productTotal += p;
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        return serviceTotal + productTotal;
     }
 
     private static int? ResolveMotorcycleId(string motorcycleStr, List<MotorcycleOptionDto>? motorcycles)
