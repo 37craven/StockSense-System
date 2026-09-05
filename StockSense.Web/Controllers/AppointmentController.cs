@@ -129,7 +129,7 @@ public class AppointmentsController : ControllerBase
                 totalDuration = 60;
             DateTime phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
             var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(Math.Max(totalDuration, 15)));
-            var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
+            var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, dto.MechanicName);
             var conflict = existing.Any(a =>
                 TimeSpan.TryParse(a.TimeSlot?.Trim(), out var existingStart) &&
                 (requestedStart < existingStart.Add(TimeSpan.FromMinutes(Math.Max(a.DurationMinutes, 15)))) &&
@@ -222,7 +222,7 @@ public class AppointmentsController : ControllerBase
         {
             appointment.PaymentStatus = PaymentStatuses.NotRequired;
             await _context.SaveChangesAsync();
-            return Ok(new { checkoutUrl = (string?)null, paymentStatus = PaymentStatuses.NotRequired });
+            return Ok(new { checkoutUrl = (string?)null, paymentStatus = PaymentStatuses.NotRequired, reservationFee });
         }
 
         if (!_payMongoOptions.Enabled)
@@ -238,7 +238,7 @@ public class AppointmentsController : ControllerBase
             appointment.PaymentStatus = PaymentStatuses.AwaitingPayment;
             appointment.PaymentAmount = reservationFee;
             await _context.SaveChangesAsync();
-            return Ok(new { checkoutUrl, paymentStatus = PaymentStatuses.AwaitingPayment });
+            return Ok(new { checkoutUrl, paymentStatus = PaymentStatuses.AwaitingPayment, reservationFee });
         }
         catch (InvalidOperationException ex)
         {
@@ -458,7 +458,7 @@ public class AppointmentsController : ControllerBase
         var duration = dto.DurationMinutes > 0 ? dto.DurationMinutes : appointment.DurationMinutes;
         var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(Math.Max(duration, 15)));
 
-        var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, null);
+        var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, dto.MechanicName);
         var conflict = existing.Any(a =>
             a.Id != id &&
             TimeSpan.TryParse(a.TimeSlot?.Trim(), out var existingStart) &&

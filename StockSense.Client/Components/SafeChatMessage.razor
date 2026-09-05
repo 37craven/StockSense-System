@@ -84,15 +84,18 @@
     .chat-table-desktop { display: none; }
     .chat-table-mobile { display: block; }
     .chat-table {
-        width: max-content;
-        min-width: 100%;
+        width: 100%;
+        table-layout: fixed;
+    }
+    .chat-table td, .chat-table th {
+        word-break: break-word;
+        overflow-wrap: break-word;
     }
 
     @@media (min-width: 768px) {
         .chat-table-desktop {
             display: block;
             max-width: 100%;
-            overflow-x: auto;
         }
         .chat-table-mobile { display: none; }
     }

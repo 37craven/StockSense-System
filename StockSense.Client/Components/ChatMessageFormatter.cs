@@ -127,7 +127,7 @@ public static partial class ChatMessageFormatter
         return item.Length > 0;
     }
 
-    private static bool IsTableRow(string line) => SplitTableRow(line).Count >= 1;
+    private static bool IsTableRow(string line) => line.TrimStart().StartsWith('|') && SplitTableRow(line).Count >= 1;
 
     private static bool IsTableSeparator(string line)
     {

@@ -10,6 +10,10 @@
 
 @attribute [Authorize]
 
+<BbPortalHost />
+<BbDialogProvider />
+<BbToastProvider Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
+
 <div class="w-full max-w-[900px] lg:max-w-[640px] mx-auto px-4 pt-8 pb-[200px] lg:pb-8">
 
     <div style="margin-top: 28px; margin-bottom: 20px;">
@@ -116,7 +120,8 @@
                                 ₱@appt.TotalAmount.ToString("N0")
                             </span>
 
-                            @if (appt.PaymentStatus is "AwaitingPayment" or "Failed" or "Expired")
+                            @if (appt.Status is not "Cancelled" and not "Expired" and not "Completed"
+                                 && appt.PaymentStatus is "AwaitingPayment" or "Failed" or "Expired")
                             {
                                 <button type="button"
                                         @onclick="() => PayFromCard(appt)"
@@ -140,9 +145,6 @@
 
 @if (showDetailModal)
 {
-<BbPortalHost />
-<BbDialogProvider />
-
 <BbDialog @bind-Open="showDetailModal">
     <BbDialogContent Style="display: flex; flex-direction: column; height: min(85vh, 800px); width: min(96vw, 420px); max-width: 400px; padding: 0; overflow: hidden;">
         <div class="p-4 pb-0 shrink-0">
@@ -239,7 +241,7 @@
                         Downpayment received. Your slot is confirmed.
                     </div>
                 }
-                else if (selectedAppointment.PaymentStatus == "AwaitingPayment")
+                else if (selectedAppointment.PaymentStatus == "AwaitingPayment" && selectedAppointment.Status is not "Cancelled" and not "Expired" and not "Completed")
                 {
                     <div class="p-3 rounded-lg bg-muted border border-border flex flex-col gap-2">
                         <p class="text-xs text-muted-foreground m-0">Service fee payment is required to secure this booking.</p>
@@ -255,7 +257,7 @@
                         </div>
                     </div>
                 }
-                else if (selectedAppointment.PaymentStatus == "Failed" || selectedAppointment.PaymentStatus == "Expired")
+                else if ((selectedAppointment.PaymentStatus == "Failed" || selectedAppointment.PaymentStatus == "Expired") && selectedAppointment.Status is not "Cancelled" and not "Expired" and not "Completed")
                 {
                     <div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300 flex flex-col gap-2">
                         <p class="m-0">Payment @(selectedAppointment.PaymentStatus == "Failed" ? "failed" : "expired"). Please try again to secure your booking.</p>
@@ -281,9 +283,6 @@
 
 @if (showCalendarModal)
 {
-<BbPortalHost />
-<BbDialogProvider />
-
 <BbDialog @bind-Open="showCalendarModal">
     <BbDialogContent Style="display: flex; flex-direction: column; height: min(85vh, 700px); width: min(96vw, 500px); max-width: 500px; padding: 0; overflow: hidden;">
         <div class="p-4 pb-0 shrink-0">

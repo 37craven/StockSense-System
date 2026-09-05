@@ -8,9 +8,9 @@ public static class AssistanceSuggestions
     {
         "Admin" =>
         [
-            new("Sales performance", "Show the sales summary for the last 30 days.", "bar-chart"),
+            new("Sales performance", "Show the sales summary for the last 30 days.", "trending-up"),
             new("Replenishment settings", "Show safety-stock confidence and automatic-order settings.", "shield"),
-            new("Pending supplier orders", "Show pending and partially received supplier orders.", "truck"),
+            new("Draft orders", "Show draft supplier orders.", "truck"),
             new("User overview", "Show user counts by role.", "users")
         ],
         "Employee" =>
@@ -18,7 +18,7 @@ public static class AssistanceSuggestions
             new("Inventory attention", "Which products are low or out of stock?", "package"),
             new("Appointment status", "Summarize current appointment status.", "calendar"),
             new("Build status", "Summarize current motorcycle build status.", "wrench"),
-            new("Incoming orders", "Show pending and partially received supplier orders.", "truck"),
+            new("Incoming orders", "Show pending supplier orders.", "truck"),
             new("Compatibility lookup", "Help me identify compatible parts for a motorcycle.", "search")
         ],
         "Guest" =>

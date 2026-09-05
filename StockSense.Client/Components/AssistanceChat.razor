@@ -873,7 +873,10 @@
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        var role = user.IsInRole("Admin") ? "Admin" : user.IsInRole("Employee") ? "Employee" : "Customer";
+        var role = !user.Identity?.IsAuthenticated == true ? "Guest"
+            : user.IsInRole("Admin") ? "Admin"
+            : user.IsInRole("Employee") ? "Employee"
+            : "Customer";
         suggestions = AssistanceSuggestions.ForRole(role);
         roleCopy = AssistanceRolePresentation.ForRole(role);
     }
@@ -1164,6 +1167,25 @@
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
             var customerName = user.Identity?.Name ?? "";
 
+            // Resolve motorcycle string to a MotorcycleId
+            int? motorcycleId = null;
+            if (!string.IsNullOrWhiteSpace(motorcycleStr))
+            {
+                try
+                {
+                    var mcResponse = await JS.InvokeAsync<BrowserApiResponse>(
+                        "stockSenseApi.get", componentLifetime.Token, "api/motorcycles");
+                    if (mcResponse.Ok)
+                    {
+                        var motorcycles = JsonSerializer.Deserialize<List<MotorcycleOptionDto>>(
+                            mcResponse.Body,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        motorcycleId = ResolveMotorcycleId(motorcycleStr, motorcycles);
+                    }
+                }
+                catch { }
+            }
+
             var newAppt = new
             {
                 CustomerName = customerName,
@@ -1173,23 +1195,125 @@
                 SelectedServices = serviceList,
                 Category = "General",
                 MechanicName = string.IsNullOrWhiteSpace(mechanicStr) ? null : mechanicStr,
+                MotorcycleId = motorcycleId,
             };
+
+            // Pre-booking slot availability check — narrow the race window by
+            // verifying the time slot is still open before calling the create API.
+            if (TimeSpan.TryParse(timeStr, out var requestedSlot))
+            {
+                try
+                {
+                    var mechanicParam = string.IsNullOrWhiteSpace(mechanicStr) ? "" : $"&mechanic={Uri.EscapeDataString(mechanicStr)}";
+                    var bookedUrl = $"api/appointments/booked-slots?date={appointmentDate:yyyy-MM-dd}{mechanicParam}";
+                    var bookedResponse = await JS.InvokeAsync<BrowserApiResponse>(
+                        "stockSenseApi.get", componentLifetime.Token, bookedUrl);
+                    if (bookedResponse.Ok)
+                    {
+                        var bookedSlots = JsonSerializer.Deserialize<List<BookedSlotDto>>(
+                            bookedResponse.Body,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (bookedSlots is not null)
+                        {
+                            // Use 30 min as a safe default duration for overlap check.
+                            // The server will do a precise check with actual service durations.
+                            var requestedEnd = requestedSlot.Add(TimeSpan.FromMinutes(30));
+                            var isTaken = bookedSlots.Any(b =>
+                                TimeSpan.TryParse(b.TimeSlot, out var bookedStart) &&
+                                requestedSlot < bookedStart.Add(TimeSpan.FromMinutes(Math.Max(b.EstimatedMinutes, 15))) &&
+                                requestedEnd > bookedStart);
+                            if (isTaken)
+                            {
+                                messages.Add(new ChatMessage("assistant",
+                                    $"The time slot {timeStr} was just booked by someone else. Let me find you a new time..."));
+                                message = $"Book {serviceStr} on {dateStr}";
+                                activeWorkflowState = null;
+                                await SendAsync();
+                                return;
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
 
             var response = await JS.InvokeAsync<BrowserApiResponse>("stockSenseApi.postJson", componentLifetime.Token, "api/appointments", newAppt);
             var responseBody = response.Body?.Length > 200 ? response.Body[..200] : response.Body;
             await JS.InvokeVoidAsync("console.log", $"[CHAT-FE] Appointment API response: ok={response.Ok} status={response.Status} body={responseBody}");
             if (response.Ok)
             {
+                int? appointmentId = null;
+                try
+                {
+                    using var doc = JsonDocument.Parse(response.Body!);
+                    if (doc.RootElement.TryGetProperty("id", out var idEl))
+                        appointmentId = idEl.GetInt32();
+                }
+                catch { }
+
                 var motorcycleLine = string.IsNullOrWhiteSpace(motorcycleStr) ? "" : $"Motorcycle: {motorcycleStr}\n";
                 var serviceDisplay = string.Join(", ", serviceList);
+
+                if (appointmentId.HasValue)
+                {
+                    try
+                    {
+                        var payResponse = await JS.InvokeAsync<BrowserApiResponse>(
+                            "stockSenseApi.postJson",
+                            componentLifetime.Token,
+                            $"api/appointments/{appointmentId.Value}/create-payment",
+                            new { });
+
+                        if (payResponse.Ok)
+                        {
+                            string? checkoutUrl = null;
+                            decimal reservationFee = 0m;
+                            using var payDoc = JsonDocument.Parse(payResponse.Body);
+                            if (payDoc.RootElement.TryGetProperty("checkoutUrl", out var urlEl)
+                                && urlEl.ValueKind == JsonValueKind.String)
+                                checkoutUrl = urlEl.GetString();
+                            if (payDoc.RootElement.TryGetProperty("reservationFee", out var feeEl)
+                                && feeEl.TryGetDecimal(out var parsedFee))
+                                reservationFee = parsedFee;
+
+                            if (!string.IsNullOrEmpty(checkoutUrl))
+                            {
+                                await JS.InvokeVoidAsync("window.open", checkoutUrl, "_blank");
+                                var postBookingActions = new List<ChatAction>
+                                {
+                                    new("View My Appointments", "navigate", "/my-bookings", null, null, "list", null),
+                                };
+                                messages.Add(new ChatMessage("assistant",
+                                    $"Appointment booked successfully!\n\n" +
+                                    $"Service: {serviceDisplay}\n" +
+                                    $"Date: {dateStr}\n" +
+                                    $"Time: {timeStr}\n" +
+                                    $"Mechanic: {(string.IsNullOrWhiteSpace(mechanicStr) ? "Any Available" : mechanicStr)}\n" +
+                                    $"{motorcycleLine}" +
+                                    $"Reservation Fee: ₱{reservationFee:N2}\n\n" +
+                                    $"A payment page has been opened in a new tab. Complete your payment to confirm the booking.",
+                                    postBookingActions));
+                                activeWorkflowState = null;
+                                return;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                var fallbackActions = new List<ChatAction>
+                {
+                    new("View My Appointments", "navigate", "/my-bookings", null, null, "list", null),
+                };
                 messages.Add(new ChatMessage("assistant",
-                    $"Your appointment has been booked successfully!\n\n" +
+                    $"Appointment booked successfully!\n\n" +
                     $"Service: {serviceDisplay}\n" +
                     $"Date: {dateStr}\n" +
                     $"Time: {timeStr}\n" +
                     $"Mechanic: {(string.IsNullOrWhiteSpace(mechanicStr) ? "Any Available" : mechanicStr)}\n" +
                     $"{motorcycleLine}" +
-                    $"\nYou can view and manage your booking in My Bookings."));
+                    $"\nYou can view and manage your booking in My Appointments.",
+                    fallbackActions));
                 activeWorkflowState = null;
             }
             else
@@ -1230,6 +1354,7 @@
         }
     }
 
+
     private async Task HandleConfirmAsync()
     {
         message = "Yes, confirm";
@@ -1252,6 +1377,43 @@
     {
         message = $"Remove service: {serviceName}";
         await SendAsync();
+    }
+
+    private static int? ResolveMotorcycleId(string motorcycleStr, List<MotorcycleOptionDto>? motorcycles)
+    {
+        if (motorcycles is null || motorcycles.Count == 0)
+            return null;
+
+        var normalized = motorcycleStr.Trim();
+        if (string.IsNullOrEmpty(normalized))
+            return null;
+
+        // Exact match on DisplayName (case-insensitive)
+        var exact = motorcycles.FirstOrDefault(m =>
+            string.Equals(m.DisplayName, normalized, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null)
+            return exact.Id;
+
+        // Exact match on "Brand Model" (without CC)
+        var brandModel = motorcycles.FirstOrDefault(m =>
+            string.Equals($"{m.Brand} {m.Model}", normalized, StringComparison.OrdinalIgnoreCase));
+        if (brandModel is not null)
+            return brandModel.Id;
+
+        // Chatbot string contains the motorcycle's Brand + Model, or vice versa
+        var containsMatch = motorcycles.FirstOrDefault(m =>
+            normalized.Contains(m.Brand, StringComparison.OrdinalIgnoreCase) &&
+            normalized.Contains(m.Model, StringComparison.OrdinalIgnoreCase));
+        if (containsMatch is not null)
+            return containsMatch.Id;
+
+        // Motorcycle's DisplayName contains the chatbot string (partial match)
+        var partialMatch = motorcycles.FirstOrDefault(m =>
+            m.DisplayName.Contains(normalized, StringComparison.OrdinalIgnoreCase));
+        if (partialMatch is not null)
+            return partialMatch.Id;
+
+        return null;
     }
 
     private sealed record FailedAssistanceRequest(
