@@ -60,7 +60,7 @@
                 <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">@onHandUnits.ToString("N0") units on hand</div>
             </div>
 
-            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid @(atRiskCount > 0 ? "var(--warning)" : "var(--border)"); background: var(--card);">
+            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--muted-foreground);">At Reorder Risk</div>
                     <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: var(--warning-muted); color: var(--warning-muted-foreground);">
@@ -195,106 +195,125 @@
             </div>
         }
 
-        @* INVENTORY HEALTH + REPLENISHMENT *@
+        @* INVENTORY HEALTH + SALES PERFORMANCE *@
         @if (products.Count > 0)
         {
             <div class="dash-grid-2" style="margin-bottom: var(--space-4);">
                 @* Inventory Health *@
-                <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
-                        <div>
-                            <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Inventory Health</div>
-                            <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Stock Position Overview</h2>
-                        </div>
-                        <span style="font-size: var(--text-2xl); font-weight: 900; color: @(healthyPercent >= 80 ? "var(--success-muted-foreground)" : healthyPercent >= 50 ? "var(--warning-muted-foreground)" : "var(--destructive-muted-foreground)");">@healthyPercent%</span>
+                <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); display: flex; flex-direction: column;">
+                    <div style="margin-bottom: var(--space-4);">
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Inventory Health</div>
+                        <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Stock Position Overview</h2>
                     </div>
-                    <div style="width: 100%; height: 8px; border-radius: 4px; background: var(--muted); overflow: hidden;">
-                        <div class="health-fill" style="width: @healthyPercent%; background: @(healthyPercent >= 80 ? "var(--success)" : healthyPercent >= 50 ? "var(--warning)" : "var(--destructive)");"></div>
+                    @{
+                        var _totalProducts = healthyCount + atRiskCount;
+                        var _atRiskOnly = atRiskCount - protectedByIncoming;
+                        var _circumference = 2 * Math.PI * 38;
+                        var _healthyArc = _totalProducts > 0 ? healthyCount * _circumference / _totalProducts : 0;
+                        var _atRiskArc = _totalProducts > 0 ? _atRiskOnly * _circumference / _totalProducts : 0;
+                        var _protectedArc = _totalProducts > 0 ? protectedByIncoming * _circumference / _totalProducts : 0;
+                    }
+                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 100 100" style="width: 140px; height: 140px;">
+                            <circle cx="50" cy="50" r="38" fill="none" stroke="var(--muted)" stroke-width="10" />
+                            @if (healthyCount > 0)
+                            {
+                                <circle cx="50" cy="50" r="38" fill="none" stroke="var(--success)" stroke-width="10"
+                                        stroke-dasharray="@(_healthyArc.ToString("F1")) @((_circumference - _healthyArc).ToString("F1"))"
+                                        stroke-dashoffset="0" transform="rotate(-90 50 50)" stroke-linecap="round" />
+                            }
+                            @if (_atRiskOnly > 0)
+                            {
+                                <circle cx="50" cy="50" r="38" fill="none" stroke="var(--warning)" stroke-width="10"
+                                        stroke-dasharray="@(_atRiskArc.ToString("F1")) @((_circumference - _atRiskArc).ToString("F1"))"
+                                        stroke-dashoffset="@((-_healthyArc).ToString("F1"))" transform="rotate(-90 50 50)" stroke-linecap="round" />
+                            }
+                            @if (protectedByIncoming > 0)
+                            {
+                                <circle cx="50" cy="50" r="38" fill="none" stroke="var(--info)" stroke-width="10"
+                                        stroke-dasharray="@(_protectedArc.ToString("F1")) @((_circumference - _protectedArc).ToString("F1"))"
+                                        stroke-dashoffset="@((-(_healthyArc + _atRiskArc)).ToString("F1"))" transform="rotate(-90 50 50)" stroke-linecap="round" />
+                            }
+                            <text x="50" y="46" text-anchor="middle" font-size="20" font-weight="900" fill="var(--foreground)">@healthyPercent%</text>
+                            <text x="50" y="60" text-anchor="middle" font-size="8" font-weight="500" fill="var(--muted-foreground)">HEALTHY</text>
+                        </svg>
                     </div>
-                    <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4);">
-                        <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
+                    <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm);">
                             <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0;"></span> Above reorder point
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0;"></span> Above reorder
                             </span>
                             <strong style="color: var(--foreground);">@healthyCount</strong>
                         </div>
-                        <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm);">
                             <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex-shrink: 0;"></span> At or below reorder point
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex-shrink: 0;"></span> At risk
                             </span>
-                            <strong style="color: var(--foreground);">@atRiskCount</strong>
+                            <strong style="color: var(--foreground);">@_atRiskOnly</strong>
                         </div>
-                        <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm);">
                             <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex-shrink: 0;"></span> Protected by incoming stock
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex-shrink: 0;"></span> Protected
                             </span>
                             <strong style="color: var(--foreground);">@protectedByIncoming</strong>
                         </div>
                     </div>
                 </div>
 
-                @* Replenishment Priorities *@
+                @* Top Brands by Sales *@
                 <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
                         <div>
-                            <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Action Queue</div>
-                            <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Replenishment Priorities</h2>
+                            <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Sales Performance</div>
+                            <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Top Brands by Sales</h2>
                         </div>
-                        <a href="/admin/orderslips" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">Generate orders →</a>
+                        <span style="display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-medium); background: var(--muted); color: var(--foreground);">
+                            Last 30 days
+                        </span>
                     </div>
-                    @if (replenishment.Count == 0)
+                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-bottom: var(--space-3);">@salesPeriodStart.ToString("MMM d")–@salesPeriodEnd.AddDays(-1).ToString("MMM d, yyyy") · Completed sales</div>
+                    @if (topBrandSales.Count == 0)
                     {
-                        <div style="display: flex; align-items: center; gap: var(--space-2); color: var(--success-muted-foreground); font-size: var(--text-sm);">
-                            <LucideIcon Name="circle-check" Size="18" /> All stocked products are above their reorder points.
-                        </div>
+                        <div style="font-size: var(--text-sm); color: var(--muted-foreground);">No completed product sales were recorded during this period.</div>
                     }
                     else
                     {
                         <div class="dashboard-table-view">
                             <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
                                 <thead>
-                                    <tr style="border-bottom: 1px solid var(--border);">
-                                        <th style="text-align: left; padding: 8px 12px; color: var(--muted-foreground);">Product</th>
-                                        <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">On Hand</th>
-                                        <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Incoming</th>
-                                        <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Reorder</th>
-                                        <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Position</th>
-                                        <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Gap</th>
+                                    <tr style="border-bottom: 1px solid var(--border); background: var(--muted);">
+                                        <th style="text-align: left; padding: 8px 12px; color: var(--muted-foreground);">Rank</th>
+                                        <th style="text-align: left; padding: 8px 12px; color: var(--muted-foreground);">Brand</th>
+                                        <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Units Sold</th>
+                                        <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Revenue</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var item in replenishment)
+                                    @foreach (var item in topBrandSales.Take(5).Select((value, index) => new { value, index }))
                                     {
                                         <tr style="border-bottom: 1px solid var(--border);">
-                                            <td style="padding: 8px 12px; color: var(--foreground);">
-                                                <div style="font-weight: var(--font-semibold);">@item.Name</div>
-                                                <div style="font-size: 10px; color: var(--muted-foreground);">@item.Brand</div>
-                                            </td>
-                                            <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.OnHand</td>
-                                            <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.Incoming</td>
-                                            <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.ReorderPoint</td>
-                                            <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.Position</td>
-                                            <td style="padding: 8px 12px; text-align: right;">
-                                                <span style="display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background: var(--warning); color: var(--warning-foreground);">@item.Gap</span>
-                                            </td>
+                                            <td style="padding: 10px 12px; color: var(--muted-foreground); font-weight: var(--font-bold);">#@(item.index + 1)</td>
+                                            <td style="padding: 10px 12px; color: var(--foreground); font-weight: var(--font-semibold);">@item.value.Brand</td>
+                                            <td style="padding: 10px 12px; text-align: right; color: var(--foreground);">@item.value.Units.ToString("N0")</td>
+                                            <td style="padding: 10px 12px; text-align: right; color: var(--accent-link); font-weight: var(--font-semibold);">₱@item.value.Revenue.ToString("N2")</td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
                         </div>
                         <div class="dashboard-card-list">
-                            @foreach (var item in replenishment)
+                            @foreach (var item in topBrandSales.Take(5).Select((value, index) => new { value, index }))
                             {
-                                <article class="dashboard-data-card">
+                                <article class="dashboard-data-card dashboard-brand-card">
                                     <div class="dashboard-card-heading">
-                                        <div><strong>@item.Name</strong><small>@item.Brand</small></div>
-                                        <span class="dashboard-gap-badge">Gap @item.Gap</span>
+                                        <div><small>Rank #@(item.index + 1)</small><strong>@item.value.Brand</strong></div>
+                                        <strong class="dashboard-primary-text">₱@item.value.Revenue.ToString("N2")</strong>
                                     </div>
-                                    <dl class="dashboard-card-grid dashboard-card-grid-four" aria-label="Inventory position">
-                                        <div class="dashboard-card-metric"><dt>On hand</dt><dd>@item.OnHand</dd></div>
-                                        <div class="dashboard-card-metric"><dt>Incoming</dt><dd>@item.Incoming</dd></div>
-                                        <div class="dashboard-card-metric"><dt>Reorder</dt><dd>@item.ReorderPoint</dd></div>
-                                        <div class="dashboard-card-metric"><dt>Position</dt><dd>@item.Position</dd></div>
+                                    <dl class="dashboard-card-grid dashboard-brand-metrics" aria-label="Sales totals">
+                                        <div class="dashboard-card-metric">
+                                            <dt>Units sold</dt>
+                                            <dd>@item.value.Units.ToString("N0")</dd>
+                                        </div>
                                     </dl>
                                 </article>
                             }
@@ -304,66 +323,77 @@
             </div>
         }
 
-        @* TOP BRANDS BY SALES *@
-        <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); margin-bottom: var(--space-4);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
-                <div>
-                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Sales Performance</div>
-                    <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Top Brands by Sales</h2>
+        @* REPLENISHMENT PRIORITIES *@
+        @if (products.Count > 0)
+        {
+            <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); margin-bottom: var(--space-4);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+                    <div>
+                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Action Queue</div>
+                        <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Replenishment Priorities</h2>
+                    </div>
+                    <a href="/admin/orderslips" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">Generate orders →</a>
                 </div>
-                <span style="display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-medium); background: var(--muted); color: var(--foreground);">
-                    Last 30 Philippine days
-                </span>
-            </div>
-            <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-bottom: var(--space-3);">@salesPeriodStart.ToString("MMM d")–@salesPeriodEnd.AddDays(-1).ToString("MMM d, yyyy") · Completed sales</div>
-            @if (topBrandSales.Count == 0)
-            {
-                <div style="font-size: var(--text-sm); color: var(--muted-foreground);">No completed product sales were recorded during this period.</div>
-            }
-            else
-            {
-                <div class="dashboard-table-view">
-                    <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
-                        <thead>
-                            <tr style="border-bottom: 1px solid var(--border); background: var(--muted);">
-                                <th style="text-align: left; padding: 8px 12px; color: var(--muted-foreground);">Rank</th>
-                                <th style="text-align: left; padding: 8px 12px; color: var(--muted-foreground);">Brand</th>
-                                <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Units Sold</th>
-                                <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Revenue</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var item in topBrandSales.Select((value, index) => new { value, index }))
-                            {
+                @if (replenishment.Count == 0)
+                {
+                    <div style="display: flex; align-items: center; gap: var(--space-2); color: var(--success-muted-foreground); font-size: var(--text-sm);">
+                        <LucideIcon Name="circle-check" Size="18" /> All stocked products are above their reorder points.
+                    </div>
+                }
+                else
+                {
+                    <div class="dashboard-table-view">
+                        <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
+                            <thead>
                                 <tr style="border-bottom: 1px solid var(--border);">
-                                    <td style="padding: 10px 12px; color: var(--muted-foreground); font-weight: var(--font-bold);">#@(item.index + 1)</td>
-                                    <td style="padding: 10px 12px; color: var(--foreground); font-weight: var(--font-semibold);">@item.value.Brand</td>
-                                    <td style="padding: 10px 12px; text-align: right; color: var(--foreground);">@item.value.Units.ToString("N0")</td>
-                                    <td style="padding: 10px 12px; text-align: right; color: var(--accent-link); font-weight: var(--font-semibold);">₱@item.value.Revenue.ToString("N2")</td>
+                                    <th style="text-align: left; padding: 8px 12px; color: var(--muted-foreground);">Product</th>
+                                    <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">On Hand</th>
+                                    <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Incoming</th>
+                                    <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Reorder</th>
+                                    <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Position</th>
+                                    <th style="text-align: right; padding: 8px 12px; color: var(--muted-foreground);">Gap</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-                <div class="dashboard-card-list">
-                    @foreach (var item in topBrandSales.Select((value, index) => new { value, index }))
-                    {
-                        <article class="dashboard-data-card dashboard-brand-card">
-                            <div class="dashboard-card-heading">
-                                <div><small>Rank #@(item.index + 1)</small><strong>@item.value.Brand</strong></div>
-                                <strong class="dashboard-primary-text">₱@item.value.Revenue.ToString("N2")</strong>
-                            </div>
-                            <dl class="dashboard-card-grid dashboard-brand-metrics" aria-label="Sales totals">
-                                <div class="dashboard-card-metric">
-                                    <dt>Units sold</dt>
-                                    <dd>@item.value.Units.ToString("N0")</dd>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in replenishment)
+                                {
+                                    <tr style="border-bottom: 1px solid var(--border);">
+                                        <td style="padding: 8px 12px; color: var(--foreground);">
+                                            <div style="font-weight: var(--font-semibold);">@item.Name</div>
+                                            <div style="font-size: 10px; color: var(--muted-foreground);">@item.Brand</div>
+                                        </td>
+                                        <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.OnHand</td>
+                                        <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.Incoming</td>
+                                        <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.ReorderPoint</td>
+                                        <td style="padding: 8px 12px; text-align: right; color: var(--foreground);">@item.Position</td>
+                                        <td style="padding: 8px 12px; text-align: right;">
+                                            <span style="display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-semibold); background: var(--warning); color: var(--warning-foreground);">@item.Gap</span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="dashboard-card-list">
+                        @foreach (var item in replenishment)
+                        {
+                            <article class="dashboard-data-card">
+                                <div class="dashboard-card-heading">
+                                    <div><strong>@item.Name</strong><small>@item.Brand</small></div>
+                                    <span class="dashboard-gap-badge">Gap @item.Gap</span>
                                 </div>
-                            </dl>
-                        </article>
-                    }
-                </div>
-            }
-        </div>
+                                <dl class="dashboard-card-grid dashboard-card-grid-four" aria-label="Inventory position">
+                                    <div class="dashboard-card-metric"><dt>On hand</dt><dd>@item.OnHand</dd></div>
+                                    <div class="dashboard-card-metric"><dt>Incoming</dt><dd>@item.Incoming</dd></div>
+                                    <div class="dashboard-card-metric"><dt>Reorder</dt><dd>@item.ReorderPoint</dd></div>
+                                    <div class="dashboard-card-metric"><dt>Position</dt><dd>@item.Position</dd></div>
+                                </dl>
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        }
 
         @* APPOINTMENTS + BUILDS *@
         <div class="dash-grid-2" style="margin-bottom: var(--space-4);">
