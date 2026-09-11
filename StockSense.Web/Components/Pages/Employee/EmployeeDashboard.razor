@@ -195,83 +195,119 @@
             </div>
         }
 
-        @* INVENTORY HEALTH + SALES PERFORMANCE *@
+        @* INVENTORY HEALTH + PURCHASING *@
         @if (products.Count > 0)
         {
             <div class="dash-grid-2" style="margin-bottom: var(--space-4);">
                 @* Inventory Health *@
-                <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); display: flex; flex-direction: column;">
-                    <div style="margin-bottom: var(--space-4);">
-                        <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Inventory Health</div>
-                        <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Stock Position Overview</h2>
-                    </div>
-                    @{
-                        var _totalProducts = healthyCount + atRiskCount;
-                        var _atRiskOnly = atRiskCount - protectedByIncoming;
-                        var _circumference = 2 * Math.PI * 38;
-                        var _healthyArc = _totalProducts > 0 ? healthyCount * _circumference / _totalProducts : 0;
-                        var _atRiskArc = _totalProducts > 0 ? _atRiskOnly * _circumference / _totalProducts : 0;
-                        var _protectedArc = _totalProducts > 0 ? protectedByIncoming * _circumference / _totalProducts : 0;
-                    }
-                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                        <svg viewBox="0 0 100 100" style="width: 140px; height: 140px;">
-                            <circle cx="50" cy="50" r="38" fill="none" stroke="var(--muted)" stroke-width="10" />
-                            @if (healthyCount > 0)
-                            {
-                                <circle cx="50" cy="50" r="38" fill="none" stroke="var(--success)" stroke-width="10"
-                                        stroke-dasharray="@(_healthyArc.ToString("F1")) @((_circumference - _healthyArc).ToString("F1"))"
-                                        stroke-dashoffset="0" transform="rotate(-90 50 50)" stroke-linecap="round" />
-                            }
+                @{
+                    var _atRiskOnly = atRiskCount - protectedByIncoming;
+                    var _total = healthyCount + atRiskCount;
+                }
+                <div class="rounded-lg border border-border bg-card p-4 flex flex-col justify-between h-full">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <div class="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Inventory Health</div>
+                                <h2 class="text-lg font-semibold text-foreground mt-0.5">Stock Position</h2>
+                            </div>
+                            <span class="text-3xl font-black" style="color: @(healthyPercent >= 80 ? "var(--success)" : healthyPercent >= 50 ? "var(--warning)" : "var(--destructive)")">@healthyPercent%</span>
+                        </div>
+                        <div class="w-full h-2 rounded-full bg-muted overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500" style="width: @(healthyPercent)%; background: @(healthyPercent >= 80 ? "var(--success)" : healthyPercent >= 50 ? "var(--warning)" : "var(--destructive)");"></div>
+                        </div>
+                        <div class="text-sm text-muted-foreground">
                             @if (_atRiskOnly > 0)
                             {
-                                <circle cx="50" cy="50" r="38" fill="none" stroke="var(--warning)" stroke-width="10"
-                                        stroke-dasharray="@(_atRiskArc.ToString("F1")) @((_circumference - _atRiskArc).ToString("F1"))"
-                                        stroke-dashoffset="@((-_healthyArc).ToString("F1"))" transform="rotate(-90 50 50)" stroke-linecap="round" />
+                                <span class="font-semibold" style="color: var(--warning)">@_atRiskOnly at risk</span>
+                                <span> · </span>
                             }
                             @if (protectedByIncoming > 0)
                             {
-                                <circle cx="50" cy="50" r="38" fill="none" stroke="var(--info)" stroke-width="10"
-                                        stroke-dasharray="@(_protectedArc.ToString("F1")) @((_circumference - _protectedArc).ToString("F1"))"
-                                        stroke-dashoffset="@((-(_healthyArc + _atRiskArc)).ToString("F1"))" transform="rotate(-90 50 50)" stroke-linecap="round" />
+                                <span>@protectedByIncoming protected by incoming</span>
                             }
-                            <text x="50" y="46" text-anchor="middle" font-size="20" font-weight="900" fill="var(--foreground)">@healthyPercent%</text>
-                            <text x="50" y="60" text-anchor="middle" font-size="8" font-weight="500" fill="var(--muted-foreground)">HEALTHY</text>
-                        </svg>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm);">
-                            <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0;"></span> Above reorder
-                            </span>
-                            <strong style="color: var(--foreground);">@healthyCount</strong>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm);">
-                            <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex-shrink: 0;"></span> At risk
-                            </span>
-                            <strong style="color: var(--foreground);">@_atRiskOnly</strong>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: var(--text-sm);">
-                            <span style="display: flex; align-items: center; gap: var(--space-2); color: var(--muted-foreground);">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--info); flex-shrink: 0;"></span> Protected
-                            </span>
-                            <strong style="color: var(--foreground);">@protectedByIncoming</strong>
+                            else if (_atRiskOnly == 0)
+                            {
+                                <span class="font-medium" style="color: var(--success)">All stocked SKUs above reorder point</span>
+                            }
                         </div>
                     </div>
+                    @if (_total > 0)
+                    {
+                        <div class="flex flex-col gap-2 mt-4 pt-4 border-t border-border">
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="flex items-center gap-2 text-muted-foreground">
+                                    <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--success)"></span> Above reorder
+                                </span>
+                                <span class="font-semibold text-foreground">@healthyCount</span>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="flex items-center gap-2 text-muted-foreground">
+                                    <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--warning)"></span> At risk
+                                </span>
+                                <span class="font-semibold text-foreground">@_atRiskOnly</span>
+                            </div>
+                            @if (protectedByIncoming > 0)
+                            {
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="flex items-center gap-2 text-muted-foreground">
+                                        <span class="w-2 h-2 rounded-full shrink-0" style="background: var(--info)"></span> Protected
+                                    </span>
+                                    <span class="font-semibold text-foreground">@protectedByIncoming</span>
+                        </div>
+                    }
+            </div>
+        }
                 </div>
 
-                @* Top Brands by Sales *@
-                <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+                @* Purchasing Activity *@
+                <div class="rounded-lg border border-border bg-card p-4 flex flex-col h-full">
+                    <div class="flex items-center justify-between mb-3">
                         <div>
-                            <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Sales Performance</div>
-                            <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Top Brands by Sales</h2>
+                            <div class="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Purchasing Activity</div>
+                            <h2 class="text-lg font-semibold text-foreground mt-0.5">Open Orders</h2>
                         </div>
-                        <span style="display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: var(--font-medium); background: var(--muted); color: var(--foreground);">
-                            Last 30 days
-                        </span>
+                        <a href="/admin/order-history" class="text-xs text-primary font-medium hover:underline">View history →</a>
                     </div>
-                    <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-bottom: var(--space-3);">@salesPeriodStart.ToString("MMM d")–@salesPeriodEnd.AddDays(-1).ToString("MMM d, yyyy") · Completed sales</div>
+                    @if (openSlips.Count == 0)
+                    {
+                        <div class="text-sm text-muted-foreground">No open purchase orders.</div>
+                    }
+                    else
+                    {
+                        var _slip = openSlips[orderPageIndex];
+                        <div class="flex-1 flex flex-col order-slide-fade" @key="orderSlideKey">
+                            <a href="/admin/order-history?orderSlip=@_slip.Id" class="block p-3 rounded-lg border border-border bg-background hover:border-primary/30 transition-colors">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="font-semibold text-foreground text-sm font-mono">@DisplaySlipNumber(_slip)</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold @GetOrderStatusBadgeStyle(_slip.Status)">@_slip.Status</span>
+                                </div>
+                                <div class="text-xs text-muted-foreground">@(_slip.Supplier?.Name ?? "Supplier") · @_slip.Items.Count line@(_slip.Items.Count == 1 ? "" : "s")</div>
+                                <div class="text-xs text-muted-foreground mt-0.5">@(_slip.ExpectedDeliveryDate.HasValue ? $"ETA {_slip.ExpectedDeliveryDate.Value:MMM d}" : "No ETA")</div>
+                            </a>
+                        </div>
+                        <div class="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                            <button type="button" class="text-xs text-muted-foreground hover:text-foreground" @onclick="OrderPrev">← Prev</button>
+                            <span class="text-xs text-muted-foreground">@(orderPageIndex + 1) / @openSlips.Count</span>
+                            <button type="button" class="text-xs text-muted-foreground hover:text-foreground" @onclick="OrderNext">Next →</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* SALES PERFORMANCE *@
+        @if (products.Count > 0)
+        {
+            <div class="rounded-lg border border-border bg-card p-4" style="margin-bottom: var(--space-4);">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Sales Performance</div>
+                        <h2 class="text-lg font-semibold text-foreground mt-0.5">Top Brands by Sales</h2>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-foreground">Last 30 days</span>
+                </div>
+                <div class="text-xs text-muted-foreground mb-3">@salesPeriodStart.ToString("MMM d")–@salesPeriodEnd.AddDays(-1).ToString("MMM d, yyyy") · Completed sales</div>
                     @if (topBrandSales.Count == 0)
                     {
                         <div style="font-size: var(--text-sm); color: var(--muted-foreground);">No completed product sales were recorded during this period.</div>
@@ -319,7 +355,6 @@
                             }
                         </div>
                     }
-                </div>
             </div>
         }
 
@@ -415,10 +450,10 @@
                     <div style="display: flex; flex-direction: column; gap: var(--space-2);">
                         @foreach (var a in upcomingAppointments.Take(5))
                         {
-                            <a href="/admin/appointments" style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
-                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--radius); background: var(--primary); color: white; flex-shrink: 0;">
-                                    <span style="font-size: var(--text-lg); font-weight: 900; line-height: 1;">@a.AppointmentDate.ToString("dd")</span>
-                                    <span style="font-size: 9px; font-weight: var(--font-medium); text-transform: uppercase; line-height: 1;">@a.AppointmentDate.ToString("MMM")</span>
+                            <a href="/admin/appointments" style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); height: 68px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius); background: var(--primary); color: white; flex-shrink: 0;">
+                                    <span style="font-size: var(--text-base); font-weight: 900; line-height: 1;">@a.AppointmentDate.ToString("dd")</span>
+                                    <span style="font-size: 8px; font-weight: var(--font-medium); text-transform: uppercase; line-height: 1;">@a.AppointmentDate.ToString("MMM")</span>
                                 </div>
                                 <div style="flex: 1; min-width: 0;">
                                     <div style="font-weight: var(--font-semibold); color: var(--foreground); font-size: var(--text-sm);">@a.CustomerName</div>
@@ -452,8 +487,8 @@
                     <div style="display: flex; flex-direction: column; gap: var(--space-2);">
                         @foreach (var build in activeBuilds.Take(5))
                         {
-                            <a href="/admin/builds" style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
-                                <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius); background: color-mix(in oklch, var(--primary) 10%, transparent); color: var(--primary); flex-shrink: 0;">
+                            <a href="/admin/builds" style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); height: 68px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
+                                <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius); background: color-mix(in oklch, var(--primary) 10%, transparent); color: var(--primary); flex-shrink: 0;">
                                     <LucideIcon Name="wrench" Size="16" />
                                 </div>
                                 <div style="flex: 1; min-width: 0;">
@@ -463,40 +498,9 @@
                                 <span style="display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); @GetBuildStatusBadgeStyle(build.Status); flex-shrink: 0;">@build.Status</span>
                             </a>
                         }
-                    </div>
-                }
-            </div>
-        </div>
-
-        @* OPEN PURCHASE ORDERS *@
-        <div style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); margin-bottom: var(--space-4);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
-                <div>
-                    <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Purchasing Activity</div>
-                    <h2 style="font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--foreground); margin: 2px 0 0 0;">Open Purchase Orders</h2>
-                </div>
-                <a href="/admin/order-history" style="font-size: var(--text-xs); color: var(--accent-link); text-decoration: none; font-weight: var(--font-medium);">View history →</a>
-            </div>
-            @if (openSlips.Count == 0)
-            {
-                <div style="font-size: var(--text-sm); color: var(--muted-foreground);">No open purchase orders.</div>
-            }
-            else
-            {
-                <div class="order-grid">
-                    @foreach (var slip in openSlips.Take(4))
-                    {
-                        <a href="/admin/order-history?orderSlip=@slip.Id" style="padding: var(--space-4); border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); text-decoration: none; transition: border-color 0.15s;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
-                                <span style="font-weight: var(--font-semibold); color: var(--foreground); font-size: var(--text-sm); font-family: monospace;">@DisplaySlipNumber(slip)</span>
-                                <span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: var(--font-semibold); @GetOrderStatusBadgeStyle(slip.Status);">@slip.Status</span>
-                            </div>
-                            <div style="font-size: var(--text-sm); color: var(--muted-foreground);">@(slip.Supplier?.Name ?? "Supplier not set") · @slip.Items.Count line@(slip.Items.Count == 1 ? "" : "s")</div>
-                            <div style="font-size: var(--text-xs); color: var(--muted-foreground); margin-top: var(--space-1);">@(slip.ExpectedDeliveryDate.HasValue ? $"ETA {slip.ExpectedDeliveryDate.Value:MMM d, yyyy}" : "No delivery date")</div>
-                        </a>
+                        </div>
                     }
-                </div>
-            }
+            </div>
         </div>
     }
 </div>
@@ -517,6 +521,8 @@
     private List<Transaction> recentTransactions = [];
     private int onHandUnits, incomingUnits, atRiskCount, healthyCount, protectedByIncoming, healthyPercent;
     private int draftCount;
+    private int orderPageIndex;
+    private int orderSlideKey;
     private int todayConfirmedAppointments, todayPendingAppointments, pendingBuildCount;
     private DateTime dashboardToday, salesPeriodStart, salesPeriodEnd;
 
@@ -608,6 +614,7 @@
         salesPeriodStart = snap.SalesPeriodStart; salesPeriodEnd = snap.SalesPeriodEnd;
         lastUpdated = snap.FetchedAt; isCached = fromCache;
         productsLoaded = slipsLoaded = salesLoaded = appointmentsLoaded = buildsLoaded = txLoaded = true;
+        orderPageIndex = 0;
         Calculate();
     }
 
@@ -663,7 +670,6 @@
 
     private void Calculate()
     {
-        // Single-pass over products for all counts
         var idSet = incomingByProduct;
         onHandUnits = 0; atRiskCount = 0; protectedByIncoming = 0;
         var replenishTemp = new List<ReplenishmentRow>(products.Count);
@@ -691,6 +697,8 @@
     }
 
     private int Incoming(int productId) => incomingByProduct.GetValueOrDefault(productId);
+    private void OrderPrev() { orderPageIndex = orderPageIndex > 0 ? orderPageIndex - 1 : openSlips.Count - 1; orderSlideKey++; }
+    private void OrderNext() { orderPageIndex = orderPageIndex < openSlips.Count - 1 ? orderPageIndex + 1 : 0; orderSlideKey++; }
     private static DateTime PhilippineToday()
     {
         TimeZoneInfo zone;

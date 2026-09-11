@@ -14,26 +14,6 @@
     gap: var(--space-3);
 }
 
-.dash-grid-3 {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: var(--space-3);
-}
-
-.order-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3);
-}
-
-.health-fill {
-    height: 14px;
-    min-width: 2px;
-    border-radius: 7px;
-    background: var(--primary);
-    transition: width 0.5s ease;
-}
-
 .dashboard-table-view {
     display: block;
     min-width: 0;
@@ -43,13 +23,21 @@
     display: none;
 }
 
+@keyframes orderSlideFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.order-slide-fade {
+    animation: orderSlideFadeIn 0.2s ease-out;
+}
+
 @media (max-width: 1024px) {
     .kpi-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .dash-grid-2,
-    .dash-grid-3 {
+    .dash-grid-2 {
         grid-template-columns: minmax(0, 1fr);
     }
 }
@@ -61,8 +49,7 @@
         overflow-x: clip;
     }
 
-    .kpi-grid,
-    .order-grid {
+    .kpi-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
