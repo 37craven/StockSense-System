@@ -381,10 +381,36 @@
         <div class="flex justify-end items-center gap-2 p-3 px-4 border-t border-border shrink-0">
             @if (CurrentBuild?.Status == "Pending")
             {
-                <BbButton Variant="ButtonVariant.Destructive" OnClick="() => CancelFromDetail(CurrentBuild!)">Cancel Build</BbButton>
+                <BbButton Variant="ButtonVariant.Destructive" OnClick="() => showCancelConfirmDialog = true">Cancel Build</BbButton>
             }
             <BbButton Variant="ButtonVariant.Outline" OnClick="CloseBuildDetail">Close</BbButton>
         </div>
+    </BbDialogContent>
+</BbDialog>
+}
+
+@if (showCancelConfirmDialog)
+{
+<BbDialog @bind-Open="showCancelConfirmDialog">
+    <BbDialogContent Style="max-width: 400px;">
+        <BbDialogHeader>
+            <BbDialogTitle>Cancel build?</BbDialogTitle>
+            <BbDialogDescription>This action cannot be undone. The build request will be moved to history.</BbDialogDescription>
+        </BbDialogHeader>
+        @if (CurrentBuild is not null)
+        {
+            <div class="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+                <p class="m-0 font-semibold">Build #@CurrentBuild.Id · ₱@CurrentBuild.TotalPrice.ToString("N2")</p>
+                <p class="mb-0 mt-1 text-muted-foreground">@CurrentBuild.CreatedAt.ToString("MMMM dd, yyyy")</p>
+            </div>
+        }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showCancelConfirmDialog = false" Disabled="@isCancelling">Keep build</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmCancel" Disabled="@isCancelling">
+                @if (isCancelling) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(isCancelling ? "Cancelling..." : "Cancel build")
+            </BbButton>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 }
@@ -405,6 +431,9 @@
     private string sortKey = "created";
 
     private bool showDetailModal;
+
+    private bool showCancelConfirmDialog;
+    private bool isCancelling;
 
     private BuildRequestDto? CurrentBuild;
 
@@ -589,11 +618,23 @@
         showDetailModal = false;
     }
 
-    private async Task CancelFromDetail(BuildRequestDto build)
+    private async Task ConfirmCancel()
     {
-        await CancelBuild(build);
-        if (build.Status == "Cancelled")
-            showDetailModal = false;
+        if (CurrentBuild is null || isCancelling) return;
+        isCancelling = true;
+        try
+        {
+            await CancelBuild(CurrentBuild);
+            if (CurrentBuild.Status == "Cancelled")
+            {
+                showCancelConfirmDialog = false;
+                showDetailModal = false;
+            }
+        }
+        finally
+        {
+            isCancelling = false;
+        }
     }
 
     private string GetStatusColor(string status) =>
