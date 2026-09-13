@@ -360,6 +360,25 @@ public class BuildsController : ControllerBase
         return Ok(builds.Select(MapToDto).ToList());
     }
 
+    [HttpPut("{id}/cancel")]
+    public async Task<IActionResult> CancelMyBuild(int id)
+    {
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+
+        var build = await _context.BuildRequests.FindAsync(id);
+        if (build is null) return NotFound(ApiResponse.NotFound("Build"));
+        if (build.CustomerUserId != customer.Id) return Forbid();
+
+        if (build.Status != WorkOrderStatuses.Pending)
+            return Conflict(ApiResponse.Error("Only pending builds can be cancelled."));
+
+        build.Status = WorkOrderStatuses.Cancelled;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Build cancelled." });
+    }
+
     private static BuildRequestDto MapToDto(BuildRequest build) => new()
     {
         Id = build.Id,
