@@ -294,7 +294,7 @@
                 }
                 else
                 {
-                    <BbButton Variant="ButtonVariant.Ghost" OnClick="RequestCloseModal">Cancel</BbButton>
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="() => modalOpen = false">Cancel</BbButton>
                     <BbButton Variant="ButtonVariant.Default" OnClick="SaveService" Disabled="@isSaving">
                         @if (isSaving)
                         {
@@ -311,32 +311,7 @@
     </BbDialogContent>
 </BbDialog>
 
-@* Discard modals *@
-<BbDialog @bind-Open="showDiscardModal">
-    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
-        <BbDialogHeader>
-            <BbDialogTitle>Discard service changes?</BbDialogTitle>
-            <BbDialogDescription>Your unsaved changes will be lost.</BbDialogDescription>
-        </BbDialogHeader>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardModal = false">Keep editing</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardAndCloseModal">Discard changes</BbButton>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
 
-<BbDialog @bind-Open="showDiscardCreateModal">
-    <BbDialogContent Class="w-[min(92vw,28rem)] p-5">
-        <BbDialogHeader>
-            <BbDialogTitle>Discard new service?</BbDialogTitle>
-            <BbDialogDescription>The service information you entered will be lost.</BbDialogDescription>
-        </BbDialogHeader>
-        <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showDiscardCreateModal = false">Keep editing</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="DiscardAndCloseCreateModal">Discard changes</BbButton>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
 
 @code {
     private List<StoreServiceDto>? services;
@@ -350,11 +325,6 @@
         set
         {
             if (_modalOpen == value) return;
-            if (!value)
-            {
-                if (isEditMode && IsEditDirty) { showDiscardModal = true; return; }
-                if (!isEditMode && IsCreateDirty) { showDiscardCreateModal = true; return; }
-            }
             _modalOpen = value;
             if (!value) ResetModalState();
         }
@@ -375,8 +345,6 @@
     private int EditTotalMinutes => Math.Max(editDays, 0) * 1440 + Math.Max(editHours, 0) * 60 + Math.Max(editMins, 0);
 
     private string editBaseline = "";
-    private bool showDiscardModal;
-    private bool showDiscardCreateModal;
 
     private HashSet<string> expandedGenericItems = new();
 
@@ -583,24 +551,6 @@
         Items = editingItems.Select(item => new { item.Name, ProductIds = item.LinkedProductIds.OrderBy(id => id).ToArray() }).ToArray()
     });
 
-    private void RequestCloseModal()
-    {
-        if (isEditMode && IsEditDirty) { showDiscardModal = true; return; }
-        if (!isEditMode && IsCreateDirty) { showDiscardCreateModal = true; return; }
-        modalOpen = false;
-    }
-
-    private void DiscardAndCloseModal()
-    {
-        showDiscardModal = false;
-        modalOpen = false;
-    }
-
-    private void DiscardAndCloseCreateModal()
-    {
-        showDiscardCreateModal = false;
-        modalOpen = false;
-    }
 
     private async Task SaveService()
     {
