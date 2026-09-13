@@ -1,0 +1,218 @@
+@page "/help"
+@layout PublicLayout
+@rendermode InteractiveServer
+@using StockSense.Client.Layout
+
+<div style="width: 70vw; max-width: 900px; min-width: 320px; margin: 0 auto; padding: 6rem 1rem 4rem;">
+    <h1 class="text-3xl font-bold text-foreground mb-2">How can we help?</h1>
+    <p class="text-muted-foreground mb-8">Search or browse the guides below to get started.</p>
+
+    <input type="text"
+           placeholder="Search articles..."
+           @bind="searchQuery"
+           @bind:event="oninput"
+           class="w-full mb-8 px-4 py-3 rounded-lg border border-border bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+
+    @foreach (var category in FilteredArticles)
+    {
+        <div class="mb-8">
+            <h2 class="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                <LucideIcon Name="@category.Icon" Size="20" />
+                @category.Title
+            </h2>
+            <div class="flex flex-col gap-2">
+                @foreach (var article in category.Articles)
+                {
+                    <div class="w-full rounded-lg border border-border bg-card overflow-hidden">
+                        <button type="button"
+                                @onclick="() => ToggleArticle(article.Id)"
+                                class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted transition-colors">
+                            <span class="text-sm font-medium text-foreground">@article.Title</span>
+                            <LucideIcon Name="@(expandedArticles.Contains(article.Id) ? "chevron-up" : "chevron-down")" Size="16" Class="text-muted-foreground shrink-0" />
+                        </button>
+                        @if (expandedArticles.Contains(article.Id))
+                        {
+                            <div class="px-4 pb-4 border-t border-border">
+                                <ol class="mt-3 flex flex-col gap-2">
+                                    @foreach (var step in article.Steps)
+                                    {
+                                        <li class="flex gap-3 text-sm text-foreground">
+                                            <span class="shrink-0 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5">@step.Number</span>
+                                            <span>@step.Text</span>
+                                        </li>
+                                    }
+                                </ol>
+                                @if (!string.IsNullOrEmpty(article.Tip))
+                                {
+                                    <div class="mt-3 p-3 rounded-md bg-muted text-xs text-muted-foreground">
+                                        <span class="font-semibold">Tip:</span> @article.Tip
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (!FilteredArticles.Any())
+    {
+        <div class="text-center py-12 text-muted-foreground text-sm">
+            No articles match your search. Try different keywords or <a href="/assistance" class="text-primary underline">ask our assistant</a>.
+        </div>
+    }
+</div>
+
+@code {
+    private string searchQuery = "";
+    private HashSet<string> expandedArticles = new();
+
+    private List<ArticleCategory> categories = new()
+    {
+        new("Getting Started", "rocket", new()
+        {
+            new("register", "Create an Account", new[]
+            {
+                (1, "Tap \"Register\" in the top navigation bar."),
+                (2, "Fill in your name, email, and a secure password."),
+                (3, "Submit the form. We'll send a confirmation email."),
+                (4, "Open your inbox, click the confirmation link, and you're in."),
+            }, "Use a password you'll remember—you can always reset it later from the login page."),
+
+            new("login", "Sign In", new[]
+            {
+                (1, "Tap \"Log In\" from the top navigation bar."),
+                (2, "Enter your email and password."),
+                (3, "You'll be redirected to your profile page."),
+            }, null),
+
+            new("password", "Reset Your Password", new[]
+            {
+                (1, "On the login page, tap \"Forgot password?\"."),
+                (2, "Enter the email address linked to your account."),
+                (3, "Check your inbox for a reset link (check spam too)."),
+                (4, "Click the link and set a new password."),
+            }, "The reset link expires after a short time. If it doesn't work, request a new one."),
+
+            new("profile", "Manage Your Account", new[]
+            {
+                (1, "Log in and tap \"Profile\" in the navigation bar."),
+                (2, "From here you can change your email, update your password, or enable two-factor authentication."),
+            }, null),
+        }),
+
+        new("Appointments", "calendar", new()
+        {
+            new("book-appointment", "Book an Appointment", new[]
+            {
+                (1, "From the home page, tap \"Book now\" or go to the Appointment page."),
+                (2, "Select the services you need (e.g., oil change, brake inspection)."),
+                (3, "Pick the specific parts you want used for each service."),
+                (4, "Choose your preferred mechanic from the available list."),
+                (5, "Select a date and time that works for you."),
+                (6, "Review everything on the summary screen, then tap \"Confirm\"."),
+                (1, "You'll see a success message with your booking details."),
+            }, "You don't need to be logged in to browse—just log in when you're ready to confirm."),
+
+            new("pay-appointment", "Pay for an Appointment", new[]
+            {
+                (1, "Go to \"My Bookings\" from your profile or the navigation bar."),
+                (2, "Find the appointment you want to pay for."),
+                (3, "Tap \"Pay Now\" next to the appointment."),
+                (4, "Complete the payment through the secure checkout page."),
+            }, "Payments are processed through PayMongo. You'll receive a confirmation once the payment goes through."),
+
+            new("cancel-appointment", "Cancel an Appointment", new[]
+            {
+                (1, "Go to \"My Bookings\" and find the appointment."),
+                (2, "Tap \"Cancel\" (only available for Pending appointments)."),
+                (3, "Confirm the cancellation when prompted."),
+            }, "Only pending appointments can be cancelled. If your appointment is already confirmed, contact the shop directly."),
+
+            new("view-calendar", "View Your Upcoming Appointments", new[]
+            {
+                (1, "Go to \"My Bookings\"."),
+                (2, "Tap the calendar icon to open the calendar view."),
+                (3, "Browse months to see dots marking your scheduled appointments."),
+                (4, "Tap a day to see all appointments for that date."),
+            }, null),
+        }),
+
+        new("Motorcycle Builds", "wrench", new()
+        {
+            new("custom-build", "Start a Custom Build", new[]
+            {
+                (1, "From the home page, tap \"Start a build\" or go to the Build page."),
+                (2, "Browse parts by category or search for specific items."),
+                (3, "Add parts to your build—adjust quantities as needed."),
+                (4, "Your running total updates in the sidebar as you add items."),
+                (5, "Select your motorcycle model to ensure compatibility."),
+                (6, "Tap \"Submit Build\" to send your request to the shop."),
+            }, "Not sure what parts fit your motorcycle? Ask our AI assistant for compatibility help."),
+
+            new("prebuilt-package", "Choose a Pre-Built Package", new[]
+            {
+                (1, "Go to the Build page and switch to the \"Prebuilt Packages\" tab."),
+                (2, "Browse available packages designed for your motorcycle model."),
+                (3, "Select a package to see what's included."),
+                (4, "Submit the package as your build request."),
+            }, "Pre-built packages are curated bundles that guarantee compatibility with your motorcycle."),
+
+            new("schedule-installation", "Schedule Installation After a Build", new[]
+            {
+                (1, "After submitting a build, tap \"Schedule Installation\" in the success message."),
+                (2, "Pick a date and time for the installation."),
+                (3, "Choose a mechanic to handle the work."),
+                (4, "Enter your phone number for contact."),
+                (5, "Confirm to book the installation alongside your build."),
+            }, null),
+
+            new("cancel-build", "Cancel a Build Request", new[]
+            {
+                (1, "Go to \"My Builds\" from your profile."),
+                (2, "Find the build you want to cancel (must be in Pending status)."),
+                (3, "Tap \"Cancel\" and confirm."),
+            }, null),
+
+            new("email-quote", "Get a Quote by Email", new[]
+            {
+                (1, "While building, tap \"Send Quote to Email\"."),
+                (2, "Enter your email address."),
+                (3, "You'll receive a PDF with the full parts list and pricing."),
+            }, null),
+        }),
+
+        new("AI Assistant", "bot", new()
+        {
+            new("ask-assistant", "Ask the AI Assistant", new[]
+            {
+                (1, "Tap \"Assistance\" in the navigation bar."),
+                (2, "Type your question in the chat box."),
+                (3, "Ask about products, services, compatibility, pricing, or how to use StockSense."),
+                (4, "The assistant can also help you book appointments or start a build right from the chat."),
+            }, "The assistant knows what's in stock and can check compatibility for your motorcycle in real time."),
+        }),
+    };
+
+    private IEnumerable<ArticleCategory> FilteredArticles =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? categories
+            : categories.Select(c => new ArticleCategory(
+                c.Title,
+                c.Icon,
+                c.Articles.Where(a =>
+                    a.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    a.Steps.Any(s => s.Text.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
+                ).ToList()
+            )).Where(c => c.Articles.Any());
+
+    private void ToggleArticle(string id)
+    {
+        if (!expandedArticles.Remove(id))
+            expandedArticles.Add(id);
+    }
+
+    private record ArticleCategory(string Title, string Icon, List<HelpArticle> Articles);
+    private record HelpArticle(string Id, string Title, (int Number, string Text)[] Steps, string? Tip);
+}
