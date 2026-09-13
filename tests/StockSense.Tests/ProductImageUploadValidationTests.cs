@@ -141,14 +141,19 @@ public sealed class ProductImageUploadValidationTests
             .UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=StockSense-ImageValidation-NotUsed;Trusted_Connection=True")
             .Options);
 
-    private static ProductsController CreateController(ApplicationDbContext context) =>
-        new(
+    private static ProductsController CreateController(ApplicationDbContext context)
+    {
+        var config = new ConfigurationBuilder().Build();
+        return new(
             new ProductRepository(context),
-            new EmailSender(new ConfigurationBuilder().Build()),
+            new EmailSender(config),
             new BarcodeService(),
             context,
             new SafetyStockCalculationService(context, NullLogger<SafetyStockCalculationService>.Instance),
+            new DocumentService(),
+            new OrderEmailSender(config),
             NullLogger<ProductsController>.Instance);
+    }
 
     private sealed class TestEnvironment(string webRoot) : IWebHostEnvironment
     {

@@ -10,6 +10,7 @@ using StockSense.Domain.Entities;
 using StockSense.Infrastructure.Data;
 using StockSense.Infrastructure.Data.Repositories;
 using StockSense.Infrastructure.Services;
+using StockSense.Web.Helpers;
 using SixLabors.ImageSharp;
 
 namespace StockSense.Web.Controllers;
@@ -24,6 +25,8 @@ public class ProductsController : ControllerBase
     private readonly BarcodeService _barcodeService;
     private readonly ApplicationDbContext _context;
     private readonly ISafetyStockCalculationService _calculationService;
+    private readonly DocumentService _documentService;
+    private readonly OrderEmailSender _orderEmailSender;
     private readonly ILogger<ProductsController> _logger;
 
     public ProductsController(
@@ -32,6 +35,8 @@ public class ProductsController : ControllerBase
         BarcodeService barcodeService,
         ApplicationDbContext context,
         ISafetyStockCalculationService calculationService,
+        DocumentService documentService,
+        OrderEmailSender orderEmailSender,
         ILogger<ProductsController> logger)
     {
         _productRepo = productRepo;
@@ -39,6 +44,8 @@ public class ProductsController : ControllerBase
         _barcodeService = barcodeService;
         _context = context;
         _calculationService = calculationService;
+        _documentService = documentService;
+        _orderEmailSender = orderEmailSender;
         _logger = logger;
     }
 
@@ -86,25 +93,38 @@ public class ProductsController : ControllerBase
         var selectedProducts = products.Where(p => request.ProductIds.Contains(p.Id)).ToList();
         if (!selectedProducts.Any()) return BadRequest(ApiResponse.Error("No valid products found."));
 
-        decimal grandTotal = selectedProducts.Sum(p => p.Price);
+        var quantities = request.ProductIds
+            .GroupBy(id => id)
+            .ToDictionary(g => g.Key, g => g.Count());
 
-        var sb = new StringBuilder();
-        sb.AppendLine("<h1>StockSense Build Quotation</h1>");
-        sb.AppendLine($"<p>Hello {request.UserEmail}, here is the quote for your custom build:</p>");
-        sb.AppendLine("<table border='1' cellpadding='10' cellspacing='0' style='border-collapse:collapse; width:100%; text-align:left;'>");
-        sb.AppendLine("<tr style='background-color:#f2f2f2;'><th>Part Name</th><th>Category</th><th>Price</th></tr>");
-
-        foreach (var p in selectedProducts)
+        var items = selectedProducts.Select(p => new QuotationItemDto
         {
-            sb.AppendLine($"<tr><td>{p.Name}</td><td>{p.Category}</td><td>P {p.Price:N2}</td></tr>");
-        }
-        sb.AppendLine("</table>");
-        sb.AppendLine($"<h3>Grand Total: P {grandTotal:N2}</h3>");
-        sb.AppendLine("<p>Regards,<br><strong>Sap Shop (Motor Parts &amp; Accessories)</strong></p>");
+            ProductName = p.Name,
+            Category = p.Category,
+            Quantity = quantities.GetValueOrDefault(p.Id, 1),
+            UnitPrice = p.Price
+        }).ToList();
+
+        var quotation = new QuotationDto
+        {
+            CustomerEmail = request.UserEmail,
+            DateGenerated = DateTime.Now,
+            Items = items
+        };
 
         try
         {
-            await _emailSender.SendEmailAsync(request.UserEmail, "Custom Build Quote", sb.ToString());
+            var pdfBytes = _documentService.GenerateQuotationPdf(quotation);
+            var htmlBody = QuotationEmailTemplate.Build(request.UserEmail, quotation.GrandTotal, items.Count);
+            var fileName = $"Quotation_{DateTime.Now:yyyyMMdd}.pdf";
+
+            await _orderEmailSender.SendEmailWithAttachmentAsync(
+                request.UserEmail,
+                "Sap Shop - Your Build Quotation",
+                htmlBody,
+                pdfBytes,
+                fileName);
+
             return Ok(new { message = "Email sent" });
         }
         catch (Exception ex)

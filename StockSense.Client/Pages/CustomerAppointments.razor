@@ -120,8 +120,8 @@
                                 ₱@appt.TotalAmount.ToString("N0")
                             </span>
 
-                            @if (appt.Status is not "Cancelled" and not "Expired" and not "Completed"
-                                 && appt.PaymentStatus is "AwaitingPayment" or "Failed" or "Expired")
+@if (appt.Status is not "Cancelled" and not "Expired" and not "Completed"
+                                     && appt.PaymentStatus is "AwaitingPayment" or "Failed" or "Expired" or "NotRequired")
                             {
                                 <button type="button"
                                         @onclick="() => PayFromCard(appt)"
@@ -241,7 +241,7 @@
                         Downpayment received. Your slot is confirmed.
                     </div>
                 }
-                else if (selectedAppointment.PaymentStatus == "AwaitingPayment" && selectedAppointment.Status is not "Cancelled" and not "Expired" and not "Completed")
+                else if (selectedAppointment.PaymentStatus is "AwaitingPayment" or "NotRequired" && selectedAppointment.Status is not "Cancelled" and not "Expired" and not "Completed")
                 {
                     <div class="p-3 rounded-lg bg-muted border border-border flex flex-col gap-2">
                         <p class="text-xs text-muted-foreground m-0">Service fee payment is required to secure this booking.</p>
@@ -273,10 +273,36 @@
         <div class="flex justify-end items-center gap-2 p-3 px-4 border-t border-border shrink-0">
             @if (selectedAppointment?.Status == "Pending")
             {
-                <BbButton Variant="ButtonVariant.Destructive" OnClick="() => CancelFromDetail(selectedAppointment!)">Cancel Appointment</BbButton>
+                <BbButton Variant="ButtonVariant.Destructive" OnClick="() => showCancelConfirmDialog = true">Cancel Appointment</BbButton>
             }
             <BbButton Variant="ButtonVariant.Outline" OnClick="CloseAppointmentDetail">Close</BbButton>
         </div>
+    </BbDialogContent>
+</BbDialog>
+}
+
+@if (showCancelConfirmDialog)
+{
+<BbDialog @bind-Open="showCancelConfirmDialog">
+    <BbDialogContent Style="max-width: 400px;">
+        <BbDialogHeader>
+            <BbDialogTitle>Cancel appointment?</BbDialogTitle>
+            <BbDialogDescription>This action cannot be undone. The appointment will be moved to history.</BbDialogDescription>
+        </BbDialogHeader>
+        @if (selectedAppointment is not null)
+        {
+            <div class="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+                <p class="m-0 font-semibold">@selectedAppointment.AppointmentDate.ToString("MMM dd, yyyy") at @FormatTimeSlot(selectedAppointment.TimeSlot)</p>
+                <p class="mb-0 mt-1 text-muted-foreground">@selectedAppointment.ServicesRequested</p>
+            </div>
+        }
+        <BbDialogFooter>
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showCancelConfirmDialog = false" Disabled="@isCancelling">Keep appointment</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmCancel" Disabled="@isCancelling">
+                @if (isCancelling) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(isCancelling ? "Cancelling..." : "Cancel appointment")
+            </BbButton>
+        </BbDialogFooter>
     </BbDialogContent>
 </BbDialog>
 }
@@ -425,6 +451,9 @@
 
     private bool isPaymentBusy;
 
+    private bool showCancelConfirmDialog;
+    private bool isCancelling;
+
     private string sortKey = "scheduled";
 
     private bool showCalendarModal;
@@ -554,11 +583,23 @@
         showDetailModal = false;
     }
 
-    private async Task CancelFromDetail(AppointmentDto appt)
+    private async Task ConfirmCancel()
     {
-        await CancelAppointment(appt);
-        if (appt.Status == "Cancelled")
-            showDetailModal = false;
+        if (selectedAppointment is null || isCancelling) return;
+        isCancelling = true;
+        try
+        {
+            await CancelAppointment(selectedAppointment);
+            if (selectedAppointment.Status == "Cancelled")
+            {
+                showCancelConfirmDialog = false;
+                showDetailModal = false;
+            }
+        }
+        finally
+        {
+            isCancelling = false;
+        }
     }
 
     private async Task CancelAppointment(AppointmentDto appt)

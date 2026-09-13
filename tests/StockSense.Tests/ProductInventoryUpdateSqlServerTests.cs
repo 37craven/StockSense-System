@@ -176,13 +176,16 @@ public sealed class ProductInventoryUpdateSqlServerTests
             _connectionString = connectionString;
             _token = token;
             Context = context;
+            var config = new ConfigurationBuilder().Build();
             var calculation = new SafetyStockCalculationService(context, NullLogger<SafetyStockCalculationService>.Instance);
             Controller = new ProductsController(
                 new ProductRepository(context),
-                new EmailSender(new ConfigurationBuilder().Build()),
+                new EmailSender(config),
                 new BarcodeService(),
                 context,
                 calculation,
+                new DocumentService(),
+                new OrderEmailSender(config),
                 NullLogger<ProductsController>.Instance)
             {
                 ControllerContext = new ControllerContext

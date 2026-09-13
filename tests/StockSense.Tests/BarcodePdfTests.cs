@@ -62,12 +62,15 @@ public sealed class BarcodePdfTests
 
     private static ProductsController CreateController(ApplicationDbContext context)
     {
+        var config = new ConfigurationBuilder().Build();
         var controller = new ProductsController(
             new ProductRepository(context),
-            new EmailSender(new ConfigurationBuilder().Build()),
+            new EmailSender(config),
             new BarcodeService(),
             context,
             new SafetyStockCalculationService(context, NullLogger<SafetyStockCalculationService>.Instance),
+            new DocumentService(),
+            new OrderEmailSender(config),
             NullLogger<ProductsController>.Instance);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         return controller;

@@ -268,15 +268,22 @@ public class AppointmentsController : ControllerBase
         if (string.IsNullOrEmpty(appointment.PaymentLinkId))
             return Ok(new { paymentStatus = appointment.PaymentStatus });
 
-        var status = await _payMongo.GetLinkStatusAsync(appointment.PaymentLinkId);
-        var mapped = PayMongoService.MapLinkStatus(status);
-        if (mapped != appointment.PaymentStatus)
-        {
-            appointment.PaymentStatus = mapped;
-            if (mapped == PaymentStatuses.Paid && appointment.Status == "Pending")
-                appointment.Status = "Confirmed";
-            await _context.SaveChangesAsync();
-        }
+            var status = await _payMongo.GetLinkStatusAsync(appointment.PaymentLinkId);
+            var mapped = PayMongoService.MapLinkStatus(status);
+            if (mapped != appointment.PaymentStatus)
+            {
+                appointment.PaymentStatus = mapped;
+                if (mapped == PaymentStatuses.Paid && appointment.Status == "Pending")
+                {
+                    appointment.Status = "Confirmed";
+                    if (!string.IsNullOrWhiteSpace(appointment.CustomerEmail))
+                    {
+                        var summary = $"Service: {appointment.ServicesRequested}\nDate: {appointment.AppointmentDate:MMMM dd, yyyy} at {appointment.TimeSlot}\nMechanic: {appointment.MechanicName}\nTotal: ₱{appointment.TotalAmount:N2}";
+                        _ = _workOrderEmail.SendStatusEmailAsync(appointment.CustomerEmail, appointment.CustomerName, "Appointment", "Confirmed", id, summary);
+                    }
+                }
+                await _context.SaveChangesAsync();
+            }
 
         return Ok(new { paymentStatus = appointment.PaymentStatus });
     }
@@ -327,7 +334,14 @@ public class AppointmentsController : ControllerBase
             {
                 appointment.PaymentStatus = PaymentStatuses.Paid;
                 if (appointment.Status == "Pending")
+                {
                     appointment.Status = "Confirmed";
+                    if (!string.IsNullOrWhiteSpace(appointment.CustomerEmail))
+                    {
+                        var summary = $"Service: {appointment.ServicesRequested}\nDate: {appointment.AppointmentDate:MMMM dd, yyyy} at {appointment.TimeSlot}\nMechanic: {appointment.MechanicName}\nTotal: ₱{appointment.TotalAmount:N2}";
+                        _ = _workOrderEmail.SendStatusEmailAsync(appointment.CustomerEmail, appointment.CustomerName, "Appointment", "Confirmed", appointment.Id, summary);
+                    }
+                }
                 _context.WorkOrderAudits.Add(new WorkOrderAudit
                 {
                     WorkOrderType = "Appointment",

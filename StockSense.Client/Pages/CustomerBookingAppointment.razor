@@ -453,7 +453,7 @@
                                 <select id="appointment-motorcycle" @bind="newAppt.MotorcycleId"
                                         class="w-full mt-1 p-2 rounded-md border border-border bg-background text-foreground text-sm box-border"
                                         disabled="@isLoadingMotorcycles">
-                                    <option value="1" disabled=true>Select your motorcycle</option>
+                                    <option value="">None — Not recorded</option>
                                     @foreach (var m in motorcycles)
                                     {
                                         <option value="@m.Id">@m.DisplayName</option>
