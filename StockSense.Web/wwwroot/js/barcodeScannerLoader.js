@@ -1,6 +1,6 @@
 (function () {
     const scannerScriptUrl =
-        "js/barcodeScanner.js?v=20260820-barcode-only-8";
+        "js/barcodeScanner.js?v=20260913-mirror-btn";
 
     let scannerLoadPromise = null;
 
@@ -73,6 +73,9 @@
 
         cycleCamera: (...args) =>
             invoke("cycleCamera", args),
+
+        mirrorVideo: (...args) =>
+            invoke("mirrorVideo", args),
 
         stop: (...args) =>
             invoke("stop", args),

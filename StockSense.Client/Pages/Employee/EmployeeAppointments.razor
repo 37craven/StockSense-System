@@ -440,7 +440,7 @@ Columns="@GetSortColumns()" />
 Options="@GetTabOptions()" />
 @if (currentTab == "Active")
 {
-<DisplayModeToggle Selected="@displayMode" OnSelect="v => displayMode = v" AriaLabel="View mode"
+<DisplayModeToggle Selected="@displayMode" OnSelect="OnDisplayModeChange" AriaLabel="View mode"
 Options="@DisplayModeToggle.TableCalendarOptions" />
 }
 </div>
@@ -489,11 +489,11 @@ else
     <div>
     <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Display Mode</div>
     <div style="display: flex; gap: 8px;">
-    <button @onclick='() => { displayMode = "table"; mobileMenuOpen = false; }'
+    <button @onclick='() => { displayMode = "table"; calView = ""; mobileMenuOpen = false; }'
     style="flex: 1; padding: 10px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(displayMode == "table" ? "var(--secondary)" : "transparent"); color: @(displayMode == "table" ? "var(--foreground)" : "var(--muted-foreground)");">
     Table
     </button>
-    <button @onclick='() => { displayMode = "calendar"; mobileMenuOpen = false; }'
+    <button @onclick='() => { displayMode = "calendar"; calView = "month"; mobileMenuOpen = false; }'
     style="flex: 1; padding: 10px; border-radius: var(--radius); font-size: var(--text-sm); font-weight: var(--font-medium); cursor: pointer; border: 1px solid var(--border); background-color: @(displayMode == "calendar" ? "var(--secondary)" : "transparent"); color: @(displayMode == "calendar" ? "var(--foreground)" : "var(--muted-foreground)");">
     Calendar
     </button>
@@ -2636,12 +2636,18 @@ else if (calView == "next7")
                                                                                                                                                                                                                                                                             private void SetNext7View() => calView = "next7";
                                                                                                                                                                                                                                                                             private void SetMonthView() => calView = "month";
 
-                                                                                                                                                                                                                                                                            private void SwitchTab(string tab)
-                                                                                                                                                                                                                                                                            {
-                                                                                                                                                                                                                                                                            currentTab = tab;
-                                                                                                                                                                                                                                                                            mobileMenuOpen = false;
-                                                                                                                                                                                                                                                                            if (tab == "History") displayMode = "table";
-                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                             private void SwitchTab(string tab)
+                                                                                                                                                                                                                                                                             {
+                                                                                                                                                                                                                                                                             currentTab = tab;
+                                                                                                                                                                                                                                                                             mobileMenuOpen = false;
+                                                                                                                                                                                                                                                                             if (tab == "History") { displayMode = "table"; calView = ""; }
+                                                                                                                                                                                                                                                                                 }
+
+                                                                                                                                                                                                                                                                                 private void OnDisplayModeChange(string mode)
+                                                                                                                                                                                                                                                                                 {
+                displayMode = mode;
+                calView = mode == "calendar" ? "month" : "";
+                                                                                                                                                                                                                                                                                     }
 
                                                                                                                                                                                                                                                                                 private void OpenDayApptsModal(DateTime date)
                                                                                                                                                                                                                                                                                 {

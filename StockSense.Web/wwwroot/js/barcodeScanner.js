@@ -1395,6 +1395,20 @@ window.barcodeScanner = (function () {
     }
 
 
+    function mirrorVideo(elementId, on) {
+        const el =
+            document.getElementById(
+                elementId || currentElementId
+            );
+        if (!el) return;
+        const video =
+            el.querySelector("video");
+        if (!video) return;
+        video.style.transform =
+            on ? "scaleX(-1)" : "";
+    }
+
+
     // ============================================================
     // PUBLIC API USED BY BLAZOR
     // ============================================================
@@ -1402,6 +1416,7 @@ window.barcodeScanner = (function () {
     return {
         start,
         cycleCamera,
+        mirrorVideo,
         stop,
         restartAfterViewportChange,
         watchViewport,

@@ -19,7 +19,7 @@
 
 @attribute [Authorize(Roles = "Admin, Employee")]
 
-<BbPortalHost />
+
 
 <PageTitle>Checkout Terminal</PageTitle>
 
@@ -493,6 +493,9 @@ else
     <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleCamera" title="Flip camera">
     <LucideIcon Name="switch-camera" Size="16" />
     </BbButton>
+    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" OnClick="ToggleMirror" title="Mirror view">
+    <LucideIcon Name="flip-horizontal" Size="16" />
+    </BbButton>
     <label class="switch">
     <input type="checkbox" id="scanner-toggle" role="switch" aria-label="Barcode scanner" @bind="scannerEnabled" />
     <span class="slider"></span>
@@ -812,23 +815,45 @@ else
                         }
                         }
 
-                        private async Task ToggleCamera()
-                        {
-                        if (dotNetRef == null)
-                            return;
+    private async Task ToggleCamera()
+    {
+    if (dotNetRef == null)
+        return;
 
-                            try
-                            {
-                            await JS.InvokeVoidAsync(
-                            "barcodeScanner.cycleCamera",
-                            _scannerElementId);
-                            }
-                            catch (Exception ex)
-                            {
-                            Logger.LogWarning(ex, "Camera switch failed.");
-                            Toast.Warning("The camera could not be switched. Try turning the scanner off and on again.", "Camera Error");
-                            }
-                            }
+        try
+        {
+        await JS.InvokeVoidAsync(
+        "barcodeScanner.cycleCamera",
+        _scannerElementId);
+        }
+        catch (Exception ex)
+        {
+        Logger.LogWarning(ex, "Camera switch failed.");
+        Toast.Warning("The camera could not be switched. Try turning the scanner off and on again.", "Camera Error");
+        }
+        }
+
+        private bool _isMirrored;
+
+        private async Task ToggleMirror()
+        {
+        if (dotNetRef == null)
+            return;
+
+            _isMirrored = !_isMirrored;
+
+            try
+            {
+            await JS.InvokeVoidAsync(
+            "barcodeScanner.mirrorVideo",
+            _scannerElementId,
+            _isMirrored);
+            }
+            catch (Exception ex)
+            {
+            Logger.LogWarning(ex, "Mirror toggle failed.");
+            }
+            }
 
     // Called from barcodeScanner.js for non-error notices (e.g., no other camera available).
                             [JSInvokable]
@@ -902,13 +927,8 @@ else
                                                 Console.WriteLine(
                                                 $"[BarcodeScanner] No product found for: '{barcode}'");
 
-                                                Toast.Warning(
-                                                $"No product found for barcode \"{barcode}\".",
-                                                "Barcode Not Found");
-
                 // Keep the currently displayed product (if any) so a
-                // stray miss does not wipe the card mid-scan. The
-                // error banner auto-dismisses.
+                // stray miss does not wipe the card mid-scan.
                                                 await InvokeAsync(StateHasChanged);
 
                                                 return;
