@@ -473,13 +473,13 @@
                         <td data-label="Items" class="px-4 py-3 col-items">
                             <span class="bg-muted px-2 py-0.5 rounded text-xs">@actualParts.Count</span>
                         </td>
+                        <td data-label="Total" class="px-4 py-3 font-bold text-foreground col-total">
+                            ₱@actualParts.Sum(p => p.Price).ToString("N0")
+                        </td>
                         <td data-label="Status" class="px-4 py-3 col-stat">
                             <span class="build-status-badge @GetStatusClass(build.Status)" role="status" aria-label="Build status: @build.Status">
                                 @build.Status
                             </span>
-                        </td>
-                        <td data-label="Total" class="px-4 py-3 font-bold text-foreground col-total">
-                            ₱@actualParts.Sum(p => p.Price).ToString("F0")
                         </td>
                         <td data-label="Actions" class="px-4 py-3 col-act" @onclick:stopPropagation>
                             @{
