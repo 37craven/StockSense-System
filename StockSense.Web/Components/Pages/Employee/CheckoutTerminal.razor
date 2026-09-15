@@ -462,7 +462,11 @@ else
     <select id="@(idPrefix)-payment-method" @bind="paymentMethod"
     class="w-full box-border p-2 border border-input rounded-md bg-background text-foreground text-sm">
     <option value="Cash">Cash</option>
-    <option value="Online">Online</option>
+    <optgroup label="Online">
+    <option value="GCash">GCash</option>
+    <option value="Maya">Maya</option>
+    <option value="Bank Transfer">Bank Transfer</option>
+    </optgroup>
     </select>
     </div>
     <div class="flex flex-col gap-2">

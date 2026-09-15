@@ -579,7 +579,10 @@
         var dto = new UpdateServiceProductsDto
         {
             ServiceId = selectedService.Id,
+            Name = editName.Trim(),
+            Category = editCategory.Trim(),
             Price = editPrice,
+            EstimatedMinutes = EditTotalMinutes,
             ProductIds = allLinkedProductIds
         };
 
@@ -588,7 +591,10 @@
             var response = await Http.PostAsJsonAsync("api/services/update-products", dto);
             if (response.IsSuccessStatusCode)
             {
+                selectedService.Name = editName.Trim();
+                selectedService.Category = editCategory.Trim();
                 selectedService.Price = editPrice;
+                selectedService.EstimatedMinutes = EditTotalMinutes;
                 Toast.Success($"\"{selectedService.Name}\" updated.", "Service saved");
             }
             else

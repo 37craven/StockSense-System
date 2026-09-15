@@ -78,8 +78,21 @@ public class ServicesController : ControllerBase
         var service = await _serviceRepo.GetByIdWithProductsAsync(dto.ServiceId);
         if (service == null) return NotFound(ApiResponse.NotFound("Service"));
 
+        var normalizedName = dto.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedName))
+            return BadRequest(ApiResponse.Error("Service name is required."));
+
+        service.Name = normalizedName;
+        service.Category = dto.Category?.Trim() ?? "General";
         service.Price = dto.Price;
-        service.RequiredProducts = await _productRepo.GetByIdsAsync(dto.ProductIds);
+        service.EstimatedMinutes = dto.EstimatedMinutes;
+
+        service.RequiredProducts.Clear();
+        if (dto.ProductIds.Any())
+        {
+            service.RequiredProducts = await _productRepo.GetByIdsAsync(dto.ProductIds);
+        }
+
         await _serviceRepo.SaveChangesAsync();
         return Ok();
     }

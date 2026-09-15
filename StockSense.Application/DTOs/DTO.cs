@@ -51,7 +51,10 @@ namespace StockSense.Application.DTOs
     public class UpdateServiceProductsDto
     {
         public int ServiceId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = "General";
         public decimal Price { get; set; }
+        public int EstimatedMinutes { get; set; }
         public List<int> ProductIds { get; set; } = new();
     }
 }

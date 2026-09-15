@@ -1454,7 +1454,11 @@
                 <select @bind="checkoutPaymentMethod" aria-label="Payment method"
                         style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-xs);">
                     <option>Cash</option>
-                    <option>Online</option>
+                    <optgroup label="Online">
+                        <option>GCash</option>
+                        <option>Maya</option>
+                        <option>Bank Transfer</option>
+                    </optgroup>
                 </select>
                 <input @bind="checkoutReference" maxlength="100" aria-label="Payment reference" placeholder="Ref (optional)"
                        style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); font-size: var(--text-xs); flex: 1; min-width: 0;" />
