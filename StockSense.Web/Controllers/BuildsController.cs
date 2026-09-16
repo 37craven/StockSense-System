@@ -289,22 +289,34 @@ public class BuildsController : ControllerBase
         if (products.Count != productIds.Count)
             return BadRequest(ApiResponse.Error("One or more products not found."));
 
-        var partsJson = JsonSerializer.Serialize(products.Select(p => new
+        var quantities = dto.Quantities;
+        var prices = dto.Prices;
+        var partsJson = JsonSerializer.Serialize(products.SelectMany(p =>
         {
-            p.Id,
-            p.Name,
-            p.Category,
-            p.Brand,
-            p.Price,
-            p.CurrentStock,
-            p.ReorderTarget,
-            SupplierId = p.SupplierId ?? 0,
-            SupplierName = p.Supplier?.Name ?? "",
-            ImageUrl = p.ImageUrl ?? ""
+            var qty = quantities.TryGetValue(p.Id, out var q) && q > 0 ? q : 1;
+            var price = prices.TryGetValue(p.Id, out var pr) && pr >= 0 ? pr : p.Price;
+            return Enumerable.Repeat(new
+            {
+                p.Id,
+                p.Name,
+                p.Category,
+                p.Brand,
+                Price = price,
+                p.CurrentStock,
+                p.ReorderTarget,
+                SupplierId = p.SupplierId ?? 0,
+                SupplierName = p.Supplier?.Name ?? "",
+                ImageUrl = p.ImageUrl ?? ""
+            }, qty);
         }));
 
         build.SelectedPartsJson = partsJson;
-        build.TotalPrice = products.Sum(p => p.Price);
+        build.TotalPrice = products.Sum(p =>
+        {
+            var qty = quantities.TryGetValue(p.Id, out var q) && q > 0 ? q : 1;
+            var price = prices.TryGetValue(p.Id, out var pr) && pr >= 0 ? pr : p.Price;
+            return price * qty;
+        });
         AddAudit("Build", id, "PartsChanged", null, string.Join(',', productIds), reason, approval);
         await _buildRepo.SaveChangesAsync();
         return Ok(new { message = "Parts updated.", totalPrice = build.TotalPrice });

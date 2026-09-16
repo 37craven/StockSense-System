@@ -276,8 +276,8 @@ else
             <div class="sv-panel overflow-y-auto flex flex-col gap-4 min-h-0 @(showProductCatalog ? "sv-panel--side" : "")">
 
                 <div>
-                    <label class="sv-label">Package Name <span class="text-destructive" aria-hidden="true">*</span></label>
-                    <input type="text" @bind="newPackage.Name" placeholder="e.g. Touring Spec Setup" class="sv-input" />
+                    <label class="sv-label" for="prebuilt-package-name">Package Name <span class="text-destructive" aria-hidden="true">*</span></label>
+                    <textarea id="prebuilt-package-name" @bind="newPackage.Name" rows="2" placeholder="e.g. Touring Spec Setup" class="sv-input resize-none overflow-y-auto min-h-[38px] max-h-20 whitespace-pre-wrap break-words"></textarea>
                 </div>
 
                 <div>

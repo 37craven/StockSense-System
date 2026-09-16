@@ -578,6 +578,9 @@
                                         GetQuantity="p => GetEditQuantity(p.Id)"
                                         OnQuantityDecrease="p => EditPartQuantity(p.Id, -1)"
                                         OnQuantityIncrease="p => EditPartQuantity(p.Id, 1)"
+                                        ShowPriceEditor="true"
+                                        GetEditedPrice="p => GetPartPrice(p.Id, p.Price)"
+                                        OnPriceChanged="args => UpdatePartPrice(args.product.Id, args.e)"
                                         ShowImageToggle="true" />
                     </div>
                 </div>
@@ -901,7 +904,7 @@
         try
         {
             var result = await BuildMutationService.UpdatePartsAsync(selectedBuild.Id,
-                new UpdateBuildPartsDto { ProductIds = editPartIds, Quantities = editQuantities, AdminUserId = NullIfAdmin(restrictedAdminUserId), AdminPin = NullIfAdmin(restrictedAdminPin), Reason = RestrictedReasonOrNull() }, currentUser);
+                new UpdateBuildPartsDto { ProductIds = editPartIds, Quantities = editQuantities, Prices = new Dictionary<int, decimal>(editedPrices), AdminUserId = NullIfAdmin(restrictedAdminUserId), AdminPin = NullIfAdmin(restrictedAdminPin), Reason = RestrictedReasonOrNull() }, currentUser);
             if (!result.Succeeded)
             {
                 Toast.Error(result.Message, "Update failed");

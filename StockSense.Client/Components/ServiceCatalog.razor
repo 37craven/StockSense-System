@@ -47,6 +47,18 @@ style="padding: var(--space-3); border-radius: var(--radius); border: 2px solid 
 <div class="select-none truncate text-sm font-semibold text-foreground" title="@s.Name">@s.Name</div>
 <div class="select-none text-xs text-muted-foreground my-1">@s.Category</div>
 <div class="select-none text-sm font-bold text-primary">₱@s.Price.ToString("N2")</div>
+@if (ShowPriceEditor && isSelected)
+{
+<div class="pc-price-editor" @onclick:stopPropagation="true">
+<span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
+<input type="number" step="1" min="0" class="price-input"
+value="@((GetEditedPrice?.Invoke(s) ?? s.Price).ToString("F0"))"
+@oninput="e => OnPriceChanged.InvokeAsync((s, e))"
+@onclick:stopPropagation="true"
+aria-label="Edit price for @s.Name"
+style="width: 72px; text-align: right; font-weight: bold; color: var(--foreground); background: transparent; border: none; font-size: var(--text-sm); outline: none; padding: 0; border-bottom: 1px dashed var(--muted-foreground); min-height: 44px;" />
+</div>
+}
 </div>
 }
 </div>
@@ -86,6 +98,28 @@ transition: box-shadow 0.25s cubic-bezier(0.25, 2, 0.5, 1);
 .pc-card:active {
 box-shadow: inset 0 0 0 2px var(--primary);
 }
+
+.pc-price-editor {
+display: flex;
+align-items: center;
+justify-content: center;
+gap: var(--space-1);
+margin-top: var(--space-2);
+}
+
+@@media (min-width: 768px) {
+.pc-price-editor { display: none; }
+}
+
+.price-input::-webkit-outer-spin-button,
+.price-input::-webkit-inner-spin-button {
+-webkit-appearance: none;
+margin: 0;
+}
+
+.price-input[type=number] {
+-moz-appearance: textfield;
+}
 </style>
 
 @code {
@@ -95,6 +129,9 @@ box-shadow: inset 0 0 0 2px var(--primary);
 [Parameter] public int Columns { get; set; } = 3;
 [Parameter] public bool ResponsiveColumns { get; set; }
 [Parameter] public int MinCardWidth { get; set; } = 140;
+[Parameter] public bool ShowPriceEditor { get; set; }
+[Parameter] public Func<StoreService, decimal>? GetEditedPrice { get; set; }
+[Parameter] public EventCallback<(StoreService service, ChangeEventArgs e)> OnPriceChanged { get; set; }
 
 private string searchTerm = "";
 private string? selectedCategory;

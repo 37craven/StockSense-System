@@ -1012,7 +1012,7 @@ else if (calView == "next7")
                     </div>
                     <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
                     @{
-                    var displayServices = isEditingServices || hasServiceChanges
+                    var displayServices = isEditingServices || hasServiceChanges || isMobile
                         ? editedServices
                         : DeserializeServiceJson(selectedAppointment.SelectedServicesJson);
                     }
@@ -1021,15 +1021,18 @@ else if (calView == "next7")
                     <div style="display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 4px; background: rgba(255,255,255,0.03); align-items: center;">
                     <span style="font-size: var(--text-sm); color: var(--foreground); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@svc.Name</span>
                     <div style="display: flex; align-items: center; gap: 2px;">
-                    @if (isEditingServices)
+                    @if (isEditingServices || isMobile)
                         {
                         <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
                         <input type="number" step="1"
                         value="@svc.Price.ToString("F0")"
                         @oninput="e => UpdateServicePrice(svc.Name, e)"
                         style="width: 50px; text-align: right; font-weight: bold; color: var(--foreground); background: transparent; border: none; font-size: var(--text-sm); outline: none; padding: 0; border-bottom: 1px dashed var(--muted-foreground);" />
+                        @if (isEditingServices)
+                        {
                         <button type="button" @onclick="() => RemoveEditedService(svc.Name)" aria-label="Remove @svc.Name"
                         style="min-width: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: none; background: transparent; color: var(--muted-foreground); cursor: pointer; font-size: var(--text-sm); margin-left: 4px;">×</button>
+                        }
                         }
                     else
                         {
@@ -1067,7 +1070,7 @@ else if (calView == "next7")
                     @{
                     var productToGenericPart = serviceItemsMap.SelectMany(kv => kv.Value.SelectMany(gi => gi.LinkedProductIds.Select(pid => (pid, gi.Name)))).ToDictionary(x => x.pid, x => x.Name);
                     List<dynamic> displayParts;
-                    if (isEditingAppointment || hasPartChanges)
+                    if (isEditingAppointment || hasPartChanges || isMobile)
                     {
                         displayParts = editPartIds
                             .Select(id => {
@@ -1097,7 +1100,7 @@ else if (calView == "next7")
                     <span style="font-size: 10px; color: var(--primary); font-weight: bold; margin-left: 4px;">@catLabel</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 2px;">
-                    @if (isEditingAppointment)
+                    @if (isEditingAppointment || isMobile)
                         {
                         <button type="button" @onclick="() => EditPartQuantity((int)part.id, -1)" aria-label="Decrease quantity"
                         style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">−</button>
@@ -1106,7 +1109,7 @@ else if (calView == "next7")
                         style="min-width: 28px; min-height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">+</button>
                         }
                     <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
-                    @if (isEditingAppointment)
+                    @if (isEditingAppointment || isMobile)
                         {
                         <input type="number" step="1" class="price-input"
                         value="@(((decimal)part.price).ToString("F0"))"
@@ -1205,6 +1208,9 @@ else if (calView == "next7")
                         GetQuantity="p => GetEditQuantity(p.Id)"
                         OnQuantityDecrease="p => EditPartQuantity(p.Id, -1)"
                         OnQuantityIncrease="p => EditPartQuantity(p.Id, 1)"
+                        ShowPriceEditor="true"
+                        GetEditedPrice="p => GetPartPrice(p.Id, p.Price)"
+                        OnPriceChanged="args => UpdatePartPrice(args.product.Id, args.e)"
                         IsDisabled="_ => false"
                         AllowDisabledClick="true"
                         ShowImageToggle="true" />
@@ -1214,7 +1220,10 @@ else if (calView == "next7")
                         <ServiceCatalog Columns="3"
                         Services="allStoreServices"
                         OnServiceClick="s => ToggleEditService(s)"
-                        IsSelected="s => editedServices.Any(es => es.Name == s.Name)" />
+                        IsSelected="s => editedServices.Any(es => es.Name == s.Name)"
+                        ShowPriceEditor="true"
+                        GetEditedPrice="s => editedServices.FirstOrDefault(es => es.Name == s.Name).Price"
+                        OnPriceChanged="args => UpdateServicePrice(args.service.Name, args.e)" />
                         }
                         else if (isEditingSchedule)
                         {
@@ -1544,6 +1553,7 @@ else if (calView == "next7")
                         private string restrictedAdminPin = "";
                         private List<AdminOption> adminOptions = [];
                         private bool isLoadingAdminOptions;
+                        private bool isMobile = false;
                         private bool restrictedPartsChange;
                         private bool restrictedScheduleChange;
                         private bool restrictedServicesChange;
@@ -1580,6 +1590,7 @@ else if (calView == "next7")
                             {
                             editedPrices[productId] = v;
                             editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
+                            if (isMobile && !isEditingAppointment) hasPartChanges = true;
                             }
                             }
 
@@ -1607,6 +1618,7 @@ else if (calView == "next7")
                                 editQuantities[productId] = Math.Min(Math.Max(1, stock), current + 1);
                                 }
                             editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
+                            if (isMobile && !isEditingAppointment) hasPartChanges = true;
                             StateHasChanged();
                             }
 
@@ -1655,13 +1667,28 @@ else if (calView == "next7")
                                                                                                          editQuantities.Clear();
                                                                                                          }
 
-                                                                                                         private void DiscardStagedChanges()
-                                                                                                         {
-                                                                                                         hasPartChanges = false;
-                                                                                                         hasServiceChanges = false;
-                                                                                                         hasScheduleChanges = false;
-                                                                                                         Toast.Success("Staged changes discarded.", "Discarded");
-                                                                                                         }
+                                                                                                          private void DiscardStagedChanges()
+                                                                                                          {
+                                                                                                          hasPartChanges = false;
+                                                                                                          hasServiceChanges = false;
+                                                                                                          hasScheduleChanges = false;
+                                                                                                          if (isMobile && selectedAppointment != null)
+                                                                                                          {
+                                                                                                          var savedServices = DeserializeServiceJson(selectedAppointment.SelectedServicesJson);
+                                                                                                          editedServices = savedServices.ToList();
+                                                                                                          RecalcServiceTotal();
+                                                                                                          var breakdown = ParseProductBreakdown(selectedAppointment.SelectedProductsJson);
+                                                                                                          var allParts = (breakdown ?? new())
+                                                                                                          .SelectMany(s => s.products.Where(p => p.selected))
+                                                                                                          .Where(p => p.id > 0)
+                                                                                                          .ToList();
+                                                                                                          editPartIds = allParts.Select(p => p.id).Distinct().ToList();
+                                                                                                          editedPrices = allParts.GroupBy(p => p.id).ToDictionary(g => g.Key, g => g.First().price);
+                                                                                                          editQuantities = allParts.GroupBy(p => p.id).ToDictionary(g => g.Key, g => g.Count());
+                                                                                                          editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
+                                                                                                          }
+                                                                                                          Toast.Success("Staged changes discarded.", "Discarded");
+                                                                                                          }
 
                                         private async Task BeginEditServices()
                                         {
@@ -1697,6 +1724,7 @@ else if (calView == "next7")
                                         var idx = editedServices.FindIndex(es => es.Name == name);
                                         if (idx >= 0) editedServices[idx] = (name, v);
                                         RecalcServiceTotal();
+                                        if (isMobile && !isEditingServices) hasServiceChanges = true;
                                         }
                                         }
 
@@ -2144,6 +2172,23 @@ else if (calView == "next7")
                             await LoadServiceItemsMap();
                             }
 
+                            protected override async Task OnAfterRenderAsync(bool firstRender)
+                            {
+                            if (firstRender)
+                            {
+                            try
+                            {
+                            var detected = await JSRuntime.InvokeAsync<bool>("eval", "window.innerWidth < 768");
+                            if (detected != isMobile)
+                            {
+                            isMobile = detected;
+                            StateHasChanged();
+                            }
+                            }
+                            catch { }
+                            }
+                            }
+
                                                                                                                                                             private async Task LoadAdminOptions()
                                                                                                                                                             {
                                                                                                                                                             isLoadingAdminOptions = true;
@@ -2186,18 +2231,34 @@ else if (calView == "next7")
                             }
 
                             private async Task OpenDetail(AppointmentDto appt)
-                                                                                                                                                            {
-                                                                                                                                                            selectedAppointment = appt;
-                                                                                                                                                            checkoutPaymentMethod = "Cash";
-                                                                                                                                                            checkoutReference = null;
-                                                                                                                                                            isEditingAppointment = false;
-                                                                                                                                                            isEditingSchedule = false;
-                                                                                                                                                            editPartIds.Clear();
-                                                                                                                                                            editedPrices.Clear();
-                                                                                                                                                            editTimeSlot = "";
-                                                                                                                                                            showDetailModal = true;
-                                                                                                                                                            await LoadAuditTrail(appt.Id);
-                                                                                                                                                            }
+                                                                                                                                                             {
+                                                                                                                                                             selectedAppointment = appt;
+                                                                                                                                                             checkoutPaymentMethod = "Cash";
+                                                                                                                                                             checkoutReference = null;
+                                                                                                                                                             isEditingAppointment = false;
+                                                                                                                                                             isEditingServices = false;
+                                                                                                                                                             isEditingSchedule = false;
+                                                                                                                                                             editPartIds.Clear();
+                                                                                                                                                             editedPrices.Clear();
+                                                                                                                                                             editTimeSlot = "";
+                                                                                                                                                             if (isMobile && appt.Status is "Pending" or "Confirmed")
+                                                                                                                                                             {
+                                                                                                                                                             var savedServices = DeserializeServiceJson(appt.SelectedServicesJson);
+                                                                                                                                                             editedServices = savedServices.ToList();
+                                                                                                                                                             RecalcServiceTotal();
+                                                                                                                                                             var breakdown = ParseProductBreakdown(appt.SelectedProductsJson);
+                                                                                                                                                             var allParts = (breakdown ?? new())
+                                                                                                                                                             .SelectMany(s => s.products.Where(p => p.selected))
+                                                                                                                                                             .Where(p => p.id > 0)
+                                                                                                                                                             .ToList();
+                                                                                                                                                             editPartIds = allParts.Select(p => p.id).Distinct().ToList();
+                                                                                                                                                             editedPrices = allParts.GroupBy(p => p.id).ToDictionary(g => g.Key, g => g.First().price);
+                                                                                                                                                             editQuantities = allParts.GroupBy(p => p.id).ToDictionary(g => g.Key, g => g.Count());
+                                                                                                                                                             editPartsTotal = editPartIds.Sum(id => GetPartPrice(id, 0) * GetEditQuantity(id));
+                                                                                                                                                             }
+                                                                                                                                                             showDetailModal = true;
+                                                                                                                                                             await LoadAuditTrail(appt.Id);
+                                                                                                                                                             }
 
                                                                                                                                                             private async Task LoadAuditTrail(int appointmentId)
                                                                                                                                                             {

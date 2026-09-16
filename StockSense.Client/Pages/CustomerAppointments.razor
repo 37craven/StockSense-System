@@ -127,7 +127,7 @@
                                         @onclick="() => PayFromCard(appt)"
                                         @onclick:stopPropagation
                                         class="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground shadow hover:bg-primary/90 whitespace-nowrap">
-                                    Pay Now
+                                    Pay Reservation
                                 </button>
                             }
     
@@ -248,7 +248,7 @@
                         <div class="flex gap-2 flex-wrap">
                             <button type="button" @onclick="PayNow" disabled="@isPaymentBusy"
                                     class="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">
-                                Pay now
+                                Pay Reservation
                             </button>
                             <button type="button" @onclick="CheckPaymentStatus" disabled="@isPaymentBusy"
                                     class="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm hover:bg-muted disabled:opacity-50">

@@ -299,9 +299,9 @@
         : manualSupplierId > 0 || manualLines.Count > 0 || !string.IsNullOrWhiteSpace(manualReason);
 
 
-    private void HandleModeChange(string value)
+    private async Task HandleModeChange(string value)
     {
-        if (value == "Automatic") ShowAutomatic(); else ShowManual();
+        if (value == "Automatic") ShowAutomatic(); else await ShowManual();
     }
 
     private void ShowAutomatic() { mode = CreationMode.Automatic; }

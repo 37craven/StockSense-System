@@ -259,7 +259,7 @@
                 <div class="w-48 shrink-0">
                     <DropdownSelect Value="@statusFilter" ValueChanged="v => { statusFilter = v; ApplyFilter(); }"
                                     Label="All statuses"
-                                    Options="@(Statuses.Select(s => new DropdownSelect.DropdownOption { Value = s, Label = ShortStatus(s) }).ToList())" />
+                                    Options="@(new List<DropdownSelect.DropdownOption> { new() { Value = "", Label = "All" } }.Concat(Statuses.Select(s => new DropdownSelect.DropdownOption { Value = s, Label = ShortStatus(s) })).ToList())" />
                 </div>
                 <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
                               OnColumnChange="v => { sort.Toggle(v); currentPage = 1; ApplySort(); }"
@@ -619,7 +619,7 @@
                 </label>
                 <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-receipt-remarks">
                     Remarks
-                    <input id="history-receipt-remarks" class="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm" @bind="receiveRemarks" maxlength="500" placeholder="Optional" />
+                    <textarea id="history-receipt-remarks" @bind="receiveRemarks" rows="2" maxlength="500" placeholder="Optional" class="min-h-20 w-full resize-y rounded-md border border-input bg-background p-3 text-sm text-foreground whitespace-pre-wrap break-words overflow-y-auto max-h-24"></textarea>
                 </label>
             </div>
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-border mx-4 sm:mx-6" style="-webkit-overflow-scrolling:touch;">

@@ -90,18 +90,24 @@ public sealed class BuildWorkOrderMutationService(
         if (products.Count != productIds.Count) return new(false, 400, "One or more products were not found or are inactive.");
 
         var existingQuantities = TryParseQuantities(build.SelectedPartsJson);
+        var existingPrices = TryParsePrices(build.SelectedPartsJson);
         var quantities = products.ToDictionary(
             product => product.Id,
             product => request.Quantities.TryGetValue(product.Id, out var qty) && qty > 0
                 ? qty
                 : existingQuantities.GetValueOrDefault(product.Id, 1));
+        var prices = products.ToDictionary(
+            product => product.Id,
+            product => request.Prices.TryGetValue(product.Id, out var price) && price >= 0
+                ? price
+                : existingPrices.GetValueOrDefault(product.Id, product.Price));
         build.SelectedPartsJson = JsonSerializer.Serialize(products.SelectMany(product => Enumerable.Repeat(new
         {
-            product.Id, product.Name, product.Category, product.Brand, product.Price,
+            product.Id, product.Name, product.Category, product.Brand, Price = prices[product.Id],
             product.CurrentStock, product.ReorderTarget, SupplierId = product.SupplierId ?? 0,
             SupplierName = product.Supplier?.Name ?? "", ImageUrl = product.ImageUrl ?? ""
         }, quantities[product.Id])));
-        build.TotalPrice = products.Sum(value => value.Price * quantities[value.Id]);
+        build.TotalPrice = products.Sum(value => prices[value.Id] * quantities[value.Id]);
         AddAudit(actor, id, "PartsChanged", null, string.Join(',', productIds), reason, approval);
         await context.SaveChangesAsync(cancellationToken);
         return new(true, 200, "Parts updated.", build.TotalPrice);
@@ -116,6 +122,22 @@ public sealed class BuildWorkOrderMutationService(
                 .Where(part => part.Id > 0)
                 .GroupBy(part => part.Id)
                 .ToDictionary(group => group.Key, group => group.Count()) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static Dictionary<int, decimal> TryParsePrices(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            return JsonSerializer.Deserialize<List<ProductDto>>(json)?
+                .Where(part => part.Id > 0)
+                .GroupBy(part => part.Id)
+                .ToDictionary(group => group.Key, group => group.First().Price) ?? [];
         }
         catch (JsonException)
         {

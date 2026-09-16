@@ -94,6 +94,18 @@ else
     style="min-width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--foreground); cursor: pointer; font-size: var(--text-base); font-weight: var(--font-bold);">+</button>
     </div>
     }
+    @if (ShowPriceEditor && isSelected)
+    {
+    <div class="pc-price-editor" @onclick:stopPropagation="true">
+    <span style="font-weight: bold; color: var(--foreground); font-size: var(--text-sm);">₱</span>
+    <input type="number" step="1" min="0" class="price-input"
+    value="@((GetEditedPrice?.Invoke(p) ?? p.Price).ToString("F0"))"
+    @oninput="e => OnPriceChanged.InvokeAsync((p, e))"
+    @onclick:stopPropagation="true"
+    aria-label="Edit price for @p.Name"
+    style="width: 72px; text-align: right; font-weight: bold; color: var(--foreground); background: transparent; border: none; font-size: var(--text-sm); outline: none; padding: 0; border-bottom: 1px dashed var(--muted-foreground); min-height: 44px;" />
+    </div>
+    }
     </div>
     }
     </div>
@@ -150,8 +162,27 @@ else
     margin-top: var(--space-2);
     }
 
+    .pc-price-editor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+    }
+
     @@media (min-width: 768px) {
     .pc-stepper { display: none; }
+    .pc-price-editor { display: none; }
+    }
+
+    .price-input::-webkit-outer-spin-button,
+    .price-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+    }
+
+    .price-input[type=number] {
+    -moz-appearance: textfield;
     }
 
     </style>
@@ -175,6 +206,9 @@ else
     [Parameter] public Func<Product, int>? GetQuantity { get; set; }
     [Parameter] public EventCallback<Product> OnQuantityDecrease { get; set; }
     [Parameter] public EventCallback<Product> OnQuantityIncrease { get; set; }
+    [Parameter] public bool ShowPriceEditor { get; set; }
+    [Parameter] public Func<Product, decimal>? GetEditedPrice { get; set; }
+    [Parameter] public EventCallback<(Product product, ChangeEventArgs e)> OnPriceChanged { get; set; }
 
     private List<Product> allProducts = new();
     private IReadOnlyCollection<Product>? _boundProducts;

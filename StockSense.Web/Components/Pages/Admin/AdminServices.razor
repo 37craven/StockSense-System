@@ -141,9 +141,9 @@
             <div class="sv-panel flex flex-col gap-4 @(isEditingGenericParts ? "sv-panel--side" : "")">
 
                 <div>
-                    <label class="sv-label">Service Name <span class="text-destructive" aria-hidden="true">*</span></label>
-                    <input type="text" @bind="editName" placeholder="e.g. Change Oil"
-                           class="sv-input" />
+                    <label for="edit-service-name" class="sv-label">Service Name <span class="text-destructive" aria-hidden="true">*</span></label>
+                    <textarea id="edit-service-name" @bind="editName" placeholder="e.g. Change Oil" rows="2"
+                              class="sv-input resize-none overflow-y-auto min-h-[38px] max-h-20 whitespace-pre-wrap break-words"></textarea>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
