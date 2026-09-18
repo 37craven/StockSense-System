@@ -5,10 +5,10 @@ namespace StockSense.Application.DTOs;
 public class CreateBuildRequestDto
 {
     [Required(ErrorMessage = "Customer name is required.")]
-    [StringLength(100)]
+    [StringLength(50, ErrorMessage = "Customer name cannot exceed 50 characters.")]
     public string CustomerName { get; set; } = string.Empty;
 
-    [StringLength(200)]
+    [StringLength(50, ErrorMessage = "Build name cannot exceed 50 characters.")]
     public string BuildName { get; set; } = "Custom Build";
 
     [Required(ErrorMessage = "Selected parts are required.")]

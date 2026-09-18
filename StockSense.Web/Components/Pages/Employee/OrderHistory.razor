@@ -553,7 +553,7 @@
                     </ul>
                 </div>
                 <label for="close-remaining-reason" class="block text-sm font-medium">Reason <span class="text-destructive" aria-hidden="true">*</span></label>
-                <textarea id="close-remaining-reason" @bind="closeRemainingReason" rows="3" maxlength="500" required aria-required="true" aria-describedby="close-remaining-help" class="min-h-24 w-full resize-y rounded-md border border-input bg-background p-3 text-sm text-foreground" placeholder="Why will the remaining items not arrive?"></textarea>
+                <textarea id="close-remaining-reason" @bind="closeRemainingReason" rows="3" maxlength="250" required aria-required="true" aria-describedby="close-remaining-help" class="min-h-24 w-full resize-y rounded-md border border-input bg-background p-3 text-sm text-foreground" placeholder="Why will the remaining items not arrive?"></textarea>
                 <p id="close-remaining-help" class="m-0 text-xs text-muted-foreground">This reason is kept with the order history.</p>
                 @if (!isAdmin)
                 {
@@ -619,7 +619,7 @@
                 </label>
                 <label class="flex flex-col gap-1.5 text-sm font-medium" for="history-receipt-remarks">
                     Remarks
-                    <textarea id="history-receipt-remarks" @bind="receiveRemarks" rows="2" maxlength="500" placeholder="Optional" class="min-h-20 w-full resize-y rounded-md border border-input bg-background p-3 text-sm text-foreground whitespace-pre-wrap break-words overflow-y-auto max-h-24"></textarea>
+                    <textarea id="history-receipt-remarks" @bind="receiveRemarks" rows="2" maxlength="250" placeholder="Optional" class="min-h-20 w-full resize-y rounded-md border border-input bg-background p-3 text-sm text-foreground whitespace-pre-wrap break-words overflow-y-auto max-h-24"></textarea>
                 </label>
             </div>
             <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-border mx-4 sm:mx-6" style="-webkit-overflow-scrolling:touch;">
@@ -692,7 +692,7 @@
     <BbDialogContent Style="width:min(99vw,34rem); max-height:92dvh; display:flex; flex-direction:column; overflow:hidden;" class="flex flex-col overflow-hidden p-0">
         <BbDialogHeader class="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6"><BbDialogTitle>Cancel Order Slip</BbDialogTitle><BbDialogDescription>Cancellation preserves audit history and cannot be undone.</BbDialogDescription></BbDialogHeader>
         <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 pt-2 pb-1 flex flex-col gap-3" style="-webkit-overflow-scrolling:touch;">
-            <label class="flex flex-col gap-1 text-sm font-medium"><span>Reason <span class="text-destructive" aria-hidden="true">*</span></span><textarea @bind="cancelReason" rows="3" maxlength="500" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
+            <label class="flex flex-col gap-1 text-sm font-medium"><span>Reason <span class="text-destructive" aria-hidden="true">*</span></span><textarea @bind="cancelReason" rows="3" maxlength="250" class="p-2 rounded-lg border border-border bg-background text-foreground text-sm resize-y min-h-[80px]" placeholder="Why is this order being cancelled?"></textarea></label>
         </div>
         <BbDialogFooter class="shrink-0 flex-col-reverse gap-2 px-4 sm:px-6 pt-2 pb-4 sm:pb-5 sm:flex-row sm:gap-0 [&>button]:w-full sm:[&>button]:w-auto">
             <BbButton Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Back</BbButton>

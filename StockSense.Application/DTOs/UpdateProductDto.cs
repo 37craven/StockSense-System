@@ -39,7 +39,7 @@ public sealed class UpdateProductInventoryDto
     [Range(-999_999, 999_999)]
     public int StockAdjustment { get; set; }
 
-    [Required, StringLength(500, MinimumLength = 1)]
+    [Required, StringLength(250, MinimumLength = 1, ErrorMessage = "Reason cannot exceed 250 characters.")]
     public string Reason { get; set; } = string.Empty;
 
     public byte[] ProductRowVersion { get; set; } = [];

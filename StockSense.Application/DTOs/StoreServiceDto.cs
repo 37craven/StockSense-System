@@ -1,9 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace StockSense.Application.DTOs;
 
 public class CreateStoreServiceDto
 {
+    [StringLength(50)]
     public string Name { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    [StringLength(50)]
     public string Category { get; set; } = "General";
     public int EstimatedMinutes { get; set; }
 }

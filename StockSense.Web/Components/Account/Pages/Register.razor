@@ -1,5 +1,6 @@
 @page "/Account/Register"
 @layout PublicLayout
+@rendermode InteractiveServer
 
 @using System.ComponentModel.DataAnnotations
 @using System.Text
@@ -14,7 +15,6 @@
 @inject Application.Interfaces.IEmailSender<ApplicationUser> EmailSender
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
-@inject IdentityRedirectManager RedirectManager
 
 <PageTitle>Register</PageTitle>
 
@@ -23,9 +23,8 @@
 
         <h1 style="text-align: center; font-size: var(--text-3xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0 0 var(--space-1) 0;">Register</h1>
 
-        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+        <EditForm Model="Input" OnValidSubmit="RegisterUser">
             <DataAnnotationsValidator />
-            <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
 
             <h2 style="text-align: center; font-size: var(--text-xl); font-weight: var(--font-medium); margin-bottom: var(--space-4); color: var(--muted-foreground);">Create a new account.</h2>
             <div style="border-top: 1px solid var(--border); margin: var(--space-6) 0;"></div>
@@ -55,43 +54,50 @@
                 </div>
             }
 
-            <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
-
             <div style="display: flex; gap: var(--space-3); margin-bottom: var(--space-6);">
                 <div style="flex: 1;">
                     <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">First Name <span class="text-destructive" aria-hidden="true">*</span></label>
-                    <InputText @bind-Value="Input.FirstName"
+                    <InputText @bind-Value="Input.FirstName" @oninput="OnFirstNameInput" maxlength="25"
                                style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
                                autocomplete="given-name" aria-required="true" placeholder="John" />
-                    <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
-                        <ValidationMessage For="() => Input.FirstName" />
+                    <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1); min-height: 1.25rem;">
+                        @if (IsTouched("FirstName"))
+                        {
+                            <ValidationMessage For="() => Input.FirstName" />
+                        }
                     </div>
                 </div>
                 <div style="flex: 1;">
                     <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Last Name <span class="text-destructive" aria-hidden="true">*</span></label>
-                    <InputText @bind-Value="Input.LastName"
+                    <InputText @bind-Value="Input.LastName" @oninput="OnLastNameInput" maxlength="25"
                                style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
                                autocomplete="family-name" aria-required="true" placeholder="Doe" />
-                    <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
-                        <ValidationMessage For="() => Input.LastName" />
+                    <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1); min-height: 1.25rem;">
+                        @if (IsTouched("LastName"))
+                        {
+                            <ValidationMessage For="() => Input.LastName" />
+                        }
                     </div>
                 </div>
             </div>
 
             <div style="margin-bottom: var(--space-6);">
                 <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Email <span class="text-destructive" aria-hidden="true">*</span></label>
-                <InputText @bind-Value="Input.Email"
+                <InputText @bind-Value="Input.Email" @oninput="OnEmailInput"
                            style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
                            autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
-                    <ValidationMessage For="() => Input.Email" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1); min-height: 1.25rem;">
+                    @if (IsTouched("Email"))
+                    {
+                        <ValidationMessage For="() => Input.Email" />
+                    }
                 </div>
             </div>
 
             <div style="margin-bottom: var(--space-6);">
                 <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Password <span class="text-destructive" aria-hidden="true">*</span></label>
                 <div class="relative">
-                    <InputText id="register-password" class="password-with-toggle" type="password" @bind-Value="Input.Password"
+                    <InputText id="register-password" class="password-with-toggle" type="password" @bind-Value="Input.Password" @oninput="OnPasswordInput" maxlength="64"
                                style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
                                autocomplete="new-password" aria-required="true" placeholder="password" />
                     <button type="button"
@@ -109,15 +115,18 @@
                         </span>
                     </button>
                 </div>
-                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
-                    <ValidationMessage For="() => Input.Password" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1); min-height: 1.25rem;">
+                    @if (IsTouched("Password"))
+                    {
+                        <ValidationMessage For="() => Input.Password" />
+                    }
                 </div>
             </div>
 
             <div style="margin-bottom: var(--space-6);">
                 <label style="display: block; font-size: var(--text-sm); font-weight: var(--font-medium); margin-bottom: var(--space-2); color: var(--foreground);">Confirm Password <span class="text-destructive" aria-hidden="true">*</span></label>
                 <div class="relative">
-                    <InputText id="register-confirm-password" class="password-with-toggle" type="password" @bind-Value="Input.ConfirmPassword"
+                    <InputText id="register-confirm-password" class="password-with-toggle" type="password" @bind-Value="Input.ConfirmPassword" @oninput="OnConfirmPasswordInput" maxlength="64"
                                style="width: 100%; padding: var(--input-padding-y) 3rem var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;"
                                autocomplete="new-password" aria-required="true" placeholder="confirm password" />
                     <button type="button"
@@ -135,8 +144,11 @@
                         </span>
                     </button>
                 </div>
-                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1);">
-                    <ValidationMessage For="() => Input.ConfirmPassword" />
+                <div style="font-size: var(--text-xs); color: var(--destructive); margin-top: var(--space-1); min-height: 1.25rem;">
+                    @if (IsTouched("ConfirmPassword"))
+                    {
+                        <ValidationMessage For="() => Input.ConfirmPassword" />
+                    }
                 </div>
             </div>
 
@@ -166,19 +178,31 @@
 @code {
     private IEnumerable<IdentityError>? identityErrors;
     private bool isSubmitting = false;
+    private Dictionary<string, bool> TouchedFields { get; set; } = new();
 
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
-    [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
 
     private string? ReturnUrl;
 
     protected override void OnInitialized()
     {
-        ReturnUrl = HttpContext.Request.Query["returnUrl"].FirstOrDefault();
+        var uri = new Uri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        ReturnUrl = query["returnUrl"];
     }
+
+    private void MarkTouched(string fieldName)
+    {
+        TouchedFields[fieldName] = true;
+    }
+
+    private bool IsTouched(string fieldName) => TouchedFields.TryGetValue(fieldName, out var touched) && touched;
+
+    private void OnFirstNameInput(ChangeEventArgs e) => MarkTouched("FirstName");
+    private void OnLastNameInput(ChangeEventArgs e) => MarkTouched("LastName");
+    private void OnEmailInput(ChangeEventArgs e) => MarkTouched("Email");
+    private void OnPasswordInput(ChangeEventArgs e) => MarkTouched("Password");
+    private void OnConfirmPasswordInput(ChangeEventArgs e) => MarkTouched("ConfirmPassword");
 
     private string? Message => identityErrors is null
         ? null
@@ -190,7 +214,6 @@
 
     public async Task RegisterUser(EditContext editContext)
     {
-        // 1. Prevent double-click phantom saves
         if (isSubmitting) return;
         isSubmitting = true;
 
@@ -215,12 +238,9 @@
                 return;
             }
 
-            // Roles are seeded during application startup/deployment. Avoid the
-            // per-registration existence query and redundant user update.
             var roleResult = await UserManager.AddToRoleAsync(user, defaultRole);
             if (!roleResult.Succeeded)
             {
-                // Do not leave an account without its required authorization role.
                 var deleteResult = await UserManager.DeleteAsync(user);
                 if (!deleteResult.Succeeded)
                 {
@@ -235,7 +255,6 @@
 
             Logger.LogInformation("User created a new account with Customer role.");
 
-            // --- START OF SAFE EMAIL LOGIC ---
             try
             {
                 var userId = await UserManager.GetUserIdAsync(user);
@@ -250,16 +269,13 @@
             }
             catch (Exception ex)
             {
-                // If SMTP fails, log it but DO NOT stop the registration flow!
                 Logger.LogError($"Email failed to send. Error: {ex.Message}");
             }
-            // --- END OF SAFE EMAIL LOGIC ---
 
-            RedirectManager.RedirectTo("/Account/RegisterConfirmation", new Dictionary<string, object?> { ["Email"] = Input.Email });
+            NavigationManager.NavigateTo($"/Account/RegisterConfirmation?Email={Input.Email}");
         }
         finally
         {
-            // 2. Unlock the button when everything is done
             isSubmitting = false;
         }
     }
@@ -290,11 +306,13 @@
     {
         [Required(ErrorMessage = "First name is required.")]
         [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "First name can only contain letters, spaces, hyphens, and apostrophes.")]
+        [StringLength(25, ErrorMessage = "First name cannot exceed 25 characters.")]
         [Display(Name = "First Name")]
         public string FirstName { get; set; } = "";
 
         [Required(ErrorMessage = "Last name is required.")]
         [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "Last name can only contain letters, spaces, hyphens, and apostrophes.")]
+        [StringLength(25, ErrorMessage = "Last name cannot exceed 25 characters.")]
         [Display(Name = "Last Name")]
         public string LastName { get; set; } = "";
 
@@ -305,6 +323,7 @@
 
         [Required(ErrorMessage = "Password is required.")]
         [StringLength(100, ErrorMessage = "Password must be between {2} and {1} characters.", MinimumLength = 6)]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).+$", ErrorMessage = "Password must contain at least one uppercase letter, one number, and one special character.")]
         [DataType(DataType.Password)]
         [Display(Name = "Password")]
         public string Password { get; set; } = "";

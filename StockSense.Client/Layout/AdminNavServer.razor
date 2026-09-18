@@ -323,6 +323,10 @@
                 @if (profileOpen)
                 {
                     <div style="padding-left: var(--space-3);">
+                        <a href="Account/Manage/Profile" style="@NavLinkStyle(IsExact("Account/Manage/Profile"), false)">
+                            <LucideIcon Name="user" Size="16" />
+                            <span style="white-space: nowrap;">Profile</span>
+                        </a>
                         <a href="Account/Manage/Email" style="@NavLinkStyle(IsExact("Account/Manage/Email"), false)">
                             <LucideIcon Name="mail" Size="16" />
                             <span style="white-space: nowrap;">Email</span>
@@ -344,7 +348,7 @@
             }
             else
             {
-                <a href="Account/Manage/Email" title="Profile" style="@NavLinkStyle(IsActive("Account/Manage/Email"), true)">
+                <a href="Account/Manage/Profile" title="Profile" style="@NavLinkStyle(IsActive("Account/Manage/Profile"), true)">
                     <LucideIcon Name="user" Size="16" />
                 </a>
             }

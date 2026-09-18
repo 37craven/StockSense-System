@@ -122,6 +122,23 @@ window.stockSenseApi = {
             body: await response.text()
         };
     },
+    putJson: async function(url, value) {
+        const response = await fetch(url, {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: window.stockSenseApi.getXsrfHeaders({
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }),
+            body: JSON.stringify(value)
+        });
+
+        return {
+            ok: response.ok,
+            status: response.status,
+            body: await response.text()
+        };
+    },
     observeLoadMore: function(element, dotNetRef) {
         if (!element || element.__ssLoadMoreObserver) return;
         const observer = new IntersectionObserver(function(entries) {

@@ -6,10 +6,16 @@
 @using Microsoft.AspNetCore.Authorization
 @using StockSense.Client.Layout
 @using StockSense.Application.DTOs
+@using BlazorBlueprint.Primitives.Services
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Nav
+@inject ToastService Toast
 
 @attribute [Authorize]
+
+<BbPortalHost />
+<BbDialogProvider />
+<BbToastProvider Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
 
 <div class="w-full max-w-[900px] lg:max-w-[640px] mx-auto px-4 pt-8 pb-[200px] lg:pb-8">
 
@@ -383,6 +389,10 @@
             {
                 <BbButton Variant="ButtonVariant.Destructive" OnClick="() => showCancelConfirmDialog = true">Cancel Build</BbButton>
             }
+            else if (CurrentBuild?.Status == "Confirmed")
+            {
+                <span class="text-xs text-muted-foreground italic">Confirmed builds cannot be cancelled.</span>
+            }
             <BbButton Variant="ButtonVariant.Outline" OnClick="CloseBuildDetail">Close</BbButton>
         </div>
     </BbDialogContent>
@@ -404,9 +414,14 @@
                 <p class="mb-0 mt-1 text-muted-foreground">@CurrentBuild.CreatedAt.ToString("MMMM dd, yyyy")</p>
             </div>
         }
+        <label for="customer-build-cancel-reason" class="block text-sm font-medium mt-4">Reason for cancellation <span class="text-destructive" aria-hidden="true">*</span></label>
+        <textarea id="customer-build-cancel-reason" @bind="cancelBuildReason" @bind:event="oninput" rows="3" maxlength="250" required aria-required="true"
+                  class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  placeholder="Tell us why you need to cancel"></textarea>
+        <p class="m-0 mt-1 text-xs text-muted-foreground">@cancelBuildReason.Length / 250 characters</p>
         <BbDialogFooter>
-            <BbButton Variant="ButtonVariant.Ghost" OnClick="() => showCancelConfirmDialog = false" Disabled="@isCancelling">Keep build</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmCancel" Disabled="@isCancelling">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseBuildCancelDialog" Disabled="@isCancelling">Keep build</BbButton>
+            <BbButton Variant="ButtonVariant.Destructive" OnClick="ConfirmCancel" Disabled="@(isCancelling || string.IsNullOrWhiteSpace(cancelBuildReason))">
                 @if (isCancelling) { <BbSpinner Size="SpinnerSize.Small" /> }
                 @(isCancelling ? "Cancelling..." : "Cancel build")
             </BbButton>
@@ -434,6 +449,7 @@
 
     private bool showCancelConfirmDialog;
     private bool isCancelling;
+    private string cancelBuildReason = "";
 
     private BuildRequestDto? CurrentBuild;
 
@@ -610,6 +626,7 @@
         var rawParts = ParseParts(build.SelectedPartsJson);
         CurrentBuild = build;
         CurrentParts = rawParts;
+        cancelBuildReason = "";
         showDetailModal = true;
     }
 
@@ -618,9 +635,21 @@
         showDetailModal = false;
     }
 
+    private void CloseBuildCancelDialog()
+    {
+        if (isCancelling) return;
+        showCancelConfirmDialog = false;
+        cancelBuildReason = "";
+    }
+
     private async Task ConfirmCancel()
     {
         if (CurrentBuild is null || isCancelling) return;
+        if (string.IsNullOrWhiteSpace(cancelBuildReason))
+        {
+            Toast.Error("Please provide a reason for cancellation.", "Reason required");
+            return;
+        }
         isCancelling = true;
         try
         {
@@ -629,6 +658,7 @@
             {
                 showCancelConfirmDialog = false;
                 showDetailModal = false;
+                cancelBuildReason = "";
             }
         }
         finally
@@ -669,8 +699,9 @@
         try
         {
             var response = await JSRuntime.InvokeAsync<BrowserApiResponse>(
-                "stockSenseApi.put",
-                $"api/builds/{build.Id}/cancel");
+                "stockSenseApi.putJson",
+                $"api/builds/{build.Id}/cancel",
+                new { Reason = cancelBuildReason.Trim() });
 
             if (response.Ok)
             {
@@ -683,10 +714,32 @@
                     );
 
                 StateHasChanged();
+                Toast.Success("Build cancelled.", "Cancelled");
+            }
+            else
+            {
+                string message = "Could not cancel build.";
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(response.Body);
+                    if (doc.RootElement.TryGetProperty("message", out var m) && m.ValueKind == System.Text.Json.JsonValueKind.String)
+                        message = m.GetString() ?? message;
+                    else if (doc.RootElement.TryGetProperty("error", out var e) && e.ValueKind == System.Text.Json.JsonValueKind.String)
+                        message = e.GetString() ?? message;
+                    else if (doc.RootElement.TryGetProperty("errors", out var errs) && errs.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    {
+                        var first = errs.EnumerateObject().FirstOrDefault().Value;
+                        if (first.ValueKind == System.Text.Json.JsonValueKind.Array && first.GetArrayLength() > 0)
+                            message = first[0].GetString() ?? message;
+                    }
+                }
+                catch { if (!string.IsNullOrWhiteSpace(response.Body)) message = response.Body; }
+                Toast.Error(message, "Cancel failed");
             }
         }
         catch
         {
+            Toast.Error("Could not cancel build. Please try again.", "Cancel failed");
         }
     }
 

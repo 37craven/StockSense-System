@@ -36,6 +36,12 @@ public static class IdentityErrorFeedback
             return passwordMessages;
         }
 
+        var otherMessages = errorList.Select(e => e.Description).Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().ToList();
+        if (otherMessages.Count > 0)
+        {
+            return otherMessages;
+        }
+
         return ["We couldn't create the account. Please review the information and try again."];
     }
 }

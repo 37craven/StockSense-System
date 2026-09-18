@@ -373,22 +373,92 @@ public class BuildsController : ControllerBase
     }
 
     [HttpPut("{id}/cancel")]
-    public async Task<IActionResult> CancelMyBuild(int id)
+    public async Task<IActionResult> CancelMyBuild(int id, [FromBody] CancelWorkOrderDto? request)
     {
         var customer = await _userManager.GetUserAsync(User);
         if (customer is null) return Unauthorized();
 
         var build = await _context.BuildRequests.FindAsync(id);
         if (build is null) return NotFound(ApiResponse.NotFound("Build"));
-        if (build.CustomerUserId != customer.Id) return Forbid();
+        var buildEmailMatches = string.Equals(build.CustomerEmail, customer.Email, StringComparison.OrdinalIgnoreCase);
+        var buildUserIdMatches = build.CustomerUserId == customer.Id;
+        if (!buildEmailMatches && !buildUserIdMatches)
+            return Forbid();
 
         if (build.Status != WorkOrderStatuses.Pending)
             return Conflict(ApiResponse.Error("Only pending builds can be cancelled."));
 
+        var reason = request?.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("Please provide a reason for cancellation."));
+        if (reason.Length > 500)
+            return BadRequest(ApiResponse.Error("Reason cannot exceed 500 characters."));
+
+        var previousStatus = build.Status;
         build.Status = WorkOrderStatuses.Cancelled;
+        _context.WorkOrderAudits.Add(new WorkOrderAudit
+        {
+            WorkOrderType = "Build",
+            WorkOrderId = id,
+            Action = "StatusChanged",
+            PreviousValue = previousStatus,
+            NewValue = WorkOrderStatuses.Cancelled,
+            ActorUserId = customer.Id,
+            ActorRole = "Customer",
+            Reason = reason,
+            CreatedAt = DateTime.Now
+        });
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "Build cancelled." });
+    }
+
+    [HttpGet("{id}/audit")]
+    [Authorize(Roles = "Employee,Admin")]
+    public async Task<ActionResult<List<WorkOrderAuditDto>>> GetBuildAuditTrail(int id)
+    {
+        try
+        {
+            var audits = await _context.WorkOrderAudits
+                .AsNoTracking()
+                .Where(audit => audit.WorkOrderType == "Build" && audit.WorkOrderId == id)
+                .OrderByDescending(audit => audit.CreatedAt)
+                .ToListAsync();
+            var actorIds = audits
+                .Select(audit => audit.ActorUserId)
+                .Where(userId => !string.IsNullOrEmpty(userId))
+                .Distinct()
+                .ToList();
+            var users = await _userManager.Users.AsNoTracking()
+                .Where(user => actorIds.Contains(user.Id))
+                .ToListAsync();
+            var actorNames = users.ToDictionary(user => user.Id, user =>
+            {
+                var fullName = $"{user.FirstName} {user.LastName}".Trim();
+                return string.IsNullOrWhiteSpace(fullName) ? user.Email?.Split('@')[0] ?? "User" : fullName;
+            });
+            return Ok(audits.Select(audit => new WorkOrderAuditDto
+            {
+                Id = audit.Id,
+                WorkOrderType = audit.WorkOrderType,
+                WorkOrderId = audit.WorkOrderId,
+                Action = audit.Action,
+                PreviousValue = audit.PreviousValue,
+                NewValue = audit.NewValue,
+                ActorUserId = audit.ActorUserId,
+                ActorName = actorNames.GetValueOrDefault(audit.ActorUserId, string.Empty),
+                ActorRole = audit.ActorRole,
+                ApproverUserId = audit.ApproverUserId,
+                ApproverEmail = audit.ApproverEmail,
+                Reason = audit.Reason,
+                CreatedAt = audit.CreatedAt
+            }).ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve audit trail for build {BuildId}.", id);
+            return StatusCode(500, ApiResponse.Error("Could not retrieve the build history. Please try again."));
+        }
     }
 
     private static BuildRequestDto MapToDto(BuildRequest build) => new()

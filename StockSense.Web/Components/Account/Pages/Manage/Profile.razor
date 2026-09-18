@@ -1,0 +1,168 @@
+@page "/Account/Manage/Profile"
+@layout SettingsLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using StockSense.Infrastructure.Data
+@using StockSense.Web.Components.Account
+@using BlazorBlueprint.Primitives.Services
+@using Microsoft.EntityFrameworkCore
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityUserAccessor UserAccessor
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext DbContext
+@inject ToastService Toast
+
+<PageTitle>Profile</PageTitle>
+
+<BbPortalHost />
+<BbToastProvider Position="ToastPosition.BottomRight" PauseOnHover="false" ShowCountdown="true" />
+
+<h1 style="font-size: var(--text-2xl); font-weight: var(--font-semibold); color: var(--foreground); margin: 0;">Profile</h1>
+<h2 style="font-size: var(--text-base); font-weight: var(--font-normal); color: var(--muted-foreground); margin: 0;">Update your display name.</h2>
+<div style="border-top: 1px solid var(--border); margin: var(--space-3) 0;"></div>
+
+<EditForm Model="Input" OnValidSubmit="OnValidSubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="account-validation-summary" role="alert" aria-live="polite" />
+
+    <div style="display: flex; flex-direction: column; gap: var(--space-4);">
+        <div style="display: flex; gap: var(--space-3);">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: var(--space-2);">
+                <label for="profile-first-name" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">First name <span class="text-destructive" aria-hidden="true">*</span></label>
+                <InputText id="profile-first-name" @bind-Value="Input.FirstName" autocomplete="given-name" aria-required="true" maxlength="25"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); outline: none; box-sizing: border-box;" />
+                <ValidationMessage For="() => Input.FirstName" style="font-size: var(--text-sm); color: var(--destructive);" />
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: var(--space-2);">
+                <label for="profile-last-name" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Last name <span class="text-destructive" aria-hidden="true">*</span></label>
+                <InputText id="profile-last-name" @bind-Value="Input.LastName" autocomplete="family-name" aria-required="true" maxlength="25"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); outline: none; box-sizing: border-box;" />
+                <ValidationMessage For="() => Input.LastName" style="font-size: var(--text-sm); color: var(--destructive);" />
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+            <label for="profile-email" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Email</label>
+            <input id="profile-email" type="text" value="@email" disabled
+                   style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--muted); color: var(--foreground); font-size: var(--input-font-size); cursor: not-allowed; outline: none; box-sizing: border-box;" />
+        </div>
+
+        <button type="submit"
+                style="width: 100%; margin-top: var(--space-2); padding: var(--btn-padding-y) var(--btn-padding-x); border-radius: var(--radius); background-color: var(--primary); color: var(--primary-foreground); font-size: var(--btn-font-size); font-weight: var(--btn-font-weight); border: none; cursor: pointer;">
+            Save changes
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    private ApplicationUser user = default!;
+    private string? email;
+
+    private InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var principal = authState.User;
+        var userId = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            try
+            {
+                var httpContext = HttpContext;
+                if (httpContext != null)
+                {
+                    user = await UserAccessor.GetRequiredUserAsync(httpContext);
+                }
+            }
+            catch { }
+        }
+        else
+        {
+            user = await UserManager.FindByIdAsync(userId) ?? throw new InvalidOperationException("User not found");
+        }
+
+        if (user != null)
+        {
+            email = await UserManager.GetEmailAsync(user);
+            Input.FirstName = user.FirstName;
+            Input.LastName = user.LastName;
+        }
+    }
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var firstName = Input.FirstName.Trim();
+        var lastName = Input.LastName.Trim();
+
+        if (string.Equals(user.FirstName, firstName, StringComparison.Ordinal) &&
+            string.Equals(user.LastName, lastName, StringComparison.Ordinal))
+        {
+            Toast.Info("No changes detected. Your profile is already up to date.", "Unchanged");
+            return;
+        }
+
+        user.FirstName = firstName;
+        user.LastName = lastName;
+
+        var result = await UserManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            Toast.Error(string.Join(", ", result.Errors.Select(e => e.Description)), "Update failed");
+            return;
+        }
+
+        // Propagate to all owned appointments/builds
+        try
+        {
+            var newFullName = $"{user.FirstName} {user.LastName}".Trim();
+            var uid = user.Id;
+            await DbContext.Appointments.Where(a => a.CustomerUserId == uid)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.CustomerName, newFullName));
+            await DbContext.BuildRequests.Where(b => b.CustomerUserId == uid)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.CustomerName, newFullName));
+        }
+        catch { /* best-effort */ }
+
+        // RefreshSignInAsync sets a cookie -> fails in InteractiveServer after response has started.
+        // In that case we skip it; the DB is already updated and the cookie will refresh on next full request.
+        try
+        {
+            if (HttpContext != null && !HttpContext.Response.HasStarted)
+            {
+                await SignInManager.RefreshSignInAsync(user);
+            }
+            else if (HttpContext == null)
+            {
+                // No HttpContext in interactive circuit, try best-effort and ignore HeadersReadOnly
+                await SignInManager.RefreshSignInAsync(user);
+            }
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Headers are read-only"))
+        {
+            // Swallow - user store already updated, toast still shown
+        }
+
+        Toast.Success("Your display name has been updated.", "Profile updated");
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "First name is required.")]
+        [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "First name can only contain letters, spaces, hyphens, and apostrophes.")]
+        [StringLength(25, ErrorMessage = "First name cannot exceed 25 characters.")]
+        public string FirstName { get; set; } = "";
+
+        [Required(ErrorMessage = "Last name is required.")]
+        [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "Last name can only contain letters, spaces, hyphens, and apostrophes.")]
+        [StringLength(25, ErrorMessage = "Last name cannot exceed 25 characters.")]
+        public string LastName { get; set; } = "";
+    }
+}

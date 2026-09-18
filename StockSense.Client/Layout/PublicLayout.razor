@@ -2,6 +2,7 @@
 @inherits LayoutComponentBase
 
 <div style="display: flex; flex-direction: column; height: 100vh;">
+    <ShopClosureBanner @rendermode="InteractiveServer" />
     @* Force the Navbar to be an Interactive Server component so the @onclick button works! *@
     <PublicNav @rendermode="InteractiveServer" />
 

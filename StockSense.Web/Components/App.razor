@@ -25,7 +25,7 @@
         <AntiforgeryToken />
     </form>
 
-<script src="/js/stockSenseApi.js?v=20260819-no-eval-1"></script>
+<script src="/js/stockSenseApi.js?v=20260819-no-eval-2"></script>
     @if (!IsStaticCustomerSettingsRequest)
     {
         <script src="_framework/blazor.web.js" defer></script>
@@ -47,5 +47,6 @@
 
     private bool IsStaticCustomerSettingsRequest =>
         HttpContext?.User.IsInRole("Customer") == true &&
-        HttpContext.Request.Path.StartsWithSegments("/Account/Manage", StringComparison.OrdinalIgnoreCase);
+        HttpContext.Request.Path.StartsWithSegments("/Account/Manage", StringComparison.OrdinalIgnoreCase) &&
+        !HttpContext.Request.Path.StartsWithSegments("/Account/Manage/Profile", StringComparison.OrdinalIgnoreCase);
 }

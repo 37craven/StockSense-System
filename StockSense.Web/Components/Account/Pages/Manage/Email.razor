@@ -81,7 +81,7 @@
 
         <div style="display: flex; flex-direction: column; gap: var(--space-2);">
 <label for="new-email" style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">New email <span class="text-destructive" aria-hidden="true">*</span></label>
-            <InputText id="new-email" @bind-Value="Input.NewEmail" autocomplete="email" aria-label="New email address" aria-required="true"
+            <InputText id="new-email" @bind-Value="Input.NewEmail" autocomplete="email" aria-label="New email address" aria-required="true" maxlength="64"
                        style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); outline: none; box-sizing: border-box;" />
             <ValidationMessage For="() => Input.NewEmail" style="font-size: var(--text-sm); color: var(--destructive);" />
         </div>
@@ -122,6 +122,13 @@
             return;
         }
 
+        var localPart = Input.NewEmail.Split('@')[0];
+        if (localPart.Length > 64)
+        {
+            message = "The part before @ must not exceed 64 characters.";
+            return;
+        }
+
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateChangeEmailTokenAsync(user, Input.NewEmail);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
@@ -129,8 +136,15 @@
             NavigationManager.ToAbsoluteUri("Account/ConfirmEmailChange").AbsoluteUri,
             new Dictionary<string, object?> { ["userId"] = userId, ["email"] = Input.NewEmail, ["code"] = code });
 
-        await EmailSender.SendConfirmationLinkAsync(user, Input.NewEmail, HtmlEncoder.Default.Encode(callbackUrl));
-        message = "Confirmation link to change email sent. Please check your email.";
+        try
+        {
+            await EmailSender.SendConfirmationLinkAsync(user, Input.NewEmail, HtmlEncoder.Default.Encode(callbackUrl));
+            message = "Confirmation link to change email sent. Please check your email.";
+        }
+        catch
+        {
+            message = "Failed to send confirmation email. Please try again later.";
+        }
     }
 
     private async Task OnSendEmailVerificationAsync()
@@ -144,8 +158,15 @@
             NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
             new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
 
-        await EmailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(callbackUrl));
-        message = "Verification email sent. Please check your email.";
+        try
+        {
+            await EmailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(callbackUrl));
+            message = "Verification email sent. Please check your email.";
+        }
+        catch
+        {
+            message = "Failed to send verification email. Please try again later.";
+        }
     }
 
     private sealed class InputModel

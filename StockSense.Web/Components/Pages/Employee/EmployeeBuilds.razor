@@ -385,6 +385,14 @@
                               Columns="@GetSortColumns()" />
 
                 <div>
+                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Search</div>
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <input @bind="buildSearch" @bind:event="oninput" @bind:after="OnBuildSearchChanged" placeholder="Search customers, builds or parts..." autocomplete="off"
+                               class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground w-full" />
+                    </label>
+                </div>
+
+                <div>
                     <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">View Builds</div>
                     <div style="display: flex; gap: 8px;">
                         <button @onclick='() => { activeTab = "Active"; currentPage = 1; mobileMenuOpen = false; }'
@@ -400,15 +408,30 @@
             </div>
         }
 
-        <div class="hidden md:flex items-center gap-2 mb-4">
-            <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
-                          OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
-                          OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
-                          Columns="@GetSortColumns()" />
-            <DisplayModeToggle Selected="@activeTab"
-                               OnSelect="v => { activeTab = v; currentPage = 1; }"
-                               AriaLabel="Tab"
-                               Options="@GetTabOptions()" />
+        <div class="hidden md:flex rounded-lg border border-border bg-card p-4 mb-5 flex-col gap-3" role="search" aria-label="Filter builds">
+            <div class="flex flex-wrap items-end gap-3">
+                <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1 min-w-56">
+                    Builds
+                    <input id="build-search" @bind="buildSearch" @bind:event="oninput" @bind:after="OnBuildSearchChanged"
+                           placeholder="Search customers, builds or parts..."
+                           autocomplete="off"
+                           class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground w-full" />
+                </label>
+                <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
+                              OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
+                              OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
+                              Columns="@GetSortColumns()" />
+                <DisplayModeToggle Selected="@activeTab"
+                                   OnSelect="v => { activeTab = v; currentPage = 1; }"
+                                   AriaLabel="Tab"
+                                   Options="@GetTabOptions()" />
+                @if (!string.IsNullOrWhiteSpace(buildSearch))
+                {
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearBuildSearch">
+                        <LucideIcon Name="x" Size="16" /> Clear
+                    </BbButton>
+                }
+            </div>
         </div>
 
         <div class="build-table-wrap">
@@ -707,9 +730,16 @@
                 <p class="mb-0 mt-1 text-muted-foreground">Build #@pendingCancellationBuild.Id · ₱@pendingCancellationBuild.TotalPrice.ToString("N2")</p>
             </div>
         }
+        <div class="px-1 pt-3">
+            <label for="pending-build-cancel-reason" class="block text-sm font-medium">Reason for cancellation <span class="text-destructive" aria-hidden="true">*</span></label>
+            <textarea id="pending-build-cancel-reason" @bind="pendingBuildCancelReason" @bind:event="oninput" rows="3" maxlength="250" required aria-required="true"
+                      class="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                      placeholder="Explain why this build is being cancelled"></textarea>
+            <p class="m-0 mt-1 text-xs text-muted-foreground">@pendingBuildCancelReason.Length / 250 characters</p>
+        </div>
         <BbDialogFooter>
             <BbButton Variant="ButtonVariant.Ghost" OnClick="ClosePendingCancellation" Disabled="@isCancellingPending">Keep build</BbButton>
-            <BbButton Variant="ButtonVariant.Destructive" Class="build-dialog-action build-action--destructive" OnClick="ConfirmPendingCancellation" Disabled="@(isCancellingPending || pendingCancellationBuild is null)">
+            <BbButton Variant="ButtonVariant.Destructive" Class="build-dialog-action build-action--destructive" OnClick="ConfirmPendingCancellation" Disabled="@(isCancellingPending || pendingCancellationBuild is null || string.IsNullOrWhiteSpace(pendingBuildCancelReason))">
                 @if (isCancellingPending) { <BbSpinner Size="SpinnerSize.Small" /> }
                 @(isCancellingPending ? "Cancelling..." : "Cancel build")
             </BbButton>
@@ -757,7 +787,7 @@
             <p id="build-pin-help" class="text-xs text-muted-foreground">Enter the admin's 6-digit PIN.</p>
         }
         <label for="build-change-reason" class="text-sm font-medium">Reason <span class="text-destructive" aria-hidden="true">*</span></label>
-        <textarea id="build-change-reason" @bind="restrictedReason" rows="4" maxlength="500"
+        <textarea id="build-change-reason" @bind="restrictedReason" rows="4" maxlength="250"
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   aria-required="true" placeholder="Explain why this change is needed"></textarea>
         <BbDialogFooter>
@@ -774,6 +804,7 @@
     private List<BuildRequestDto>? allBuilds;
     private string activeTab = "Active";
     private bool mobileMenuOpen = false;
+    private string buildSearch = "";
 
     private bool showDetailModal = false;
     private BuildRequestDto? selectedBuild;
@@ -790,6 +821,7 @@
     private bool showPendingCancellationConfirmation;
     private BuildRequestDto? pendingCancellationBuild;
     private bool isCancellingPending;
+    private string pendingBuildCancelReason = "";
     private bool isProcessing;
     private ClaimsPrincipal currentUser = new(new ClaimsIdentity());
     private bool isAdmin;
@@ -963,11 +995,39 @@
         }
     }
 
+    private bool BuildMatchesSearch(BuildRequestDto build, string search)
+    {
+        if (build.CustomerName.Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
+        if (build.CustomerEmail != null && build.CustomerEmail.Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
+        if (build.BuildName.Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
+        if (build.Id.ToString().Contains(search, StringComparison.OrdinalIgnoreCase)) return true;
+        try
+        {
+            var parts = ParseParts(build.SelectedPartsJson);
+            if (parts.Any(p => p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || (p.Brand != null && p.Brand.Contains(search, StringComparison.OrdinalIgnoreCase)) || (p.Category != null && p.Category.Contains(search, StringComparison.OrdinalIgnoreCase)))) return true;
+        }
+        catch { }
+        return false;
+    }
+
+    private void OnBuildSearchChanged() => currentPage = 1;
+
+    private void ClearBuildSearch()
+    {
+        buildSearch = "";
+        currentPage = 1;
+    }
+
     private IEnumerable<BuildRequestDto> DisplayBuilds
     {
         get
         {
             var src = activeTab == "Active" ? ActiveBuilds : HistoryBuilds;
+            if (!string.IsNullOrWhiteSpace(buildSearch))
+            {
+                var search = buildSearch.Trim();
+                src = src.Where(b => BuildMatchesSearch(b, search));
+            }
             return (sort.Column, sort.Ascending) switch
             {
                 ("customer", true) => src.OrderBy(b => b.CustomerName),
@@ -1270,6 +1330,7 @@
     {
         if (build.Status != "Pending") return;
         pendingCancellationBuild = build;
+        pendingBuildCancelReason = "";
         showPendingCancellationConfirmation = true;
     }
 
@@ -1278,18 +1339,26 @@
         if (isCancellingPending) return;
         showPendingCancellationConfirmation = false;
         pendingCancellationBuild = null;
+        pendingBuildCancelReason = "";
     }
 
     private async Task ConfirmPendingCancellation()
     {
         if (isCancellingPending || pendingCancellationBuild is null) return;
+        if (string.IsNullOrWhiteSpace(pendingBuildCancelReason))
+        {
+            Toast.Error("Please provide a reason for cancellation.", "Reason required");
+            return;
+        }
         isCancellingPending = true;
         var build = pendingCancellationBuild;
-        var changed = await UpdateStatus(build, "Cancelled");
+        var changed = await UpdateStatus(build, "Cancelled", pendingBuildCancelReason.Trim());
         isCancellingPending = false;
         if (!changed) return;
         showPendingCancellationConfirmation = false;
         pendingCancellationBuild = null;
+        pendingBuildCancelReason = "";
+        await LoadAuditTrail(build.Id);
         if (ReferenceEquals(selectedBuild, build)) showDetailModal = false;
     }
 
@@ -1392,6 +1461,22 @@
                 </div>
             </div>
         </div>
+        @if (selectedBuild?.Status == "Cancelled")
+        {
+            var cancelAudit = buildAuditTrail?.FirstOrDefault(a => a.Action == "StatusChanged" && a.NewValue == "Cancelled");
+            var cancelReason = cancelAudit?.Reason;
+            if (!string.IsNullOrWhiteSpace(cancelReason))
+            {
+                <div class="p-3 rounded-lg border border-destructive/30 bg-destructive/10">
+                    <div class="text-[10px] font-bold text-destructive uppercase">Cancellation Reason</div>
+                    <p class="mt-1 text-sm text-foreground whitespace-pre-wrap">@cancelReason</p>
+                    @if (cancelAudit != null)
+                    {
+                        <p class="mt-1 text-xs text-muted-foreground">By @AuditActorName(cancelAudit) · @cancelAudit.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</p>
+                    }
+                </div>
+            }
+        }
 
         <div style="padding: var(--space-3); border-radius: var(--radius); background: var(--muted);">
             <div style="font-size: 10px; font-weight: bold; color: var(--muted-foreground); text-transform: uppercase;">Date Received</div>

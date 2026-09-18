@@ -176,6 +176,7 @@ builder.Services.AddScoped<AppointmentRepository>();
 builder.Services.AddScoped<ProductRepository>();
 builder.Services.AddScoped<PinnedSlipRepository>();
 builder.Services.AddScoped<MechanicRepository>();
+builder.Services.AddHostedService<StockSense.Web.Services.MechanicAutoActivateService>();
 builder.Services.AddScoped<BuildRequestRepository>();
 builder.Services.AddScoped<StoreServiceRepository>();
 

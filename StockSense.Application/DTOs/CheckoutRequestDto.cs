@@ -13,7 +13,7 @@ public sealed class CheckoutRequestDto
     [MaxLength(100)]
     public string? ReferenceNumber { get; set; }
 
-    [MaxLength(500)]
+    [StringLength(250, ErrorMessage = "Remarks cannot exceed 250 characters.")]
     public string? Remarks { get; set; }
 }
 

@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using StockSense.Application.DTOs
 @using StockSense.Domain.Entities
+@using StockSense.Infrastructure.Data
 @using StockSense.Infrastructure.Data.Repositories
 @using Microsoft.AspNetCore.Authorization
 @using BlazorBlueprint.Primitives.Services
@@ -12,6 +13,7 @@
 @inject ProductRepository ProductRepo
 @inject MotorcycleRepository MotorcycleRepo
 @inject ToastService Toast
+@inject ApplicationDbContext DbContext
 
 @attribute [Authorize(Roles = "Admin")]
 
@@ -158,12 +160,13 @@ else
         </BbDialogHeader>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: var(--space-2); margin: var(--space-4) 0;">
-            <input type="text" @bind="newMotorBrand" placeholder="Brand"
+            <input type="text" @bind="newMotorBrand" placeholder="Brand" maxlength="25"
                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"/>
-            <input type="text" @bind="newMotorModel" placeholder="Model"
+            <input type="text" @bind="newMotorModel" placeholder="Model" maxlength="25"
                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"/>
-            <input type="number" @bind="newMotorBaseCC" placeholder="Base CC"
-                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"/>
+            <input type="text" @bind="newMotorBaseCC" placeholder="Base CC" maxlength="12"
+                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-xs); box-sizing: border-box;"
+                   oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
             <BbButton Variant="ButtonVariant.Default" OnClick="AddMotorcycle" Disabled="isProcessing">
                 <LucideIcon Name="plus" Size="14"/>
             </BbButton>
@@ -277,12 +280,12 @@ else
 
                 <div>
                     <label class="sv-label" for="prebuilt-package-name">Package Name <span class="text-destructive" aria-hidden="true">*</span></label>
-                    <textarea id="prebuilt-package-name" @bind="newPackage.Name" rows="2" placeholder="e.g. Touring Spec Setup" class="sv-input resize-none overflow-y-auto min-h-[38px] max-h-20 whitespace-pre-wrap break-words"></textarea>
+                    <textarea id="prebuilt-package-name" @bind="newPackage.Name" rows="2" maxlength="50" placeholder="e.g. Touring Spec Setup" class="sv-input resize-none overflow-y-auto min-h-[38px] max-h-20 whitespace-pre-wrap break-words"></textarea>
                 </div>
 
                 <div>
                     <label class="sv-label">Description</label>
-                    <textarea @bind="newPackage.Description" rows="2" placeholder="Describe who this build is for..." class="sv-input resize-none"></textarea>
+                    <textarea @bind="newPackage.Description" rows="2" maxlength="500" placeholder="Describe who this build is for..." class="sv-input resize-none"></textarea>
                 </div>
 
                 <div>
@@ -290,11 +293,13 @@ else
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <span class="text-[10px] text-muted-foreground">Min</span>
-                            <input type="number" @bind="newPackage.MinAddedCC" placeholder="20" class="sv-input" />
+                            <input type="text" @bind="newPackage.MinAddedCC" maxlength="12" class="sv-input"
+                                   oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
                         </div>
                         <div>
                             <span class="text-[10px] text-muted-foreground">Max</span>
-                            <input type="number" @bind="newPackage.MaxAddedCC" placeholder="30" class="sv-input" />
+                            <input type="text" @bind="newPackage.MaxAddedCC" maxlength="12" class="sv-input"
+                                   oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
                         </div>
                     </div>
                 </div>
@@ -422,6 +427,7 @@ else
 @code {
     private bool isLoading = true;
     private bool isProcessing = false;
+    private bool isSaving = false;
     private bool showCreateModal = false;
     private bool showDiscardPackageEditor;
     private string packageEditorBaseline = "";
@@ -616,8 +622,18 @@ else
 
     private Task OnCreateModalOpenChanged(bool open)
     {
-        if (open) showCreateModal = true;
-        else RequestClosePackageEditor();
+        if (open)
+        {
+            showCreateModal = true;
+        }
+        else if (isSaving || !PackageEditorDirty)
+        {
+            showCreateModal = false;
+        }
+        else
+        {
+            showDiscardPackageEditor = true;
+        }
         return Task.CompletedTask;
     }
 
@@ -868,12 +884,28 @@ else
                 package.Description = newPackage.Description;
                 package.MinAddedCC = newPackage.MinAddedCC;
                 package.MaxAddedCC = newPackage.MaxAddedCC;
-                package.CompatibleMotors = resolvedMotors.Select(x => new PreBuiltPackageMotor
+
+                // Remove old motors explicitly (no DbSet, must Remove each), then add new ones
+                foreach (var oldMotor in package.CompatibleMotors.ToList())
+                    DbContext.Remove(oldMotor);
+                package.CompatibleMotors.Clear();
+                foreach (var m in resolvedMotors)
                 {
-                    Brand = x.Motor.Brand.Trim(), Model = x.Motor.Model.Trim(), StockCC = x.Motor.StockCC.Trim(),
-                    MotorcycleId = x.MotorcycleId
-                }).ToList();
-                package.IncludedProducts = await PreBuiltRepo.GetProductsByIdsAsync(newPackage.SelectedProductIds);
+                    package.CompatibleMotors.Add(new PreBuiltPackageMotor
+                    {
+                        Brand = m.Motor.Brand.Trim(), Model = m.Motor.Model.Trim(), StockCC = m.Motor.StockCC.Trim(),
+                        MotorcycleId = m.MotorcycleId
+                    });
+                }
+
+                // Replace products via skip navigation (Clear + AddRange)
+                package.IncludedProducts.Clear();
+                var newProducts = await PreBuiltRepo.GetProductsByIdsAsync(newPackage.SelectedProductIds);
+                foreach (var p in newProducts)
+                {
+                    package.IncludedProducts.Add(p);
+                }
+
                 await PreBuiltRepo.UpdateAsync(package);
             }
             else
@@ -896,7 +928,10 @@ else
                 await PreBuiltRepo.AddAsync(package);
             }
 
+            newPackage = new CreatePreBuiltDto();
+            selectedMotorValues = new();
             packageEditorBaseline = PackageEditorFingerprint();
+            isSaving = true;
             showCreateModal = false;
             await LoadData();
         }
@@ -907,6 +942,7 @@ else
         finally
         {
             isProcessing = false;
+            isSaving = false;
         }
     }
 

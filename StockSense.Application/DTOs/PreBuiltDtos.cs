@@ -38,7 +38,7 @@ public class PreBuiltProductDto
 public class CreatePreBuiltDto
 {
     [Required(ErrorMessage = "Package name is required.")]
-    [StringLength(200)]
+    [StringLength(50, ErrorMessage = "Package name cannot exceed 50 characters.")]
     public string Name { get; set; } = string.Empty;
 
     [StringLength(1000)]

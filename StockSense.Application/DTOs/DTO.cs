@@ -22,6 +22,19 @@ namespace StockSense.Application.DTOs
         public string Email { get; set; } = string.Empty;
     }
 
+    public sealed class UpdateProfileDto
+    {
+        [Required(ErrorMessage = "First name is required.")]
+        [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "First name can only contain letters, spaces, hyphens, and apostrophes.")]
+        [StringLength(25, ErrorMessage = "First name cannot exceed 25 characters.")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Last name is required.")]
+        [RegularExpression(@"^[a-zA-Z\s\-']+$", ErrorMessage = "Last name can only contain letters, spaces, hyphens, and apostrophes.")]
+        [StringLength(25, ErrorMessage = "Last name cannot exceed 25 characters.")]
+        public string LastName { get; set; } = string.Empty;
+    }
+
     public class CreateEmployeeDto
     {
         [Required(ErrorMessage = "Email address is required.")]
@@ -32,11 +45,11 @@ namespace StockSense.Application.DTOs
         public string Password { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "First name is required.")]
-        [StringLength(100, ErrorMessage = "First name cannot exceed 100 characters.")]
+        [StringLength(25, ErrorMessage = "First name cannot exceed 25 characters.")]
         public string FirstName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Last name is required.")]
-        [StringLength(100, ErrorMessage = "Last name cannot exceed 100 characters.")]
+        [StringLength(25, ErrorMessage = "Last name cannot exceed 25 characters.")]
         public string LastName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Role is required.")]

@@ -19,7 +19,28 @@ public class MechanicRepository
 
     public async Task<List<Mechanic>> GetActiveAsync()
     {
-        return await _context.Mechanics.Where(m => m.IsActive).ToListAsync();
+        var today = DateTime.Today;
+        return await _context.Mechanics.Where(m =>
+            m.IsActive &&
+            (m.InactiveFrom == null || m.InactiveUntil == null || today < m.InactiveFrom.Value.Date || today > m.InactiveUntil.Value.Date)
+        ).ToListAsync();
+    }
+
+    public async Task<int> AutoActivateExpiredAsync()
+    {
+        var today = DateTime.Today;
+        var expired = await _context.Mechanics
+            .Where(m => !m.IsActive && m.InactiveUntil != null && m.InactiveUntil.Value.Date < today)
+            .ToListAsync();
+        foreach (var m in expired)
+        {
+            m.IsActive = true;
+            m.InactiveFrom = null;
+            m.InactiveUntil = null;
+            m.InactiveReason = null;
+        }
+        if (expired.Count > 0) await _context.SaveChangesAsync();
+        return expired.Count;
     }
 
     public async Task<Mechanic?> GetByIdAsync(int id)

@@ -5,10 +5,13 @@ namespace StockSense.Application.DTOs;
 public class CreateProductDto
 {
     [Required]
+    [StringLength(25)]
     public string Name { get; set; } = "";
     [Required]
+    [StringLength(25)]
     public string Brand { get; set; } = "";
     [Required]
+    [StringLength(25)]
     public string Category { get; set; } = "";
     [Range(0.01, 9_999_999)]
     public decimal Price { get; set; }

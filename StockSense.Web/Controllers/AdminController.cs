@@ -290,6 +290,41 @@ namespace StockSense.Web.Controllers
                 result.Errors.FirstOrDefault()?.Description ?? "Could not update trust status."));
         }
 
+        [HttpPut("users/{id}/name")]
+        public async Task<IActionResult> UpdateUserName(string id, [FromBody] UpdateProfileDto dto)
+        {
+            if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null) return NotFound(ApiResponse.NotFound("User"));
+
+            var firstName = dto.FirstName.Trim();
+            var lastName = dto.LastName.Trim();
+
+            user.FirstName = firstName;
+            user.LastName = lastName;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+                return BadRequest(ApiResponse.Error(string.Join(", ", result.Errors.Select(e => e.Description))));
+
+            // Propagate to owned appointments/builds
+            if (_context != null)
+            {
+                try
+                {
+                    var fullName = $"{firstName} {lastName}".Trim();
+                    await _context.Appointments.Where(a => a.CustomerUserId == id)
+                        .ExecuteUpdateAsync(s => s.SetProperty(a => a.CustomerName, fullName));
+                    await _context.BuildRequests.Where(b => b.CustomerUserId == id)
+                        .ExecuteUpdateAsync(s => s.SetProperty(b => b.CustomerName, fullName));
+                }
+                catch { /* best-effort */ }
+            }
+
+            return Ok(ApiResponse.Success("Name updated"));
+        }
+
         [HttpDelete("users/{id}")]
         public async Task<IActionResult> DeleteUser(string id)
         {

@@ -1,0 +1,52 @@
+@using StockSense.Application.DTOs
+@inject HttpClient Http
+
+@if (activeClosure != null && !dismissed)
+{
+    <div role="alert" class="w-full bg-destructive border-b px-4 py-3 text-sm text-white flex items-center gap-2">
+        <div class="flex-1 flex items-center justify-center gap-2">
+            <LucideIcon Name="calendar-off" Size="16" Class="shrink-0" />
+            <span class="font-medium">
+                Shop is closed
+                @if (activeClosure.IsWholeDay)
+                {
+                    <span>on @activeClosure.StartDateTime.ToString("MMM dd, yyyy") @if (activeClosure.StartDateTime.Date != activeClosure.EndDateTime.Date) { <span>– @activeClosure.EndDateTime.ToString("MMM dd, yyyy")</span> }</span>
+                }
+                else
+                {
+                    <span>from @activeClosure.StartDateTime.ToString("MMM dd, yyyy HH:mm") to @activeClosure.EndDateTime.ToString("MMM dd, yyyy HH:mm")</span>
+                }
+                — @activeClosure.Reason
+            </span>
+        </div>
+        <button type="button" @onclick="() => dismissed = true" class="shrink-0 text-white/70 hover:text-white" aria-label="Dismiss">
+            <LucideIcon Name="x" Size="16" />
+        </button>
+    </div>
+}
+
+@code {
+    private ShopClosureDto? activeClosure;
+    private bool dismissed = false;
+
+    private static TimeZoneInfo PhZone
+    {
+        get
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch { try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); } catch { return TimeZoneInfo.Utc; } }
+        }
+    }
+    private static DateTime PhNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var closures = await Http.GetFromJsonAsync<List<ShopClosureDto>>("api/shop-closures");
+            var now = PhNow;
+            activeClosure = closures?.FirstOrDefault(c => now >= c.StartDateTime && now <= c.EndDateTime);
+        }
+        catch { }
+    }
+}

@@ -36,7 +36,6 @@ public class PreBuiltRepository
 
     public async Task UpdateAsync(PreBuiltPackage package)
     {
-        _context.PreBuiltPackages.Update(package);
         await _context.SaveChangesAsync();
     }
 
@@ -53,6 +52,7 @@ public class PreBuiltRepository
     public async Task<List<Product>> GetProductsByIdsAsync(List<int> productIds)
     {
         return await _context.Products
+            .AsNoTracking()
             .Where(p => productIds.Contains(p.Id))
             .ToListAsync();
     }

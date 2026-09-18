@@ -24,6 +24,11 @@ public sealed class UpdateBuildPartsDto : AdminOverrideDto
     public Dictionary<int, decimal> Prices { get; set; } = new();
 }
 
+public sealed class CancelWorkOrderDto
+{
+    public string? Reason { get; set; }
+}
+
 public sealed class SetAdminPinDto
 {
     public string CurrentPassword { get; set; } = string.Empty;

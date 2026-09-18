@@ -12,7 +12,7 @@ public class Transaction
     [System.ComponentModel.DataAnnotations.MaxLength(100)] public string? ReferenceNumber { get; set; }
     [System.ComponentModel.DataAnnotations.MaxLength(450)] public string? UserId { get; set; }
     [System.ComponentModel.DataAnnotations.MaxLength(50)] public string LocationId { get; set; } = "MAIN";
-    [System.ComponentModel.DataAnnotations.MaxLength(500)] public string? Remarks { get; set; }
+    [System.ComponentModel.DataAnnotations.MaxLength(250)] public string? Remarks { get; set; }
     [Column(TypeName = "decimal(18,2)")] public decimal DiscountAmount { get; set; }
     [Column(TypeName = "decimal(18,2)")] public decimal ServiceAmount { get; set; }
     [Column(TypeName = "decimal(18,2)")] public decimal TotalAmount { get; set; }

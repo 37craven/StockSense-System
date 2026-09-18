@@ -480,6 +480,14 @@
                               Columns="@GetSortColumns()" />
 
                 <div>
+                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Search</div>
+                    <label class="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <input @bind="searchTerm" @bind:event="oninput" @bind:after="OnSearchChanged" placeholder="Search invoice, product or payment..." autocomplete="off"
+                               class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground w-full" />
+                    </label>
+                </div>
+
+                <div>
                     <div style="font-size: var(--text-xs); font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Transaction Type</div>
                     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
                         <button @onclick='() => { SetFilter(null); mobileMenuOpen = false; }'
@@ -542,8 +550,15 @@
         }
 
         @* DESKTOP FILTERS *@
-        <div class="hidden md:flex items-center justify-between gap-4 mb-4">
-            <div class="flex items-center gap-2">
+        <div class="hidden md:flex rounded-lg border border-border bg-card p-4 mb-5 flex-col gap-3" role="search" aria-label="Filter transactions">
+            <div class="flex flex-wrap items-end gap-3">
+                <label class="flex flex-col gap-1 text-xs text-muted-foreground flex-1 min-w-56">
+                    Transactions
+                    <input id="txn-search" @bind="searchTerm" @bind:event="oninput" @bind:after="OnSearchChanged"
+                           placeholder="Search invoice, product or payment..."
+                           autocomplete="off"
+                           class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground w-full" />
+                </label>
                 <SortDropdown SelectedColumn="@sort.Column" Ascending="@sort.Ascending"
                               OnColumnChange="v => { sort.Toggle(v); currentPage = 1; }"
                               OnDirectionChange="v => { sort.Ascending = v; currentPage = 1; }"
@@ -577,9 +592,6 @@
                     </div>
                 }
             </div>
-            </div>
-
-            <div class="flex items-center gap-2">
                 <div class="txn-dropdown">
                     <button class="txn-dropdown-btn @(daysFilter != null ? "txn-dropdown-btn-active" : "")"
                             @onclick="() => { dayDropdownOpen = !dayDropdownOpen; typeDropdownOpen = false; }">
@@ -621,6 +633,12 @@
                     <button type="button" class="txn-filter-clear" @onclick="() => selectedMonth = null" aria-label="Clear month filter">
                         <LucideIcon Name="x" Size="14" />
                     </button>
+                }
+                @if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    <BbButton Variant="ButtonVariant.Ghost" OnClick="ClearSearch">
+                        <LucideIcon Name="x" Size="16" /> Clear
+                    </BbButton>
                 }
             </div>
         </div>
@@ -855,7 +873,7 @@
                 <p class="text-sm text-muted-foreground">Voiding marks the sale as void and returns every item quantity to inventory.</p>
                 <div class="space-y-2">
                     <label for="void-reason" class="text-sm font-medium text-foreground">Reason for voiding <span class="text-destructive">*</span></label>
-                    <textarea id="void-reason" @bind="voidReason" @bind:event="oninput" maxlength="300" rows="3" required
+                    <textarea id="void-reason" @bind="voidReason" @bind:event="oninput" maxlength="250" rows="3" required
                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               placeholder="Explain why this transaction must be voided"></textarea>
                     <p class="text-xs text-muted-foreground">The reason and approving Admin are retained with the stock reversal record.</p>
@@ -878,6 +896,7 @@
     private string? filterType;
     private string? selectedMonth;
     private int? daysFilter;
+    private string searchTerm = "";
     private bool showDetailModal;
     private bool showVoidConfirmation;
     private string voidReason = string.Empty;
@@ -934,6 +953,18 @@
                 var today = DateTime.Today;
                 var start = daysFilter.Value == 0 ? today : today.AddDays(-(daysFilter.Value - 1));
                 src = src.Where(t => t.TransactionDate.Date >= start && t.TransactionDate.Date <= today);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var search = searchTerm.Trim();
+                src = src.Where(t =>
+                    t.InvoiceNumber.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    GetTypeLabel(t).Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    t.PaymentMethod.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (t.ReferenceNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) == true) ||
+                    (t.Remarks?.Contains(search, StringComparison.OrdinalIgnoreCase) == true) ||
+                    t.Items.Any(item => item.ProductName.Contains(search, StringComparison.OrdinalIgnoreCase)));
             }
 
             return (sort.Column, sort.Ascending) switch
@@ -1012,6 +1043,17 @@
     private void SetDays(int? days)
     {
         daysFilter = days;
+        currentPage = 1;
+    }
+
+    private void OnSearchChanged()
+    {
+        currentPage = 1;
+    }
+
+    private void ClearSearch()
+    {
+        searchTerm = "";
         currentPage = 1;
     }
 

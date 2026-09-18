@@ -336,7 +336,7 @@ else
     <section aria-labelledby="inventory-values-heading">
     <div class="section-heading"><div><h3 id="inventory-values-heading">Price and stock</h3><p>Changes are audited and require a reason.</p></div></div>
     <div class="editor-grid two-fields"><label for="edit-price"><span>Selling price <span class="text-destructive" aria-hidden="true">*</span></span><input id="edit-price" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" inputmode="decimal" @bind="editPriceText" aria-invalid="@(editPriceInvalid ? "true" : "false")" /></label><label for="edit-stock"><span>Current stock <span class="text-destructive" aria-hidden="true">*</span></span><input id="edit-stock" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" inputmode="numeric" @bind="editStockText" aria-invalid="@(editStockInvalid ? "true" : "false")" /></label></div>
-    <label class="editor-label" for="stock-reason"><span>Reason for change <span class="text-destructive" aria-hidden="true">*</span></span><textarea id="stock-reason" class="w-full border border-input rounded-md bg-background text-foreground px-2 py-2 resize-none" rows="2" maxlength="500" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/500 characters</small></label>
+    <label class="editor-label" for="stock-reason"><span>Reason for change <span class="text-destructive" aria-hidden="true">*</span></span><textarea id="stock-reason" class="w-full border border-input rounded-md bg-background text-foreground px-2 py-2 resize-none" rows="2" maxlength="250" placeholder="Explain the value or physical-count correction" @bind="stockCorrectionReason" aria-required="true" aria-invalid="@(reasonInvalid ? "true" : "false")"></textarea><small>@stockCorrectionReason.Length/250 characters</small></label>
     <div class="section-actions"><BbButton Class="min-h-11 max-sm:w-full" OnClick="RequestProductInventorySave" Disabled="@(ModalOperationLocked || inventoryConfirmationOpen)">Save inventory values</BbButton></div>
     </section>
     <section aria-labelledby="danger-zone-heading">
@@ -387,13 +387,13 @@ else
     {
     <div class="supplier-stack">
     <label for="new-supplier-name">New supplier name <span class="text-destructive" aria-hidden="true">*</span>
-    <input id="new-supplier-name" type="text" @bind="newSupplierName" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="e.g. Motostar" maxlength="200" />
+    <input id="new-supplier-name" type="text" @bind="newSupplierName" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="e.g. Motostar" maxlength="50" />
     </label>
     <label for="new-supplier-email">Email
     <input id="new-supplier-email" type="email" @bind="newSupplierEmail" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="supplier@example.com" maxlength="200" />
     </label>
     <label for="new-supplier-mobile">Mobile number
-    <input id="new-supplier-mobile" type="tel" @bind="newSupplierMobile" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="09123456789" maxlength="50" />
+    <input id="new-supplier-mobile" type="tel" @bind="newSupplierMobile" class="w-full h-11 border border-input rounded-md bg-background text-foreground px-2" placeholder="09123456789" maxlength="11" />
     </label>
     </div>
     <div class="section-actions flex-wrap">
@@ -564,19 +564,19 @@ else
     <div class="grid gap-4" style="grid-template-columns:1fr">
     <div>
     <label for="new-product-name" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Name <span class="text-destructive" aria-hidden="true">*</span></label>
-    <textarea id="new-product-name" @bind="newProduct.Name" placeholder="Product name" required rows="2"
+    <textarea id="new-product-name" @bind="newProduct.Name" placeholder="Product name" required rows="2" maxlength="25"
     class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none resize-none overflow-y-auto whitespace-pre-wrap break-words min-h-[44px] max-h-20"></textarea>
     </div>
     </div>
     <div class="grid gap-4" style="grid-template-columns:1fr 1fr">
     <div>
     <label for="new-product-brand" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Brand <span class="text-destructive" aria-hidden="true">*</span></label>
-    <input id="new-product-brand" @bind="newProduct.Brand" placeholder="Brand name" required
+    <input id="new-product-brand" @bind="newProduct.Brand" placeholder="Brand name" required maxlength="25"
     class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
     </div>
     <div>
     <label for="new-product-category" class="block text-xs font-bold uppercase text-muted-foreground mb-1.5">Category <span class="text-destructive" aria-hidden="true">*</span></label>
-    <input id="new-product-category" @bind="newProduct.Category" placeholder="e.g. Engine, Brakes" required
+    <input id="new-product-category" @bind="newProduct.Category" placeholder="e.g. Engine, Brakes" required maxlength="25"
     class="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm text-foreground outline-none" />
     </div>
     </div>
@@ -1706,9 +1706,12 @@ else
                                                                                                                                                                                                                                                                 var response = await Http.PostAsJsonAsync("api/products", newProduct);
                                                                                                                                                                                                                                                                 if (response.IsSuccessStatusCode)
                                                                                                                                                                                                                                                                     {
-                                                                                                                                                                                                                                                                    var created = await response.Content.ReadFromJsonAsync<ProductDto>();
-                                                                                                                                                                                                                                                                    await LoadAsync();
-                                                                                                                                                                                                                                                                    CloseNewProductModal();
+                                                                                                                                                                                                                                                                     var created = await response.Content.ReadFromJsonAsync<ProductDto>();
+                                                                                                                                                                                                                                                                     await LoadAsync();
+                                                                                                                                                                                                                                                                     newProduct = new();
+                                                                                                                                                                                                                                                                     newProductImageFile = null;
+                                                                                                                                                                                                                                                                     newProductImagePreview = "";
+                                                                                                                                                                                                                                                                     CloseNewProductModal();
 
                                                                                                                                                                                                                                                                     if (created != null)
                                                                                                                                                                                                                                                                         {

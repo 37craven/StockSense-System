@@ -21,6 +21,7 @@ namespace StockSense.Infrastructure.Data
         public DbSet<OrderSlipItem> OrderSlipItems { get; set; }
         public DbSet<Supplier> Suppliers { get; set; }
         public DbSet<Mechanic> Mechanics { get; set; }
+        public DbSet<ShopClosure> ShopClosures { get; set; }
         public DbSet<PreBuiltPackage> PreBuiltPackages { get; set; }
         public DbSet<Motorcycle> Motorcycles { get; set; }
         public DbSet<Transaction> Transactions { get; set; }

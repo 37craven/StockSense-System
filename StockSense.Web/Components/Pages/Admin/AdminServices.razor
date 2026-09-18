@@ -142,14 +142,14 @@
 
                 <div>
                     <label for="edit-service-name" class="sv-label">Service Name <span class="text-destructive" aria-hidden="true">*</span></label>
-                    <textarea id="edit-service-name" @bind="editName" placeholder="e.g. Change Oil" rows="2"
+                    <textarea id="edit-service-name" @bind="editName" placeholder="e.g. Change Oil" rows="2" maxlength="50"
                               class="sv-input resize-none overflow-y-auto min-h-[38px] max-h-20 whitespace-pre-wrap break-words"></textarea>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="sv-label">Category</label>
-                        <input type="text" @bind="editCategory" placeholder="e.g. General"
+                        <input type="text" @bind="editCategory" placeholder="e.g. General" maxlength="50"
                                class="sv-input" />
                     </div>
                     <div>
@@ -176,7 +176,7 @@
 
                     <div class="sv-generic-card__add">
                         <input @bind="newItemName" @bind:event="oninput" @onkeydown="HandleItemInputKey"
-                               placeholder="Add generic part..." class="sv-input flex-1" />
+                               placeholder="Add generic part..." maxlength="50" class="sv-input flex-1" />
                         <BbButton Variant="ButtonVariant.Default" Size="ButtonSize.Small" OnClick="AddGenericItem"
                                   Disabled="@string.IsNullOrWhiteSpace(newItemName)">
                             <LucideIcon Name="plus" Size="14" />

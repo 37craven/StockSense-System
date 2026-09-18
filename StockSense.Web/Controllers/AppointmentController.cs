@@ -129,6 +129,12 @@ public class AppointmentsController : ControllerBase
                 totalDuration = 60;
             DateTime phNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
             var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(Math.Max(totalDuration, 15)));
+            // Shop closure check (Ph)
+            var bookingStart = dto.AppointmentDate.Date + requestedStart;
+            var bookingEnd = bookingStart.Add(TimeSpan.FromMinutes(Math.Max(totalDuration, 15)));
+            var closed = await _context.ShopClosures.FirstOrDefaultAsync(c => bookingStart < c.EndDateTime && bookingEnd > c.StartDateTime);
+            if (closed != null)
+                return BadRequest(ApiResponse.Error($"Shop is closed: {closed.Reason}. Please choose another date/time."));
             var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, dto.MechanicName);
             var conflict = existing.Any(a =>
                 TimeSpan.TryParse(a.TimeSlot?.Trim(), out var existingStart) &&
@@ -471,6 +477,11 @@ public class AppointmentsController : ControllerBase
 
         var duration = dto.DurationMinutes > 0 ? dto.DurationMinutes : appointment.DurationMinutes;
         var requestedEnd = requestedStart.Add(TimeSpan.FromMinutes(Math.Max(duration, 15)));
+        var bookingStartDetail = dto.AppointmentDate.Date + requestedStart;
+        var bookingEndDetail = bookingStartDetail.Add(TimeSpan.FromMinutes(Math.Max(duration, 15)));
+        var closedDetail = await _context.ShopClosures.FirstOrDefaultAsync(c => bookingStartDetail < c.EndDateTime && bookingEndDetail > c.StartDateTime);
+        if (closedDetail != null)
+            return BadRequest(ApiResponse.Error($"Shop is closed: {closedDetail.Reason}. Please choose another date/time."));
 
         var existing = await _repo.GetAppointmentsByDateAndMechanicAsync(dto.AppointmentDate, dto.MechanicName);
         var conflict = existing.Any(a =>
@@ -902,20 +913,41 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id}/cancel")]
-    public async Task<IActionResult> CancelMyAppointment(int id)
+    public async Task<IActionResult> CancelMyAppointment(int id, [FromBody] CancelWorkOrderDto? request)
     {
         var customer = await _userManager.GetUserAsync(User);
         if (customer is null) return Unauthorized();
 
         var appointment = await _context.Appointments.FindAsync(id);
         if (appointment is null) return NotFound(ApiResponse.NotFound("Appointment"));
-        if (appointment.CustomerEmail != customer.Email)
+        var emailMatches = string.Equals(appointment.CustomerEmail, customer.Email, StringComparison.OrdinalIgnoreCase);
+        var userIdMatches = appointment.CustomerUserId == customer.Id;
+        if (!emailMatches && !userIdMatches)
             return Forbid();
 
         if (appointment.Status != WorkOrderStatuses.Pending)
             return Conflict(ApiResponse.Error("Only pending appointments can be cancelled."));
 
+        var reason = request?.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+            return BadRequest(ApiResponse.Error("Please provide a reason for cancellation."));
+        if (reason.Length > 500)
+            return BadRequest(ApiResponse.Error("Reason cannot exceed 500 characters."));
+
+        var previousStatus = appointment.Status;
         appointment.Status = WorkOrderStatuses.Cancelled;
+        _context.WorkOrderAudits.Add(new WorkOrderAudit
+        {
+            WorkOrderType = "Appointment",
+            WorkOrderId = id,
+            Action = "StatusChanged",
+            PreviousValue = previousStatus,
+            NewValue = WorkOrderStatuses.Cancelled,
+            ActorUserId = customer.Id,
+            ActorRole = "Customer",
+            Reason = reason,
+            CreatedAt = DateTime.Now
+        });
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "Appointment cancelled." });

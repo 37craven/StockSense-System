@@ -33,11 +33,12 @@ public class AppointmentDto
 public partial class CreateAppointmentDto
 {
     [Required(ErrorMessage = "Customer name is required.")]
-    [StringLength(100)]
+    [StringLength(50, ErrorMessage = "Customer name cannot exceed 50 characters.")]
     public string CustomerName { get; set; } = string.Empty;
 
-    [Phone]
-    public string? ContactNumber { get; set; }
+    [Required(ErrorMessage = "Contact number is required.")]
+    [RegularExpression(@"^09\d{9}$", ErrorMessage = "Enter a valid Philippine mobile number (09XXXXXXXXX).")]
+    public string ContactNumber { get; set; } = string.Empty;
 
     [Required]
     public DateTime AppointmentDate { get; set; } = DateTime.Now;
@@ -54,7 +55,7 @@ public partial class CreateAppointmentDto
     [StringLength(100)]
     public string Category { get; set; } = "General";
 
-    [StringLength(100)]
+    [StringLength(50, ErrorMessage = "Mechanic name cannot exceed 50 characters.")]
     public string? MechanicName { get; set; }
 
     public string? SelectedProductsJson { get; set; }
@@ -73,7 +74,7 @@ public class BookedSlotDto
 public class MechanicAssignmentDto
 {
     [Required(ErrorMessage = "Mechanic name is required.")]
-    [StringLength(100)]
+    [StringLength(50, ErrorMessage = "Mechanic name cannot exceed 50 characters.")]
     public string MechanicName { get; set; } = string.Empty;
 
     [Range(15, 480)]

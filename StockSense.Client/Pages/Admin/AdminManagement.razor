@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using StockSense.Client.Layout
 @using StockSense.Domain.Entities
+@using StockSense.Application.DTOs
 @inject HttpClient Http
 @inject ToastService Toast
 
@@ -35,6 +36,12 @@
                     aria-pressed="@(currentTab == "AdminPin")">
                 My Admin PIN
             </button>
+            <button type="button"
+                    @onclick='() => SelectTab("ShopClosures")'
+                    class="rounded-md border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 @(currentTab == "ShopClosures" ? "bg-secondary text-foreground" : "bg-transparent text-muted-foreground")"
+                    aria-pressed="@(currentTab == "ShopClosures")">
+                Shop Closures
+            </button>
         </div>
 
         @if (currentTab == "Staff")
@@ -56,6 +63,13 @@
             <BbButton Variant="ButtonVariant.Default" @onclick="OpenMechanicModal" Class="shrink-0">
                 <LucideIcon Name="bolt" Size="16" />
                 Add Mechanic
+            </BbButton>
+        }
+        else if (currentTab == "ShopClosures")
+        {
+            <BbButton Variant="ButtonVariant.Default" @onclick="() => OpenClosureDialog()" Class="shrink-0">
+                <LucideIcon Name="calendar-off" Size="16" />
+                Add Closure
             </BbButton>
         }
     </div>
@@ -132,16 +146,21 @@
                                     </td>
                                 }
                                 <td style="padding: 12px; text-align: right;">
-                                    @if (user.IsCurrentUser)
-                                    {
-                                        <span style="color:var(--muted-foreground);font-size:var(--text-xs);">Your account is protected.</span>
-                                    }
-                                    else
-                                    {
-                                        <button @onclick="() => ConfirmDelete(user, user.FullName)" style="padding: 6px 12px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); border: 1px solid var(--destructive-muted-foreground); border-radius: 4px; cursor: pointer;">
-                                            Delete
+                                    <div style="display: flex; justify-content: flex-end; gap: 6px; align-items: center;">
+                                        <button @onclick="() => OpenEditName(user)" style="padding: 6px 12px; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">
+                                            Edit
                                         </button>
-                                    }
+                                        @if (user.IsCurrentUser)
+                                        {
+                                            <span style="color:var(--muted-foreground);font-size:var(--text-xs); margin-left: 6px;">Your account is protected.</span>
+                                        }
+                                        else
+                                        {
+                                            <button @onclick="() => ConfirmDelete(user, user.FullName)" style="padding: 6px 12px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); border: 1px solid var(--destructive-muted-foreground); border-radius: 4px; cursor: pointer;">
+                                                Delete
+                                            </button>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -168,17 +187,51 @@
                     <tbody>
                         @foreach (var mech in mechanics)
                         {
+                            var isScheduledInactive = !mech.IsActive && mech.InactiveFrom != null && mech.InactiveUntil != null;
                             <tr style="border-bottom: 1px solid var(--border);">
-                                <td style="padding: 12px; font-weight: bold; color: var(--foreground);">@mech.Name</td>
-                                <td style="padding: 12px; text-align: center; min-width: 100px;">
-                                    <button @onclick="() => ToggleMechanic(mech)" style="padding: 4px 8px; border: 1px solid var(--border); background: var(--background); color: @(mech.IsActive ? "var(--success-muted-foreground)" : "var(--muted-foreground)"); border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: bold;">
-                                        @(mech.IsActive ? "ACTIVE" : "INACTIVE")
-                                    </button>
+                                <td style="padding: 12px;">
+                                    <div style="font-weight: bold; color: var(--foreground);">@mech.Name</div>
+                                    @if (isScheduledInactive)
+                                    {
+                                        <div style="font-size: 0.7rem; color: var(--muted-foreground); margin-top: 2px;">@mech.InactiveFrom?.ToString("MMM dd, yyyy") – @mech.InactiveUntil?.ToString("MMM dd, yyyy")</div>
+                                        @if (!string.IsNullOrWhiteSpace(mech.InactiveReason))
+                                        {
+                                            <div style="font-size: 0.65rem; color: var(--muted-foreground); font-style: italic;">@mech.InactiveReason</div>
+                                        }
+                                    }
+                                    else if (!mech.IsActive)
+                                    {
+                                        <div style="font-size: 0.7rem; color: var(--muted-foreground);">Manually inactive</div>
+                                    }
+                                </td>
+                                <td style="padding: 12px; text-align: center; min-width: 140px;">
+                                    @if (mech.IsActive)
+                                    {
+                                        <span style="padding: 4px 8px; border: 1px solid var(--border); background: var(--success-muted); color: var(--success-muted-foreground); border-radius: 4px; font-size: 0.7rem; font-weight: bold;">ACTIVE</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="padding: 4px 8px; border: 1px solid var(--border); background: var(--muted); color: var(--muted-foreground); border-radius: 4px; font-size: 0.7rem; font-weight: bold;">INACTIVE</span>
+                                    }
                                 </td>
                                 <td style="padding: 12px; text-align: right;">
-                                    <button @onclick="() => ConfirmDelete(mech, mech.Name)" style="padding: 6px 12px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); border: 1px solid var(--destructive-muted-foreground); border-radius: 4px; cursor: pointer;">
-                                        Delete
-                                    </button>
+                                    <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+                                        @if (mech.IsActive)
+                                        {
+                                            <button @onclick="() => OpenMechanicScheduleDialog(mech)" style="padding: 6px 12px; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Deactivate</button>
+                                        }
+                                        else
+                                        {
+                                            @if (isScheduledInactive)
+                                            {
+                                                <button @onclick="() => OpenMechanicScheduleDialog(mech)" style="padding: 6px 12px; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Edit Range</button>
+                                            }
+                                            <button @onclick="() => ActivateMechanic(mech)" style="padding: 6px 12px; background: var(--success-muted); color: var(--success-muted-foreground); border: 1px solid var(--success-muted-foreground); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Activate</button>
+                                        }
+                                        <button @onclick="() => ConfirmDelete(mech, mech.Name)" style="padding: 6px 12px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); border: 1px solid var(--destructive-muted-foreground); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
+                                            Delete
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -296,6 +349,64 @@
                 </div>
             </section>
         }
+        else if (currentTab == "ShopClosures")
+        {
+            @if (closures == null)
+            {
+                <LoadingState Description="Loading closures..." />
+            }
+            else if (!closures.Any())
+            {
+                <div class="text-center py-12 border border-dashed border-border rounded-lg">
+                    <LucideIcon Name="calendar-off" Size="32" Class="mx-auto text-muted-foreground mb-2" />
+                    <p class="text-sm font-medium text-foreground">No shop closures set</p>
+                    <p class="text-xs text-muted-foreground">Add a date range when the shop will be closed.</p>
+                </div>
+            }
+            else
+            {
+                <table style="width: 100%; border-collapse: collapse; font-size: var(--text-sm); text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border); color: var(--muted-foreground);">
+                            <th style="padding: 12px;">Date Range</th>
+                            <th style="padding: 12px;">Type</th>
+                            <th style="padding: 12px;">Reason</th>
+                            <th style="padding: 12px; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in closures.OrderBy(x => x.StartDateTime))
+                        {
+                            var isActiveNow = DateTime.Now >= c.StartDateTime && DateTime.Now <= c.EndDateTime;
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 12px; font-weight: 600; color: var(--foreground);">
+                                    @if (c.IsWholeDay)
+                                    {
+                                        <span>@c.StartDateTime.ToString("MMM dd, yyyy") @if (c.StartDateTime.Date != c.EndDateTime.Date) { <span> – @c.EndDateTime.ToString("MMM dd, yyyy")</span> } <span class="ml-2 text-xs px-2 py-0.5 rounded bg-muted">Whole day</span></span>
+                                    }
+                                    else
+                                    {
+                                        <span>@c.StartDateTime.ToString("MMM dd, yyyy HH:mm") – @c.EndDateTime.ToString("MMM dd, yyyy HH:mm")</span>
+                                    }
+                                    @if (isActiveNow)
+                                    {
+                                        <span style="margin-left: 8px; padding: 2px 6px; border-radius: 999px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); font-size: 0.65rem; font-weight: bold;">ACTIVE NOW</span>
+                                    }
+                                </td>
+                                <td style="padding: 12px; font-size: 0.75rem; color: var(--muted-foreground);">@(c.IsWholeDay ? "Whole day" : "Partial")</td>
+                                <td style="padding: 12px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="@c.Reason">@c.Reason</td>
+                                <td style="padding: 12px; text-align: right;">
+                                    <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                                        <button @onclick="() => OpenClosureDialog(c)" style="padding: 6px 12px; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Edit</button>
+                                        <button @onclick="() => DeleteClosure(c)" style="padding: 6px 12px; background: var(--destructive-muted); color: var(--destructive-muted-foreground); border: 1px solid var(--destructive-muted-foreground); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
     </div>
 
 @* --- DESTRUCTIVE ACTION CONFIRMATIONS --- *@
@@ -355,6 +466,126 @@
     </BbDialogContent>
 </BbDialog>
 
+<BbDialog @bind-Open="showEditNameDialog">
+    <BbDialogContent Class="w-[min(96vw,420px)] p-0 overflow-hidden flex flex-col">
+        <BbDialogHeader Class="px-6 py-5 border-b border-border">
+            <BbDialogTitle Class="text-lg font-semibold text-foreground m-0">Edit Name</BbDialogTitle>
+            <BbDialogDescription Class="text-sm text-muted-foreground mt-1">Update display name for @userToEditName?.Email</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="px-6 py-5 flex flex-col gap-3">
+            <div class="flex gap-3">
+                <div class="flex-1 flex flex-col gap-2">
+                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">First Name <span aria-hidden="true" class="text-destructive">*</span></label>
+                    <input @bind="editFirstName" placeholder="First name" aria-required="true" maxlength="25"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                </div>
+                <div class="flex-1 flex flex-col gap-2">
+                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Last Name <span aria-hidden="true" class="text-destructive">*</span></label>
+                    <input @bind="editLastName" placeholder="Last name" aria-required="true" maxlength="25"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                </div>
+            </div>
+        </div>
+        <BbDialogFooter Class="px-6 py-4 border-t border-border justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseEditName" Disabled="isSavingName">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="SaveEditName" Disabled="isSavingName">
+                @if (isSavingName) { <BbSpinner Size="SpinnerSize.Small" /> }
+                Save
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showMechanicScheduleDialog">
+    <BbDialogContent Class="w-[min(96vw,440px)] p-0 overflow-hidden flex flex-col">
+        <BbDialogHeader Class="px-6 py-5 border-b border-border">
+            <BbDialogTitle Class="text-lg font-semibold text-foreground m-0">@(mechanicToSchedule?.IsActive == false && mechanicToSchedule?.InactiveFrom != null ? "Edit Inactive Period" : "Deactivate Mechanic")</BbDialogTitle>
+            <BbDialogDescription Class="text-sm text-muted-foreground mt-1">Select a date range when @mechanicToSchedule?.Name will be inactive. It will auto-activate after the range ends.</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="px-6 py-5 flex flex-col gap-4">
+            <div class="flex flex-col gap-2">
+                <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Inactive From <span aria-hidden="true" class="text-destructive">*</span></label>
+                <input type="date" @bind="scheduleFrom" aria-required="true"
+                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                       style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+            </div>
+            <div class="flex flex-col gap-2">
+                <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Inactive Until <span aria-hidden="true" class="text-destructive">*</span></label>
+                <input type="date" @bind="scheduleUntil" aria-required="true"
+                       min="@(scheduleFrom?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd"))"
+                       style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+            </div>
+            <div class="flex flex-col gap-2">
+                <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Reason <span aria-hidden="true" class="text-destructive">*</span></label>
+                <textarea @bind="scheduleReason" @bind:event="oninput" rows="2" maxlength="250" placeholder="e.g., Annual leave" aria-required="true" required
+                          style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box; resize: vertical;"></textarea>
+                <div style="font-size: 0.7rem; color: var(--muted-foreground); text-align: right;">@scheduleReason.Length / 250</div>
+            </div>
+        </div>
+        <BbDialogFooter Class="px-6 py-4 border-t border-border justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseMechanicScheduleDialog" Disabled="isSavingMechanicSchedule">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="SaveMechanicSchedule" Disabled="@(isSavingMechanicSchedule || string.IsNullOrWhiteSpace(scheduleReason))">
+                @if (isSavingMechanicSchedule) { <BbSpinner Size="SpinnerSize.Small" /> }
+                Save
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showClosureDialog">
+    <BbDialogContent Class="w-[min(96vw,480px)] p-0 overflow-hidden flex flex-col">
+        <BbDialogHeader Class="px-6 py-5 border-b border-border">
+            <BbDialogTitle Class="text-lg font-semibold text-foreground m-0">@(editingClosure == null ? "Add Shop Closure" : "Edit Shop Closure")</BbDialogTitle>
+            <BbDialogDescription Class="text-sm text-muted-foreground mt-1">Pick a date range when the shop is closed. Use whole-day or partial hours (Ph timezone).</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="px-6 py-5 flex flex-col gap-4">
+            <label class="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input type="checkbox" @bind="closureIsWholeDay" /> Whole day (00:00 – 23:59)
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="flex flex-col gap-2">
+                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium);">Start Date <span class="text-destructive">*</span></label>
+                    <input type="date" @bind="closureStartDate" aria-required="true" min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label style="font-size: var(--text-sm); font-weight: var(--font-medium);">End Date <span class="text-destructive">*</span></label>
+                    <input type="date" @bind="closureEndDate" aria-required="true" min="@(closureStartDate?.ToString("yyyy-MM-dd") ?? DateTime.Today.ToString("yyyy-MM-dd"))"
+                           style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                </div>
+            </div>
+            @if (!closureIsWholeDay)
+            {
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-2">
+                        <label style="font-size: var(--text-sm); font-weight: var(--font-medium);">Start Time <span class="text-destructive">*</span></label>
+                        <input type="time" @bind="closureStartTime" aria-required="true"
+                               style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label style="font-size: var(--text-sm); font-weight: var(--font-medium);">End Time <span class="text-destructive">*</span></label>
+                        <input type="time" @bind="closureEndTime" aria-required="true"
+                               style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
+                    </div>
+                </div>
+            }
+            <div class="flex flex-col gap-2">
+                <label style="font-size: var(--text-sm); font-weight: var(--font-medium);">Reason <span class="text-destructive">*</span></label>
+                <textarea @bind="closureReason" @bind:event="oninput" rows="2" maxlength="250" placeholder="e.g., Holiday, Inventory audit" aria-required="true" required
+                          style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box; resize: vertical;"></textarea>
+                <div style="font-size: 0.7rem; color: var(--muted-foreground); text-align: right;">@closureReason.Length / 250</div>
+            </div>
+        </div>
+        <BbDialogFooter Class="px-6 py-4 border-t border-border justify-end gap-2">
+            <BbButton Variant="ButtonVariant.Ghost" OnClick="CloseClosureDialog" Disabled="isSavingClosure">Cancel</BbButton>
+            <BbButton Variant="ButtonVariant.Default" OnClick="SaveClosure" Disabled="@(isSavingClosure || string.IsNullOrWhiteSpace(closureReason))">
+                @if (isSavingClosure) { <BbSpinner Size="SpinnerSize.Small" /> }
+                @(editingClosure == null ? "Create" : "Save")
+            </BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @* --- ADD EMPLOYEE MODAL --- *@
 <BbDialog @bind-Open="showEmployeeModal">
     <BbDialogContent Class="w-[min(96vw,440px)] p-0 overflow-hidden flex flex-col">
@@ -368,13 +599,13 @@
                 <div class="flex-1 flex flex-col gap-2">
                     <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">First Name <span aria-hidden="true" class="text-destructive">*</span></label>
                     <input @bind="newEmp.FirstName" placeholder="First name"
-                           aria-required="true"
+                           aria-required="true" maxlength="25"
                            style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                 </div>
                 <div class="flex-1 flex flex-col gap-2">
                     <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Last Name <span aria-hidden="true" class="text-destructive">*</span></label>
                     <input @bind="newEmp.LastName" placeholder="Last name"
-                           aria-required="true"
+                           aria-required="true" maxlength="25"
                            style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
                 </div>
             </div>
@@ -382,7 +613,7 @@
             <div class="flex flex-col gap-2">
                 <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Email Address <span aria-hidden="true" class="text-destructive">*</span></label>
                 <input @bind="newEmp.Email" type="email" placeholder="email@example.com"
-                       aria-required="true"
+                       aria-required="true" maxlength="254"
                        style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
             </div>
 
@@ -429,7 +660,7 @@
 
         <div class="px-6 py-5 flex flex-col gap-2">
             <label style="font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--foreground);">Full Name</label>
-            <input @bind="newMechanicName" placeholder="e.g. Juan dela Cruz"
+            <input @bind="newMechanicName" placeholder="e.g. Juan dela Cruz" maxlength="50"
                    style="width: 100%; padding: var(--input-padding-y) var(--input-padding-x); border-radius: var(--radius); border: 1px solid var(--input); background-color: var(--background); color: var(--foreground); font-size: var(--input-font-size); box-sizing: border-box;" />
         </div>
 
@@ -455,6 +686,11 @@
     private UserDto? userToToggleBlock;
     private bool showBlockDialog;
     private bool isChangingBlock;
+    private bool showEditNameDialog;
+    private UserDto? userToEditName;
+    private string editFirstName = "";
+    private string editLastName = "";
+    private bool isSavingName;
 
     private IEnumerable<UserDto> FilteredUsers => users?
         .Where(user => currentTab == "Customers"
@@ -472,15 +708,36 @@
     private string newMechanicName = "";
     private AdminPinForm pinForm = new();
     private bool isSavingPin;
+    private List<ShopClosureDto>? closures;
+    private bool showClosureDialog;
+    private ShopClosureDto? editingClosure;
+    private DateTime? closureStartDate;
+    private DateTime? closureEndDate;
+    private TimeOnly? closureStartTime;
+    private TimeOnly? closureEndTime;
+    private bool closureIsWholeDay = true;
+    private string closureReason = "";
+    private bool isSavingClosure;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadUsers();
         await LoadMechanics();
+        await LoadClosures();
     }
 
-    private async Task LoadUsers() => users = await Http.GetFromJsonAsync<List<UserDto>>("api/admin/users");
-    private async Task LoadMechanics() => mechanics = await Http.GetFromJsonAsync<List<Mechanic>>("api/mechanics/all");
+    private async Task LoadUsers()
+    {
+        try { users = await Http.GetFromJsonAsync<List<UserDto>>("api/admin/users"); } catch { users = new(); }
+    }
+    private async Task LoadMechanics()
+    {
+        try { mechanics = await Http.GetFromJsonAsync<List<Mechanic>>("api/mechanics/all"); } catch { mechanics = new(); }
+    }
+    private async Task LoadClosures()
+    {
+        try { closures = await Http.GetFromJsonAsync<List<ShopClosureDto>>("api/shop-closures/all"); } catch { closures = new(); }
+    }
 
     private void ConfirmDelete(object target, string name)
     {
@@ -615,10 +872,104 @@
         }
     }
 
-    private async Task ToggleMechanic(Mechanic mech)
+    private bool showMechanicScheduleDialog;
+    private Mechanic? mechanicToSchedule;
+    private DateTime? scheduleFrom;
+    private DateTime? scheduleUntil;
+    private string scheduleReason = "";
+    private bool isSavingMechanicSchedule;
+
+    private void OpenMechanicScheduleDialog(Mechanic mech)
     {
-        mech.IsActive = !mech.IsActive;
-        await Http.PutAsJsonAsync($"api/mechanics/{mech.Id}", mech);
+        mechanicToSchedule = mech;
+        if (!mech.IsActive && mech.InactiveFrom != null && mech.InactiveUntil != null)
+        {
+            scheduleFrom = mech.InactiveFrom.Value.Date;
+            scheduleUntil = mech.InactiveUntil.Value.Date;
+            scheduleReason = mech.InactiveReason ?? "";
+        }
+        else
+        {
+            scheduleFrom = DateTime.Today;
+            scheduleUntil = DateTime.Today.AddDays(1);
+            scheduleReason = "";
+        }
+        showMechanicScheduleDialog = true;
+    }
+
+    private void CloseMechanicScheduleDialog()
+    {
+        if (isSavingMechanicSchedule) return;
+        showMechanicScheduleDialog = false;
+        mechanicToSchedule = null;
+    }
+
+    private async Task SaveMechanicSchedule()
+    {
+        if (mechanicToSchedule == null || isSavingMechanicSchedule) return;
+        if (scheduleFrom == null || scheduleUntil == null)
+        {
+            Toast.Warning("Please select both From and Until dates.", "Validation");
+            return;
+        }
+        if (scheduleFrom.Value.Date > scheduleUntil.Value.Date)
+        {
+            Toast.Warning("From date cannot be after Until date.", "Validation");
+            return;
+        }
+        if (scheduleUntil.Value.Date < DateTime.Today)
+        {
+            Toast.Warning("Until date cannot be in the past.", "Validation");
+            return;
+        }
+        if ((scheduleUntil.Value.Date - scheduleFrom.Value.Date).TotalDays > 365)
+        {
+            Toast.Warning("Range cannot exceed 365 days.", "Validation");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(scheduleReason))
+        {
+            Toast.Warning("Reason is required when deactivating a mechanic.", "Validation");
+            return;
+        }
+        isSavingMechanicSchedule = true;
+        try
+        {
+            mechanicToSchedule.IsActive = false;
+            mechanicToSchedule.InactiveFrom = scheduleFrom.Value.Date;
+            mechanicToSchedule.InactiveUntil = scheduleUntil.Value.Date;
+            mechanicToSchedule.InactiveReason = string.IsNullOrWhiteSpace(scheduleReason) ? null : scheduleReason.Trim();
+            var response = await Http.PutAsJsonAsync($"api/mechanics/{mechanicToSchedule.Id}", mechanicToSchedule);
+            if (!response.IsSuccessStatusCode)
+            {
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not update mechanic schedule."), "Update failed");
+                // revert local optimistic change by reloading
+                await LoadMechanics();
+                return;
+            }
+            Toast.Success($"{mechanicToSchedule.Name} deactivated until {scheduleUntil.Value:MMM dd, yyyy}.", "Scheduled");
+            showMechanicScheduleDialog = false;
+            mechanicToSchedule = null;
+        }
+        finally { isSavingMechanicSchedule = false; }
+    }
+
+    private async Task ActivateMechanic(Mechanic mech)
+    {
+        mech.IsActive = true;
+        mech.InactiveFrom = null;
+        mech.InactiveUntil = null;
+        mech.InactiveReason = null;
+        var response = await Http.PutAsJsonAsync($"api/mechanics/{mech.Id}", mech);
+        if (response.IsSuccessStatusCode)
+        {
+            Toast.Success($"{mech.Name} activated.", "Activated");
+        }
+        else
+        {
+            Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not activate mechanic."), "Update failed");
+            await LoadMechanics();
+        }
     }
 
     private async Task ToggleTrust(UserDto user)
@@ -638,9 +989,157 @@
         }
     }
 
+    private void OpenEditName(UserDto user)
+    {
+        userToEditName = user;
+        var parts = user.FullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        editFirstName = parts.Length > 0 ? parts[0] : "";
+        editLastName = parts.Length > 1 ? parts[1] : "";
+        // Try to get more accurate split if full name had been constructed from First+Last
+        // Fallback to full name split is best we have from UserDto
+        showEditNameDialog = true;
+    }
+
+    private void CloseEditName()
+    {
+        if (isSavingName) return;
+        showEditNameDialog = false;
+        userToEditName = null;
+        editFirstName = "";
+        editLastName = "";
+    }
+
+    private async Task SaveEditName()
+    {
+        if (userToEditName == null || isSavingName) return;
+        var first = editFirstName.Trim();
+        var last = editLastName.Trim();
+        if (string.IsNullOrWhiteSpace(first) || string.IsNullOrWhiteSpace(last))
+        {
+            Toast.Warning("Both first and last name are required.", "Validation");
+            return;
+        }
+        if (!System.Text.RegularExpressions.Regex.IsMatch(first, @"^[a-zA-Z\s\-']+$") ||
+            !System.Text.RegularExpressions.Regex.IsMatch(last, @"^[a-zA-Z\s\-']+$"))
+        {
+            Toast.Warning("Names can only contain letters, spaces, hyphens, and apostrophes.", "Validation");
+            return;
+        }
+        isSavingName = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/admin/users/{userToEditName.Id}/name", new { FirstName = first, LastName = last });
+            if (!response.IsSuccessStatusCode)
+            {
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "The name could not be updated."), "Update failed");
+                return;
+            }
+            userToEditName.FullName = $"{first} {last}".Trim();
+            Toast.Success($"Name updated to {userToEditName.FullName}.", "Updated");
+            showEditNameDialog = false;
+            userToEditName = null;
+        }
+        finally { isSavingName = false; }
+    }
+
     private void SelectTab(string tab)
     {
         currentTab = tab;
+        if (tab == "ShopClosures") _ = LoadClosures();
+    }
+
+    private void OpenClosureDialog(ShopClosureDto? existing = null)
+    {
+        editingClosure = existing;
+        if (existing != null)
+        {
+            closureIsWholeDay = existing.IsWholeDay;
+            closureStartDate = existing.StartDateTime.Date;
+            closureEndDate = existing.EndDateTime.Date;
+            closureStartTime = existing.IsWholeDay ? null : TimeOnly.FromTimeSpan(existing.StartDateTime.TimeOfDay);
+            closureEndTime = existing.IsWholeDay ? null : TimeOnly.FromTimeSpan(existing.EndDateTime.TimeOfDay);
+            closureReason = existing.Reason;
+        }
+        else
+        {
+            closureIsWholeDay = true;
+            closureStartDate = DateTime.Today;
+            closureEndDate = DateTime.Today;
+            closureStartTime = new TimeOnly(8, 30);
+            closureEndTime = new TimeOnly(18, 0);
+            closureReason = "";
+        }
+        showClosureDialog = true;
+    }
+
+    private void CloseClosureDialog()
+    {
+        if (isSavingClosure) return;
+        showClosureDialog = false;
+        editingClosure = null;
+    }
+
+    private async Task SaveClosure()
+    {
+        if (closureStartDate == null || closureEndDate == null)
+        {
+            Toast.Warning("Please select start and end dates.", "Validation");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(closureReason))
+        {
+            Toast.Warning("Reason is required.", "Validation");
+            return;
+        }
+        if (closureReason.Trim().Length > 500)
+        {
+            Toast.Warning("Reason cannot exceed 500 characters.", "Validation");
+            return;
+        }
+        if (!closureIsWholeDay && (closureStartTime == null || closureEndTime == null))
+        {
+            Toast.Warning("Start and end time are required for partial closure.", "Validation");
+            return;
+        }
+        isSavingClosure = true;
+        try
+        {
+            var payload = new
+            {
+                StartDate = closureStartDate.Value.Date,
+                EndDate = closureEndDate.Value.Date,
+                StartTime = closureIsWholeDay ? (TimeSpan?)null : closureStartTime?.ToTimeSpan(),
+                EndTime = closureIsWholeDay ? (TimeSpan?)null : closureEndTime?.ToTimeSpan(),
+                Reason = closureReason.Trim(),
+                IsWholeDay = closureIsWholeDay
+            };
+            HttpResponseMessage response;
+            if (editingClosure == null)
+                response = await Http.PostAsJsonAsync("api/shop-closures", payload);
+            else
+                response = await Http.PutAsJsonAsync($"api/shop-closures/{editingClosure.Id}", payload);
+            if (!response.IsSuccessStatusCode)
+            {
+                Toast.Error(await ApiErrorMessage.FromResponseAsync(response, "Could not save closure."), "Save failed");
+                return;
+            }
+            Toast.Success(editingClosure == null ? "Shop closure created." : "Shop closure updated.", "Saved");
+            showClosureDialog = false;
+            editingClosure = null;
+            await LoadClosures();
+        }
+        finally { isSavingClosure = false; }
+    }
+
+    private async Task DeleteClosure(ShopClosureDto c)
+    {
+        var res = await Http.DeleteAsync($"api/shop-closures/{c.Id}");
+        if (res.IsSuccessStatusCode)
+        {
+            Toast.Success("Closure deleted.", "Deleted");
+            await LoadClosures();
+        }
+        else Toast.Error(await ApiErrorMessage.FromResponseAsync(res, "Could not delete closure."), "Delete failed");
     }
 
     private async Task SaveAdminPin()

@@ -151,9 +151,18 @@
                             <p style="font-size: var(--text-xs); color: var(--destructive); margin: var(--space-1) 0 0 0;">@submitMotorcycleError</p>
                         }
                     </div>
-                    <div style="display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-2);">
+                    <div class="flex items-start gap-2 p-3 rounded-lg bg-muted border border-border cursor-pointer select-none" @onclick="() => policyAccepted = !policyAccepted">
+                        <span class="mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors @(policyAccepted ? "bg-destructive border-destructive" : "bg-background border-border")">
+                            @if (policyAccepted)
+                            {
+                                <svg class="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12" /></svg>
+                            }
+                        </span>
+                        <span class="text-xs text-muted-foreground leading-relaxed">I understand that a pending build does not guarantee product availability, and confirmed builds cannot be cancelled.</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-2); margin-top: var(--space-3);">
                         <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick="SendEmailQuote" Disabled="@(isProcessing || !selectedParts.Any())">Send Quote to Email</BbButton>
-                        <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="SubmitBuildToAdmin" Disabled="@(isProcessing || !selectedParts.Any())">Submit Build to Shop</BbButton>
+                        <BbButton Variant="ButtonVariant.Default" Class="w-full" OnClick="SubmitBuildToAdmin" Disabled="@(isProcessing || !selectedParts.Any() || !policyAccepted)">Submit Build to Shop</BbButton>
                         <div style="margin-top: var(--space-2); padding-top: var(--space-3); border-top: 1px dashed var(--border);">
                             <BbButton Variant="ButtonVariant.Outline" Class="w-full" OnClick='@(() => Nav.NavigateTo("/my-builds", forceLoad: true))'>
                                 <LucideIcon Name="blocks" Size="16" style="margin-right: 6px;" aria-hidden="true" />
@@ -229,9 +238,18 @@
                             <p style="font-size: var(--text-xs); color: var(--destructive); margin: var(--space-1) 0 0 0;">@submitMotorcycleError</p>
                         }
                     </div>
+                    <div class="flex items-start gap-2 p-3 rounded-lg bg-muted border border-border cursor-pointer select-none" @onclick="() => policyAccepted = !policyAccepted">
+                        <span class="mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors @(policyAccepted ? "bg-destructive border-destructive" : "bg-background border-border")">
+                            @if (policyAccepted)
+                            {
+                                <svg class="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12" /></svg>
+                            }
+                        </span>
+                        <span class="text-xs text-muted-foreground leading-relaxed">I understand that a pending build does not guarantee product availability, and confirmed builds cannot be cancelled.</span>
+                    </div>
                     <div class="build-mobile-actions" style="gap: var(--space-3); padding-bottom: var(--space-4);">
                         <BbButton Variant="ButtonVariant.Outline" Class="build-mobile-action" OnClick="SendEmailQuote" Disabled="@(isProcessing || !selectedParts.Any())">Send Quote to Email</BbButton>
-                        <BbButton Variant="ButtonVariant.Default" Class="build-mobile-action" OnClick="SubmitBuildToAdmin" Disabled="@(isProcessing || !selectedParts.Any())">Submit Build to Shop</BbButton>
+                        <BbButton Variant="ButtonVariant.Default" Class="build-mobile-action" OnClick="SubmitBuildToAdmin" Disabled="@(isProcessing || !selectedParts.Any() || !policyAccepted)">Submit Build to Shop</BbButton>
                         <BbButton Variant="ButtonVariant.Ghost" Class="build-mobile-action build-mobile-action-secondary" OnClick='@(() => Nav.NavigateTo("/my-builds", forceLoad: true))'>
                             <LucideIcon Name="blocks" Size="14" style="margin-right: 6px;" aria-hidden="true" />
                             View My Builds
@@ -419,12 +437,14 @@
                     </div>
                     <div>
                         <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Phone Number <span class="text-destructive" aria-hidden="true">*</span></label>
-                        <input type="tel" @bind="bookingPhone" @bind:after="FormatBookingPhone" placeholder="09XXXXXXXXX or 639XXXXXXXXX" maxlength="12"
+                        <input type="tel" @bind="bookingPhone" @bind:event="oninput" @bind:after="OnBookingPhoneInput" placeholder="09XXXXXXXXX" maxlength="11"
                             style="width: 100%; padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--text-sm); box-sizing: border-box;" />
-                        @if (!string.IsNullOrWhiteSpace(bookingPhoneError))
-                        {
-                            <p style="font-size: var(--text-xs); color: var(--destructive); margin: var(--space-1) 0 0 0;">@bookingPhoneError</p>
-                        }
+                        <div style="min-height: 1.25rem;">
+                            @if (!string.IsNullOrWhiteSpace(bookingPhoneError))
+                            {
+                                <p style="font-size: var(--text-xs); color: var(--destructive); margin: var(--space-1) 0 0 0;">@bookingPhoneError</p>
+                            }
+                        </div>
                     </div>
                     <div>
                         <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Motorcycle</label>
@@ -443,6 +463,28 @@
                     </div>
                     <div>
                         <label style="font-size: var(--text-xs); font-weight: 600; color: var(--foreground); display: block; margin-bottom: var(--space-1);">Time Slot <span class="text-destructive" aria-hidden="true">*</span></label>
+                        @{
+                            var closureForBooking = shopClosures.FirstOrDefault(c => bookingDate.Date >= c.StartDateTime.Date && bookingDate.Date <= c.EndDateTime.Date);
+                        }
+                        @if (closureForBooking != null && showClosureBanner)
+                        {
+                            <div class="mb-2 p-2 rounded bg-destructive text-white text-xs flex items-start justify-between gap-2">
+                                <div>
+                                    <span class="font-semibold">Shop closed:</span> @closureForBooking.Reason
+                                    @if (closureForBooking.IsWholeDay)
+                                    {
+                                        <span> (@closureForBooking.StartDateTime.ToString("MMM dd, yyyy") @if (closureForBooking.StartDateTime.Date != closureForBooking.EndDateTime.Date) { <span>– @closureForBooking.EndDateTime.ToString("MMM dd, yyyy")</span> })</span>
+                                    }
+                                    else
+                                    {
+                                        <span> (@closureForBooking.StartDateTime.ToString("MMM dd HH:mm") – @closureForBooking.EndDateTime.ToString("MMM dd HH:mm"))</span>
+                                    }
+                                </div>
+                                <button type="button" @onclick="() => showClosureBanner = false" class="shrink-0 mt-0.5 text-white/70 hover:text-white" aria-label="Dismiss">
+                                    <LucideIcon Name="x" Size="14" />
+                                </button>
+                            </div>
+                        }
                         @if (isLoadingSlots)
                         {
                             <div style="padding: var(--space-4); text-align: center; color: var(--muted-foreground); font-size: var(--text-xs);">Loading slots...</div>
@@ -469,9 +511,18 @@
                     }
 
                 </div>
+                    <div class="flex items-start gap-2 p-3 rounded-lg bg-muted border border-border cursor-pointer select-none" @onclick="() => bookingPolicyAccepted = !bookingPolicyAccepted">
+                        <span class="mt-0.5 shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors @(bookingPolicyAccepted ? "bg-destructive border-destructive" : "bg-background border-border")">
+                            @if (bookingPolicyAccepted)
+                            {
+                                <svg class="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12" /></svg>
+                            }
+                        </span>
+                        <span class="text-xs text-muted-foreground leading-relaxed">I understand that a pending booking does not guarantee product availability or service slot, and confirmed appointments cannot be cancelled.</span>
+                    </div>
                 <div style="flex-shrink: 0; border-top: 1px solid var(--border); padding-top: var(--space-3); padding-bottom: var(--space-2); display: flex; justify-content: flex-end; gap: var(--space-3);">
                     <BbButton Variant="ButtonVariant.Ghost" OnClick="@(() => showBookingModal = false)">Skip</BbButton>
-                    <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmBooking" Disabled="@(bookingTime == null || isScheduling || string.IsNullOrWhiteSpace(bookingPhone) || !string.IsNullOrWhiteSpace(bookingPhoneError))">@(isScheduling ? "Booking..." : "Book Appointment")</BbButton>
+                    <BbButton Variant="ButtonVariant.Default" OnClick="ConfirmBooking" Disabled="@(bookingTime == null || isScheduling || string.IsNullOrWhiteSpace(bookingPhone) || !string.IsNullOrWhiteSpace(bookingPhoneError) || !bookingPolicyAccepted)">@(isScheduling ? "Booking..." : "Book Appointment")</BbButton>
                 </div>
             </BbDialogContent>
         </BbDialog>
@@ -586,9 +637,13 @@
     private string selectedMechanic = "Any Available";
     private string bookingPhone = "";
     private string bookingPhoneError = "";
+    private bool showClosureBanner = true;
+    private bool policyAccepted;
+    private bool bookingPolicyAccepted;
     private int? bookingMotorcycleId;
     private List<string> mechanics = new() { "Any Available" };
     private List<(TimeSpan Start, TimeSpan End)> bookedIntervals = [];
+    private List<ShopClosureDto> shopClosures = new();
     private bool isLoadingSlots;
 
     private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
@@ -608,6 +663,19 @@
         date.DayOfWeek == DayOfWeek.Sunday
             ? (SundayOpeningTime, SundayClosingTime)
             : (WeekdayOpeningTime, WeekdayClosingTime);
+
+    private bool IsSlotShopClosed(DateTime date, TimeSpan start, int duration)
+    {
+        var slotStart = date.Date + start;
+        var slotEnd = slotStart.Add(TimeSpan.FromMinutes(duration));
+        return shopClosures.Any(c => slotStart < c.EndDateTime && slotEnd > c.StartDateTime);
+    }
+
+    private async Task LoadShopClosures()
+    {
+        try { shopClosures = await BrowserGetAsync<List<ShopClosureDto>>("api/shop-closures") ?? new(); }
+        catch { shopClosures = new(); }
+    }
 
     private int? submitMotorcycleId;
     private bool isScheduling;
@@ -661,6 +729,7 @@
 
             // Preload motorcycles for build submit (moved from appointment booking)
             await LoadMotorcycles();
+            await LoadShopClosures();
             await RestoreBuildState();
         }
         catch (Exception ex)
@@ -947,6 +1016,7 @@
 
     private async Task FetchBookedSlots()
     {
+        showClosureBanner = true;
         isLoadingSlots = true;
         try
         {
@@ -972,17 +1042,27 @@
         await FetchBookedSlots();
     }
 
+    private void OnBookingPhoneInput()
+    {
+        bookingPhoneError = "";
+        if (string.IsNullOrWhiteSpace(bookingPhone)) return;
+        var digits = new string(bookingPhone.Where(char.IsDigit).ToArray());
+        bookingPhone = digits;
+        if (digits.Length == 11 && digits.StartsWith("09"))
+            bookingPhoneError = "";
+        else if (digits.Length > 0)
+            bookingPhoneError = "Enter a valid Philippine mobile number (09XXXXXXXXX).";
+    }
+
     private void FormatBookingPhone()
     {
         bookingPhoneError = "";
         if (string.IsNullOrWhiteSpace(bookingPhone)) return;
         var digits = new string(bookingPhone.Where(char.IsDigit).ToArray());
-        if (digits.StartsWith("63") && digits.Length == 12)
-            bookingPhone = digits;
-        else if (digits.StartsWith("09") && digits.Length == 11)
+        if (digits.StartsWith("09") && digits.Length == 11)
             bookingPhone = digits;
         else if (digits.Length > 0)
-            bookingPhoneError = "Enter a valid number.";
+            bookingPhoneError = "Enter a valid Philippine mobile number (09XXXXXXXXX).";
     }
 
     private List<string> GenerateAllTimeSlots()
@@ -1009,6 +1089,9 @@
         var end = start.Add(TimeSpan.FromMinutes(Math.Max(BuildInstallationMinutes, MinimumBookedDuration)));
 
         if (end > closing)
+            return false;
+
+        if (IsSlotShopClosed(bookingDate, start, BuildInstallationMinutes))
             return false;
 
         return !bookedIntervals.Any(b => start < b.End && end > b.Start);
