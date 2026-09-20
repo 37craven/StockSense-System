@@ -241,11 +241,11 @@
                                 <span class="text-amber-600 dark:text-amber-400 font-semibold">(Unpaid)</span>
                             }
                         </span>
-                        <span class="font-semibold text-foreground">@($"-₱{reservationFeeAmount:N2}")</span>
+                        <span class="font-semibold text-foreground">@(isPaid ? $"-₱{reservationFeeAmount:N2}" : $"₱{reservationFeeAmount:N2}")</span>
                     </div>
                     <div class="flex justify-between items-center pt-2 border-t border-border">
                         <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
-                        <span class="text-xl font-bold text-primary">@($"₱{DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m) - reservationFeeAmount:N2}")</span>
+                        <span class="text-xl font-bold text-primary">@($"₱{DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m) - (isPaid ? reservationFeeAmount : 0m):N2}")</span>
                     </div>
                 </div>
 
