@@ -224,23 +224,28 @@
                         <span class="text-muted-foreground">Products</span>
                         <span class="font-semibold text-foreground">@($"₱{(ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m):N2}")</span>
                     </div>
-                    @if (selectedAppointment.PaymentStatus == "Paid" && selectedAppointment.PaymentAmount is decimal dpPaid && dpPaid > 0)
-                    {
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-muted-foreground">Reservation Fee <span class="text-emerald-600 dark:text-emerald-400 font-semibold">(Paid)</span></span>
-                            <span class="font-semibold text-foreground">@($"-₱{dpPaid:N2}")</span>
-                        </div>
+                    @{
+                        var computedReservationFee = 100m + Math.Max(0, (int)Math.Ceiling(selectedAppointment.DurationMinutes / 30.0) - 2) * 25m;
+                        var isPaid = selectedAppointment.PaymentStatus == "Paid";
+                        var reservationFeeAmount = isPaid ? (selectedAppointment.PaymentAmount ?? computedReservationFee) : computedReservationFee;
                     }
-                    else
-                    {
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-muted-foreground">Reservation Fee <span class="text-amber-600 dark:text-amber-400 font-semibold">(Unpaid)</span></span>
-                            <span class="font-semibold text-muted-foreground">—</span>
-                        </div>
-                    }
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-muted-foreground">
+                            Reservation Fee
+                            @if (isPaid)
+                            {
+                                <span class="text-emerald-600 dark:text-emerald-400 font-semibold">(Paid)</span>
+                            }
+                            else
+                            {
+                                <span class="text-amber-600 dark:text-amber-400 font-semibold">(Unpaid)</span>
+                            }
+                        </span>
+                        <span class="font-semibold text-foreground">@($"-₱{reservationFeeAmount:N2}")</span>
+                    </div>
                     <div class="flex justify-between items-center pt-2 border-t border-border">
                         <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
-                        <span class="text-xl font-bold text-primary">@($"₱{(DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m) - (selectedAppointment.PaymentStatus == "Paid" ? (selectedAppointment.PaymentAmount ?? 0m) : 0m)):N2}")</span>
+                        <span class="text-xl font-bold text-primary">@($"₱{DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m) - reservationFeeAmount:N2}")</span>
                     </div>
                 </div>
 
