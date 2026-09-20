@@ -118,7 +118,7 @@
                         <div class="flex items-center gap-2">
 
                             <span class="text-sm font-bold text-primary whitespace-nowrap">
-                                ₱@appt.TotalAmount.ToString("N0")
+                                ₱@(appt.PaymentStatus == "Paid" ? (appt.TotalAmount - (appt.PaymentAmount ?? 0m)).ToString("N0") : appt.TotalAmount.ToString("N0"))
                             </span>
 
 @if (appt.Status is not "Cancelled" and not "Expired" and not "Completed"
