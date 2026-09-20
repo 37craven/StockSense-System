@@ -6,6 +6,7 @@
 @using StockSense.Client.Layout
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
+@inject HttpClient Http
 @inject ToastService Toast
 
 @attribute [Authorize]
@@ -165,6 +166,21 @@
         <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
             @if (selectedAppointment != null)
             {
+                @if (selectedAppointment.Status == "Cancelled" && !string.IsNullOrWhiteSpace(CancellationReason))
+                {
+                    <div class="p-3 rounded-lg border border-destructive/30 bg-destructive/10">
+                        <div class="text-[10px] font-bold text-destructive uppercase">Cancellation Reason</div>
+                        <p class="mt-1 text-sm text-foreground whitespace-pre-wrap">@CancellationReason</p>
+                        @{
+                            var cancelAudit = appointmentAuditTrail?.FirstOrDefault(a => a.Action == "StatusChanged" && a.NewValue == "Cancelled");
+                        }
+                        @if (cancelAudit != null)
+                        {
+                            <p class="mt-1 text-xs text-muted-foreground">By @(string.IsNullOrWhiteSpace(cancelAudit.ActorName) ? cancelAudit.ActorRole : $"{cancelAudit.ActorName} ({cancelAudit.ActorRole})") · @cancelAudit.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</p>
+                        }
+                    </div>
+                }
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="p-3 rounded-lg bg-muted">
                         <div class="text-[10px] font-bold text-muted-foreground uppercase">Customer</div>
@@ -186,7 +202,7 @@
 
                 <div class="p-3 rounded-lg bg-muted">
                     <div class="text-[10px] font-bold text-muted-foreground uppercase">Schedule</div>
-                    <div class="flex items-center gap-3 mt-1">
+                    <div class="flex items-center gap-3 mt-1 flex-wrap">
                         <span class="text-sm font-semibold text-foreground">@selectedAppointment.AppointmentDate.ToString("MMMM dd, yyyy")</span>
                         <span class="text-sm text-blue-500 font-bold">@FormatTimeSlot(selectedAppointment.TimeSlot)</span>
                         <span class="text-xs text-muted-foreground">(~@DurationFormatting.Format(selectedAppointment.DurationMinutes))</span>
@@ -199,17 +215,38 @@
                 </div>
 
                 <div class="p-3 rounded-lg bg-muted">
-                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Services</div>
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Selected Services</div>
                     <div class="mt-1 flex flex-col gap-1">
-                        @foreach (var svc in selectedAppointment.ServicesRequested.Split(", ", StringSplitOptions.RemoveEmptyEntries))
+                        @{
+                            var displayServices = DeserializeServiceJson(selectedAppointment.SelectedServicesJson);
+                        }
+                        @if (displayServices.Any())
                         {
-                            <div class="text-sm text-foreground">@svc</div>
+                            @foreach (var svc in displayServices)
+                            {
+                                <div class="flex justify-between text-sm py-0.5">
+                                    <span class="text-foreground">@svc.Name</span>
+                                    <span class="font-semibold text-foreground">₱@svc.Price.ToString("N2")</span>
+                                </div>
+                            }
+                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-border">
+                                <div class="text-[10px] font-bold text-muted-foreground uppercase">Services Subtotal</div>
+                                <span class="text-sm font-bold text-foreground">₱@displayServices.Sum(s => s.Price).ToString("N2")</span>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var svc in selectedAppointment.ServicesRequested.Split(", ", StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                <div class="text-sm text-foreground">@svc</div>
+                            }
                         }
                     </div>
                 </div>
 
                 @if (ParseProductBreakdown(selectedAppointment.SelectedProductsJson) is { } breakdown && breakdown.Any(s => s.products.Any(p => p.selected)))
                 {
+                    var partsSubtotal = breakdown.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price);
                     <div class="p-3 rounded-lg bg-muted">
                         <div class="text-[10px] font-bold text-muted-foreground uppercase">Selected Parts</div>
                         <div class="mt-2 flex flex-col gap-3">
@@ -221,18 +258,35 @@
                                     {
                                         <div class="flex justify-between text-sm py-0.5">
                                             <span class="text-foreground">@part.name</span>
-                                            <span class="font-semibold text-foreground">₱@part.price.ToString("N0")</span>
+                                            <span class="font-semibold text-foreground">₱@part.price.ToString("N2")</span>
                                         </div>
                                     }
                                 </div>
                             }
+                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-border">
+                                <div class="text-[10px] font-bold text-muted-foreground uppercase">Parts Subtotal</div>
+                                <span class="text-sm font-bold text-foreground">₱@partsSubtotal.ToString("N2")</span>
+                            </div>
                         </div>
                     </div>
                 }
 
                 <div class="p-3 rounded-lg bg-muted">
-                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
-                    <span class="text-xl font-bold text-primary">₱@selectedAppointment.TotalAmount.ToString("N2")</span>
+                    <div class="flex justify-between items-center">
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Appointment Subtotal</div>
+                        <span class="text-sm font-bold text-foreground">₱@(DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m)).ToString("N2")</span>
+                    </div>
+                    @if (selectedAppointment.PaymentStatus == "Paid" && selectedAppointment.PaymentAmount is decimal dpAmt && dpAmt > 0)
+                    {
+                        <div class="flex justify-between items-center mt-1">
+                            <div class="text-[10px] font-bold text-muted-foreground uppercase">Downpayment Credit</div>
+                            <span class="text-sm font-bold text-foreground">-₱@dpAmt.ToString("N2")</span>
+                        </div>
+                    }
+                    <div class="flex justify-between items-center mt-1 pt-1 border-t border-border">
+                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
+                        <span class="text-xl font-bold text-primary">₱@((DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m) - (selectedAppointment.PaymentStatus == "Paid" ? (selectedAppointment.PaymentAmount ?? 0m) : 0m)).ToString("N2"))</span>
+                    </div>
                 </div>
 
                 @if (selectedAppointment.PaymentStatus == "Paid")
@@ -469,6 +523,9 @@
     private bool showCalendarModal;
     private DateTime calendarMonth = new(DateTime.Now.Year, DateTime.Now.Month, 1);
 
+    private List<WorkOrderAuditDto>? appointmentAuditTrail;
+    private string? CancellationReason => appointmentAuditTrail?.FirstOrDefault(a => a.Action == "StatusChanged" && a.NewValue == "Cancelled")?.Reason;
+
     private static readonly TimeZoneInfo PhZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
     private static DateTime PhNow => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, PhZone);
     private static DateTime PhToday => PhNow.Date;
@@ -582,11 +639,17 @@
         };
 
 
-    private void OpenAppointmentDetail(AppointmentDto appt)
+    private async Task OpenAppointmentDetail(AppointmentDto appt)
     {
         selectedAppointment = appt;
         cancelReason = "";
+        appointmentAuditTrail = null;
         showDetailModal = true;
+        try
+        {
+            appointmentAuditTrail = await Http.GetFromJsonAsync<List<WorkOrderAuditDto>>($"api/appointments/{appt.Id}/my-audit");
+        }
+        catch { appointmentAuditTrail = new(); }
     }
 
     private void CloseAppointmentDetail()
@@ -775,6 +838,24 @@
             return System.Text.Json.JsonSerializer.Deserialize<List<ProductBreakdownEntry>>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
         catch { return null; }
+    }
+
+    private static List<(string Name, decimal Price)> DeserializeServiceJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new();
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return doc.RootElement.EnumerateArray().Select(e =>
+            {
+                var name = e.TryGetProperty("Name", out var n) ? n.GetString() ?? "" :
+                    e.TryGetProperty("Item1", out var i1) ? i1.GetString() ?? "" : "";
+                var price = e.TryGetProperty("Price", out var p) ? p.GetDecimal() :
+                    e.TryGetProperty("Item2", out var i2) ? i2.GetDecimal() : 0m;
+                return (name, price);
+            }).ToList();
+        }
+        catch { return new(); }
     }
 
     private class ProductBreakdownEntry

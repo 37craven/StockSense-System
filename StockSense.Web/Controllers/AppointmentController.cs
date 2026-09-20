@@ -912,6 +912,36 @@ public class AppointmentsController : ControllerBase
         }
     }
 
+    [HttpGet("{id}/my-audit")]
+    [Authorize]
+    public async Task<ActionResult<List<WorkOrderAuditDto>>> GetMyAuditTrail(int id)
+    {
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+
+        var appointment = await _context.Appointments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
+        if (appointment is null) return NotFound(ApiResponse.NotFound("Appointment"));
+        if (appointment.CustomerUserId != customer.Id &&
+            !string.Equals(appointment.CustomerEmail, customer.Email, StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
+        var audits = await _context.WorkOrderAudits
+            .AsNoTracking()
+            .Where(audit => audit.WorkOrderType == "Appointment" && audit.WorkOrderId == id)
+            .OrderByDescending(audit => audit.CreatedAt)
+            .ToListAsync();
+        var actorIds = audits
+            .Select(audit => audit.ActorUserId)
+            .Where(userId => !string.IsNullOrEmpty(userId))
+            .Distinct()
+            .ToList();
+        var users = await _userManager.Users.AsNoTracking()
+            .Where(user => actorIds.Contains(user.Id))
+            .ToListAsync();
+        var actorNames = users.ToDictionary(user => user.Id, GetFullName);
+        return Ok(audits.Select(audit => MapAudit(audit, actorNames)).ToList());
+    }
+
     [HttpPut("{id}/cancel")]
     public async Task<IActionResult> CancelMyAppointment(int id, [FromBody] CancelWorkOrderDto? request)
     {

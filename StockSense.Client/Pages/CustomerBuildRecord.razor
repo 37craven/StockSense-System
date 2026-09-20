@@ -9,6 +9,7 @@
 @using BlazorBlueprint.Primitives.Services
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Nav
+@inject HttpClient Http
 @inject ToastService Toast
 
 @attribute [Authorize]
@@ -337,6 +338,21 @@
                 string buildName = metaTag?.Brand ?? (isPreBuilt ? "Pre-Built Package" : "Custom Parts Selection");
                 var actualParts = rawParts.Where(p => p.Category != "SYSTEM_METADATA").ToList();
 
+                @if (CurrentBuild.Status == "Cancelled" && !string.IsNullOrWhiteSpace(CancellationReason))
+                {
+                    <div class="p-3 rounded-lg border border-destructive/30 bg-destructive/10">
+                        <div class="text-[10px] font-bold text-destructive uppercase">Cancellation Reason</div>
+                        <p class="mt-1 text-sm text-foreground whitespace-pre-wrap">@CancellationReason</p>
+                        @{
+                            var cancelAudit = buildAuditTrail?.FirstOrDefault(a => a.Action == "StatusChanged" && a.NewValue == "Cancelled");
+                        }
+                        @if (cancelAudit != null)
+                        {
+                            <p class="mt-1 text-xs text-muted-foreground">By @(string.IsNullOrWhiteSpace(cancelAudit.ActorName) ? cancelAudit.ActorRole : $"{cancelAudit.ActorName} ({cancelAudit.ActorRole})") · @cancelAudit.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</p>
+                        }
+                    </div>
+                }
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="p-3 rounded-lg bg-muted">
                         <div class="text-[10px] font-bold text-muted-foreground uppercase">Type</div>
@@ -451,6 +467,9 @@
     private BuildRequestDto? CurrentBuild;
 
     private List<ProductDto> CurrentParts = new();
+
+    private List<WorkOrderAuditDto>? buildAuditTrail;
+    private string? CancellationReason => buildAuditTrail?.FirstOrDefault(a => a.Action == "StatusChanged" && a.NewValue == "Cancelled")?.Reason;
 
 
     private IEnumerable<BuildRequestDto> FilteredBuilds
@@ -618,13 +637,19 @@
             .Select(g => (g.First(), g.Count()));
 
 
-    private void OpenBuildDetail(BuildRequestDto build)
+    private async Task OpenBuildDetail(BuildRequestDto build)
     {
         var rawParts = ParseParts(build.SelectedPartsJson);
         CurrentBuild = build;
         CurrentParts = rawParts;
         cancelBuildReason = "";
+        buildAuditTrail = null;
         showDetailModal = true;
+        try
+        {
+            buildAuditTrail = await Http.GetFromJsonAsync<List<WorkOrderAuditDto>>($"api/builds/{build.Id}/my-audit");
+        }
+        catch { buildAuditTrail = new(); }
     }
 
     private void CloseBuildDetail()

@@ -461,6 +461,55 @@ public class BuildsController : ControllerBase
         }
     }
 
+    [HttpGet("{id}/my-audit")]
+    [Authorize]
+    public async Task<ActionResult<List<WorkOrderAuditDto>>> GetMyBuildAuditTrail(int id)
+    {
+        var customer = await _userManager.GetUserAsync(User);
+        if (customer is null) return Unauthorized();
+
+        var build = await _context.BuildRequests.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        if (build is null) return NotFound(ApiResponse.NotFound("Build"));
+        if (build.CustomerUserId != customer.Id &&
+            !string.Equals(build.CustomerEmail, customer.Email, StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
+        var audits = await _context.WorkOrderAudits
+            .AsNoTracking()
+            .Where(audit => audit.WorkOrderType == "Build" && audit.WorkOrderId == id)
+            .OrderByDescending(audit => audit.CreatedAt)
+            .ToListAsync();
+        var actorIds = audits
+            .Select(audit => audit.ActorUserId)
+            .Where(userId => !string.IsNullOrEmpty(userId))
+            .Distinct()
+            .ToList();
+        var users = await _userManager.Users.AsNoTracking()
+            .Where(user => actorIds.Contains(user.Id))
+            .ToListAsync();
+        var actorNames = users.ToDictionary(user => user.Id, user =>
+        {
+            var fullName = $"{user.FirstName} {user.LastName}".Trim();
+            return string.IsNullOrWhiteSpace(fullName) ? user.Email?.Split('@')[0] ?? "User" : fullName;
+        });
+        return Ok(audits.Select(audit => new WorkOrderAuditDto
+        {
+            Id = audit.Id,
+            WorkOrderType = audit.WorkOrderType,
+            WorkOrderId = audit.WorkOrderId,
+            Action = audit.Action,
+            PreviousValue = audit.PreviousValue,
+            NewValue = audit.NewValue,
+            ActorUserId = audit.ActorUserId,
+            ActorName = actorNames.GetValueOrDefault(audit.ActorUserId, string.Empty),
+            ActorRole = audit.ActorRole,
+            ApproverUserId = audit.ApproverUserId,
+            ApproverEmail = audit.ApproverEmail,
+            Reason = audit.Reason,
+            CreatedAt = audit.CreatedAt
+        }).ToList());
+    }
+
     private static BuildRequestDto MapToDto(BuildRequest build) => new()
     {
         Id = build.Id,
