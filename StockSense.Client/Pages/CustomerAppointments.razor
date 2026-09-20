@@ -214,78 +214,26 @@
                     <div class="text-sm font-semibold text-foreground mt-1">@(selectedAppointment.Motorcycle?.DisplayName ?? "Not recorded")</div>
                 </div>
 
-                <div class="p-3 rounded-lg bg-muted">
-                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Selected Services</div>
-                    <div class="mt-1 flex flex-col gap-1">
-                        @{
-                            var displayServices = DeserializeServiceJson(selectedAppointment.SelectedServicesJson);
-                        }
-                        @if (displayServices.Any())
-                        {
-                            @foreach (var svc in displayServices)
-                            {
-                                <div class="flex justify-between text-sm py-0.5">
-                                    <span class="text-foreground">@svc.Name</span>
-                                    <span class="font-semibold text-foreground">₱@svc.Price.ToString("N2")</span>
-                                </div>
-                            }
-                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-border">
-                                <div class="text-[10px] font-bold text-muted-foreground uppercase">Services Subtotal</div>
-                                <span class="text-sm font-bold text-foreground">₱@displayServices.Sum(s => s.Price).ToString("N2")</span>
-                            </div>
-                        }
-                        else
-                        {
-                            @foreach (var svc in selectedAppointment.ServicesRequested.Split(", ", StringSplitOptions.RemoveEmptyEntries))
-                            {
-                                <div class="text-sm text-foreground">@svc</div>
-                            }
-                        }
+                <div class="p-3 rounded-lg bg-muted flex flex-col gap-2">
+                    <div class="text-[10px] font-bold text-muted-foreground uppercase">Price Breakdown</div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-muted-foreground">Service (Labor)</span>
+                        <span class="font-semibold text-foreground">₱@DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price).ToString("N2")</span>
                     </div>
-                </div>
-
-                @if (ParseProductBreakdown(selectedAppointment.SelectedProductsJson) is { } breakdown && breakdown.Any(s => s.products.Any(p => p.selected)))
-                {
-                    var partsSubtotal = breakdown.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price);
-                    <div class="p-3 rounded-lg bg-muted">
-                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Selected Parts</div>
-                        <div class="mt-2 flex flex-col gap-3">
-                            @foreach (var svc in breakdown.Where(s => s.products.Any(p => p.selected)))
-                            {
-                                <div>
-                                    <div class="text-xs font-semibold text-primary mb-1">@svc.serviceName</div>
-                                    @foreach (var part in svc.products.Where(p => p.selected))
-                                    {
-                                        <div class="flex justify-between text-sm py-0.5">
-                                            <span class="text-foreground">@part.name</span>
-                                            <span class="font-semibold text-foreground">₱@part.price.ToString("N2")</span>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-border">
-                                <div class="text-[10px] font-bold text-muted-foreground uppercase">Parts Subtotal</div>
-                                <span class="text-sm font-bold text-foreground">₱@partsSubtotal.ToString("N2")</span>
-                            </div>
-                        </div>
-                    </div>
-                }
-
-                <div class="p-3 rounded-lg bg-muted">
-                    <div class="flex justify-between items-center">
-                        <div class="text-[10px] font-bold text-muted-foreground uppercase">Appointment Subtotal</div>
-                        <span class="text-sm font-bold text-foreground">₱@(DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m)).ToString("N2")</span>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-muted-foreground">Products</span>
+                        <span class="font-semibold text-foreground">₱@(ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m).ToString("N2")</span>
                     </div>
                     @if (selectedAppointment.PaymentStatus == "Paid" && selectedAppointment.PaymentAmount is decimal dpAmt && dpAmt > 0)
                     {
-                        <div class="flex justify-between items-center mt-1">
-                            <div class="text-[10px] font-bold text-muted-foreground uppercase">Downpayment Credit</div>
-                            <span class="text-sm font-bold text-foreground">-₱@dpAmt.ToString("N2")</span>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-muted-foreground">Reservation Fee</span>
+                            <span class="font-semibold text-foreground">-₱@dpAmt.ToString("N2")</span>
                         </div>
                     }
-                    <div class="flex justify-between items-center mt-1 pt-1 border-t border-border">
+                    <div class="flex justify-between items-center pt-2 border-t border-border">
                         <div class="text-[10px] font-bold text-muted-foreground uppercase">Total Amount</div>
-                        <span class="text-xl font-bold text-primary">₱@((DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m) - (selectedAppointment.PaymentStatus == "Paid" ? (selectedAppointment.PaymentAmount ?? 0m) : 0m)).ToString("N2"))</span>
+                        <span class="text-xl font-bold text-primary">₱@(DeserializeServiceJson(selectedAppointment.SelectedServicesJson).Sum(s => s.Price) + (ParseProductBreakdown(selectedAppointment.SelectedProductsJson)?.SelectMany(s => s.products.Where(p => p.selected)).Sum(p => p.price) ?? 0m) - (selectedAppointment.PaymentStatus == "Paid" ? (selectedAppointment.PaymentAmount ?? 0m) : 0m)).ToString("N2")</span>
                     </div>
                 </div>
 
