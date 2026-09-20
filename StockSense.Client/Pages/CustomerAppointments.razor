@@ -146,7 +146,7 @@
 @if (showDetailModal)
 {
 <BbDialog @bind-Open="showDetailModal">
-    <BbDialogContent Style="display: flex; flex-direction: column; height: min(85vh, 800px); width: min(96vw, 420px); max-width: 400px; padding: 0; overflow: hidden;">
+    <BbDialogContent Class="flex flex-col h-[min(85vh,800px)] w-[min(96vw,480px)] p-0 overflow-hidden">
         <div class="p-4 pb-0 shrink-0">
             <BbDialogHeader>
                 <div class="flex items-center gap-1.5">
@@ -165,7 +165,7 @@
         <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
             @if (selectedAppointment != null)
             {
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div class="p-3 rounded-lg bg-muted">
                         <div class="text-[10px] font-bold text-muted-foreground uppercase">Customer</div>
                         <div class="text-sm font-semibold text-foreground mt-1">@selectedAppointment.CustomerName</div>
@@ -288,7 +288,7 @@
 @if (showCancelConfirmDialog)
 {
 <BbDialog @bind-Open="showCancelConfirmDialog">
-    <BbDialogContent Style="max-width: 400px;">
+    <BbDialogContent Class="max-w-sm">
         <BbDialogHeader>
             <BbDialogTitle>Cancel appointment?</BbDialogTitle>
             <BbDialogDescription>This action cannot be undone. The appointment will be moved to history.</BbDialogDescription>
